@@ -1,47 +1,28 @@
-// 예약 현황 카운터 섹션
-// 4열 그리드: 시선/Creator/Wedding/잔여
+// 참여자 카운터 섹션
+// 단순 참여 현황 표시
 
 import { RevealOnScroll } from "@/components/ui/reveal-on-scroll";
-import { TIERS } from "@/lib/constants/tiers";
-import { bookedByTier, totalRemain, TOTAL_SLOTS } from "@/lib/constants/bookings";
+
+/** 하드코딩 참여자 수 (추후 API 연동) */
+const PARTICIPANT_COUNT = 47;
 
 export function SeatsSection() {
   return (
     <RevealOnScroll>
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8 md:py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 border border-black/10">
-          {/* 티어별 예약 수 */}
-          {TIERS.map((tier, index) => (
-            <div
-              key={tier.id}
-              className={`flex flex-col px-7 py-6 border-r border-black/10 ${
-                index === TIERS.length - 1 ? "max-md:border-r-0" : ""
-              } ${index === 1 ? "max-md:border-r-0" : ""}`}
-            >
-              <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">
-                {tier.name}
-              </span>
-              <span className="font-[family-name:var(--font-serif)] text-[clamp(32px,4vw,48px)] font-light leading-none">
-                {bookedByTier(tier.id)}
-                <span className="font-[family-name:var(--font-sans)] text-sm font-normal opacity-40 ml-1">
-                  건 예약
-                </span>
-              </span>
-            </div>
-          ))}
-
-          {/* 잔여 석 */}
-          <div className="flex flex-col px-7 py-6 bg-black/[0.03] border-r-0">
-            <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">
-              잔여
+        <div className="flex flex-col items-center text-center">
+          <span className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-3">
+            현재 참여 현황
+          </span>
+          <span className="font-[family-name:var(--font-serif)] text-[clamp(48px,6vw,72px)] font-light leading-none">
+            {PARTICIPANT_COUNT}
+            <span className="font-[family-name:var(--font-sans)] text-base font-normal opacity-40 ml-2">
+              명 참여
             </span>
-            <span className="font-[family-name:var(--font-serif)] text-[clamp(32px,4vw,48px)] font-light leading-none">
-              {totalRemain}
-              <span className="font-[family-name:var(--font-sans)] text-sm font-normal opacity-40 ml-1">
-                석 / {TOTAL_SLOTS}
-              </span>
-            </span>
-          </div>
+          </span>
+          <p className="mt-4 text-[13px] opacity-30">
+            지금 바로 AI 자가진단을 시작해보세요
+          </p>
         </div>
       </section>
     </RevealOnScroll>

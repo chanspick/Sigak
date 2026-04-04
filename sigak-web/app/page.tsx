@@ -1,7 +1,8 @@
 "use client";
 
 // 랜딩 페이지 - 7개 섹션 조립
-import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { Nav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
 import { TierSection } from "@/components/landing/tier-section";
@@ -9,39 +10,36 @@ import { ExpertSection } from "@/components/landing/expert-section";
 import { SeatsSection } from "@/components/landing/seats-section";
 import { CtaSection } from "@/components/landing/cta-section";
 import { Footer } from "@/components/landing/footer";
-import { BookingOverlay } from "@/components/landing/booking-overlay";
 import { Divider } from "@/components/ui/divider";
 import { TIERS } from "@/lib/constants/tiers";
-import { bookedByTier } from "@/lib/constants/bookings";
 import type { Tier } from "@/lib/types/tier";
 
 export default function LandingPage() {
-  const [overlayOpen, setOverlayOpen] = useState(false);
-  const [overlayTier, setOverlayTier] = useState<Tier["id"] | null>(null);
+  const router = useRouter();
 
-  const book = useCallback((tierId?: Tier["id"]) => {
-    setOverlayTier(tierId ?? null);
-    setOverlayOpen(true);
-  }, []);
+  /** /start 페이지로 이동 (티어 선택 시 쿼리 파라미터 전달) */
+  const goToStart = useCallback(
+    (tierId?: Tier["id"]) => {
+      const url = tierId ? `/start?tier=${tierId}` : "/start";
+      router.push(url);
+    },
+    [router],
+  );
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)]">
       {/* NAV */}
-      <Nav onBook={() => book()} />
+      <Nav onStart={() => goToStart()} />
 
       {/* HERO */}
-      <Hero onBook={() => book()} />
+      <Hero onStart={() => goToStart()} />
 
       <Divider className="mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 
       {/* TIERS */}
       {TIERS.map((tier) => (
         <div key={tier.id}>
-          <TierSection
-            tier={tier}
-            bookedCount={bookedByTier(tier.id)}
-            onBook={book}
-          />
+          <TierSection tier={tier} onStart={goToStart} />
           <Divider className="mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
         </div>
       ))}
@@ -65,17 +63,10 @@ export default function LandingPage() {
       <Divider className="mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 
       {/* CTA */}
-      <CtaSection onBook={() => book()} />
+      <CtaSection onStart={() => goToStart()} />
 
       {/* FOOTER */}
       <Footer />
-
-      {/* BOOKING OVERLAY */}
-      <BookingOverlay key={overlayTier}
-        open={overlayOpen}
-        onClose={() => setOverlayOpen(false)}
-        initTier={overlayTier}
-      />
     </div>
   );
 }

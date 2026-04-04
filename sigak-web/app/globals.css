@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* 디자인 토큰 */
+@theme {
+  --color-bg: #F3F0EB;
+  --color-fg: #000000;
+  --color-blur-bg: rgba(243, 240, 235, 0.7);
+  --color-accent: #000000;
+  --color-muted: #666666;
+  --color-danger: #A32D2D;
+  --color-border: #E0DCD6;
+
+  --font-serif: var(--font-noto-serif-kr);
+  --font-sans: var(--font-pretendard);
+
+  --spacing-page-x: 60px;
+  --spacing-page-x-mobile: 24px;
+  --breakpoint-mobile: 768px;
+}
+
+/* 기본 스타일 */
+html {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+}
+
+body {
+  font-family: var(--font-sans), "Pretendard Variable", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 선택 영역 반전 */
+::selection {
+  background-color: var(--color-fg);
+  color: var(--color-bg);
+}
+
+/* 블러 오버레이 유틸리티 */
+.blur-overlay {
+  backdrop-filter: blur(12px);
+  background: var(--color-blur-bg);
+}
+
+/* 블러 해제 트랜지션 */
+.blur-fade-out {
+  transition: opacity 0.6s ease;
+}
+
+/* 스크롤 reveal 기본 */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 예약 오버레이 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+}

@@ -1,9 +1,10 @@
 ---
 id: SPEC-NEXTJS-INIT-001
 version: "1.0.0"
-status: "planned"
+status: "completed"
 created: "2026-04-04"
 updated: "2026-04-04"
+completed: "2026-04-04"
 author: ""
 priority: "high"
 ---

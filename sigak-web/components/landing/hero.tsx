@@ -1,13 +1,14 @@
 // 히어로 섹션
-// 제목 "당신을 아는 사람들." (serif font), 부제, 예약 링크
+// 제목 "당신을 아는 사람들." (serif font), 부제, 시작 링크
 
+import Link from "next/link";
 import { RevealOnScroll } from "@/components/ui/reveal-on-scroll";
 
 interface HeroProps {
-  onBook: () => void;
+  onStart: () => void;
 }
 
-export function Hero({ onBook }: HeroProps) {
+export function Hero({ onStart }: HeroProps) {
   return (
     <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] pt-10 pb-8 md:pt-[60px] md:pb-12">
       <RevealOnScroll>
@@ -24,13 +25,17 @@ export function Hero({ onBook }: HeroProps) {
 
           {/* 오른쪽 링크 */}
           <div className="text-left md:text-right md:pb-1">
-            <p
-              className="text-sm font-medium cursor-pointer mb-1.5 transition-opacity duration-200 hover:opacity-60"
-              onClick={onBook}
+            <Link
+              href="/start"
+              className="text-sm font-medium mb-1.5 transition-opacity duration-200 hover:opacity-60 no-underline text-[var(--color-fg)]"
+              onClick={(e) => {
+                e.preventDefault();
+                onStart();
+              }}
             >
-              → 예약하기
-            </p>
-            <p className="text-sm opacity-40">↓ 서비스 소개</p>
+              지금 시작하기
+            </Link>
+            <p className="text-sm opacity-40 mt-1.5">서비스 소개</p>
           </div>
         </div>
       </RevealOnScroll>

@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 시각 (Sigak) - AI 이미지 컨설팅 서비스
 
-## Getting Started
+AI 기반 얼굴 분석 및 스타일 컨설팅 웹 서비스
 
-First, run the development server:
+## 기술 스택
+
+- **프레임워크**: Next.js 16 (App Router)
+- **UI**: React 19, TypeScript 5.9+, Tailwind CSS v4
+- **패키지 매니저**: pnpm
+
+## 시작하기
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+cd sigak-web
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[http://localhost:3000](http://localhost:3000)에서 확인할 수 있습니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 라우트 구조
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 라우트 | 설명 |
+|--------|------|
+| `/` | 랜딩 페이지 (서비스 소개 + "지금 시작하기" CTA) |
+| `/start` | 즉시 시작 (티어 선택 + 기본정보 입력) |
+| `/questionnaire` | 셀프 질의 폼 (3페이지 멀티스텝) |
+| `/questionnaire/complete` | 분석 대기 + 리포트 링크 |
+| `/report/[id]` | 리포트 뷰어 (8섹션 + 블러 티저 + 페이월) |
 
-## Learn More
+## 프로젝트 구조
 
-To learn more about Next.js, take a look at the following resources:
+```
+sigak-web/
+├── app/                    # Next.js App Router 라우트
+│   ├── page.tsx            # 랜딩 페이지
+│   ├── start/              # 즉시 시작 플로우
+│   ├── questionnaire/      # 셀프 질의 폼 + 완료
+│   └── report/[id]/        # 리포트 뷰어
+├── components/
+│   ├── landing/            # 랜딩 섹션 (hero, nav, tier 등)
+│   ├── start/              # 시작 오버레이
+│   ├── questionnaire/      # 질의 폼, 사진 업로드, 분석 로더
+│   ├── report/             # 리포트 뷰어 + 8개 섹션
+│   └── ui/                 # 공용 UI (button, input, divider 등)
+├── lib/
+│   ├── api/                # API 클라이언트 (mock)
+│   ├── types/              # TypeScript 타입 정의
+│   ├── constants/          # 상수 (질문, 티어, mock 데이터)
+│   └── utils/              # 유틸리티 (날짜, 리포트, 폴링)
+└── public/                 # 정적 파일
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 서비스 티어
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| 티어 | 가격 | 포함 내용 |
+|------|------|-----------|
+| 기본 시선 | 50,000원 | 얼굴 분석 + 컬러 매칭 + 메이크업 가이드 |
+| 시각 Creator | 200,000원 | 기본 + 썸네일 최적화 + 브랜드 이미지 |
+| 시각 Wedding | 200,000원 | 기본 + 웨딩 드레스 가이드 + 스튜디오 앵글 |
 
-## Deploy on Vercel
+## 빌드
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm build    # 프로덕션 빌드
+pnpm lint     # ESLint 검사
+```

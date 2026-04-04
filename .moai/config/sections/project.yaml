@@ -1,0 +1,9 @@
+project:
+  name: Sigak
+  description: ''
+  type: ''
+  locale: '{{LOCALE}}'
+  created_at: '2026-04-04T12:21:44.608632Z'
+  initialized: 'true'
+github:
+  profile_name: chanspick

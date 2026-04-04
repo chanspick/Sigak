@@ -31,13 +31,28 @@ interface SavedState {
   photos: string[];
 }
 
+// localStorage에서 저장된 상태 복원
+function loadSavedState(storageKey: string): SavedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // 파싱 실패 시 무시
+  }
+  return null;
+}
+
 /** 설문 진단 멀티스텝 폼 */
 export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
   const router = useRouter();
   const storageKey = STORAGE_PREFIX + userId;
 
-  const [step, setStep] = useState(1);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  // lazy initializer로 localStorage 복원 (useEffect 내 setState 회피)
+  const [step, setStep] = useState(() => loadSavedState(storageKey)?.step ?? 1);
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    () => loadSavedState(storageKey)?.answers ?? {},
+  );
   const [photos, setPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,22 +62,6 @@ export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
     if (tier === "creator") return CREATOR_QUESTIONS;
     return [];
   }, [tier]);
-
-  // localStorage에서 복원 (마운트 시 1회)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const saved: SavedState = JSON.parse(raw);
-        if (saved.step) setStep(saved.step);
-        if (saved.answers) setAnswers(saved.answers);
-        // 사진은 object URL이므로 복원 불가 -- 건너뜀
-      }
-    } catch {
-      // 파싱 실패 시 무시
-    }
-  }, [storageKey]);
 
   // 상태 변경 시 localStorage 자동 저장
   useEffect(() => {

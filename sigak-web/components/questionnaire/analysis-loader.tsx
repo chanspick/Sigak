@@ -43,29 +43,27 @@ export function AnalysisLoader({ userId }: AnalysisLoaderProps) {
     }
   }, [userId]);
 
-  /** 폴링 시작 */
+  /** 폴링 시작 (setTimeout/setInterval 콜백으로 setState 호출) */
   useEffect(() => {
-    // 초기 호출
-    fetchStatus();
-
     // 완료 시 폴링 중지
     if (isComplete) return;
 
-    const timer = setInterval(() => {
-      fetchStatus();
-    }, 3000);
+    // 초기 호출 (setTimeout 콜백 내에서 실행하여 lint 규칙 준수)
+    const initialTimer = setTimeout(fetchStatus, 100);
+    const pollTimer = setInterval(fetchStatus, 3000);
 
     // 탭 비활성 시 폴링 중지
     const handleVisibility = () => {
       if (document.hidden) {
-        clearInterval(timer);
+        clearInterval(pollTimer);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      clearInterval(timer);
+      clearTimeout(initialTimer);
+      clearInterval(pollTimer);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [fetchStatus, isComplete]);

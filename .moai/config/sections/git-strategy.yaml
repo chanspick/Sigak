@@ -29,17 +29,13 @@ git_strategy:
     branch_prefix: feature/SPEC-
     main_branch: main
     branch_creation:
-      prompt_always: false
-      auto_enabled: true
+      prompt_always: true
+      auto_enabled: false
     automation:
-      auto_branch: true
+      auto_branch: false
       auto_commit: true
       auto_pr: false
-      auto_push: true
-    auto_branch: true
-    auto_commit: true
-    auto_pr: false
-    auto_push: true
+      auto_push: false
     hooks:
       pre_commit: enforce
       pre_push: warn
@@ -65,10 +61,6 @@ git_strategy:
       auto_commit: true
       auto_pr: true
       auto_push: true
-    auto_branch: true
-    auto_commit: true
-    auto_pr: true
-    auto_push: true
     hooks:
       pre_commit: enforce
       pre_push: warn

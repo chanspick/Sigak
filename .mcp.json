@@ -1,8 +1,19 @@
 {
   "mcpServers": {
     "context7": {
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"]
+      "$comment": "Windows uses cmd /c which loads PATH automatically (no shell wrapper needed)",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx -y @upstash/context7-mcp@latest"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx -y @modelcontextprotocol/server-sequential-thinking"
+      ]
     }
   },
   "staggeredStartup": {

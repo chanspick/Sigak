@@ -178,3 +178,4 @@ dist-ssr/
 .vercel/
 .netlify/
 .firebase/
+.claude/plans/

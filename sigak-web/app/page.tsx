@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { BookingOverlay } from "@/components/landing/booking-overlay";
-import type { Tier } from "@/lib/types/tier";
 
 function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -36,9 +34,6 @@ const AXES = [
 ] as const;
 
 export default function HomePage() {
-  const [overlayOpen, setOverlayOpen] = useState(false);
-  const [overlayTier, setOverlayTier] = useState<Tier["id"] | null>(null);
-  const book = useCallback((tierId?: Tier["id"]) => { setOverlayTier(tierId ?? null); setOverlayOpen(true); }, []);
   return (
     <div className="min-h-screen bg-bg text-fg antialiased">
       <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
@@ -49,7 +44,6 @@ export default function HomePage() {
         </div>
         <span className="text-[13px] font-semibold tracking-[6px] uppercase">SIGAK</span>
         <div className="flex items-center gap-5">
-          <button onClick={() => book()} className="hidden md:inline text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 bg-transparent border-none text-bg cursor-pointer">예약</button>
           <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">진단 시작</Link>
         </div>
       </nav>
@@ -200,7 +194,6 @@ export default function HomePage() {
           &copy; 2026 시각(SIGAK). ALL RIGHTS RESERVED
         </span>
       </footer>
-      <BookingOverlay key={overlayTier} open={overlayOpen} onClose={() => setOverlayOpen(false)} initTier={overlayTier} />
     </div>
   );
 }

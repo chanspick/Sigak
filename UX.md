@@ -27,9 +27,9 @@
       "teaser": null }
   ],
   "paywall": {
-    "standard": { "price": 20000, "label": "₩20,000 잠금 해제" },
-    "full": { "price": 30000, "label": "+₩30,000 잠금 해제",
-              "total_note": "이전 결제 포함 총 ₩50,000" }
+    "standard": { "price": 5000, "label": "₩5,000 잠금 해제" },
+    "full": { "price": 15000, "label": "+₩15,000 잠금 해제",
+              "total_note": "이전 결제 포함 총 ₩20,000" }
   }
 }
 ```

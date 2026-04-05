@@ -11,9 +11,9 @@
 ```
 FREE        ₩0         커버 + 한줄요약 + 얼굴구조분석
 ─────────── paywall 1 ──────────────────────────────
-STANDARD    ₩20,000    + 피부톤분석 + 미감좌표계
+STANDARD    ₩5,000    + 피부톤분석 + 미감좌표계
 ─────────── paywall 2 ──────────────────────────────
-FULL        +₩30,000   + 실행가이드 + 셀럽 + 트렌드 (총 ₩50,000)
+FULL        +₩15,000   + 실행가이드 + 셀럽 + 트렌드 (총 ₩20,000)
 ```
 
 ## access_level 상태 + UI 매핑
@@ -44,8 +44,8 @@ pending 상태 = 유저가 "송금 완료" 클릭했으나 알바 미확인.
   "pending_level": null,
   "sections": [ ... ],
   "paywall": {
-    "standard": { "price": 20000, "label": "₩20,000 잠금 해제", "method": "manual" },
-    "full": { "price": 30000, "label": "+₩30,000 잠금 해제", "total_note": "이전 결제 포함 총 ₩50,000", "method": "manual" }
+    "standard": { "price": 5000, "label": "₩5,000 잠금 해제", "method": "manual" },
+    "full": { "price": 15000, "label": "+₩15,000 잠금 해제", "total_note": "이전 결제 포함 총 ₩20,000", "method": "manual" }
   },
   "payment_account": {
     "bank": "카카오뱅크",
@@ -73,7 +73,7 @@ pending 상태 = 유저가 "송금 완료" 클릭했으나 알바 미확인.
 | user_id | UUID FK | |
 | report_id | UUID FK | |
 | requested_level | VARCHAR(10) | standard / full |
-| amount | INTEGER | 20000 / 30000 |
+| amount | INTEGER | 5000 / 15000 |
 | status | VARCHAR(10) | pending / confirmed / unconfirmed / cancelled |
 | requested_at | TIMESTAMP | 유저 클릭 시각 |
 | confirmed_at | TIMESTAMP | 알바 확인 시각 (nullable) |

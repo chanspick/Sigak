@@ -94,13 +94,13 @@ class FeedbackSubmit(BaseModel):
 @app.post("/api/v1/booking")
 async def create_booking(data: BookingCreate):
     user_id = str(uuid.uuid4())
-    price_map = {"basic": 50000, "creator": 200000, "wedding": 200000}
+    price_map = {"basic": 5000, "creator": 200000, "wedding": 200000}
 
     user = {
         "id": user_id,
         "status": "booked",
         "created_at": datetime.utcnow().isoformat(),
-        "price": price_map.get(data.tier, 50000),
+        "price": price_map.get(data.tier, 5000),
         **data.model_dump(),
     }
     USERS[user_id] = user
@@ -265,8 +265,8 @@ async def get_report(user_id: str):
     response["pending_level"] = report.get("pending_level")
     response["access_level"] = report.get("access_level", "free")
     response["paywall"] = {
-        "standard": {"price": 20000, "label": "₩20,000 unlock", "method": "manual"},
-        "full": {"price": 30000, "label": "+₩30,000 unlock", "total_note": "Total ₩50,000", "method": "manual"},
+        "standard": {"price": 5000, "label": "₩5,000 unlock", "method": "manual"},
+        "full": {"price": 15000, "label": "+₩15,000 unlock", "total_note": "Total ₩20,000", "method": "manual"},
     }
     response["payment_account"] = PAYMENT_ACCOUNT
     return response

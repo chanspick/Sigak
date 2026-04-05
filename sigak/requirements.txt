@@ -16,9 +16,9 @@ opencv-python-headless==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
 
-# CLIP (comment out for WoZ phase — use mock)
-# torch==2.4.0
-# open-clip-torch==2.26.1
+# CLIP
+torch==2.4.0
+open-clip-torch==2.26.1
 
 # LLM
 anthropic==0.39.0

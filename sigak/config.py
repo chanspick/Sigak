@@ -24,14 +24,14 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
 
     # ── CV Pipeline ──
-    clip_model: str = "ViT-B-32"                # CLIP model variant
+    clip_model: str = "ViT-L-14"                 # CLIP model variant
     clip_pretrained: str = "openai"
     use_mock_clip: bool = True                    # WoZ phase: use random embeddings
     face_photo_max_size: int = 2048               # Max dimension in px
 
     # ── Coordinate System ──
-    coordinate_axes: int = 4                      # Number of aesthetic axes
-    embedding_dim: int = 512                      # CLIP embedding dimension
+    coordinate_axes: int = 3                      # Number of aesthetic axes
+    embedding_dim: int = 768                      # CLIP embedding dimension
     anchors_per_pole: int = 10                    # Reference celebs per axis pole
 
     # ── Report ──

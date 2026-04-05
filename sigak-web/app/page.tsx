@@ -14,9 +14,9 @@ function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; 
 }
 
 const GALLERY = [
-  { id: "hawk", src: "/images/sculptures/hawk.webp", alt: "매 조각상", axis: "샤프 · 쿨글램", desc: "강렴한 인상과 선명한 윤곽. 도시적 세련미와 대담한 구조가 만들어내는 압도적 아우라." },
-  { id: "cat", src: "/images/sculptures/cat.webp", alt: "고양이 조각상", axis: "소프트 · 프레시", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
-  { id: "wolf", src: "/images/sculptures/wolf.webp", alt: "늑대 조각상", axis: "성숙 · 시크", desc: "깊은 인상과 볼드한 구조. 시간이 쌍아올린 무게감과 세련된 존재감." },
+  { id: "owl", src: "/images/sculptures/owl.png", alt: "부엉이 조각상", axis: "샤프 · 쿨글램", desc: "강렬한 인상과 선명한 윤곽. 도시적 세련미와 대담한 구조가 만들어내는 압도적 아우라." },
+  { id: "cat", src: "/images/sculptures/cat.png", alt: "고양이 조각상", axis: "소프트 · 프레시", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
+  { id: "fox", src: "/images/sculptures/fox.png", alt: "여우 조각상", axis: "성숙 · 시크", desc: "깊은 인상과 볼드한 구조. 시간이 쌓아올린 무게감과 세련된 존재감." },
 ] as const;
 const PROCESS = [
   { step: "01", title: "셀카 업로드", desc: "정면 사진 1장과 간단한 설문. 추구하는 이미지, 레퍼런스, 현재 고민을 자유롭게." },
@@ -36,39 +36,86 @@ const AXES = [
 ] as const;
 
 export default function HomePage() {
-  const [scrollY, setScrollY] = useState(0);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [overlayTier, setOverlayTier] = useState<Tier["id"] | null>(null);
-  useEffect(() => { const onScroll = () => setScrollY(window.scrollY); window.addEventListener("scroll", onScroll, { passive: true }); return () => window.removeEventListener("scroll", onScroll); }, []);
   const book = useCallback((tierId?: Tier["id"]) => { setOverlayTier(tierId ?? null); setOverlayOpen(true); }, []);
-  const navScrolled = scrollY > 60;
   return (
     <div className="min-h-screen bg-bg text-fg antialiased">
-      <nav className="fixed top-0 left-0 right-0 z-[100] transition-all duration-300" style={{ background: navScrolled ? "rgba(243,240,235,0.92)" : "transparent", borderBottom: navScrolled ? "1px solid var(--color-border)" : "1px solid transparent", backdropFilter: navScrolled ? "blur(12px)" : "none" }}><div className="mx-auto flex max-w-[1200px] items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-14"><span className="text-[13px] font-bold tracking-[6px] uppercase">SIGAK</span><div className="hidden md:flex items-center gap-8">{["About", "Method", "Team"].map((t) => (<a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] tracking-[2px] uppercase text-muted hover:text-fg transition-colors duration-200">{t}</a>))}</div><div className="flex items-center gap-5"><button onClick={() => book()} className="hidden md:inline text-[11px] tracking-[2px] uppercase text-muted hover:text-fg transition-colors duration-200 bg-transparent border-none cursor-pointer">예약</button><Link href="/start" className="text-[11px] tracking-[2px] uppercase font-semibold px-5 py-2 bg-fg text-bg rounded-full hover:opacity-80 transition-opacity duration-200">진단 시작</Link></div></div></nav>
-      <section className="relative flex min-h-screen flex-col items-center justify-center px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] pt-[120px] pb-20"><div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 md:grid-cols-2 items-center gap-10 md:gap-[60px]"><div><div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-6">Aesthetic Coordinate System</div><h1 className="font-[family-name:var(--font-serif)] text-[clamp(36px,5vw,56px)] font-normal leading-[1.3] mb-6">미감을<br />좌표로 읽다</h1><p className="text-[15px] leading-[1.8] text-muted max-w-[400px] mb-10">당신의 얼굴, 취향, 트렌드를 하나의 공간에 배치합니다. 현재 위치에서 추구하는 방향까지 — 구체적 경로를 설계합니다.</p><div className="flex items-center gap-4 flex-wrap"><Link href="/start" className="px-9 py-3.5 bg-fg text-bg text-[13px] font-semibold tracking-[1px] hover:opacity-80 transition-opacity duration-200">내 좌표 확인하기</Link><a href="#about" className="text-[12px] text-muted tracking-[1px] border-b border-border pb-0.5 hover:text-fg transition-colors duration-200">더 알아보기 →</a></div></div><div className="relative aspect-[3/4] w-full bg-[#E8E5DF] overflow-hidden"><Image src="/images/sculptures/deer.webp" alt="사슴 조각상" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority /></div></div><div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 transition-opacity duration-500" style={{ opacity: scrollY > 100 ? 0 : 0.4 }}><div className="w-px h-8 bg-fg" /><span className="text-[9px] tracking-[3px] uppercase">Scroll</span></div></section>
-      <Reveal><section className="mx-auto max-w-[1200px] grid grid-cols-2 md:grid-cols-4 border-y border-border">{([["12,400+", "미감 데이터 분석"], ["3축", "좌표계 매핑"], ["24hr", "리포트 딜리버리"], ["93%", "만족도"]] as const).map(([num, desc], i) => (<div key={desc} className={`py-9 px-6 text-center ${i < 3 ? "border-r border-border" : ""} ${i === 1 ? "max-md:border-r-0" : ""}`}><div className="font-[family-name:var(--font-serif)] text-[28px] font-normal mb-1.5">{num}</div><div className="text-[10px] tracking-[2px] text-muted uppercase">{desc}</div></div>))}</section></Reveal>
-      <section id="about" className="mx-auto max-w-[1200px] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-[120px]"><Reveal><div className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-10 md:gap-20 items-start"><div>
-              <div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-4">About SIGAK</div>
-              <h2 className="font-[family-name:var(--font-serif)] text-[clamp(28px,3.5vw,40px)] font-normal leading-[1.4] mb-8">라벨이 아닌,<br />좌표를 드립니다</h2>
-              <p className="text-sm leading-[2] text-muted mb-0">기존 이미지 컨설팅은 쿨톤, 봄웰, 내추럴 같은 고정된 라벨을 붙여줍니다. 하지만 미감은 고정되지 않습니다 — 트렌드에 따라 이동하고, 취향에 따라 방향이 달라집니다.</p>
-              <div className="my-8 border-t border-border" />
-              <p className="text-sm leading-[2] text-muted">SIGAK은 당신의 얼굴 구조, 피부톤, 스타일 취향을 다차원 좌표계 위에 배치합니다. 현재 위치와 추구하는 방향 사이의 차이가 곧 구체적인 실행 가이드가 됩니다.</p>
+      <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
+        <div className="hidden md:flex items-center gap-7">
+          {["About", "Method", "Team"].map((t) => (
+            <a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">{t}</a>
+          ))}
+        </div>
+        <span className="text-[13px] font-semibold tracking-[6px] uppercase">SIGAK</span>
+        <div className="flex items-center gap-5">
+          <button onClick={() => book()} className="hidden md:inline text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 bg-transparent border-none text-bg cursor-pointer">예약</button>
+          <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">진단 시작</Link>
+        </div>
+      </nav>
+      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] pt-10 pb-8 md:pt-[60px] md:pb-12"><Reveal><div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-end"><div>
+              <h1 className="font-[family-name:var(--font-serif)] text-[clamp(32px,5vw,52px)] font-normal leading-[1.35] tracking-[-0.01em]">
+                미감을<br />좌표로 읽다
+              </h1>
+              <p className="mt-5 text-[15px] leading-[1.7] opacity-50">
+                당신의 얼굴, 취향, 트렌드를 하나의 공간에 배치합니다.<br />
+                현재 위치에서 추구하는 방향까지 — 구체적 경로를 설계합니다.
+              </p>
+              <div className="mt-8 flex items-center gap-6">
+                <Link href="/start" className="text-sm font-medium transition-opacity duration-200 hover:opacity-50">→ 내 좌표 확인하기</Link>
+                <a href="#about" className="text-sm opacity-40">↓ 더 알아보기</a>
+              </div>
+            </div><div className="relative aspect-[3/4] w-full overflow-hidden"><Image src="/images/sculptures/deer.png" alt="사슴 조각상" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority /></div></div></Reveal></section>
+      <Reveal><section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8 md:py-12"><div className="grid grid-cols-2 md:grid-cols-4 border border-black/10">
+            {(["12,400+", "3축", "24hr", "93%"] as const).map((num, i) => (
+              <div key={num} className={`flex flex-col px-7 py-6 ${i < 3 ? "border-r border-black/10" : ""} ${i === 1 ? "max-md:border-r-0" : ""}`}>
+                <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">
+                  {["미감 데이터", "좌표계 매핑", "리포트 딜리버리", "만족도"][i]}
+                </span>
+                <span className="font-[family-name:var(--font-serif)] text-[clamp(28px,4vw,48px)] font-light leading-none">
+                  {num}
+                </span>
+              </div>
+            ))}
+          </div></section></Reveal>
+      <section id="about" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
+        <Reveal><div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start"><div>
+              <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">About</h2>
             </div>
-            <div className="bg-[#E8E5DF] p-8 md:p-12 relative">
-              <div className="text-[10px] tracking-[4px] text-muted uppercase mb-8">3-Axis Coordinate Preview</div>
+            <div>
+              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">라벨이 아닌,<br />좌표를 드립니다</p>
+            </div>
+            <div>
+              <p className="text-[15px] leading-[1.7] opacity-70">기존 이미지 컨설팅은 쿨톤, 봄웰, 내추럴 같은 고정된 라벨을 붙여줍니다. 하지만 미감은 고정되지 않습니다 — 트렌드에 따라 이동하고, 취향에 따라 방향이 달라집니다. SIGAK은 당신의 얼굴 구조, 피부톤, 스타일 취향을 다차원 좌표계 위에 배치합니다. 현재 위치와 추구하는 방향 사이의 차이가 곧 구체적인 실행 가이드가 됩니다.</p>
+            </div>
+            </div>
+        </Reveal>
+      </section>
+
+      {/* COORDINATE PREVIEW */}
+      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
+        <Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start">
+            <div>
+              <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Coordinate</h2>
+            </div>
+            <div>
+              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">3축 좌표계 미리보기</p>
+            </div>
+            <div>
               <div className="space-y-0">
                 {AXES.map((axis) => (
-                  <div key={axis.label} className="py-5 border-b border-border last:border-b-0">
-                    <div className="text-xs tracking-[0.15em] text-muted mb-3 font-medium">{axis.label}</div>
+                  <div key={axis.label} className="py-5 border-b border-black/10 last:border-b-0">
+                    <div className="text-xs tracking-[0.15em] opacity-40 mb-3 font-medium">{axis.label}</div>
                     <div className="relative h-1 bg-black/[0.08] rounded-sm">
                       <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full bg-fg" style={{ left: `${axis.current * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
                       <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-fg bg-transparent" style={{ left: `${axis.target * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
                     </div>
-                    <div className="flex justify-between mt-2 text-[10px] text-muted"><span>{axis.left}</span><span>{axis.right}</span></div>
+                    <div className="flex justify-between mt-2 text-[10px] opacity-40"><span>{axis.left}</span><span>{axis.right}</span></div>
                   </div>
                 ))}
               </div>
-              <div className="mt-5 flex gap-4 text-[10px] text-muted">
+              <div className="mt-5 flex gap-4 text-[10px] opacity-40">
                 <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-fg" />현재 위치</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full border-2 border-fg" />추구미</span>
               </div>
@@ -76,81 +123,82 @@ export default function HomePage() {
           </div>
         </Reveal>
       </section>
-      <section id="method" className="mx-auto max-w-[1200px] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] pb-[120px]">
+      <section id="method" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
         <Reveal>
-          <div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-4">The Three Dimensions</div>
-          <h2 className="font-[family-name:var(--font-serif)] text-[clamp(28px,3.5vw,40px)] font-normal leading-[1.4] mb-12">미감의 세 방향</h2>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
+            <div><h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Method</h2></div>
+            <div><p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">미감의 세 방향</p></div>
+            <div><p className="text-[15px] leading-[1.7] opacity-70">세 가지 축이 만들어내는 미감의 좌표. 각 방향은 고정된 유형이 아니라, 당신이 이동할 수 있는 공간입니다.</p></div>
+          </div>
         </Reveal>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-0.5">
           {GALLERY.map((item, i) => (
             <Reveal key={item.id} delay={i * 0.12}>
               <div>
-                <div className="relative aspect-[3/4] w-full bg-[#E8E5DF] overflow-hidden">
+                <div className="relative aspect-[3/4] w-full overflow-hidden">
                   <Image src={item.src} alt={item.alt} fill className="object-cover" sizes="(max-width: 640px) 100vw, 33vw" />
                 </div>
                 <div className="pt-5 pb-2">
                   <h3 className="font-[family-name:var(--font-serif)] text-sm font-normal mb-1.5">{item.axis}</h3>
-                  <p className="text-[11px] text-muted leading-[1.6]">{item.desc}</p>
+                  <p className="text-[11px] opacity-50 leading-[1.6]">{item.desc}</p>
                 </div>
               </div>
             </Reveal>
           ))}
         </div>
       </section>
-      <section className="border-t border-border mx-auto max-w-[1200px] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-[100px]">
+      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">
         <Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-[0.4fr_1fr] gap-10 md:gap-20">
-            <div>
-              <div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-4">Process</div>
-              <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-normal leading-[1.4]">셀카 한 장에서<br />리포트까지</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
+            <div><h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Process</h2></div>
+            <div><p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">셀카 한 장에서<br />리포트까지</p></div>
+            <div />
+          </div>
+        </Reveal>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
               {PROCESS.map((item, i) => (
                 <Reveal key={item.step} delay={i * 0.15}>
                   <div>
-                    <div className="font-[family-name:var(--font-serif)] text-[32px] font-light text-border mb-4">{item.step}</div>
+                    <div className="font-[family-name:var(--font-serif)] text-[clamp(32px,4vw,48px)] font-light leading-none opacity-20 mb-4">{item.step}</div>
                     <h3 className="text-[15px] font-semibold mb-2.5">{item.title}</h3>
-                    <p className="text-[12px] leading-[1.8] text-muted">{item.desc}</p>
+                    <p className="text-[12px] leading-[1.8] opacity-50">{item.desc}</p>
                   </div>
                 </Reveal>
               ))}
-            </div>
-          </div>
-        </Reveal>
+        </div>
       </section>
-      <section id="team" className="border-t border-border mx-auto max-w-[1200px] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-[100px]">
+      <section id="team" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">
         <Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-20">
-            <div>
-              <div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-4">Team</div>
-              <h2 className="font-[family-name:var(--font-serif)] text-[28px] font-normal leading-[1.4] mb-8">기술과 미감,<br />양쪽을 읽는 팀</h2>
-              <p className="text-sm leading-[2] text-muted">컴퓨터 비전 엔지니어와 미감 전문가가 함께 만듭니다. 얼굴 구조를 정밀하게 분석하는 영상처리 기술 위에, 미감의 맥락을 읽는 전문가의 해석이 더해집니다.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-0.5">
-              {TEAM.map((m) => (
-                <div key={m.role} className="bg-[#E8E5DF] p-7 flex flex-col justify-end min-h-[160px]">
-                  <div className="text-[10px] tracking-[2px] text-muted uppercase mb-2">{m.role}</div>
-                  <div className="text-[12px] text-muted leading-[1.6]">{m.focus}</div>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
+            <div><h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Team</h2></div>
+            <div><p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">기술과 미감,<br />양쪽을 읽는 팀</p></div>
+            <div><p className="text-[15px] leading-[1.7] opacity-70">컴퓨터 비전 엔지니어와 미감 전문가가 함께 만듭니다. 얼굴 구조를 정밀하게 분석하는 영상처리 기술 위에, 미감의 맥락을 읽는 전문가의 해석이 더해집니다.</p></div>
           </div>
         </Reveal>
+        <div className="grid grid-cols-2 md:grid-cols-4 border border-black/10">
+          {TEAM.map((m, i) => (
+            <Reveal key={m.role} delay={i * 0.08}>
+              <div className={`flex flex-col px-7 py-6 ${i < 3 ? "border-r border-black/10" : ""} ${i === 1 ? "max-md:border-r-0" : ""}`}>
+                <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">{m.role}</span>
+                <span className="text-[12px] leading-[1.6] opacity-70">{m.focus}</span>
+              </div>
+            </Reveal>
+          ))}
+        </div>
       </section>
-      <section id="cta" className="border-t border-border px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-[120px] text-center">
-        <Reveal>
-          <div className="mx-auto max-w-[520px]">
-            <div className="text-[10px] font-semibold tracking-[5px] uppercase text-muted mb-5">Start Now</div>
-            <h2 className="font-[family-name:var(--font-serif)] text-[clamp(28px,4vw,44px)] font-normal leading-[1.3] mb-5">내 미감 좌표를<br />확인해보세요</h2>
-            <p className="text-sm text-muted leading-[1.8] mb-9">셀카 한 장과 5분의 설문으로<br />당신만의 미감 리포트를 받아보세요.</p>
-            <Link href="/start" className="inline-block px-12 py-4 bg-fg text-bg text-sm font-semibold tracking-[2px] hover:opacity-80 transition-opacity duration-200">진단 시작하기</Link>
-            <div className="mt-4 text-[11px] text-border">₩5,000부터</div>
-          </div>
-        </Reveal>
-      </section>
-      <footer className="border-t border-border mx-auto max-w-[1200px] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <span className="text-[11px] tracking-[4px] font-bold uppercase">SIGAK</span>
-        <span className="text-[10px] text-border tracking-[1px]">&copy; 2026 SIGAK. All rights reserved.</span>
+      <Reveal>
+        <Link href="/start" className="block px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 md:py-14 text-center group border-t border-black/10">
+          <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4] opacity-50 mb-3">셀카 한 장과 5분의 설문으로</p>
+          <p className="text-[clamp(24px,4vw,40px)] font-bold tracking-[1px] transition-opacity duration-200 group-hover:opacity-50">
+            → 진단 시작하기
+          </p>
+          <p className="mt-3 text-[11px] opacity-30">₩5,000부터</p>
+        </Link>
+      </Reveal>
+      <footer className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-6 md:py-8 text-center border-t border-black/10">
+        <span className="text-[11px] tracking-[1.5px] opacity-30">
+          &copy; 2026 시각(SIGAK). ALL RIGHTS RESERVED
+        </span>
       </footer>
       <BookingOverlay key={overlayTier} open={overlayOpen} onClose={() => setOverlayOpen(false)} initTier={overlayTier} />
     </div>

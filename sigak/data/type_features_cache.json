@@ -1,0 +1,62 @@
+{
+  "type_1": {
+    "skin_warmth_score": 27.8172,
+    "jaw_angle": 106.6,
+    "skin_brightness": 0.609,
+    "philtrum_ratio": 0.21,
+    "eye_tilt": 2.06,
+    "face_shape": "heart",
+    "skin_tone": "warm",
+    "sample_count": 1
+  },
+  "type_2": {
+    "skin_warmth_score": 0.9348,
+    "jaw_angle": 101.7,
+    "skin_brightness": 0.6525,
+    "philtrum_ratio": 0.24,
+    "eye_tilt": 3.36,
+    "face_shape": "heart",
+    "skin_tone": "neutral",
+    "sample_count": 2
+  },
+  "type_4": {
+    "skin_warmth_score": 17.1964,
+    "jaw_angle": 119.5,
+    "skin_brightness": 0.557,
+    "philtrum_ratio": 0.234,
+    "eye_tilt": -1.24,
+    "face_shape": "heart",
+    "skin_tone": "warm",
+    "sample_count": 1
+  },
+  "type_5": {
+    "skin_warmth_score": 28.4383,
+    "jaw_angle": 91.0,
+    "skin_brightness": 0.578,
+    "philtrum_ratio": 0.214,
+    "eye_tilt": 1.73,
+    "face_shape": "heart",
+    "skin_tone": "warm",
+    "sample_count": 1
+  },
+  "type_6": {
+    "skin_warmth_score": 26.2192,
+    "jaw_angle": 103.8,
+    "skin_brightness": 0.225,
+    "philtrum_ratio": 0.222,
+    "eye_tilt": 2.88,
+    "face_shape": "heart",
+    "skin_tone": "warm",
+    "sample_count": 1
+  },
+  "type_7": {
+    "skin_warmth_score": -4.2381,
+    "jaw_angle": 100.8,
+    "skin_brightness": 0.486,
+    "philtrum_ratio": 0.2535,
+    "eye_tilt": 3.075,
+    "face_shape": "heart",
+    "skin_tone": "neutral",
+    "sample_count": 2
+  }
+}

@@ -1,4 +1,5 @@
 // 리포트 커버 섹션 (항상 공개)
+// 에디토리얼 매거진 스타일 — 첫인상이 리포트 전체 만족도를 결정
 
 interface CoverContent {
   title: string;
@@ -12,36 +13,48 @@ interface CoverProps {
   locked: boolean;
 }
 
-// 리포트 상단 커버 영역 - 타이틀, 유저명, 날짜, 티어 표시
+// 리포트 상단 커버 영역
 export function Cover({ content }: CoverProps) {
-  // 티어 라벨 매핑
   const tierLabels: Record<string, string> = {
-    basic: "Basic",
-    creator: "Creator",
-    wedding: "Wedding",
+    basic: "Basic Diagnostic",
+    creator: "Creator Edition",
+    wedding: "Wedding Edition",
   };
 
   return (
-    <section className="py-12 border-b border-[var(--color-border)]">
-      {/* 서비스 라벨 */}
-      <p className="text-xs font-semibold tracking-[4px] uppercase text-[var(--color-muted)] mb-4">
-        SIGAK REPORT
-      </p>
-      {/* 리포트 타이틀 */}
-      <h1 className="text-3xl font-bold mb-2 font-serif">
+    <section className="pt-16 pb-12 border-b border-[var(--color-border)]">
+      {/* 서비스 로고 마크 */}
+      <div className="flex items-center gap-2 mb-10">
+        <div className="w-6 h-6 bg-[var(--color-fg)] rounded-full" />
+        <span className="text-xs font-semibold tracking-[5px] uppercase">
+          SIGAK
+        </span>
+      </div>
+
+      {/* 메인 타이틀 — 큰 세리프 */}
+      <h1 className="text-4xl md:text-5xl font-bold font-serif leading-tight mb-6">
         {content.title}
       </h1>
-      {/* 유저명 + 날짜 */}
-      <div className="flex items-center gap-3 mt-4 text-sm text-[var(--color-muted)]">
-        <span className="font-medium text-[var(--color-fg)]">
-          {content.user_name}
-        </span>
-        <span className="w-px h-3 bg-[var(--color-border)]" />
-        <span>{content.date}</span>
-        <span className="w-px h-3 bg-[var(--color-border)]" />
-        <span className="text-xs tracking-[1px] uppercase">
-          {tierLabels[content.tier] ?? content.tier}
-        </span>
+
+      {/* 구분선 */}
+      <div className="w-12 h-px bg-[var(--color-fg)] mb-6" />
+
+      {/* 메타 정보 — 수직 스택 */}
+      <div className="flex flex-col gap-1.5 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--color-muted)] w-16">Client</span>
+          <span className="font-medium">{content.user_name}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--color-muted)] w-16">Date</span>
+          <span>{content.date}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[var(--color-muted)] w-16">Edition</span>
+          <span className="text-xs tracking-[2px] uppercase font-semibold">
+            {tierLabels[content.tier] ?? content.tier}
+          </span>
+        </div>
       </div>
     </section>
   );

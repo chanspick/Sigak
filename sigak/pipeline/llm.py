@@ -10,6 +10,9 @@ from typing import Optional
 import anthropic
 
 from config import get_settings
+from pipeline.similarity import get_type_reference_prompt, load_anchors
+from pipeline.face_comparison import format_comparison_for_report
+from pipeline.cluster import format_cluster_for_report
 
 
 # ─────────────────────────────────────────────
@@ -38,7 +41,10 @@ def _call_llm(system: str, user: str, max_tokens: int = 2048) -> str:
 #     "뉴진스 같은데 좀 더 성숙" → aspiration coordinates
 # ─────────────────────────────────────────────
 
-INTERVIEW_SYSTEM = """당신은 SIGAK 미감 좌표계의 해석 엔진입니다.
+def _build_interview_system(gender: str = "female") -> str:
+    """유형 앵커 데이터에서 동적으로 인터뷰 해석 프롬프트를 생성한다."""
+    type_ref = get_type_reference_prompt(gender)
+    return f"""당신은 SIGAK 미감 좌표계의 해석 엔진입니다.
 유저의 인터뷰 응답을 분석해서, 미감 좌표계의 4개 축 위에 '추구미 좌표'를 산출합니다.
 
 4개 축:
@@ -47,32 +53,26 @@ INTERVIEW_SYSTEM = """당신은 SIGAK 미감 좌표계의 해석 엔진입니다
 3. maturity (성숙도): -1 = 프레시/어린 ↔ +1 = 성숙한/시크한
 4. intensity (강도): -1 = 자연스러운/내추럴 ↔ +1 = 볼드/강렬한
 
-주요 셀럽 좌표 레퍼런스 (근사값):
-- 수지: structure=0.4, impression=-0.2, maturity=-0.1, intensity=-0.3 (부드럽고 따뜻, 자연스러운)
-- 제니: structure=-0.5, impression=0.6, maturity=0.3, intensity=0.5 (날카롭고 쿨, 볼드)
-- 아이유: structure=0.2, impression=0.1, maturity=-0.3, intensity=-0.2 (약간 부드럽, 프레시)
-- 한소희: structure=-0.3, impression=0.7, maturity=0.4, intensity=0.3 (쿨하고 성숙)
-- 카리나: structure=-0.2, impression=0.4, maturity=-0.1, intensity=0.4 (쿨하고 볼드, 프레시)
-- 원빈: structure=-0.6, impression=0.5, maturity=0.5, intensity=0.2 (날카롭고 쿨, 성숙)
-- 차은우: structure=0.3, impression=0.3, maturity=-0.2, intensity=-0.1 (부드럽고 쿨, 프레시)
-- 뉴진스(그룹): structure=0.1, impression=0.3, maturity=-0.5, intensity=0.2 (프레시하고 약간 쿨)
+SIGAK 인상 유형 레퍼런스:
+{type_ref}
 
 규칙:
-- 레퍼런스 셀럽이 언급되면 해당 셀럽의 좌표를 기준점으로 사용
+- 유저가 특정 유형이나 키워드를 언급하면 해당 유형의 좌표를 기준점으로 사용
+- 별명도 인식하세요 (예: "첫사랑" = 따뜻한 첫사랑, "시크" = 날카롭고 시크)
+- 유저가 셀럽 이름을 언급하면, 해당 셀럽의 구조적 특성을 기반으로 가장 유사한 유형 좌표에 매핑
 - 수식어("좀 더 성숙", "근데 좀 자연스럽게")는 해당 축에 오프셋 적용
 - 불분명한 경우 0에 가까운 중립값 사용
 - 반드시 JSON만 출력, 다른 텍스트 금지
 
 출력 형식:
-{
-  "coordinates": {"structure": 0.1, "impression": 0.3, "maturity": -0.3, "intensity": 0.2},
-  "reference_base": "뉴진스",
-  "interpretation": "뉴진스의 프레시한 기반에 성숙도를 높인 방향",
+{{"coordinates": {{"structure": 0.1, "impression": 0.3, "maturity": -0.3, "intensity": 0.2}},
+  "reference_base": "따뜻한 첫사랑",
+  "interpretation": "따뜻한 첫사랑 기반에 성숙도를 높인 방향",
   "confidence": 0.8
-}"""
+}}"""
 
 
-def interpret_interview(interview_data: dict) -> dict:
+def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
     """
     Parse interview responses into aspiration coordinates.
 
@@ -103,7 +103,8 @@ def interpret_interview(interview_data: dict) -> dict:
 
 JSON으로만 응답해주세요."""
 
-    raw = _call_llm(INTERVIEW_SYSTEM, user_prompt, max_tokens=512)
+    system_prompt = _build_interview_system(gender)
+    raw = _call_llm(system_prompt, user_prompt, max_tokens=512)
 
     # Parse JSON response
     try:
@@ -186,11 +187,57 @@ REPORT_SYSTEM = """당신은 SIGAK의 미감 리포트 라이터입니다.
     {"category": "스타일링", "recommendation": "구체적 조언", "priority": "medium"},
     {"category": "컬러", "recommendation": "구체적 조언", "priority": "medium"}
   ],
-  "similar_celebs": [
-    {"name": "셀럽명", "similarity": 0.85, "reason": "유사한 이유"}
+  "similar_types": [
+    {
+      "name": "유형 라벨 (예: 따뜻한 첫사랑)",
+      "type_id": 1,
+      "similarity_pct": 82,
+      "reason": "유사한 이유",
+      "key_differences": ["턱선이 더 날카로움 → structure sharp", "눈매 올라감 → impression cool"],
+      "styling_insight": "이 유형을 참고한 구체적 스타일링 한 줄"
+    }
   ],
+  "type_comparisons": [
+    {
+      "type_name": "유형 라벨",
+      "similarities": ["유사한 특징 1~2개"],
+      "differences": ["차이점 1~3개 (축 영향 포함)"],
+      "direction_summary": "부드러운 인상을 베이스로, 날카로운 턱선을 살리는 방향"
+    }
+  ],
+  "cluster_label": "쿨 갓데스",
+  "cluster_description": "클러스터 특성 설명 + 대표 셀럽 + 유저 위치 해석",
   "trend_context": "현재 트렌드와의 관계 설명"
-}"""
+}
+
+중요: similar_types, type_comparisons, cluster_label, cluster_description 필드는 반드시 포함하세요.
+프롬프트에 CLIP/구조적 비교 데이터가 주어지면 그 수치를 기반으로, 없으면 좌표 분석을 기반으로 작성하세요.
+셀럽 이름 대신 유형 라벨(예: "따뜻한 첫사랑", "날카롭고 시크")을 사용하세요."""
+
+
+def _format_similar_types(similar_types: Optional[list[dict]]) -> str:
+    """유형 유사도 결과를 LLM 프롬프트 삽입용 문자열로 포매팅."""
+    if not similar_types:
+        return "[유사 유형] 데이터 없음 — 분석 결과를 바탕으로 가장 유사한 유형을 추론해주세요."
+
+    lines = ["[유사 유형 분석 (CLIP 임베딩 기반)]"]
+    for i, c in enumerate(similar_types, 1):
+        type_id = c.get("type_id", "?")
+        mode = "CLIP 코사인" if c["mode"] == "clip" else "좌표 거리"
+        lines.append(f"  {i}위: {c['name_kr']} (Type {type_id}) — 유사도 {c['similarity_pct']}% ({mode})")
+        desc = c.get("description_kr", "")
+        if desc:
+            lines.append(f"     설명: {desc}")
+        delta = c.get("axis_delta", {})
+        diffs = []
+        for ax, val in delta.items():
+            if abs(val) >= 0.2:
+                direction = "더 높음" if val > 0 else "더 낮음"
+                diffs.append(f"{ax} {abs(val):.1f} {direction}")
+        if diffs:
+            lines.append(f"     축별 차이: {', '.join(diffs)}")
+    lines.append("  → similar_types 필드에 위 결과를 반영해주세요.")
+    return "\n".join(lines)
 
 
 def generate_report(
@@ -202,6 +249,9 @@ def generate_report(
     gap: dict,
     interview_data: dict,
     aspiration_interpretation: dict,
+    similar_celebs: Optional[list[dict]] = None,
+    celeb_comparisons: Optional[list[dict]] = None,
+    cluster_result: Optional[dict] = None,
 ) -> dict:
     """
     Generate the full PI report using Claude.
@@ -216,11 +266,17 @@ def generate_report(
 - 얼굴형: {face_features.get('face_shape', 'N/A')}
 - 턱선 각도: {face_features.get('jaw_angle', 'N/A')}°
 - 광대 돌출도: {face_features.get('cheekbone_prominence', 'N/A')}
-- 눈 비율: {face_features.get('eye_width_ratio', 'N/A')}
+- 눈 크기 비율: {face_features.get('eye_width_ratio', 'N/A')}
+- 눈 가로세로비: {face_features.get('eye_ratio', 'N/A')}
+- 눈꼬리 기울기: {face_features.get('eye_tilt', 'N/A')}° (+ 올라감 / - 처짐)
 - 눈 간격: {face_features.get('eye_spacing_ratio', 'N/A')}
+- 눈썹 아치: {face_features.get('brow_arch', 'N/A')}
 - 코 길이 비율: {face_features.get('nose_length_ratio', 'N/A')}
+- 코 높이: {face_features.get('nose_bridge_height', 'N/A')}
 - 입술 풍성도: {face_features.get('lip_fullness', 'N/A')}
+- 얼굴 종횡비: {face_features.get('face_length_ratio', 'N/A')}
 - 이마 비율: {face_features.get('forehead_ratio', 'N/A')}
+- 인중 비율: {face_features.get('philtrum_ratio', 'N/A')}
 - 대칭도: {face_features.get('symmetry_score', 'N/A')}
 - 황금비 근접도: {face_features.get('golden_ratio_score', 'N/A')}
 - 피부톤: {face_features.get('skin_tone', 'N/A')}
@@ -256,6 +312,12 @@ def generate_report(
 {"[웨딩 정보] 컨셉: " + interview_data.get('wedding_concept', '') + ", 드레스: " + interview_data.get('dress_preference', '') if tier == 'wedding' else ''}
 {"[크리에이터 정보] 콘텐츠: " + interview_data.get('content_style', '') + ", 타겟: " + interview_data.get('target_audience', '') if tier == 'creator' else ''}
 
+{_format_similar_types(similar_celebs)}
+
+{format_comparison_for_report(celeb_comparisons, tier=tier) if celeb_comparisons else ""}
+
+{format_cluster_for_report(cluster_result, tier=tier) if cluster_result else ""}
+
 JSON으로만 응답해주세요."""
 
     raw = _call_llm(REPORT_SYSTEM, user_prompt, max_tokens=4096)
@@ -275,3 +337,93 @@ JSON으로만 응답해주세요."""
         }
 
     return report
+
+
+# ─────────────────────────────────────────────
+#  3. Face Structure Interpretation
+#     raw 수치 → 자연어 해석
+# ─────────────────────────────────────────────
+
+FACE_INTERPRET_SYSTEM = """당신은 SIGAK의 얼굴 구조 분석 전문가입니다.
+MediaPipe 랜드마크에서 추출한 수치 데이터를 기반으로,
+유저의 얼굴 구조 특징을 자연어로 해석합니다.
+
+톤:
+- 판단이 아닌 관찰. "예쁘다/못생겼다"가 아니라 "이러한 특징을 가지고 있다"
+- 각 특징이 주는 인상을 설명 (예: "부드러운 턱라인은 친근하고 편안한 인상을 준다")
+- 따뜻하고 전문적인 어조, 존댓말
+- 전체적인 조화와 특징적인 포인트를 함께 언급
+
+반드시 아래 JSON 구조로만 출력하세요. 다른 텍스트 금지.
+
+{
+  "overall_impression": "전체적인 인상을 2~3문장으로 요약",
+  "feature_interpretations": [
+    {
+      "feature": "jaw_angle",
+      "label": "턱선",
+      "interpretation": "자연어 해석 1~2문장"
+    }
+  ],
+  "harmony_note": "얼굴 전체 조화에 대한 1문장 코멘트",
+  "distinctive_points": ["가장 특징적인 포인트 1~3개"]
+}"""
+
+
+def interpret_face_structure(face_features: dict) -> dict:
+    """
+    raw 얼굴 수치를 LLM으로 자연어 해석한다.
+
+    Args:
+        face_features: face.py에서 추출한 특징 dict
+            jaw_angle, eye_tilt, cheekbone_prominence, lip_fullness,
+            face_shape, symmetry_score, golden_ratio_score 등
+
+    Returns:
+        {
+            "overall_impression": "...",
+            "feature_interpretations": [...],
+            "harmony_note": "...",
+            "distinctive_points": [...]
+        }
+    """
+    user_prompt = f"""다음 얼굴 구조 수치를 자연어로 해석해주세요.
+
+[얼굴 구조 데이터]
+- 얼굴형: {face_features.get('face_shape', 'N/A')}
+- 턱선 각도: {face_features.get('jaw_angle', 'N/A')}° (낮을수록 날카로움, 높을수록 부드러움)
+- 광대 돌출도: {face_features.get('cheekbone_prominence', 'N/A')} (0~1, 높을수록 돌출)
+- 눈 크기 비율: {face_features.get('eye_width_ratio', 'N/A')} (눈 너비 / 얼굴 너비)
+- 눈 가로세로비: {face_features.get('eye_ratio', 'N/A')} (높을수록 길쭉한 눈)
+- 눈꼬리 기울기: {face_features.get('eye_tilt', 'N/A')}° (+ 올라감 / - 처짐)
+- 눈 간격: {face_features.get('eye_spacing_ratio', 'N/A')}
+- 눈썹 아치: {face_features.get('brow_arch', 'N/A')}
+- 코 길이 비율: {face_features.get('nose_length_ratio', 'N/A')}
+- 코 높이: {face_features.get('nose_bridge_height', 'N/A')}
+- 입술 풍성도: {face_features.get('lip_fullness', 'N/A')} (0~1)
+- 얼굴 종횡비: {face_features.get('face_length_ratio', 'N/A')}
+- 이마 비율: {face_features.get('forehead_ratio', 'N/A')}
+- 인중 비율: {face_features.get('philtrum_ratio', 'N/A')}
+- 대칭도: {face_features.get('symmetry_score', 'N/A')} (0~1, 1=완벽)
+- 황금비 근접도: {face_features.get('golden_ratio_score', 'N/A')} (0~1, 1=황금비)
+- 피부톤: {face_features.get('skin_tone', 'N/A')}
+- 피부 밝기: {face_features.get('skin_brightness', 'N/A')} (0~1)
+
+JSON으로만 응답해주세요."""
+
+    raw = _call_llm(FACE_INTERPRET_SYSTEM, user_prompt, max_tokens=1024)
+
+    try:
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0]
+        result = json.loads(cleaned)
+    except json.JSONDecodeError:
+        result = {
+            "overall_impression": "얼굴 구조 해석 중 오류가 발생했습니다.",
+            "feature_interpretations": [],
+            "harmony_note": "",
+            "distinctive_points": [],
+        }
+
+    return result

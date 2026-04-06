@@ -16,9 +16,12 @@ from config import get_settings
 from pipeline.face import analyze_face
 from pipeline.coordinate import (
     compute_coordinates, compute_gap,
-    mock_clip_embedding, mock_anchor_projector, AXES,
+    mock_clip_embedding, mock_anchor_projector, load_anchor_projector, AXES,
 )
-from pipeline.llm import interpret_interview, generate_report
+from pipeline.llm import interpret_interview, generate_report, interpret_face_structure
+from pipeline.similarity import find_similar_celebs, select_teaser_celeb
+from pipeline.face_comparison import compare_with_top_anchors
+from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
 from payment import router as payment_router, PAYMENT_ACCOUNT
 
 settings = get_settings()
@@ -41,8 +44,18 @@ INTERVIEWS = {}
 ANALYSES = {}
 REPORTS = {}
 
-# ── WoZ: Mock CLIP projector ──
-PROJECTOR = mock_anchor_projector()
+# ── 앵커 프로젝터 (실제 임베딩 있으면 사용, 없으면 mock 폴백) ──
+PROJECTORS = {
+    "female": load_anchor_projector("female"),
+    "male": load_anchor_projector("male"),
+}
+
+# ── 클러스터 부트스트랩 (cluster_labels.json 없으면 reference_coords로 생성) ──
+_cluster_data = load_cluster_labels()
+if not _cluster_data.get("clusters"):
+    print("[부트스트랩] 클러스터 라벨 없음 — reference_coords 기반 자동 생성")
+    discover_clusters(gender="female")
+    discover_clusters(gender="male")
 
 
 # ─────────────────────────────────────────────
@@ -52,6 +65,7 @@ PROJECTOR = mock_anchor_projector()
 class BookingCreate(BaseModel):
     name: str
     phone: str
+    gender: str  # female | male
     tier: str  # basic | creator | wedding
     booking_date: str  # "2026-04-15"
     booking_time: str  # "14:00"
@@ -189,27 +203,55 @@ async def run_analysis(user_id: str):
     USERS[user_id]["status"] = "analyzing"
 
     # ── Step 1: Get face features + compute coordinates ──
+    gender = user.get("gender", "female")
+    projector = PROJECTORS.get(gender, PROJECTORS["female"])
+
     analysis = ANALYSES.get(user_id)
+    clip_embedding = None
     if analysis:
         features = analysis["primary_features"]
         # WoZ: mock CLIP embedding (replace with real CLIP later)
-        mock_emb = mock_clip_embedding(str(features).encode())
-        current_coords = compute_coordinates(features, mock_emb, PROJECTOR)
+        clip_embedding = mock_clip_embedding(str(features).encode())
+        current_coords = compute_coordinates(features, clip_embedding, projector)
     else:
         # No photo uploaded — use neutral coordinates (manual override needed)
         features = {}
         current_coords = {"structure": 0, "impression": 0, "maturity": 0, "intensity": 0}
 
-    # ── Step 2: Interpret interview → aspiration coordinates ──
-    aspiration_result = interpret_interview(interview)
+    # ── Step 2: Face structure interpretation (LLM 자연어 해석) ──
+    face_interpretation = {}
+    if features:
+        face_interpretation = interpret_face_structure(features)
+
+    # ── Step 3: Find similar types (CLIP cosine or coord fallback) ──
+    similar_celebs = find_similar_celebs(
+        user_embedding=clip_embedding,
+        user_coords=current_coords,
+        gender=gender,
+        top_k=3,
+    )
+
+    # ── Step 4: Structural comparison (유저↔앵커 핀포인트 비교) ──
+    celeb_comparisons = compare_with_top_anchors(
+        user_features=features,
+        similar_celebs=similar_celebs,
+        gender=gender,
+        max_compare=3,
+    )
+
+    # ── Step 5: Cluster classification (미감 클러스터 배정) ──
+    cluster_result = classify_user(user_coords=current_coords, gender=gender)
+
+    # ── Step 6: Interpret interview → aspiration coordinates ──
+    aspiration_result = interpret_interview(interview, gender=gender)
     aspiration_coords = aspiration_result.get("coordinates", {
         "structure": 0, "impression": 0, "maturity": 0, "intensity": 0
     })
 
-    # ── Step 3: Compute gap ──
+    # ── Step 7: Compute gap ──
     gap = compute_gap(current_coords, aspiration_coords)
 
-    # ── Step 4: Generate report ──
+    # ── Step 8: Generate report (with all analysis data) ──
     report_content = generate_report(
         user_name=user["name"],
         tier=user["tier"],
@@ -219,18 +261,27 @@ async def run_analysis(user_id: str):
         gap=gap,
         interview_data=interview,
         aspiration_interpretation=aspiration_result,
+        similar_celebs=similar_celebs,
+        celeb_comparisons=celeb_comparisons,
+        cluster_result=cluster_result,
     )
 
     # ── Store report ──
+    teaser_celeb = select_teaser_celeb(similar_celebs)
     report_id = str(uuid.uuid4())
     report = {
         "id": report_id,
         "user_id": user_id,
 
+        "face_interpretation": face_interpretation,
         "current_coords": current_coords,
         "aspiration_coords": aspiration_coords,
         "gap": gap,
         "aspiration_interpretation": aspiration_result,
+        "similar_celebs": similar_celebs,
+        "celeb_comparisons": celeb_comparisons,
+        "cluster": cluster_result,
+        "teaser_celeb": teaser_celeb,
         "content": report_content,
         "created_at": datetime.utcnow().isoformat(),
         "access_level": "free",
@@ -248,6 +299,12 @@ async def run_analysis(user_id: str):
         "aspiration_coords": aspiration_coords,
         "gap_magnitude": gap["magnitude"],
         "gap_primary": f"{gap['primary_direction']} → {gap['primary_shift_kr']}",
+        "similar_celebs": [
+            {"name": c["name_kr"], "similarity_pct": c["similarity_pct"]}
+            for c in similar_celebs
+        ],
+        "cluster": cluster_result.get("cluster_label_kr") if cluster_result else None,
+        "teaser": f"{teaser_celeb['name_kr']}와 {teaser_celeb['similarity_pct']}% 유사" if teaser_celeb else None,
     }
 
 
@@ -299,6 +356,7 @@ async def get_queue():
         queue.append({
             "id": uid,
             "name": u["name"],
+            "gender": u.get("gender", "female"),
             "tier": u["tier"],
             "status": u["status"],
             "booking_date": u["booking_date"],

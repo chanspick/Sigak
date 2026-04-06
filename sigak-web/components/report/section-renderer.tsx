@@ -7,8 +7,11 @@ import { ExecutiveSummary } from "./sections/executive-summary";
 import { FaceStructure } from "./sections/face-structure";
 import { SkinAnalysis } from "./sections/skin-analysis";
 import { CoordinateMap } from "./sections/coordinate-map";
+import { FaceInterpretation } from "./sections/face-interpretation";
+import { GapAnalysis } from "./sections/gap-analysis";
 import { ActionPlan } from "./sections/action-plan";
 import { CelebReference } from "./sections/celeb-reference";
+import { TypeReference } from "./sections/type-reference";
 import { TrendContext } from "./sections/trend-context";
 
 interface SectionRendererProps {
@@ -54,6 +57,20 @@ export function SectionRenderer({ section, accessLevel }: SectionRendererProps) 
           locked={locked}
         />
       );
+    case "face_interpretation":
+      return (
+        <FaceInterpretation
+          content={content as Parameters<typeof FaceInterpretation>[0]["content"]}
+          locked={locked}
+        />
+      );
+    case "gap_analysis":
+      return (
+        <GapAnalysis
+          content={content as Parameters<typeof GapAnalysis>[0]["content"]}
+          locked={locked}
+        />
+      );
     case "coordinate_map":
       return (
         <CoordinateMap
@@ -65,6 +82,13 @@ export function SectionRenderer({ section, accessLevel }: SectionRendererProps) 
       return (
         <ActionPlan
           content={content as Parameters<typeof ActionPlan>[0]["content"]}
+          locked={locked}
+        />
+      );
+    case "type_reference":
+      return (
+        <TypeReference
+          content={content as Parameters<typeof TypeReference>[0]["content"]}
           locked={locked}
         />
       );

@@ -1,0 +1,10 @@
+sigak-web/
+.claude/
+.moai/
+*.md
+.git/
+__pycache__/
+*.pyc
+.venv/
+venv/
+experiments/

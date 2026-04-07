@@ -256,6 +256,9 @@ def compute_gap(
 #  Mock CLIP for WoZ Phase
 # ─────────────────────────────────────────────
 
+EMBEDDING_DIM = 768  # ViT-L-14 출력 차원
+
+
 def mock_clip_embedding(image_bytes: bytes) -> np.ndarray:
     """
     WoZ phase: generate a deterministic pseudo-embedding from image hash.
@@ -265,22 +268,47 @@ def mock_clip_embedding(image_bytes: bytes) -> np.ndarray:
     h = hashlib.sha256(image_bytes).digest()
     seed = int.from_bytes(h[:4], "big")
     rng = np.random.RandomState(seed)
-    emb = rng.randn(512).astype(np.float32)
+    emb = rng.randn(EMBEDDING_DIM).astype(np.float32)
     return emb / (np.linalg.norm(emb) + 1e-8)
 
 
-def mock_anchor_projector() -> AnchorProjector:
+def mock_anchor_projector(gender: str = "female") -> AnchorProjector:
     """
     WoZ phase: create projector with random anchor vectors.
     Replace with real celeb embeddings when CLIP pipeline is live.
+
+    Args:
+        gender: "female" or "male" — 성별별 다른 시드 사용
     """
-    rng = np.random.RandomState(42)
+    seed = 42 if gender == "female" else 99
+    rng = np.random.RandomState(seed)
     projector = AnchorProjector()
     anchors = {}
     for ax in AXES:
         anchors[ax.name] = {
-            "negative": rng.randn(512).astype(np.float32),
-            "positive": rng.randn(512).astype(np.float32),
+            "negative": rng.randn(EMBEDDING_DIM).astype(np.float32),
+            "positive": rng.randn(EMBEDDING_DIM).astype(np.float32),
         }
     projector.fit(anchors)
+    return projector
+
+
+def load_anchor_projector(gender: str = "female") -> AnchorProjector:
+    """
+    실제 앵커 임베딩에서 프로젝터를 생성한다.
+    임베딩이 없으면 mock으로 폴백.
+
+    celeb_anchors.json의 axis_roles에 따라 극별 평균 벡터를 계산하여
+    AnchorProjector.fit()에 전달한다.
+    """
+    from pipeline.similarity import build_anchor_poles
+
+    poles = build_anchor_poles(gender)
+
+    if not poles or len(poles) < len(AXES):
+        # 임베딩 부족 — mock 폴��
+        return mock_anchor_projector(gender)
+
+    projector = AnchorProjector()
+    projector.fit(poles)
     return projector

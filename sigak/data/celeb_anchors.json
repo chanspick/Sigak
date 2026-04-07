@@ -1,0 +1,342 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-04-06",
+  "dimension": 768,
+  "similarity_threshold": 0.3,
+  "teaser_weights": {
+    "similarity": 0.7,
+    "community": 0.3
+  },
+  "anchors": {
+    "jang_wonyoung": {
+      "name_kr": "장원영",
+      "name_en": "Jang Wonyoung",
+      "group": "IVE",
+      "gender": "female",
+      "aliases": ["원영", "원영이", "장원", "wonyoung", "원영쓰"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "negative",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.7,
+        "impression": 0.8,
+        "maturity": -0.9,
+        "intensity": 0.7
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "karina": {
+      "name_kr": "카리나",
+      "name_en": "Karina",
+      "group": "aespa",
+      "gender": "female",
+      "aliases": ["유지민", "지민", "karina", "카리나짱"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "positive",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.8,
+        "impression": 0.9,
+        "maturity": 0.2,
+        "intensity": 0.8
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "sullyoon": {
+      "name_kr": "설윤",
+      "name_en": "Sullyoon",
+      "group": "NMIXX",
+      "gender": "female",
+      "aliases": ["설윤이", "sullyoon", "엔믹스설윤"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "positive",
+        "maturity": "negative",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": 0.8,
+        "impression": 0.3,
+        "maturity": -0.5,
+        "intensity": 0.5
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "jennie": {
+      "name_kr": "제니",
+      "name_en": "Jennie",
+      "group": "BLACKPINK",
+      "gender": "female",
+      "aliases": ["제니킴", "김제니", "jennie", "젠"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "positive",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.5,
+        "impression": 0.5,
+        "maturity": 0.7,
+        "intensity": 0.9
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "han_sohee": {
+      "name_kr": "한소희",
+      "name_en": "Han So-hee",
+      "group": null,
+      "gender": "female",
+      "aliases": ["소희", "한소희배우", "hansohee"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "positive",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.9,
+        "impression": 0.7,
+        "maturity": 0.8,
+        "intensity": 0.6
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "suzy": {
+      "name_kr": "수지",
+      "name_en": "Suzy",
+      "group": null,
+      "gender": "female",
+      "aliases": ["배수지", "수지배우", "수지언니", "suzy"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "negative",
+        "maturity": null,
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": 0.8,
+        "impression": -0.7,
+        "maturity": 0.0,
+        "intensity": -0.8
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "iu": {
+      "name_kr": "아이유",
+      "name_en": "IU",
+      "group": null,
+      "gender": "female",
+      "aliases": ["이지은", "지은", "아이유언니", "iu", "유애나"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "negative",
+        "maturity": null,
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": 0.5,
+        "impression": -0.8,
+        "maturity": -0.2,
+        "intensity": -0.9
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "kim_yoojung": {
+      "name_kr": "김유정",
+      "name_en": "Kim Yoo-jung",
+      "group": null,
+      "gender": "female",
+      "aliases": ["유정", "유정이", "김유정배우", "yoojung"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "negative",
+        "maturity": "negative",
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": 0.7,
+        "impression": -0.6,
+        "maturity": -0.7,
+        "intensity": -0.6
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "winter": {
+      "name_kr": "윈터",
+      "name_en": "Winter",
+      "group": "aespa",
+      "gender": "female",
+      "aliases": ["김민정", "민정", "winter", "윈터리"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "negative",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.7,
+        "impression": 0.8,
+        "maturity": -0.5,
+        "intensity": 0.5
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "an_yujin": {
+      "name_kr": "안유진",
+      "name_en": "An Yujin",
+      "group": "IVE",
+      "gender": "female",
+      "aliases": ["유진", "유진이", "안유진아이브", "yujin"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "negative",
+        "maturity": "negative",
+        "intensity": null
+      },
+      "reference_coords": {
+        "structure": 0.6,
+        "impression": -0.4,
+        "maturity": -0.6,
+        "intensity": -0.3
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "minji": {
+      "name_kr": "민지",
+      "name_en": "Minji",
+      "group": "NewJeans",
+      "gender": "female",
+      "aliases": ["민지뉴진스", "minji", "민지언니"],
+      "axis_roles": {
+        "structure": null,
+        "impression": null,
+        "maturity": "negative",
+        "intensity": null
+      },
+      "reference_coords": {
+        "structure": 0.0,
+        "impression": 0.3,
+        "maturity": -0.6,
+        "intensity": 0.3
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "haerin": {
+      "name_kr": "해린",
+      "name_en": "Haerin",
+      "group": "NewJeans",
+      "gender": "female",
+      "aliases": ["해린뉴진스", "haerin", "해린이", "강해린"],
+      "axis_roles": {
+        "structure": "negative",
+        "impression": "positive",
+        "maturity": "negative",
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": -0.4,
+        "impression": 0.5,
+        "maturity": -0.8,
+        "intensity": -0.4
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "hwasa": {
+      "name_kr": "화사",
+      "name_en": "Hwasa",
+      "group": "MAMAMOO",
+      "gender": "female",
+      "aliases": ["안혜진", "혜진", "hwasa", "화사마마무"],
+      "axis_roles": {
+        "structure": null,
+        "impression": "negative",
+        "maturity": "positive",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": -0.2,
+        "impression": -0.5,
+        "maturity": 0.6,
+        "intensity": 1.0
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "kim_taeri": {
+      "name_kr": "김태리",
+      "name_en": "Kim Tae-ri",
+      "group": null,
+      "gender": "female",
+      "aliases": ["태리", "김태리배우", "taeri"],
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "negative",
+        "maturity": "positive",
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": 0.3,
+        "impression": -0.5,
+        "maturity": 0.7,
+        "intensity": -0.5
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    },
+    "jisoo": {
+      "name_kr": "지수",
+      "name_en": "Jisoo",
+      "group": "BLACKPINK",
+      "gender": "female",
+      "aliases": ["김지수", "지수블핑", "jisoo", "지수언니"],
+      "axis_roles": {
+        "structure": null,
+        "impression": "negative",
+        "maturity": null,
+        "intensity": "negative"
+      },
+      "reference_coords": {
+        "structure": -0.2,
+        "impression": -0.3,
+        "maturity": 0.3,
+        "intensity": -0.2
+      },
+      "community_score": null,
+      "image_count": 0,
+      "embedding_path": null
+    }
+  }
+}

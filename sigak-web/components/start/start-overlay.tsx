@@ -8,30 +8,52 @@ import { useRouter } from "next/navigation";
 import { TIERS } from "@/lib/constants/tiers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { createBooking, ApiError } from "@/lib/api/client";
 import type { Tier } from "@/lib/types/tier";
 
 /** 시작 오버레이 (티어 선택 + 기본 정보 입력) */
+type Gender = "female" | "male";
+
 export function StartOverlay() {
   const router = useRouter();
   const [tier, setTier] = useState<Tier["id"] | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const isValid = tier && name.trim().length > 0 && phone.trim().length > 0;
+  const isValid = tier && gender && name.trim().length > 0 && phone.trim().length > 0;
 
   const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!isValid) return;
+      if (!isValid || !tier || !gender) return;
       setSubmitting(true);
-      // 유저 ID 생성 (mock)
-      const userId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-      router.push(
-        "/questionnaire?user_id=" + userId + "&tier=" + tier,
-      );
+      setError(null);
+
+      try {
+        // 백엔드 API로 예약 생성
+        const result = await createBooking({
+          name: name.trim(),
+          phone: phone.trim(),
+          gender,
+          tier,
+        });
+
+        router.push(
+          "/questionnaire?user_id=" + result.user_id + "&tier=" + tier + "&gender=" + gender,
+        );
+      } catch (err) {
+        setSubmitting(false);
+        if (err instanceof ApiError) {
+          setError(err.message);
+        } else {
+          setError("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        }
+      }
     },
-    [isValid, tier, router],
+    [isValid, tier, gender, name, phone, router],
   );
 
   return (
@@ -54,7 +76,7 @@ export function StartOverlay() {
             진단 선택
           </p>
           <div className="flex flex-col gap-2">
-            {TIERS.map((t) => {
+            {TIERS.filter((t) => t.id === "basic").map((t) => {
               const isActive = tier === t.id;
               return (
                 <button
@@ -92,8 +114,39 @@ export function StartOverlay() {
           </div>
         </div>
 
-        {/* 기본 정보 입력 */}
+        {/* 성별 선택 */}
         {tier && (
+          <div className="mb-8">
+            <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-3">
+              성별
+            </p>
+            <div className="flex gap-2">
+              {([
+                { id: "female" as Gender, label: "여성" },
+                { id: "male" as Gender, label: "남성" },
+              ]).map((g) => {
+                const isActive = gender === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGender(g.id)}
+                    className={
+                      isActive
+                        ? "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)] text-sm font-bold tracking-[0.5px]"
+                        : "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 border-black/[0.12] bg-transparent hover:border-black/40 text-sm font-bold tracking-[0.5px]"
+                    }
+                  >
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 기본 정보 입력 */}
+        {tier && gender && (
           <div className="mb-8 flex flex-col gap-4">
             <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-1">
               기본 정보
@@ -115,8 +168,15 @@ export function StartOverlay() {
           </div>
         )}
 
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-700 text-[13px]">
+            {error}
+          </div>
+        )}
+
         {/* 제출 버튼 */}
-        {tier && (
+        {tier && gender && (
           <Button
             type="submit"
             variant="primary"

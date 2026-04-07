@@ -15,10 +15,15 @@ mediapipe==0.10.18
 opencv-python-headless==4.10.0.84
 Pillow==10.4.0
 numpy==1.26.4
+scipy==1.14.0
 
 # CLIP
 torch==2.4.0
 open-clip-torch==2.26.1
+
+# InsightFace (primary face analysis)
+insightface==0.7.3
+onnxruntime==1.19.0
 
 # LLM
 anthropic==0.39.0

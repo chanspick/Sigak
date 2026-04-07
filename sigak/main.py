@@ -22,6 +22,7 @@ from pipeline.llm import interpret_interview, generate_report, interpret_face_st
 from pipeline.similarity import find_similar_celebs, select_teaser_celeb
 from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
+from pipeline.report_formatter import format_report_for_frontend, _sanitize
 from payment import router as payment_router, PAYMENT_ACCOUNT
 
 settings = get_settings()
@@ -266,6 +267,22 @@ async def run_analysis(user_id: str):
         cluster_result=cluster_result,
     )
 
+    # ── 프론트엔드용 리포트 포매팅 ──
+    formatted_report = format_report_for_frontend(
+        user_id=user_id,
+        user_name=user["name"],
+        tier=user["tier"],
+        gender=gender,
+        face_features=features,
+        current_coords=current_coords,
+        aspiration_coords=aspiration_coords,
+        gap=gap,
+        similar_types=similar_celebs,
+        face_interpretation=face_interpretation,
+        report_content=report_content,
+        aspiration_interpretation=aspiration_result,
+    )
+
     # ── Store report ──
     teaser_celeb = select_teaser_celeb(similar_celebs)
     report_id = str(uuid.uuid4())
@@ -273,6 +290,10 @@ async def run_analysis(user_id: str):
         "id": report_id,
         "user_id": user_id,
 
+        # 프론트엔드 ReportData 구조 (get_report에서 직접 반환)
+        "formatted": formatted_report,
+
+        # 원본 파이프라인 데이터 (디버깅/대시보드용)
         "face_interpretation": face_interpretation,
         "current_coords": current_coords,
         "aspiration_coords": aspiration_coords,
@@ -289,7 +310,7 @@ async def run_analysis(user_id: str):
         "payment_1_at": None,
         "payment_2_at": None,
     }
-    REPORTS[user_id] = report
+    REPORTS[user_id] = _sanitize(report)
     USERS[user_id]["status"] = "reported"
 
     return {
@@ -298,7 +319,7 @@ async def run_analysis(user_id: str):
         "current_coords": current_coords,
         "aspiration_coords": aspiration_coords,
         "gap_magnitude": gap["magnitude"],
-        "gap_primary": f"{gap['primary_direction']} → {gap['primary_shift_kr']}",
+        "gap_primary": f"{gap['primary_direction']} \u2192 {gap['primary_shift_kr']}",
         "similar_celebs": [
             {"name": c["name_kr"], "similarity_pct": c["similarity_pct"]}
             for c in similar_celebs
@@ -314,16 +335,43 @@ async def run_analysis(user_id: str):
 
 @app.get("/api/v1/report/{user_id}")
 async def get_report(user_id: str):
+    """
+    프론트엔드 ReportData 형식으로 리포트를 반환한다.
+
+    formatted 키에 저장된 프론트엔드 구조를 직접 반환하되,
+    결제 상태(access_level, pending_level)를 실시간으로 반영한다.
+    """
     if user_id not in REPORTS:
         raise HTTPException(404, "Report not found")
     report = REPORTS[user_id]
-    # Add payment info to response
+
+    # 포맷된 리포트가 있으면 프론트엔드 구조로 반환
+    if "formatted" in report:
+        response = {**report["formatted"]}
+        # 결제 상태를 실시간으로 반영 (결제 후 access_level 변경)
+        response["access_level"] = report.get("access_level", "free")
+        response["pending_level"] = report.get("pending_level")
+
+        # access_level에 따라 섹션 잠금 상태 업데이트
+        level_order = {"free": 0, "standard": 1, "full": 2}
+        current_level = level_order.get(response["access_level"], 0)
+
+        for section in response.get("sections", []):
+            unlock = section.get("unlock_level")
+            if unlock:
+                required_level = level_order.get(unlock, 0)
+                section["locked"] = current_level < required_level
+
+        return response
+
+    # 폴백: 기존 형식 (formatted가 없는 경우 하위 호환)
     response = {**report}
+    response.pop("formatted", None)
     response["pending_level"] = report.get("pending_level")
     response["access_level"] = report.get("access_level", "free")
     response["paywall"] = {
-        "standard": {"price": 5000, "label": "₩5,000 unlock", "method": "manual"},
-        "full": {"price": 15000, "label": "+₩15,000 unlock", "total_note": "Total ₩20,000", "method": "manual"},
+        "standard": {"price": 5000, "label": "\u20A95,000 잠금 해제", "method": "manual"},
+        "full": {"price": 15000, "label": "+\u20A915,000 잠금 해제", "total_note": "이전 결제 포함 총 \u20A920,000", "method": "manual"},
     }
     response["payment_account"] = PAYMENT_ACCOUNT
     return response

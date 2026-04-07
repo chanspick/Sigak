@@ -13,11 +13,14 @@ import {
 import { QuestionnaireStep } from "@/components/questionnaire/questionnaire-step";
 import { ProgressBar } from "@/components/questionnaire/progress-bar";
 import { PhotoUploader } from "@/components/questionnaire/photo-uploader";
+import type { PhotoEntry } from "@/components/questionnaire/photo-uploader";
 import { Button } from "@/components/ui/button";
+import { uploadPhotos, submitInterview, runAnalysis, ApiError } from "@/lib/api/client";
 
 interface QuestionnaireFormProps {
   userId: string;
   tier: "basic" | "creator" | "wedding";
+  gender: "female" | "male";
 }
 
 const TOTAL_STEPS = 3;
@@ -44,7 +47,7 @@ function loadSavedState(storageKey: string): SavedState | null {
 }
 
 /** 설문 진단 멀티스텝 폼 */
-export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
+export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormProps) {
   const router = useRouter();
   const storageKey = STORAGE_PREFIX + userId;
 
@@ -54,7 +57,9 @@ export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
     () => loadSavedState(storageKey)?.answers ?? {},
   );
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoFiles, setPhotoFiles] = useState<PhotoEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // 티어별 추가 질문
   const tierQuestions = useMemo(() => {
@@ -102,16 +107,40 @@ export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
     }
   }, [step]);
 
-  // 제출 처리
-  const handleSubmit = useCallback(() => {
+  // 제출 처리 - 백엔드 API 호출
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
-    // localStorage 정리
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(storageKey);
+    setSubmitError(null);
+
+    try {
+      // 1단계: 사진 업로드
+      const files = photoFiles.map((entry) => entry.file);
+      if (files.length > 0) {
+        await uploadPhotos(userId, files);
+      }
+
+      // 2단계: 설문 답변 제출
+      await submitInterview(userId, answers);
+
+      // localStorage 정리
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(storageKey);
+      }
+
+      // 3단계: 바로 분석 페이지로 이동 (analyze는 백그라운드 실행)
+      router.push("/questionnaire/complete?user_id=" + userId + "&gender=" + gender);
+
+      // 분석 파이프라인은 fire-and-forget (완료 페이지에서 폴링)
+      runAnalysis(userId).catch(() => {});
+    } catch (err) {
+      setSubmitting(false);
+      if (err instanceof ApiError) {
+        setSubmitError(err.message);
+      } else {
+        setSubmitError("제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      }
     }
-    // 완료 페이지로 이동
-    router.push("/questionnaire/complete?user_id=" + userId);
-  }, [router, userId, storageKey]);
+  }, [router, userId, gender, storageKey, photoFiles, answers]);
 
   // 다음 버튼 비활성화 조건
   const isNextDisabled = (step === 1 && !isPage1Valid) || (step === 2 && !isPage2Valid);
@@ -157,7 +186,12 @@ export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
               />
             </div>
           )}
-          <PhotoUploader photos={photos} onChange={setPhotos} />
+          <PhotoUploader
+            photos={photos}
+            onChange={setPhotos}
+            photoFiles={photoFiles}
+            onFilesChange={setPhotoFiles}
+          />
         </div>
       )}
 
@@ -206,6 +240,12 @@ export function QuestionnaireForm({ userId, tier }: QuestionnaireFormProps) {
               ))}
             </div>
           </div>
+          {/* 에러 메시지 */}
+          {submitError && (
+            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-700 text-[13px]">
+              {submitError}
+            </div>
+          )}
           {/* 제출 버튼 */}
           <Button
             variant="primary"

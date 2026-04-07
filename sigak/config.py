@@ -39,10 +39,15 @@ class Settings(BaseSettings):
     base_url: str = "https://sigak.kr"
 
     class Config:
-        env_file = ".env"
+        env_file = (".env", "../.env")
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
-@lru_cache()
+_settings = None
+
 def get_settings() -> Settings:
-    return Settings()
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings

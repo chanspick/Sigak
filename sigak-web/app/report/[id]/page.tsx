@@ -1,25 +1,22 @@
 // 리포트 페이지 (서버 컴포넌트)
-// - mock 데이터 사용 (실제 API 연동은 후행)
+// - 백엔드 API에서 리포트 데이터 조회
+// - 실패 시 에러 메시지 표시
 // - ReportViewer에 initialReport 전달
 
-import { MOCK_REPORT } from "@/lib/constants/mock-report";
+import { getReportServerSide } from "@/lib/api/client";
 import { ReportViewer } from "@/components/report/report-viewer";
+import Link from "next/link";
 
 interface ReportPageProps {
   params: Promise<{ id: string }>;
 }
 
-// 동적 리포트 페이지 - ID 기반으로 리포트 데이터를 로드하여 뷰어에 전달
+// 동적 리포트 페이지 - user_id 기반으로 리포트 데이터를 로드하여 뷰어에 전달
 export default async function ReportPage({ params }: ReportPageProps) {
-  // 파라미터에서 리포트 ID 추출 (현재는 mock 데이터 사용)
   const { id } = await params;
 
-  // 실제로는 fetch(`/api/v1/report/${id}`) 호출
-  // mock: MOCK_REPORT를 id 덮어쓰기로 사용
-  const report = {
-    ...MOCK_REPORT,
-    id,
-  };
+  // 서버 사이드에서 리포트 데이터 조회
+  const report = await getReportServerSide(id);
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)]">
@@ -31,10 +28,28 @@ export default async function ReportPage({ params }: ReportPageProps) {
         </span>
       </nav>
 
-      {/* 리포트 뷰어 */}
-      <div className="pt-4 pb-20">
-        <ReportViewer initialReport={report} />
-      </div>
+      {/* 리포트 뷰어 또는 에러 */}
+      {report ? (
+        <div className="pt-4 pb-20">
+          <ReportViewer initialReport={report} />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
+          <h1 className="font-[family-name:var(--font-serif)] text-[24px] font-normal mb-3">
+            리포트를 불러올 수 없습니다
+          </h1>
+          <p className="text-[13px] opacity-50 mb-8 max-w-[360px]">
+            분석이 아직 완료되지 않았거나, 유효하지 않은 링크입니다.
+            잠시 후 다시 시도해 주세요.
+          </p>
+          <Link
+            href="/start"
+            className="inline-block px-8 py-3 text-sm font-bold bg-[var(--color-fg)] text-[var(--color-bg)] transition-opacity duration-200 hover:opacity-85"
+          >
+            처음으로 돌아가기
+          </Link>
+        </div>
+      )}
     </main>
   );
 }

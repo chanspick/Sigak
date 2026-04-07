@@ -6,13 +6,21 @@
 import { useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 
+export interface PhotoEntry {
+  url: string; // 미리보기용 object URL
+  file: File; // 업로드용 원본 File 객체
+}
+
 interface PhotoUploaderProps {
   photos: string[];
   onChange: (photos: string[]) => void;
+  /** File 객체 참조 목록 — API 업로드에 사용 */
+  photoFiles?: PhotoEntry[];
+  onFilesChange?: (entries: PhotoEntry[]) => void;
 }
 
 /** 사진 업로드 + 미리보기 + 재촬영 */
-export function PhotoUploader({ photos, onChange }: PhotoUploaderProps) {
+export function PhotoUploader({ photos, onChange, photoFiles, onFilesChange }: PhotoUploaderProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceIndexRef = useRef<number | null>(null);
 
@@ -36,16 +44,28 @@ export function PhotoUploader({ photos, onChange }: PhotoUploaderProps) {
         }
         next[idx] = url;
         onChange(next);
+
+        // File 목록도 업데이트
+        if (photoFiles && onFilesChange) {
+          const nextFiles = [...photoFiles];
+          nextFiles[idx] = { url, file };
+          onFilesChange(nextFiles);
+        }
+
         replaceIndexRef.current = null;
       } else {
         // 새 사진 추가
         onChange([...photos, url]);
+        // File 목록도 추가
+        if (onFilesChange) {
+          onFilesChange([...(photoFiles || []), { url, file }]);
+        }
       }
 
       // input 초기화 (동일 파일 재선택 허용)
       e.target.value = "";
     },
-    [photos, onChange],
+    [photos, onChange, photoFiles, onFilesChange],
   );
 
   /** 새 사진 추가 트리거 */
@@ -65,8 +85,12 @@ export function PhotoUploader({ photos, onChange }: PhotoUploaderProps) {
     (index: number) => {
       URL.revokeObjectURL(photos[index]);
       onChange(photos.filter((_, i) => i !== index));
+      // File 목록도 삭제
+      if (photoFiles && onFilesChange) {
+        onFilesChange(photoFiles.filter((_, i) => i !== index));
+      }
     },
-    [photos, onChange],
+    [photos, onChange, photoFiles, onFilesChange],
   );
 
   // 슬롯 라벨

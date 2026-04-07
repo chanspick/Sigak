@@ -11,8 +11,7 @@ COPY sigak/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY sigak/ ./
-COPY .env .env
 
-# Railway는 PORT 환경변수를 설정한다
+# Railway 환경변수에서 설정을 읽음 (.env 파일 불필요)
 ENV PYTHONPATH=/app
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

@@ -5,6 +5,11 @@ import type { ReportData } from "@/lib/types/report";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ngrok free 브라우저 경고 우회 헤더
+const COMMON_HEADERS: Record<string, string> = {
+  "ngrok-skip-browser-warning": "true",
+};
+
 // API 에러 클래스
 export class ApiError extends Error {
   constructor(
@@ -87,7 +92,7 @@ export async function createBooking(data: {
 
   const response = await fetch(`${API_URL}/api/v1/booking`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
     body: JSON.stringify(body),
   });
 
@@ -120,8 +125,8 @@ export async function uploadPhotos(
 
   const response = await fetch(`${API_URL}/api/v1/photos/${userId}`, {
     method: "POST",
+    headers: { ...COMMON_HEADERS },
     body: formData,
-    // Content-Type은 브라우저가 자동 설정 (boundary 포함)
   });
 
   return handleResponse<PhotoUploadResponse>(response);
@@ -133,7 +138,7 @@ export async function runAnalysis(
 ): Promise<AnalysisResponse> {
   const response = await fetch(`${API_URL}/api/v1/analyze/${userId}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
   });
 
   return handleResponse<AnalysisResponse>(response);
@@ -143,7 +148,7 @@ export async function runAnalysis(
 export async function getReport(userId: string): Promise<ReportData> {
   const response = await fetch(`${API_URL}/api/v1/report/${userId}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
   });
 
   return handleResponse<ReportData>(response);

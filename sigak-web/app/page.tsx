@@ -18,7 +18,7 @@ const GALLERY = [
 ] as const;
 const PROCESS = [
   { step: "01", title: "셀카 업로드", desc: "정면 사진 1장과 간단한 설문. 추구하는 이미지, 레퍼런스, 현재 고민을 자유롭게." },
-  { step: "02", title: "AI 좌표 분석", desc: "얼굴 구조, 피부톤, 스타일 취향을 3축 좌표계에 매핑. 트렌드 데이터와 교차 분석." },
+  { step: "02", title: "AI 좌표 분석", desc: "얼굴 구조, 피부톤, 스타일 취향을 4축 좌표계에 매핑해요." },
   { step: "03", title: "맞춤 리포트", desc: "현재 위치에서 추구미까지의 구체적 경로. 메이크업, 헤어, 스타일링 실행 가이드." },
 ] as const;
 const TEAM = [
@@ -28,9 +28,9 @@ const TEAM = [
   { role: "Growth Lead", focus: "시장 검증, B2B 매칭, 데이터 전략" },
 ] as const;
 const AXES = [
-  { label: "인상", left: "소프트", right: "샤프", current: 0.35, target: 0.7 },
-  { label: "톤", left: "웰내추럴", right: "쿨글램", current: 0.6, target: 0.8 },
-  { label: "무드", left: "프레시큐트", right: "성숙시크", current: 0.45, target: 0.65 },
+  { label: "인상", left: "부드러운", right: "선명한", current: 0.35, target: 0.7 },
+  { label: "분위기", left: "프레시", right: "시크", current: 0.6, target: 0.8 },
+  { label: "존재감", left: "자연스러운", right: "볼드", current: 0.45, target: 0.65 },
 ] as const;
 
 export default function HomePage() {
@@ -59,12 +59,12 @@ export default function HomePage() {
                 <Link href="/start" className="text-sm font-medium transition-opacity duration-200 hover:opacity-50">→ 내 좌표 확인하기</Link>
                 <a href="#about" className="text-sm opacity-40">↓ 더 알아보기</a>
               </div>
-            </div><div className="relative aspect-[3/4] w-full overflow-hidden"><Image src="/images/sculptures/deer.png" alt="사슴 조각상" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" priority /></div></div></Reveal></section>
+            </div><div className="relative aspect-[2/3] w-[60%] ml-auto overflow-hidden"><Image src="/images/sculptures/deer.png" alt="사슴 조각상" fill className="object-contain" sizes="(max-width: 768px) 60vw, 30vw" priority /></div></div></Reveal></section>
       <Reveal><section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8 md:py-12"><div className="grid grid-cols-2 md:grid-cols-4 border border-black/10">
-            {(["12,400+", "3축", "24hr", "93%"] as const).map((num, i) => (
+            {(["4축", "AI 분석", "24hr", "맞춤형"] as const).map((num, i) => (
               <div key={num} className={`flex flex-col px-7 py-6 ${i < 3 ? "border-r border-black/10" : ""} ${i === 1 ? "max-md:border-r-0" : ""}`}>
                 <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">
-                  {["미감 데이터", "좌표계 매핑", "리포트 딜리버리", "만족도"][i]}
+                  {["좌표계", "얼굴 구조", "리포트 딜리버리", "스타일링 가이드"][i]}
                 </span>
                 <span className="font-[family-name:var(--font-serif)] text-[clamp(28px,4vw,48px)] font-light leading-none">
                   {num}
@@ -80,7 +80,7 @@ export default function HomePage() {
               <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">라벨이 아닌,<br />좌표를 드립니다</p>
             </div>
             <div>
-              <p className="text-[15px] leading-[1.7] opacity-70">기존 이미지 컨설팅은 쿨톤, 봄웰, 내추럴 같은 고정된 라벨을 붙여줍니다. 하지만 미감은 고정되지 않습니다 — 트렌드에 따라 이동하고, 취향에 따라 방향이 달라집니다. SIGAK은 당신의 얼굴 구조, 피부톤, 스타일 취향을 다차원 좌표계 위에 배치합니다. 현재 위치와 추구하는 방향 사이의 차이가 곧 구체적인 실행 가이드가 됩니다.</p>
+              <p className="text-[15px] leading-[1.7] opacity-70">기존 진단은 &ldquo;쿨톤이에요&rdquo;, &ldquo;가을 웜이에요&rdquo; 같은 고정 라벨을 붙여줍니다. 하지만 미감은 고정되지 않아요 — 트렌드에 따라 이동하고, 취향에 따라 방향이 달라집니다. SIGAK은 당신의 얼굴 구조, 피부톤, 스타일 취향을 다차원 좌표계 위에 배치합니다. 현재 위치와 추구하는 방향 사이의 차이가 곧 구체적인 실행 가이드가 됩니다.</p>
             </div>
             </div>
         </Reveal>
@@ -94,7 +94,7 @@ export default function HomePage() {
               <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Coordinate</h2>
             </div>
             <div>
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">3축 좌표계 미리보기</p>
+              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">좌표계 미리보기</p>
             </div>
             <div>
               <div className="space-y-0">
@@ -129,8 +129,8 @@ export default function HomePage() {
           {GALLERY.map((item, i) => (
             <Reveal key={item.id} delay={i * 0.12}>
               <div>
-                <div className="relative aspect-[3/4] w-full overflow-hidden">
-                  <Image src={item.src} alt={item.alt} fill className="object-cover" sizes="(max-width: 640px) 100vw, 33vw" />
+                <div className="relative aspect-[2/3] w-[70%] mx-auto overflow-hidden">
+                  <Image src={item.src} alt={item.alt} fill className="object-contain" sizes="(max-width: 640px) 70vw, 23vw" />
                 </div>
                 <div className="pt-5 pb-2">
                   <h3 className="font-[family-name:var(--font-serif)] text-sm font-normal mb-1.5">{item.axis}</h3>

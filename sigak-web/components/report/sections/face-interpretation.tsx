@@ -62,7 +62,7 @@ export function FaceInterpretation({
                 key={fi.feature}
                 className={`py-5 ${idx < content.feature_interpretations.length - 1 ? "border-b border-[var(--color-border)] border-opacity-40" : ""}`}
               >
-                {/* 상단: 라벨 태그 + 값 배지 + P백분위 */}
+                {/* 상단: 라벨 태그 + 값 배지 (백분위 텍스트 제거, Fix #12) */}
                 <div className="flex items-center gap-2.5 flex-wrap mb-3">
                   {/* 라벨 태그 — 깔끔한 필 스타일 */}
                   <span className="shrink-0 px-2.5 py-1 text-[11px] font-semibold tracking-[1px] border border-[var(--color-fg)] rounded-full">
@@ -71,10 +71,6 @@ export function FaceInterpretation({
                   {/* 수치 + 단위 — 아웃라인 배지 (대비 보장) */}
                   <span className="px-2 py-0.5 text-[13px] font-semibold tabular-nums text-[var(--color-fg)] border border-[var(--color-border)] rounded">
                     {formatValue(fi.value, fi.unit)}
-                  </span>
-                  {/* 범위 라벨 (예: 하위 5%, 상위 38%) */}
-                  <span className="text-[11px] text-[var(--color-muted)] tracking-[0.3px]">
-                    {fi.range_label}
                   </span>
                 </div>
 

@@ -43,12 +43,12 @@ interface GapAnalysisProps {
   locked: boolean;
 }
 
-// 축 라벨 매핑 (영문 키 → 한글)
+// 축 라벨 매핑 (영문 키 → 한글) (Fix #15)
 const AXIS_LABELS: Record<string, string> = {
-  structure: "Structure",
-  impression: "Impression",
-  maturity: "Maturity",
-  intensity: "Presence",
+  structure: "라인",
+  impression: "인상",
+  maturity: "분위기",
+  intensity: "존재감",
 };
 
 // 난이도 배지 스타일 — 프리미엄 모노크롬
@@ -128,11 +128,11 @@ function DirectionCard({ item }: { item: DirectionItem }) {
 
   return (
     <div className="p-4 border border-[var(--color-border)] rounded-lg">
-      {/* 상단: 축 라벨 + 난이도 배지 + delta */}
+      {/* 상단: 축 라벨 + 난이도 배지 (Fix #15: delta 수치 제거, 난이도 라벨만) */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)]">
-            {item.label}
+            {AXIS_LABELS[item.axis] ?? item.label}
           </span>
           <span
             className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${getDifficultyStyle(item.difficulty)}`}
@@ -140,9 +140,6 @@ function DirectionCard({ item }: { item: DirectionItem }) {
             {item.difficulty}
           </span>
         </div>
-        <span className="text-[11px] font-semibold text-[var(--color-fg)]">
-          {item.difficulty}
-        </span>
       </div>
 
       {/* from → to 라벨 */}
@@ -275,6 +272,11 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           </span>
         </div>
 
+        {/* 차트 읽기 안내 (Fix #14) */}
+        <p className="text-[12px] text-[var(--color-muted)] mb-3 leading-relaxed">
+          ○가 지금 위치, ●이 가고 싶은 위치예요.
+        </p>
+
         {/* 2단 레이아웃: 산점도(좌) + 미니 비교(우) — 모바일은 스택 */}
         <div className="flex flex-col md:flex-row gap-6 items-start">
           {/* 산점도 */}
@@ -312,6 +314,11 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
             </div>
           </div>
         </div>
+
+        {/* 차트 아래 안내 (Fix #14) */}
+        <p className="text-[11px] text-[var(--color-muted)] mt-4 leading-relaxed">
+          위 차트는 성숙도(↕)와 존재감(↔) 두 축을 보여줘요. 아래에서 4축을 각각 볼 수 있어요.
+        </p>
       </div>
 
       {/* ─── 갭 요약 ─── */}

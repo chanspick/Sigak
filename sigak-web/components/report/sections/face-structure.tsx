@@ -12,6 +12,8 @@ interface FaceMetric {
   context: string;
   min_label?: string;
   max_label?: string;
+  show_numeric_value?: boolean;
+  context_label?: string;
 }
 
 interface FaceStructureContent {
@@ -78,6 +80,15 @@ function FaceShapeIcon({ shape }: { shape: string }) {
   );
 }
 
+// "상위 X%", "하위 X%", "P45" 등 백분위 텍스트 제거 (Fix #12)
+function stripPercentileText(text: string): string {
+  return text
+    .replace(/[상하]위\s*\d+(\.\d+)?%/g, "")
+    .replace(/P\d+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // 수치 포맷 — 정수/소수점 구분
 function formatValue(value: number, unit: string): string {
   if (value == null) return "";
@@ -129,13 +140,15 @@ export function FaceStructure({ content }: FaceStructureProps) {
               paddingTop: idx > 0 ? "16px" : "0",
             }}
           >
-            {/* 상단 행: 라벨(좌) + 값+단위(우, 볼드 tabular-nums) */}
+            {/* 상단 행: 라벨(좌) + 값 또는 맥락 라벨(우) */}
             <div className="flex items-baseline justify-between mb-2">
               <span className="text-[13px] text-[var(--color-muted)] tracking-[0.3px]">
                 {metric.label}
               </span>
               <span className="text-[15px] font-semibold tabular-nums text-[var(--color-fg)]">
-                {formatValue(metric.value, metric.unit)}
+                {metric.show_numeric_value !== false
+                  ? formatValue(metric.value, metric.unit)
+                  : metric.context_label ?? ""}
               </span>
             </div>
 
@@ -150,9 +163,9 @@ export function FaceStructure({ content }: FaceStructureProps) {
               </div>
             )}
 
-            {/* 맥락 설명 — 작고 뮤트된 텍스트 */}
+            {/* 맥락 설명 — 백분위 텍스트 제거 후 표시 (Fix #12) */}
             <p className="text-[11px] text-[var(--color-muted)] leading-relaxed opacity-80">
-              {metric.context}
+              {stripPercentileText(metric.context)}
             </p>
 
             {/* 미세 구분선 (마지막 항목 제외) */}

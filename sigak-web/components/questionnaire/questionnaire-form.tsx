@@ -25,8 +25,8 @@ interface QuestionnaireFormProps {
 
 const TOTAL_STEPS = 3;
 const STORAGE_PREFIX = "questionnaire-";
-// 핵심 질문 6개 중 최소 4개 답변 필수
-const MIN_CORE_ANSWERS = 4;
+// 핵심 질문 5개 중 최소 3개 답변 필수
+const MIN_CORE_ANSWERS = 3;
 
 interface SavedState {
   step: number;
@@ -157,7 +157,7 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
             기본 질문
           </h2>
           <p className="text-[12px] opacity-40 mb-5">
-            6개 중 최소 {MIN_CORE_ANSWERS}개 이상 답변해 주세요 (
+            5개 중 최소 {MIN_CORE_ANSWERS}개 이상 답변해 주세요 (
             {coreAnswerCount}/{CORE_QUESTIONS.length} 완료)
           </p>
           <QuestionnaireStep

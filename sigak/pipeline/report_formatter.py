@@ -34,9 +34,8 @@ def contains_raw_metric(text: str) -> bool:
 
 
 def sanitize_interpretation(text: str) -> str:
-    """해석문에서 raw 수치 패턴을 제거하고 문장을 정리"""
-    if not contains_raw_metric(text):
-        return text
+    """해석문에서 raw 수치 + 잔해 패턴을 제거하고 문장을 정리"""
+    # 수치 제거 (contains_raw_metric 체크 없이 항상 실행 — 잔해도 처리)
     # "101.5도의 턱선" → "턱선"
     text = _re.sub(r"\d+(\.\d+)?도의?\s*", "", text)
     # "93.7°의 턱선" → "턱선"
@@ -47,9 +46,12 @@ def sanitize_interpretation(text: str) -> str:
     text = _re.sub(r"\s*\d+\.\d+\s*", " ", text)
     # 남은 "101도" 등
     text = _re.sub(r"\d+도", "", text)
+    # 문두 잔해 패턴 (#1: sanitize 잔해)
+    text = _re.sub(r"^(각도로|비율로|돌출도로|근접도로|점수로|종횡비로)\s*", "", text)
+    text = _re.sub(r"^로\s+", "", text)
     # 정리
     text = _re.sub(r"\s{2,}", " ", text).strip()
-    text = _re.sub(r"^[의는이가을를에서]\s+", "", text)
+    text = _re.sub(r"^[의는이가을를에서로]\s+", "", text)
     # 빈 괄호 제거
     text = _re.sub(r"\(\s*\)", "", text)
     text = _re.sub(r"\s{2,}", " ", text).strip()
@@ -108,6 +110,49 @@ SKIN_COLOR_MAP = {
         "avoid": ["극강 오렌지", "극강 블루핑크"],
     },
 }
+
+# #9: zone 이름 한글화 매핑
+ZONE_NAME_KR = {
+    "overall": "전체 베이스", "cheek_apple": "볼 사과존", "lip": "입술",
+    "under_eye": "눈 밑", "jawline": "턱선", "forehead": "이마",
+    "forehead_center": "이마 중앙", "eye_line": "아이라인", "brow": "눈썹",
+    "brow_tail": "눈썹 끝", "brow_arch": "눈썹 아치", "outer_eye": "눈꼬리",
+    "eye_crease": "눈두덩", "nose_bridge": "콧대", "nose_tip": "코끝",
+    "mid_cheek": "볼 중앙", "cheekbone": "광대", "temple": "관자놀이",
+    "lip_center": "입술 중앙", "lip_corner": "입꼬리",
+}
+
+# #4: subtone 라벨 ("웜톤·보통" → "웜 소프트")
+SUBTONE_MAP = {
+    ("웜톤", "밝은 편"): ("웜 라이트", "따뜻하고 밝은 톤"),
+    ("웜톤", "보통"): ("웜 소프트", "따뜻하고 차분한 톤"),
+    ("웜톤", "어두운 편"): ("웜 딥", "따뜻하고 깊은 톤"),
+    ("쿨톤", "밝은 편"): ("쿨 라이트", "차갑고 밝은 톤"),
+    ("쿨톤", "보통"): ("쿨 소프트", "차갑고 차분한 톤"),
+    ("쿨톤", "어두운 편"): ("쿨 딥", "차갑고 깊은 톤"),
+    ("뉴트럴", "밝은 편"): ("뉴트럴 라이트", "중성적이고 밝은 톤"),
+    ("뉴트럴", "보통"): ("뉴트럴 소프트", "중성적이고 차분한 톤"),
+    ("뉴트럴", "어두운 편"): ("뉴트럴 딥", "중성적이고 깊은 톤"),
+}
+
+
+def get_subtone_label(tone_kr: str, brightness_label: str) -> tuple[str, str]:
+    """(subtone 이름, 설명) 반환."""
+    return SUBTONE_MAP.get((tone_kr, brightness_label), (f"{tone_kr} {brightness_label}", ""))
+
+
+# #5: metric context 라벨 생성 (무단위 비율은 자연어로)
+def _get_context_label(key: str, value: float, percentile: int) -> str:
+    """percentile 기반 자연어 라벨 — 숫자 대신 이것만 표시."""
+    tone = percentile_to_tone_kr(percentile)
+    LABEL_MAP = {
+        "jaw_angle": {True: f"{round(value, 1)}\u00B0"},  # 각도는 숫자 OK
+        "eye_tilt": {True: f"{round(value, 1)}\u00B0"},
+    }
+    if key in LABEL_MAP:
+        return LABEL_MAP[key][True]
+    return tone
+
 
 # 얼굴형 한국어 매핑
 FACE_SHAPE_KR = {
@@ -369,6 +414,15 @@ def _build_face_metrics(features: dict) -> list[dict]:
         pct = _percentile(key, value)
         context = _build_metric_context(key, value, pct)
 
+        # #7: context에서 "상위X%", "하위X%" 제거
+        context = _re.sub(r"상위 \d+%\s*[—\-]\s*", "", context)
+        context = _re.sub(r"하위 \d+%\s*[—\-]\s*", "", context)
+        context = context.strip()
+
+        # #5: show_numeric_value (각도 단위만 숫자 표시) + context_label
+        show_numeric = key in ("jaw_angle", "eye_tilt")
+        context_label = _get_context_label(key, float(value), pct)
+
         metrics.append({
             "key": key,
             "label": config["label"],
@@ -380,6 +434,8 @@ def _build_face_metrics(features: dict) -> list[dict]:
             "max_value": config["max_value"],
             "min_label": config["min_label"],
             "max_label": config["max_label"],
+            "show_numeric_value": show_numeric,
+            "context_label": context_label,
         })
 
     return metrics
@@ -423,6 +479,14 @@ def _build_face_structure(face_features: dict) -> dict:
     face_type_raw = face_features.get("face_shape", "oval")
     face_type = FACE_SHAPE_KR.get(face_type_raw, face_type_raw)
 
+    # #4-2: 헤더에서 raw 숫자 대신 자연어
+    sym_val = face_features.get("symmetry_score", 0)
+    sym_pct = _percentile("symmetry_score", float(sym_val)) if sym_val else 50
+    sym_label = percentile_to_tone_kr(sym_pct)
+    gr_val = face_features.get("golden_ratio_score", 0)
+    gr_pct = _percentile("golden_ratio_score", float(gr_val)) if gr_val else 50
+    gr_label = percentile_to_tone_kr(gr_pct)
+
     return {
         "id": "face_structure",
         "locked": False,
@@ -430,8 +494,8 @@ def _build_face_structure(face_features: dict) -> dict:
             "face_type": face_type,
             "face_length_ratio": face_features.get("face_length_ratio", 0),
             "jaw_angle": face_features.get("jaw_angle", 0),
-            "symmetry_score": face_features.get("symmetry_score", 0),
-            "golden_ratio_score": face_features.get("golden_ratio_score", 0),
+            "symmetry_label": f"대칭 {sym_label}",
+            "golden_ratio_label": f"황금비 {gr_label}",
             "metrics": _build_face_metrics(face_features),
         },
     }
@@ -457,13 +521,18 @@ def _build_skin_analysis(face_features: dict) -> dict:
 
     color_info = SKIN_COLOR_MAP.get(tone, SKIN_COLOR_MAP["neutral"])
 
+    # #4: subtone 라벨 ("웜톤·보통" → "웜 소프트")
+    subtone_name, subtone_desc = get_subtone_label(tone_kr, brightness_label)
+
     return {
         "id": "skin_analysis",
         "locked": True,
         "unlock_level": "standard",
-        "teaser": {"headline": f"{tone_kr} \u00B7 {brightness_label}"},
+        "teaser": {"headline": subtone_name},
         "content": {
             "tone": tone_kr,
+            "subtone": subtone_name,
+            "subtone_description": subtone_desc,
             "brightness": brightness_label,
             "warmth_score": round(warmth, 2),
             "recommended_colors": color_info["recommended"],
@@ -636,11 +705,15 @@ def _build_gap_analysis(
     primary_delta = abs(gap_vector.get(primary_dir, 0))
     secondary_delta = abs(gap_vector.get(secondary_dir, 0))
 
-    primary_label = AXIS_LABELS.get(primary_dir, {}).get("name_kr", primary_dir)
-    secondary_label = AXIS_LABELS.get(secondary_dir, {}).get("name_kr", secondary_dir)
-    pp1 = _postposition(primary_label, "이", "가")
-    pp2 = _postposition(secondary_label, "이", "가")
-    gap_summary = f"주요 변화 방향은 {primary_label}{pp1}고, {secondary_label}{pp2} 보조 방향이에요."
+    # #6: 축 이름 대신 방향을 직접 서술
+    primary_shift_kr = gap.get("primary_shift_kr", "")
+    secondary_shift_kr = gap.get("secondary_shift_kr", "")
+    primary_neg = AXIS_LABELS.get(primary_dir, {}).get("neg", "")
+    primary_pos = AXIS_LABELS.get(primary_dir, {}).get("pos", "")
+    # "가장 큰 변화는 볼드함을 빼고 자연스럽게 가는 거예요"
+    gap_summary = f"가장 큰 변화는 더 {primary_shift_kr} 방향으로 가는 거예요."
+    if secondary_shift_kr and secondary_dir != primary_dir:
+        gap_summary += f" 그리고 전체적으로 더 {secondary_shift_kr} 느낌으로요."
 
     # direction_items 생성
     direction_items = []
@@ -710,88 +783,53 @@ def _build_action_plan(
     # LLM action_items 가져오기
     llm_items = _safe_get(report_content, "action_items", [])
 
-    # 카테고리별 그룹핑
+    # #8: priority 한글 라벨 + % 제거 + #9: zone 한글화
+    PRIORITY_LABEL_KR = {"HIGH": "핵심 포인트", "MEDIUM": "추가하면 좋은 포인트", "LOW": "보너스"}
+
     category_map: dict[str, dict] = {}
     for item in llm_items:
-        cat = item.get("category", "기타")
+        cat_raw = item.get("category", "기타")
+        cat = ZONE_NAME_KR.get(cat_raw, cat_raw)  # zone 한글화
         priority = item.get("priority", "MEDIUM").upper()
         rec_text = item.get("recommendation", "")
 
         if cat not in category_map:
             category_map[cat] = {
                 "category": cat,
-                "priority": priority,
-                "target_axis": gap.get("primary_direction", "maturity"),
-                "target_delta": round(abs(gap_vector.get(
-                    gap.get("primary_direction", "maturity"), 0
-                )), 2),
+                "priority": PRIORITY_LABEL_KR.get(priority, priority),
                 "recommendations": [],
             }
 
-        # delta_contribution: priority 기반 차등 (HIGH=3, MEDIUM=2, LOW=1)
-        priority_score = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(priority, 1)
-        est_contribution = round(priority_score * 0.12, 2) if magnitude > 0 else 0.1
-
         category_map[cat]["recommendations"].append({
             "action": rec_text,
-            "expected_effect": f"{gap.get('primary_shift_kr', '')} 방향 이동",
-            "delta_contribution": est_contribution,
+            "expected_effect": f"더 {gap.get('primary_shift_kr', '')} 느낌으로",
         })
 
     items = list(category_map.values())
 
     # 폴백: LLM이 빈 결과를 줬을 때 기본 카테고리 생성
     if not items:
-        primary_axis = gap.get("primary_direction", "maturity")
-        primary_delta = abs(gap_vector.get(primary_axis, 0))
+        shift_kr = gap.get("primary_shift_kr", "")
         items = [
             {
                 "category": "메이크업",
-                "priority": "HIGH",
-                "target_axis": primary_axis,
-                "target_delta": round(primary_delta, 2),
-                "recommendations": [
-                    {
-                        "action": "갭 분석 기반 메이크업 조정 필요",
-                        "expected_effect": f"{AXIS_LABELS.get(primary_axis, {}).get('name_kr', '')} 축 이동",
-                        "delta_contribution": round(primary_delta * 0.3, 2),
-                    },
-                ],
+                "priority": "핵심 포인트",
+                "recommendations": [{"action": "메이크업으로 전체 인상을 조정해보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
             },
             {
                 "category": "헤어",
-                "priority": "HIGH",
-                "target_axis": primary_axis,
-                "target_delta": round(primary_delta, 2),
-                "recommendations": [
-                    {
-                        "action": "갭 분석 기반 헤어 스타일 조정 필요",
-                        "expected_effect": f"{AXIS_LABELS.get(primary_axis, {}).get('name_kr', '')} 축 이동",
-                        "delta_contribution": round(primary_delta * 0.2, 2),
-                    },
-                ],
+                "priority": "핵심 포인트",
+                "recommendations": [{"action": "헤어 스타일링으로 분위기를 바꿔보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
             },
             {
                 "category": "스타일링",
-                "priority": "MEDIUM",
-                "target_axis": gap.get("secondary_direction", "intensity"),
-                "target_delta": round(abs(gap_vector.get(
-                    gap.get("secondary_direction", "intensity"), 0
-                )), 2),
-                "recommendations": [
-                    {
-                        "action": "갭 분석 기반 스타일링 조정 필요",
-                        "expected_effect": "보조축 이동",
-                        "delta_contribution": 0.1,
-                    },
-                ],
+                "priority": "추가하면 좋은 포인트",
+                "recommendations": [{"action": "전체 스타일링 방향을 맞춰보세요.", "expected_effect": "전체 조화"}],
             },
         ]
 
     # 티저용 카테고리 요약
-    teaser_categories = [
-        f"{item['category']} {item['priority']}" for item in items[:3]
-    ]
+    teaser_categories = [item["category"] for item in items[:3]]
 
     return {
         "id": "action_plan",
@@ -882,7 +920,12 @@ def _build_trend_context(report_content: dict, user_name: str = "", action_spec=
     """trend_context 섹션 -- full 잠금. LLM 출력 무시, 항상 deterministic."""
     top_zones = []
     if action_spec and hasattr(action_spec, 'recommended_actions'):
-        top_zones = [a.zone for a in action_spec.recommended_actions[:2]]
+        top_zones = [ZONE_NAME_KR.get(a.zone, a.zone) for a in action_spec.recommended_actions[:2]]
+    # fallback: action_spec 없으면 report_content에서 추출
+    if not top_zones:
+        action_items = _safe_get(report_content, "action_items", [])
+        if isinstance(action_items, list):
+            top_zones = [ZONE_NAME_KR.get(item.get("category", ""), item.get("category", "")) for item in action_items[:2]]
     zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
     name = user_name or "고객"
     trends = [{

@@ -19,8 +19,6 @@ export function DistributionBar({
   const pos = Math.max(0, Math.min(100, percentile));
   // SVG 내 마커 X 위치 (양쪽 4px 패딩)
   const markerX = 6 + (pos / 100) * 188;
-  // 백분위 포맷: P62 스타일
-  const pLabel = `P${Math.round(pos)}`;
 
   return (
     <div className="w-full max-w-[260px]">
@@ -29,7 +27,7 @@ export function DistributionBar({
         viewBox="0 0 200 32"
         className="w-full h-auto"
         role="img"
-        aria-label={`분포 위치: 백분위 ${Math.round(pos)}`}
+        aria-label="분포 위치"
       >
         {/* ─── 가우시안 벨커브 실루엣 (부드러운 배경) ─── */}
         <path
@@ -89,19 +87,7 @@ export function DistributionBar({
           opacity="0.6"
         />
 
-        {/* ─── 백분위 라벨 (마커 상단) ─── */}
-        <text
-          x={markerX}
-          y="6"
-          fontSize="7.5"
-          fill="var(--color-fg)"
-          textAnchor="middle"
-          fontFamily="ui-monospace, monospace"
-          fontWeight="600"
-          letterSpacing="0.3"
-        >
-          {pLabel}
-        </text>
+        {/* 백분위 라벨 제거 — 슬라이더 위치만으로 표현 (Fix #12) */}
       </svg>
 
       {/* 양쪽 끝 라벨 — 미세한 페이드 효과를 위한 그라데이션 텍스트 */}

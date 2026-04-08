@@ -71,8 +71,8 @@ function scoreToPercent(score: number): number {
 
 // 축 양 끝 라벨 (백엔드 미제공 시 폴백)
 const AXIS_END_LABELS: Record<string, { low: string; high: string }> = {
-  structure: { low: "부드러운", high: "각진" },
-  impression: { low: "부드러운", high: "선명한" },
+  structure: { low: "둥근", high: "각진" },
+  impression: { low: "온화한", high: "선명한" },
   maturity: { low: "프레시", high: "성숙한" },
   intensity: { low: "절제된", high: "화려한" },
 };
@@ -227,7 +227,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
       </h2>
 
       {/* ─── 현재 → 추구 비주얼 카드 ─── */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-start gap-4 mb-8">
         {/* 현재 유형 */}
         <div className="flex flex-col items-center gap-2 flex-1">
           {currentImg && (
@@ -280,7 +280,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           </span>
           {/* 추구 유형 특징 포인트 (1-12) */}
           {content.aspiration_features && content.aspiration_features.length > 0 ? (
-            <ul className="mt-1.5 space-y-0.5 text-left">
+            <ul className="mt-1.5 space-y-0.5 text-left list-none p-0 m-0">
               {content.aspiration_features.slice(0, 4).map((feat, i) => (
                 <li key={i} className="text-[10px] text-[var(--color-muted)] leading-snug">
                   · {feat}

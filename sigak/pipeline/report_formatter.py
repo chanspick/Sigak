@@ -258,20 +258,20 @@ FACE_SHAPE_KR = {
 # gap recommendation 템플릿
 GAP_RECOMMENDATION_TEMPLATES = {
     "structure": {
-        "increase": "구조 축에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
-        "decrease": "구조 축에서는 라인을 부드럽게 풀어주는 방향이 핵심이에요.",
+        "increase": "라인에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+        "decrease": "라인에서는 윤곽을 둥글고 부드럽게 풀어주는 방향이 핵심이에요.",
     },
     "impression": {
-        "increase": "인상 축에서는 눈매와 이목구비를 또렷하게 살리는 방향이 중요해요.",
-        "decrease": "인상 축에서는 눈매와 라인을 부드럽게 풀어주는 방향이 중요해요.",
+        "increase": "인상에서는 눈매와 이목구비를 또렷하게 살리는 방향이 중요해요.",
+        "decrease": "인상에서는 눈매를 온화하고 부드럽게 풀어주는 방향이 중요해요.",
     },
     "maturity": {
-        "increase": "성숙도 축에서는 세련되고 성숙한 분위기를 더하는 방향이에요.",
-        "decrease": "성숙도 축에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
+        "increase": "분위기에서는 세련되고 성숙한 느낌을 더하는 방향이에요.",
+        "decrease": "분위기에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
     },
     "intensity": {
-        "increase": "존재감 축에서는 존재감 있고 임팩트 있는 표현이 포인트예요.",
-        "decrease": "존재감 축에서는 자연스럽고 힘을 뺀 표현이 포인트예요.",
+        "increase": "존재감에서는 임팩트 있고 또렷한 표현이 포인트예요.",
+        "decrease": "존재감에서는 자연스럽고 힘을 뺀 표현이 포인트예요.",
     },
 }
 
@@ -328,12 +328,12 @@ def _postposition(word: str, with_batchim: str, without_batchim: str) -> str:
 AXIS_LABELS = {
     "structure": {
         "name_kr": "라인",
-        "low": "부드러운", "high": "각진",
-        "description": "턱선 각도, 광대, 얼굴 길이로 본 윤곽의 부드러움과 날카로움",
+        "low": "둥근", "high": "각진",
+        "description": "턱선 각도, 광대, 얼굴 길이로 본 윤곽의 둥근 정도",
     },
     "impression": {
         "name_kr": "인상",
-        "low": "부드러운", "high": "선명한",
+        "low": "온화한", "high": "선명한",
         "description": "눈매 기울기와 눈썹 아치가 만드는 전체적인 인상",
     },
     "maturity": {
@@ -699,7 +699,7 @@ def _build_face_interpretation(
     UNIT_MAP = {"jaw_angle": "\u00B0", "eye_tilt": "\u00B0"}
     LABEL_MAP = {
         "jaw_angle": ("날카로운", "둥근"),
-        "eye_tilt": ("처진 -5\u00B0", "올라간 +8\u00B0"),
+        "eye_tilt": ("처진", "올라간"),
         "lip_fullness": ("얇은", "풍성한"),
         "brow_arch": ("일자", "아치"),
         "symmetry_score": ("비대칭", "대칭"),
@@ -922,6 +922,29 @@ def _build_action_plan(
     # #8: priority 한글 라벨 + % 제거 + #9: zone 한글화
     PRIORITY_LABEL_KR = {"HIGH": "핵심 포인트", "MEDIUM": "추가하면 좋은 포인트", "LOW": "보너스"}
 
+    # zone → 주요 기여 축 매핑 (어떤 축에 영향을 주는 zone인지)
+    ZONE_AXIS_MAP = {
+        "jawline": "structure", "cheekbone": "structure", "forehead": "structure",
+        "under_eye": "impression", "brow": "impression", "brow_arch": "impression",
+        "brow_tail": "impression", "eye_line": "impression", "outer_eye": "impression",
+        "cheek_apple": "maturity", "mid_cheek": "maturity",
+        "lip": "intensity", "lip_center": "intensity", "lip_corner": "intensity",
+        "nose_bridge": "intensity", "nose_tip": "intensity",
+    }
+    gap_vector = gap.get("vector", {})
+
+    def _zone_effect_label(zone_raw: str) -> str:
+        """zone의 주요 기여 축 + gap 방향 → 방향 태그 생성."""
+        axis = ZONE_AXIS_MAP.get(zone_raw)
+        if axis and axis in gap_vector:
+            delta = gap_vector[axis]
+            ax = AXIS_LABELS.get(axis, {})
+            direction = ax.get("high") if delta > 0 else ax.get("low")
+            name_kr = ax.get("name_kr", axis)
+            if direction:
+                return f"더 {direction} {name_kr}으로"
+        return f"더 {gap.get('primary_shift_kr', '')} 느낌으로"
+
     category_map: dict[str, dict] = {}
     for item in llm_items:
         cat_raw = item.get("category", "기타")
@@ -938,7 +961,7 @@ def _build_action_plan(
 
         category_map[cat]["recommendations"].append({
             "action": rec_text,
-            "expected_effect": f"더 {gap.get('primary_shift_kr', '')} 느낌으로",
+            "expected_effect": _zone_effect_label(cat_raw),
         })
 
     items = list(category_map.values())
@@ -1037,7 +1060,8 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
     has_bracket = any("[" in r or "]" in r for r in reasons)
     if not reasons or has_bracket:
         match_score = similarity_pct / 100.0
-        axis_values = primary.get("reference_coords", {})
+        # axis_delta: find_similar_types() 반환값에 포함 (유저↔앵커 축 차이)
+        axis_values = primary.get("axis_delta", {})
         reasons = build_why_this_type(type_name, match_score, axis_values)
 
     # styling_tips deterministic 폴백

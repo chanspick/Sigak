@@ -15,16 +15,17 @@ const AXIS_META: Record<
   string,
   { label: string; minLabel: string; maxLabel: string }
 > = {
-  structure: { label: "라인", minLabel: "부드러운", maxLabel: "각진" },
-  impression: { label: "인상", minLabel: "부드러운", maxLabel: "선명한" },
+  structure: { label: "라인", minLabel: "둥근", maxLabel: "각진" },
+  impression: { label: "인상", minLabel: "온화한", maxLabel: "선명한" },
   maturity: { label: "분위기", minLabel: "프레시", maxLabel: "성숙한" },
   intensity: { label: "존재감", minLabel: "절제된", maxLabel: "화려한" },
 };
 
 // 한국어 형용사 → "~고" 연결형 (ㅂ불규칙 등 직접 매핑)
 const CONNECTIVE_MAP: Record<string, string> = {
-  "부드러운": "부드럽고",
+  "둥근": "둥글고",
   "각진": "각지고",
+  "온화한": "온화하고",
   "선명한": "선명하고",
   "프레시": "프레시하고",
   "성숙한": "성숙하고",

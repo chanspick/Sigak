@@ -65,19 +65,23 @@ def _sanitize(obj):
 
 # ─────────────────────────────────────────────
 #  한국 여성 얼굴 통계 (백분위 계산용)
-#  실 DB 없으므로 논문/경험 기반 근사치 사용
+#  SCUT-FBP5500 AF 2000장, InsightFace 실측 (2026-04-08)
 # ─────────────────────────────────────────────
 
 FACE_STATS = {
-    "jaw_angle":             {"mean": 124.0,  "std": 8.0},
-    "eye_tilt":              {"mean": 1.5,    "std": 2.5},
-    "face_length_ratio":     {"mean": 1.35,   "std": 0.1},
-    "symmetry_score":        {"mean": 0.88,   "std": 0.05},
-    "golden_ratio_score":    {"mean": 0.72,   "std": 0.08},
-    "cheekbone_prominence":  {"mean": 0.3,    "std": 0.12},
-    "lip_fullness":          {"mean": 0.045,  "std": 0.01},
-    "eye_width_ratio":       {"mean": 0.24,   "std": 0.03},
-    "brow_arch":             {"mean": 0.015,  "std": 0.005},
+    "jaw_angle":             {"mean": 102.92, "std": 10.70},
+    "eye_tilt":              {"mean": 2.30,   "std": 2.81},
+    "face_length_ratio":     {"mean": 1.227,  "std": 0.052},
+    "symmetry_score":        {"mean": 0.919,  "std": 0.084},
+    "golden_ratio_score":    {"mean": 0.794,  "std": 0.046},
+    "cheekbone_prominence":  {"mean": 0.628,  "std": 0.088},
+    "lip_fullness":          {"mean": 0.062,  "std": 0.040},
+    "eye_width_ratio":       {"mean": 0.193,  "std": 0.014},
+    "brow_arch":             {"mean": 0.031,  "std": 0.004},
+    "eye_ratio":             {"mean": 0.343,  "std": 0.049},
+    "forehead_ratio":        {"mean": 0.412,  "std": 0.044},
+    "philtrum_ratio":        {"mean": 0.264,  "std": 0.051},
+    "nose_bridge_height":    {"mean": 0.518,  "std": 0.039},
 }
 
 # 피부톤별 추천/비추천 컬러

@@ -53,25 +53,25 @@ AXES = [
 
 
 # ─────────────────────────────────────────────
-#  Observed Ranges (F-0.5: FACE_STATS p10~p90 기반)
-#  실측 샘플 확보 후 교체할 것
+#  Observed Ranges (SCUT-FBP5500 AF 2000장, InsightFace, p10~p90)
+#  2026-04-08 실측 캘리브레이션
 # ─────────────────────────────────────────────
 
 OBSERVED_RANGES: dict[str, tuple[float, float]] = {
-    "eye_tilt": (-2.0, 5.0),
-    "brow_arch": (0.008, 0.022),
-    "eye_ratio": (0.28, 0.42),
-    "lip_fullness": (0.030, 0.060),
-    "eye_width_ratio": (0.20, 0.28),
-    "nose_bridge_height": (0.02, 0.08),
+    "eye_tilt": (-1.06, 5.50),
+    "brow_arch": (0.026, 0.037),
+    "eye_ratio": (0.284, 0.41),
+    "lip_fullness": (0.003, 0.106),
+    "eye_width_ratio": (0.178, 0.214),
+    "nose_bridge_height": (0.472, 0.573),
     "brow_eye_distance": (0.1, 0.4),  # optional, 미존재 시 skip
     # structure 축 전용
-    "jaw_angle": (110.0, 150.0),
-    "cheekbone_prominence": (0.1, 0.6),
-    "face_length_ratio": (1.15, 1.55),
+    "jaw_angle": (90.1, 117.2),
+    "cheekbone_prominence": (0.522, 0.746),
+    "face_length_ratio": (1.158, 1.293),
     # maturity 축 전용
-    "forehead_ratio": (0.25, 0.45),
-    "philtrum_ratio": (0.15, 0.30),
+    "forehead_ratio": (0.354, 0.465),
+    "philtrum_ratio": (0.206, 0.339),
 }
 
 

@@ -19,11 +19,12 @@ import re as _re
 
 # raw 수치 패턴 — face_interpretation 해석문 필터용
 RAW_NUMBER_PATTERNS = [
-    r"\d+(\.\d+)?°",       # 93.7°
-    r"\d+(\.\d+)?%",       # 87%
-    r"\b0\.\d{2,}\b",      # 0.644, 0.872
-    r"\b1\.\d{2,}\b",      # 1.366
-    r"\d{2,}\.\d+의\s",    # "93.7의 "
+    r"\d+(\.\d+)?°",           # 93.7°
+    r"\d+(\.\d+)?도",          # 101.5도 (한글 '도')
+    r"\d+(\.\d+)?%",           # 87%
+    r"0\.\d{2,}",              # 0.644, 0.872 (word boundary 제거 — 더 공격적)
+    r"1\.\d{2,}",              # 1.366
+    r"\d{2,}\.\d+",            # 93.7, 101.5 등 2자리 이상 소수
 ]
 
 
@@ -36,14 +37,22 @@ def sanitize_interpretation(text: str) -> str:
     """해석문에서 raw 수치 패턴을 제거하고 문장을 정리"""
     if not contains_raw_metric(text):
         return text
-    text = _re.sub(r"\d+(\.\d+)?°의\s*", "", text)
-    text = _re.sub(r"\b[01]\.\d+의\s*", "", text)
+    # "101.5도의 턱선" → "턱선"
+    text = _re.sub(r"\d+(\.\d+)?도의?\s*", "", text)
+    # "93.7°의 턱선" → "턱선"
     text = _re.sub(r"\d+(\.\d+)?°의?\s*", "", text)
-    text = _re.sub(r"\b0\.\d{2,}\b", "", text)
-    text = _re.sub(r"\b1\.\d{2,}\b", "", text)
+    # "0.872의 황금비" → "황금비"
+    text = _re.sub(r"\d+\.\d+의\s*", "", text)
+    # 남은 소수점 숫자 (문장 내)
+    text = _re.sub(r"\s*\d+\.\d+\s*", " ", text)
+    # 남은 "101도" 등
+    text = _re.sub(r"\d+도", "", text)
+    # 정리
     text = _re.sub(r"\s{2,}", " ", text).strip()
-    text = _re.sub(r"^의\s+", "", text)
-    text = _re.sub(r"^는\s+", "", text)
+    text = _re.sub(r"^[의는이가을를에서]\s+", "", text)
+    # 빈 괄호 제거
+    text = _re.sub(r"\(\s*\)", "", text)
+    text = _re.sub(r"\s{2,}", " ", text).strip()
     return text
 
 
@@ -267,8 +276,12 @@ def _build_metric_context(key: str, value: float, percentile: int) -> str:
         else:
             return "긴 얼굴형"
     elif key == "symmetry_score":
-        rank = 100 - percentile
-        return f"상위 {rank}% \u2014 {'균형 잡힌 구조' if percentile >= 60 else '보통 수준'}"
+        if percentile >= 60:
+            return f"상위 {100 - percentile}% \u2014 균형 잡힌 구조"
+        elif percentile <= 25:
+            return f"하위 {percentile}% \u2014 비대칭이 있는 편"
+        else:
+            return "보통 수준"
     elif key == "golden_ratio_score":
         return "조화로운 비율" if value >= 0.7 else "보통 수준"
     elif key == "cheekbone_prominence":
@@ -315,31 +328,32 @@ def _build_metric_context(key: str, value: float, percentile: int) -> str:
 # ─────────────────────────────────────────────
 
 # 메트릭별 표시 범위 설정
+# SCUT-FBP5500 AF InsightFace 실측 기반 (p5~p95 범위)
 METRIC_RANGES = {
     "jaw_angle": {
         "label": "턱 각도", "unit": "\u00B0",
-        "min_value": 110, "max_value": 150,
-        "min_label": "날카로운 110\u00B0", "max_label": "둥근 150\u00B0",
+        "min_value": 85, "max_value": 125,
+        "min_label": "날카로운", "max_label": "둥근",
     },
     "face_length_ratio": {
         "label": "얼굴 종횡비", "unit": "",
-        "min_value": 1.1, "max_value": 1.6,
-        "min_label": "넓은 1.1", "max_label": "긴 1.6",
+        "min_value": 1.1, "max_value": 1.35,
+        "min_label": "넓은", "max_label": "긴",
     },
     "symmetry_score": {
         "label": "좌우 대칭도", "unit": "",
-        "min_value": 0.7, "max_value": 1.0,
-        "min_label": "비대칭 0.7", "max_label": "대칭 1.0",
+        "min_value": 0.6, "max_value": 1.0,
+        "min_label": "비대칭", "max_label": "대칭",
     },
     "golden_ratio_score": {
         "label": "황금비 근접도", "unit": "",
-        "min_value": 0.5, "max_value": 1.0,
-        "min_label": "낮음 0.5", "max_label": "황금비 1.0",
+        "min_value": 0.65, "max_value": 0.9,
+        "min_label": "낮음", "max_label": "황금비",
     },
     "cheekbone_prominence": {
         "label": "광대 돌출도", "unit": "",
-        "min_value": 0, "max_value": 0.8,
-        "min_label": "평면 0", "max_label": "돌출 0.8",
+        "min_value": 0.4, "max_value": 0.85,
+        "min_label": "평면", "max_label": "돌출",
     },
 }
 
@@ -865,30 +879,21 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
 
 
 def _build_trend_context(report_content: dict, user_name: str = "", action_spec=None) -> dict:
-    """trend_context 섹션 -- full 잠금."""
-    trend_text = _safe_get(report_content, "trend_context", "")
-    trends = []
-    if trend_text and len(trend_text) >= 20:
-        trends.append({
-            "title": "적용 가이드",
-            "description": trend_text,
-        })
-    else:
-        # action_spec 기반 fallback
-        top_zones = []
-        if action_spec and hasattr(action_spec, 'recommended_actions'):
-            top_zones = [a.zone for a in action_spec.recommended_actions[:2]]
-        zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
-        name = user_name or "고객"
-        trends.append({
-            "title": "적용 가이드",
-            "description": (
-                f"{name}님의 리포트에서 가장 변화가 큰 포인트는 "
-                f"{zone_str} 부분이에요. "
-                f"하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. "
-                f"처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요."
-            ),
-        })
+    """trend_context 섹션 -- full 잠금. LLM 출력 무시, 항상 deterministic."""
+    top_zones = []
+    if action_spec and hasattr(action_spec, 'recommended_actions'):
+        top_zones = [a.zone for a in action_spec.recommended_actions[:2]]
+    zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
+    name = user_name or "고객"
+    trends = [{
+        "title": "적용 가이드",
+        "description": (
+            f"{name}님의 리포트에서 가장 변화가 큰 포인트는 "
+            f"{zone_str} 부분이에요. "
+            f"하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. "
+            f"처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요."
+        ),
+    }]
 
     return {
         "id": "trend_context",

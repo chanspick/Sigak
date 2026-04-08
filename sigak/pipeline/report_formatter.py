@@ -75,10 +75,10 @@ FACE_SHAPE_KR = {
 
 # 축 라벨 (coordinate.py AXES와 동일)
 AXIS_LABELS = {
-    "structure":  {"name_kr": "구조",   "neg": "날카로운", "pos": "부드러운"},
-    "impression": {"name_kr": "인상",   "neg": "따뜻한",   "pos": "쿨한"},
+    "structure":  {"name_kr": "구조",   "neg": "부드러운", "pos": "날카로운"},
+    "impression": {"name_kr": "인상",   "neg": "부드러운", "pos": "선명한"},
     "maturity":   {"name_kr": "성숙도", "neg": "프레시",   "pos": "성숙"},
-    "intensity":  {"name_kr": "강도",   "neg": "내추럴",   "pos": "볼드"},
+    "intensity":  {"name_kr": "존재감", "neg": "내추럴",   "pos": "볼드"},
 }
 
 
@@ -507,12 +507,11 @@ def _build_gap_analysis(
     primary_delta = abs(gap_vector.get(primary_dir, 0))
     secondary_delta = abs(gap_vector.get(secondary_dir, 0))
 
+    primary_label = AXIS_LABELS.get(primary_dir, {}).get("name_kr", primary_dir)
+    secondary_label = AXIS_LABELS.get(secondary_dir, {}).get("name_kr", secondary_dir)
     gap_summary = (
-        f"4축 거리 {magnitude:.2f} \u2014 "
-        f"주 변화축은 {AXIS_LABELS.get(primary_dir, {}).get('name_kr', primary_dir)}"
-        f"(delta {primary_delta:.2f})이며, "
-        f"{AXIS_LABELS.get(secondary_dir, {}).get('name_kr', secondary_dir)}"
-        f"(delta {secondary_delta:.2f})가 보조축입니다."
+        f"주요 변화 방향은 {primary_label}이며, "
+        f"{secondary_label}이 보조 방향입니다."
     )
 
     # direction_items 생성
@@ -529,19 +528,12 @@ def _build_gap_analysis(
         from_label = _get_axis_label(axis_name, from_score)
         to_label = _get_axis_label(axis_name, to_score)
 
-        # LLM 리포트에서 추천 텍스트 추출 시도
-        recommendation = ""
-        llm_sections = _safe_get(report_content, "sections", [])
-        for sec in llm_sections:
-            if sec.get("id") == "gap_analysis":
-                recommendation = sec.get("content", "")
-                break
-
-        if not recommendation:
-            recommendation = (
-                f"{ax_labels.get('name_kr', axis_name)} 축에서 "
-                f"{abs(delta_val):.2f} 이동이 필요합니다."
-            )
+        # 축별 방향 추천 텍스트 생성 (LLM 단일 content 재사용 → 중복 버그 수정)
+        direction_word = ax_labels.get("pos", "") if delta_val > 0 else ax_labels.get("neg", "")
+        recommendation = (
+            f"{ax_labels.get('name_kr', axis_name)} 방향에서 "
+            f"{'더 ' + direction_word if direction_word else '조정이'} 필요한 구간입니다."
+        )
 
         direction_items.append({
             "axis": axis_name,
@@ -810,7 +802,7 @@ def format_report_for_frontend(
         current_coords: 현재 미감 4축 좌표
         aspiration_coords: 추구미 4축 좌표
         gap: compute_gap() 결과
-        similar_types: find_similar_celebs() 결과
+        similar_types: find_similar_types() 결과
         face_interpretation: interpret_face_structure() LLM 결과
         report_content: generate_report() LLM 결과
         aspiration_interpretation: interpret_interview() LLM 결과
@@ -819,6 +811,21 @@ def format_report_for_frontend(
         프론트엔드 ReportData 구조에 맞는 dict
     """
     report_id = f"report_{user_id[:8]}"
+
+    # v2 report_content → v1 포맷 브릿지 (generate_report v2 호환)
+    if "summary" in report_content and "executive_summary" not in report_content:
+        report_content["executive_summary"] = report_content["summary"]
+    if "action_tips" in report_content and "action_items" not in report_content:
+        report_content["action_items"] = [
+            {
+                "category": tip.get("zone", ""),
+                "recommendation": tip.get("description", tip.get("title", "")),
+                "priority": "HIGH" if i < 2 else "MEDIUM",
+            }
+            for i, tip in enumerate(report_content.get("action_tips", []))
+        ]
+    if "closing" in report_content and "trend_context" not in report_content:
+        report_content["trend_context"] = report_content.get("closing", "")
 
     # 각 섹션 빌드
     sections = [

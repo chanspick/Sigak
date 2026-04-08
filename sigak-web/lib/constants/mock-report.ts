@@ -207,7 +207,7 @@ export const MOCK_REPORT: ReportData = {
           },
           {
             axis: "intensity",
-            label: "강도",
+            label: "존재감",
             from_score: -0.15,
             to_score: 0.12,
             delta: 0.27,

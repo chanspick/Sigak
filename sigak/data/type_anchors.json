@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "updated": "2026-04-07",
+  "version": "2.0.0",
+  "updated": "2026-04-08",
   "dimension": 768,
   "similarity_threshold": 0.3,
   "anchor_type": "ai_generated",
@@ -37,17 +37,18 @@
         0.2,
         0.2
       ],
+      "anchor_version": "v2",
       "axis_roles": {
-        "structure": "positive",
+        "structure": "negative",
         "impression": "negative",
         "maturity": "negative",
         "intensity": "negative"
       },
       "reference_coords": {
-        "structure": 0.6,
+        "structure": -0.7,
         "impression": -0.6,
         "maturity": -0.6,
-        "intensity": -0.5
+        "intensity": -0.3
       },
       "structural_keywords": [
         "둥근 얼굴형",
@@ -87,17 +88,18 @@
         0.8,
         0.2
       ],
+      "anchor_version": "v2",
       "axis_roles": {
-        "structure": "positive",
+        "structure": "negative",
         "impression": "positive",
         "maturity": "negative",
         "intensity": "neutral"
       },
       "reference_coords": {
-        "structure": 0.6,
-        "impression": 0.6,
-        "maturity": -0.6,
-        "intensity": 0.0
+        "structure": -0.2,
+        "impression": 0.4,
+        "maturity": -0.5,
+        "intensity": 0.3
       },
       "structural_keywords": [
         "작은 달걀형 얼굴",
@@ -135,16 +137,17 @@
         0.8,
         0.8
       ],
+      "anchor_version": "v2",
       "axis_roles": {
-        "structure": "negative",
+        "structure": "positive",
         "impression": "positive",
         "maturity": "positive",
         "intensity": "positive"
       },
       "reference_coords": {
-        "structure": -0.6,
-        "impression": 0.6,
-        "maturity": 0.6,
+        "structure": 0.8,
+        "impression": 0.8,
+        "maturity": 0.7,
         "intensity": 0.7
       },
       "structural_keywords": [
@@ -184,16 +187,17 @@
         0.2,
         0.8
       ],
+      "anchor_version": "v2",
       "axis_roles": {
-        "structure": "positive",
+        "structure": "negative",
         "impression": "negative",
         "maturity": "positive",
         "intensity": "negative"
       },
       "reference_coords": {
-        "structure": 0.6,
-        "impression": -0.6,
-        "maturity": 0.6,
+        "structure": -0.3,
+        "impression": -0.5,
+        "maturity": 0.5,
         "intensity": -0.3
       },
       "structural_keywords": [
@@ -232,17 +236,18 @@
         0.2,
         0.8
       ],
+      "anchor_version": "v2",
       "axis_roles": {
-        "structure": "negative",
-        "impression": "negative",
+        "structure": "positive",
+        "impression": "positive",
         "maturity": "positive",
         "intensity": "positive"
       },
       "reference_coords": {
-        "structure": -0.6,
-        "impression": -0.6,
+        "structure": 0.5,
+        "impression": 0.3,
         "maturity": 0.6,
-        "intensity": 0.4
+        "intensity": 0.7
       },
       "structural_keywords": [
         "사각형 얼굴형",
@@ -280,6 +285,7 @@
         0.8,
         0.8
       ],
+      "anchor_version": "legacy",
       "axis_roles": {
         "structure": "positive",
         "impression": "positive",
@@ -287,10 +293,10 @@
         "intensity": "neutral"
       },
       "reference_coords": {
-        "structure": 0.6,
-        "impression": 0.6,
-        "maturity": 0.6,
-        "intensity": 0.0
+        "structure": 0.2,
+        "impression": 0.7,
+        "maturity": 0.5,
+        "intensity": 0.1
       },
       "structural_keywords": [
         "달걀형 얼굴",
@@ -328,17 +334,18 @@
         0.8,
         0.2
       ],
+      "anchor_version": "legacy",
       "axis_roles": {
-        "structure": "negative",
+        "structure": "positive",
         "impression": "positive",
         "maturity": "negative",
         "intensity": "positive"
       },
       "reference_coords": {
-        "structure": -0.6,
-        "impression": 0.6,
-        "maturity": -0.6,
-        "intensity": 0.3
+        "structure": 0.6,
+        "impression": 0.5,
+        "maturity": -0.5,
+        "intensity": 0.4
       },
       "structural_keywords": [
         "작은 역삼각형 얼굴",

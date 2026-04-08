@@ -2,10 +2,7 @@
 // 카테고리별: target_axis + target_delta + 누적 진행 바
 // 각 추천: action + metric current→target + expected_effect + 기여율
 
-import {
-  CumulativeProgressBar,
-  ContributionBadge,
-} from "@/components/report/charts/cumulative-progress-bar";
+import { CumulativeProgressBar } from "@/components/report/charts/cumulative-progress-bar";
 
 interface ActionRecommendation {
   action: string;
@@ -49,7 +46,7 @@ function getPriorityStyle(priority: string): string {
 // 축 이름 매핑 (영문 → 한글)
 const AXIS_LABELS: Record<string, string> = {
   maturity: "성숙도",
-  intensity: "강도",
+  intensity: "존재감",
   structure: "구조",
   impression: "인상",
 };
@@ -91,10 +88,9 @@ export function ActionPlan({ content, locked }: ActionPlanProps) {
                 {/* 카테고리 헤더 + 대상 축/델타 */}
                 <div className="flex items-center gap-3 mb-3">
                   <h3 className="text-sm font-bold">{item.category}</h3>
-                  {item.target_axis && item.target_delta !== undefined && (
-                    <span className="text-xs tabular-nums text-[var(--color-muted)]">
-                      {AXIS_LABELS[item.target_axis] ?? item.target_axis} delta{" "}
-                      {(item.target_delta ?? 0).toFixed(2)}
+                  {item.target_axis && (
+                    <span className="text-xs text-[var(--color-muted)]">
+                      {AXIS_LABELS[item.target_axis] ?? item.target_axis}
                     </span>
                   )}
                 </div>
@@ -136,16 +132,8 @@ export function ActionPlan({ content, locked }: ActionPlanProps) {
                               )}
                           </span>
                           {/* 예상 효과 + 기여율 배지 */}
-                          <span className="text-xs text-[var(--color-muted)] leading-relaxed flex items-center gap-1.5">
+                          <span className="text-xs text-[var(--color-muted)] leading-relaxed">
                             {rec.expected_effect}
-                            {rec.delta_contribution !== undefined &&
-                              item.target_delta !== undefined &&
-                              item.target_delta > 0 && (
-                                <ContributionBadge
-                                  contribution={rec.delta_contribution}
-                                  targetDelta={item.target_delta}
-                                />
-                              )}
                           </span>
                         </div>
                       </div>

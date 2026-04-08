@@ -8,7 +8,7 @@ AI 유형 앵커 임베딩과 유저 임베딩 간 코사인 유사도를 계산
   1. CLIP 모드: .npy 임베딩 파일이 있으면 코사인 유사도 사용
   2. 좌표 폴백: 임베딩 없으면 reference_coords 기반 유클리드 거리 사용
 
-v2: celeb_anchors.json → type_anchors.json 전환 (AI 유형 앵커, 법적 리스크 제거)
+v2: type_anchors.json 전환 (AI 유형 앵커, 법적 리스크 제거)
 """
 import json
 import logging
@@ -60,7 +60,7 @@ def load_anchor_embeddings(gender: str) -> dict[str, np.ndarray]:
     저장된 앵커 임베딩(.npy)을 로드한다.
 
     Returns:
-        {셀럽_key: 768d numpy 배열}
+        {type_key: 768d numpy 배열}
     """
     anchors_data = load_anchors()
     dimension = anchors_data.get("dimension", 768)
@@ -131,8 +131,6 @@ def normalize_anchor_name(text: str) -> Optional[str]:
     return None
 
 
-# 하위 호환 별칭
-normalize_celeb_name = normalize_anchor_name
 
 
 def extract_anchor_mentions(text: str) -> list[str]:
@@ -162,8 +160,6 @@ def extract_anchor_mentions(text: str) -> list[str]:
     return found
 
 
-# 하위 호환 별칭
-extract_celeb_mentions = extract_anchor_mentions
 
 
 # ─────────────────────────────────────────────
@@ -201,10 +197,10 @@ def _coord_similarity(user_coords: dict[str, float], ref_coords: dict[str, float
 
 
 # ─────────────────────────────────────────────
-#  Top-K 유사 셀럽 검색
+#  Top-K 유사 유형 검색
 # ─────────────────────────────────────────────
 
-def find_similar_celebs(
+def find_similar_types(
     user_embedding: Optional[np.ndarray],
     user_coords: dict[str, float],
     gender: str,
@@ -293,17 +289,17 @@ def find_similar_celebs(
 
 
 # ─────────────────────────────────────────────
-#  티저 셀럽 선택
+#  티저 유형 선택
 # ─────────────────────────────────────────────
 
-def select_teaser_celeb(similar_celebs: list[dict]) -> Optional[dict]:
+def select_teaser_type(similar_types: list[dict]) -> Optional[dict]:
     """
-    티저(무료 구간)에 노출할 셀럽 1명을 선택한다.
+    티저(무료 구간)에 노출할 유형 1개를 선택한다.
 
     전략: similarity 70% + community_score 30%
-    → 유사도 높으면서 유명한 셀럽이 티저에 → 전환율 최적화
+    → 유사도 높으면서 인지도 높은 유형이 티저에 → 전환율 최적화
     """
-    if not similar_celebs:
+    if not similar_types:
         return None
 
     anchors_data = load_anchors()
@@ -314,14 +310,14 @@ def select_teaser_celeb(similar_celebs: list[dict]) -> Optional[dict]:
     best = None
     best_score = -1
 
-    for celeb in similar_celebs:
-        score = celeb["similarity"] * w_sim
-        cs = celeb.get("community_score")
+    for type_item in similar_types:
+        score = type_item["similarity"] * w_sim
+        cs = type_item.get("community_score")
         if cs is not None:
             score += (cs / 100) * w_com
         if score > best_score:
             best_score = score
-            best = celeb
+            best = type_item
 
     return best
 
@@ -397,7 +393,7 @@ def build_anchor_poles(gender: str) -> dict[str, dict[str, np.ndarray]]:
 
 
 # ─────────────────────────────────────────────
-#  LLM 프롬프트용 셀럽 레퍼런스 생성
+#  LLM 프롬프트용 유형 레퍼런스 생성
 # ─────────────────────────────────────────────
 
 def get_type_reference_prompt(gender: str = "female") -> str:
@@ -450,5 +446,3 @@ def get_type_reference_prompt(gender: str = "female") -> str:
     return "\n".join(lines)
 
 
-# 하위 호환 별칭
-get_celeb_reference_prompt = get_type_reference_prompt

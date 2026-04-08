@@ -1,7 +1,7 @@
 """
 SIGAK Face Comparison Engine
 
-유저 얼굴 특징과 앵커 셀럽 얼굴 특징을 비교하여
+유저 얼굴 특징과 앵커 유형 얼굴 특징을 비교하여
 구체적인 유사점/차이점을 산출한다.
 
 기존 face.py의 MediaPipe 랜드마크 기반 특징을 활용하며,
@@ -37,7 +37,7 @@ FEATURE_META = {
         "similarity_threshold": 3.0,    # 이 이내면 "유사"
         "significance_threshold": 5.0,  # 이 이상이면 "유의미한 차이"
         "description_similar": "턱선 라인이 비슷한 형태입니다",
-        "description_template": "턱선이 {celeb}보다 {direction}",
+        "description_template": "턱선이 {anchor}보다 {direction}",
     },
     "cheekbone_prominence": {
         "label": "광대 돌출도",
@@ -50,7 +50,7 @@ FEATURE_META = {
         "similarity_threshold": 0.05,
         "significance_threshold": 0.1,
         "description_similar": "광대 볼륨감이 유사합니다",
-        "description_template": "광대가 {celeb}보다 {direction}",
+        "description_template": "광대가 {anchor}보다 {direction}",
     },
     "eye_ratio": {
         "label": "눈 비율 (가로:세로)",
@@ -63,7 +63,7 @@ FEATURE_META = {
         "similarity_threshold": 0.03,
         "significance_threshold": 0.06,
         "description_similar": "눈의 가로세로 비율이 유사합니다",
-        "description_template": "눈매가 {celeb}보다 {direction}",
+        "description_template": "눈매가 {anchor}보다 {direction}",
     },
     "eye_tilt": {
         "label": "눈매 기울기",
@@ -76,7 +76,7 @@ FEATURE_META = {
         "similarity_threshold": 1.5,
         "significance_threshold": 3.0,
         "description_similar": "눈매 각도가 유사합니다",
-        "description_template": "눈꼬리가 {celeb}보다 {direction}",
+        "description_template": "눈꼬리가 {anchor}보다 {direction}",
     },
     "lip_fullness": {
         "label": "입술 볼륨",
@@ -89,7 +89,7 @@ FEATURE_META = {
         "similarity_threshold": 0.03,
         "significance_threshold": 0.06,
         "description_similar": "입술 두께감이 비슷합니다",
-        "description_template": "입술이 {celeb}보다 {direction}",
+        "description_template": "입술이 {anchor}보다 {direction}",
     },
     "face_length_ratio": {
         "label": "얼굴 종횡비",
@@ -102,7 +102,7 @@ FEATURE_META = {
         "similarity_threshold": 0.04,
         "significance_threshold": 0.08,
         "description_similar": "얼굴 종횡비가 유사합니다",
-        "description_template": "얼굴형이 {celeb}보다 {direction}",
+        "description_template": "얼굴형이 {anchor}보다 {direction}",
     },
     "nose_bridge_height": {
         "label": "코 높이",
@@ -115,7 +115,7 @@ FEATURE_META = {
         "similarity_threshold": 0.03,
         "significance_threshold": 0.06,
         "description_similar": "코 높이가 비슷합니다",
-        "description_template": "콧대가 {celeb}보다 {direction}",
+        "description_template": "콧대가 {anchor}보다 {direction}",
     },
     "brow_arch": {
         "label": "눈썹 아치",
@@ -128,7 +128,7 @@ FEATURE_META = {
         "similarity_threshold": 0.02,
         "significance_threshold": 0.05,
         "description_similar": "눈썹 형태가 유사합니다",
-        "description_template": "눈썹이 {celeb}보다 {direction}",
+        "description_template": "눈썹이 {anchor}보다 {direction}",
     },
     "philtrum_ratio": {
         "label": "인중 비율",
@@ -141,7 +141,7 @@ FEATURE_META = {
         "similarity_threshold": 0.02,
         "significance_threshold": 0.04,
         "description_similar": "인중 길이가 비슷합니다",
-        "description_template": "인중이 {celeb}보다 {direction}",
+        "description_template": "인중이 {anchor}보다 {direction}",
     },
     "forehead_ratio": {
         "label": "이마 비율",
@@ -154,7 +154,7 @@ FEATURE_META = {
         "similarity_threshold": 0.03,
         "significance_threshold": 0.06,
         "description_similar": "이마 비율이 유사합니다",
-        "description_template": "이마가 {celeb}보다 {direction}",
+        "description_template": "이마가 {anchor}보다 {direction}",
     },
 }
 
@@ -176,7 +176,7 @@ _features_cache: dict | None = None
 
 
 def load_anchor_features() -> dict:
-    """앵커 셀럽의 사전 계산된 얼굴 특징을 로드한다."""
+    """앵커 유형의 사전 계산된 얼굴 특징을 로드한다."""
     global _features_cache
     if _features_cache is not None:
         return _features_cache
@@ -191,7 +191,7 @@ def load_anchor_features() -> dict:
 
 
 def save_anchor_features(features_dict: dict) -> None:
-    """앵커 셀럽 얼굴 특징을 JSON 캐시에 저장한다."""
+    """앵커 유형 얼굴 특징을 JSON 캐시에 저장한다."""
     global _features_cache
     _features_cache = features_dict
     _FEATURES_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -219,13 +219,13 @@ def compute_and_cache_anchor_features(gender: str = "female") -> dict:
     SUPPORTED = {".jpg", ".jpeg", ".png"}
     result = {}
 
-    for celeb_dir in sorted(anchors_dir.iterdir()):
-        if not celeb_dir.is_dir():
+    for type_dir in sorted(anchors_dir.iterdir()):
+        if not type_dir.is_dir():
             continue
-        celeb_key = celeb_dir.name
+        type_key = type_dir.name
         all_features = []
 
-        for img_path in sorted(celeb_dir.iterdir()):
+        for img_path in sorted(type_dir.iterdir()):
             if img_path.suffix.lower() not in SUPPORTED:
                 continue
             img = cv2.imread(str(img_path))
@@ -253,7 +253,7 @@ def compute_and_cache_anchor_features(gender: str = "female") -> dict:
             if values:
                 avg[key] = sum(values) / len(values)
 
-        result[celeb_key] = avg
+        result[type_key] = avg
 
     save_anchor_features(result)
     return result
@@ -359,7 +359,7 @@ def compare_with_anchor(
             axis_impacts[axis] = round(axis_impacts[axis] + impact, 3)
 
             entry["description"] = meta["description_template"].format(
-                celeb=anchor_name_kr,
+                anchor=anchor_name_kr,
                 direction=direction_info[1],
             )
             differences.append(entry)
@@ -386,7 +386,7 @@ def compare_with_anchor(
 
 def compare_with_top_anchors(
     user_features: dict,
-    similar_celebs: list[dict],
+    similar_types: list[dict],
     gender: str = "female",
     max_compare: int = 3,
 ) -> list[dict]:
@@ -395,7 +395,7 @@ def compare_with_top_anchors(
 
     Args:
         user_features: face.py 추출 결과
-        similar_celebs: similarity.py의 find_similar_celebs() 결과
+        similar_types: similarity.py의 find_similar_types() 결과
         gender: 성별
         max_compare: 비교할 앵커 수
 
@@ -403,13 +403,13 @@ def compare_with_top_anchors(
         [compare_with_anchor 결과, ...]
     """
     results = []
-    for celeb in similar_celebs[:max_compare]:
-        key = celeb.get("key") or celeb.get("anchor_key", "")
+    for type_item in similar_types[:max_compare]:
+        key = type_item.get("key") or type_item.get("anchor_key", "")
         if not key:
             continue
         comp = compare_with_anchor(user_features, key, gender)
-        comp["similarity_pct"] = celeb.get("similarity_pct", 0)
-        comp["similarity_mode"] = celeb.get("mode", "unknown")
+        comp["similarity_pct"] = type_item.get("similarity_pct", 0)
+        comp["similarity_mode"] = type_item.get("mode", "unknown")
         results.append(comp)
     return results
 

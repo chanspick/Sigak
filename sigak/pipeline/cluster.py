@@ -1,10 +1,10 @@
 """
 SIGAK Cluster Discovery & Labeling Engine
 
-앵커 셀럽의 **구조적 얼굴 특징**(InsightFace/MediaPipe 랜드마크 기반)에서
+앵커 유형의 **구조적 얼굴 특징**(InsightFace/MediaPipe 랜드마크 기반)에서
 자연 클러스터를 발견하고, 4축 좌표 특성 + community_score 기반으로 라벨링한다.
 
-v2: CLIP 임베딩 대신 celeb_features_cache.json의 13개 수치 특징 벡터를
+v2: CLIP 임베딩 대신 type_features_cache.json의 13개 수치 특징 벡터를
     StandardScaler 정규화 → K-Means 클러스터링하는 structural 모드를 기본값으로 전환.
     PCA loadings로 각 축에 대한 원래 특징의 기여도를 확인 가능.
 
@@ -609,18 +609,18 @@ def _compute_relative_thresholds(features_data: dict) -> dict:
 
 def _assign_color_subtype(
     features_data: dict,
-    celeb_key: str,
+    type_key: str,
     thresholds: dict,
 ) -> dict:
     """
-    셀럽의 skin_warmth_score + skin_brightness에서 퍼스널컬러 서브타입을 결정.
+    유형의 skin_warmth_score + skin_brightness에서 퍼스널컬러 서브타입을 결정.
     앵커 풀 내 상대 분류 기준 사용.
 
     Returns:
         {"season": "spring", "label_kr": "봄 웜", ...,
          "relative_tone": "warm", "warmth_score": 12.3, "brightness_level": "light"}
     """
-    feat = features_data.get(celeb_key, {})
+    feat = features_data.get(type_key, {})
     warmth_score = feat.get("skin_warmth_score", 0.0)
     skin_brightness = feat.get("skin_brightness", thresholds["brightness_median"])
 
@@ -716,7 +716,7 @@ def _build_cluster_info(
             "intensity": round(float(centroid[3]), 3),
         }
 
-        # community_score 기반 대표 셀럽 (null이면 0으로 처리)
+        # community_score 기반 대표 유형 (null이면 0으로 처리)
         best_rep = member_keys[0]
         best_score = 0
         for mk in member_keys:
@@ -965,10 +965,10 @@ def format_cluster_for_report(
         parts.append(f"  (자세한 분석은 Standard 이상에서 확인 가능)")
 
     elif tier in ("standard", "basic"):
-        # Standard: 클러스터명 + 대표셀럽 + 설명
+        # Standard: 클러스터명 + 대표 유형 + 설명
         parts.append(f"  미감 유형: {label} ({label_en})")
         if rep:
-            parts.append(f"  대표 셀럽: {rep}")
+            parts.append(f"  대표 유형: {rep}")
         parts.append(f"  소속 확신도: {conf * 100:.0f}%")
         desc = classification.get("description", "")
         if desc:
@@ -978,7 +978,7 @@ def format_cluster_for_report(
         # Full/Creator/Wedding: 전체 + 인접 클러스터 + 키워드
         parts.append(f"  미감 유형: {label} ({label_en})")
         if rep:
-            parts.append(f"  대표 셀럽: {rep}")
+            parts.append(f"  대표 유형: {rep}")
         parts.append(f"  소속 확신도: {conf * 100:.0f}% / 위치: {'중심부' if pos == 'core' else '경계'}")
 
         desc = classification.get("description", "")

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # ── Coordinate System ──
     coordinate_axes: int = 3                      # Number of aesthetic axes
     embedding_dim: int = 768                      # CLIP embedding dimension
-    anchors_per_pole: int = 10                    # Reference celebs per axis pole
+    anchors_per_pole: int = 10                    # Reference anchors per axis pole
 
     # ── Report ──
     report_delivery_hours: int = 24

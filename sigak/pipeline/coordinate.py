@@ -1,14 +1,14 @@
 """
-SIGAK Coordinate System — Aesthetic Anchor Projection
+SIGAK Coordinate System — Structural Feature Projection
 
 Core IP: Maps any face into an interpretable 4-axis aesthetic space
-by projecting CLIP embeddings onto anchor-defined direction vectors.
+using structural facial features only (CLIP dependency removed).
 
 Axes:
-  1. Structure   — Sharp ↔ Soft    (structural features + CLIP)
-  2. Impression   — Warm ↔ Cool     (CLIP dominant)
-  3. Maturity     — Fresh ↔ Mature  (structural + CLIP)
-  4. Intensity    — Natural ↔ Bold  (CLIP dominant)
+  1. Structure  — soft(-1) ↔ sharp(+1)   골격의 부드러움 vs 날카로움
+  2. Impression — soft(-1) ↔ sharp(+1)    이목구비가 주는 인상
+  3. Maturity   — fresh(-1) ↔ mature(+1)  생기 vs 성숙
+  4. Intensity  — natural(-1) ↔ bold(+1)  존재감/Presence
 """
 import numpy as np
 from dataclasses import dataclass
@@ -27,141 +27,198 @@ class AxisDefinition:
     positive_label: str    # +1 pole
     negative_label_kr: str
     positive_label_kr: str
-    structural_weight: float  # 0–1: how much structural features contribute
-    clip_weight: float        # 0–1: how much CLIP embedding contributes
 
 AXES = [
     AxisDefinition(
         name="structure",    name_kr="구조",
-        negative_label="sharp", positive_label="soft",
-        negative_label_kr="날카로운", positive_label_kr="부드러운",
-        structural_weight=0.6, clip_weight=0.4,
+        negative_label="soft", positive_label="sharp",
+        negative_label_kr="부드러운", positive_label_kr="날카로운",
     ),
     AxisDefinition(
         name="impression",   name_kr="인상",
-        negative_label="warm", positive_label="cool",
-        negative_label_kr="따뜻한", positive_label_kr="쿨한",
-        structural_weight=0.2, clip_weight=0.8,
+        negative_label="soft", positive_label="sharp",
+        negative_label_kr="부드러운", positive_label_kr="선명한",
     ),
     AxisDefinition(
         name="maturity",     name_kr="성숙도",
         negative_label="fresh", positive_label="mature",
         negative_label_kr="프레시", positive_label_kr="성숙한",
-        structural_weight=0.4, clip_weight=0.6,
     ),
     AxisDefinition(
-        name="intensity",    name_kr="강도",
+        name="intensity",    name_kr="존재감",
         negative_label="natural", positive_label="bold",
         negative_label_kr="자연스러운", positive_label_kr="볼드",
-        structural_weight=0.1, clip_weight=0.9,
     ),
 ]
 
 
 # ─────────────────────────────────────────────
-#  Structural Score Derivation
+#  Observed Ranges (F-0.5: FACE_STATS p10~p90 기반)
+#  실측 샘플 확보 후 교체할 것
 # ─────────────────────────────────────────────
 
-def structural_to_axis_scores(features: dict) -> dict:
-    """
-    Convert raw facial structure features into per-axis scores (-1 to +1).
-    This is the 'hard' signal — measurable, reproducible.
-
-    features: dict from face.py → extract_structural_features()
-    """
-    scores = {}
-
-    # ── Structure axis (sharp ↔ soft) ──
-    # Sharp = low jaw angle + high cheekbone + angular features
-    # Soft  = high jaw angle + round face + full lips
-    jaw_norm = (features["jaw_angle"] - 110) / 40  # 110°=sharp → 150°=soft, normalized 0–1
-    cheek_inv = 1 - features["cheekbone_prominence"]  # Low prominence = softer
-    lip_factor = features["lip_fullness"] * 15         # Fuller lips = softer (scaled)
-    structure_raw = (jaw_norm * 0.5 + cheek_inv * 0.3 + lip_factor * 0.2)
-    scores["structure"] = np.clip(structure_raw * 2 - 1, -1, 1)  # Map to [-1, 1]
-
-    # ── Impression axis (warm ↔ cool) ──
-    # Structural contribution is minor — mostly from face proportions
-    # Wide-set eyes + round features → warmer impression
-    eye_space = features["eye_spacing_ratio"]
-    symmetry = features["symmetry_score"]
-    impression_raw = (eye_space * 3 - 0.5) * 0.5 + (1 - symmetry) * 0.5
-    scores["impression"] = np.clip(impression_raw * 2 - 1, -1, 1)
-
-    # ── Maturity axis (fresh ↔ mature) ──
-    # Larger forehead ratio + smaller eyes = more mature look
-    forehead = features["forehead_ratio"]
-    eye_size = features["eye_width_ratio"]
-    maturity_raw = (forehead * 2) * 0.5 + (1 - eye_size * 5) * 0.5
-    scores["maturity"] = np.clip(maturity_raw * 2 - 1, -1, 1)
-
-    # ── Intensity axis (natural ↔ bold) ──
-    # Structural contribution minimal — mostly from CLIP
-    golden = features["golden_ratio_score"]
-    scores["intensity"] = np.clip((golden - 0.5) * 2, -1, 1)
-
-    return scores
+OBSERVED_RANGES: dict[str, tuple[float, float]] = {
+    "eye_tilt": (-2.0, 5.0),
+    "brow_arch": (0.008, 0.022),
+    "eye_ratio": (0.28, 0.42),
+    "lip_fullness": (0.030, 0.060),
+    "eye_width_ratio": (0.20, 0.28),
+    "nose_bridge_height": (0.02, 0.08),
+    "brow_eye_distance": (0.1, 0.4),  # optional, 미존재 시 skip
+    # structure 축 전용
+    "jaw_angle": (110.0, 150.0),
+    "cheekbone_prominence": (0.1, 0.6),
+    "face_length_ratio": (1.15, 1.55),
+    # maturity 축 전용
+    "forehead_ratio": (0.25, 0.45),
+    "philtrum_ratio": (0.15, 0.30),
+}
 
 
 # ─────────────────────────────────────────────
-#  CLIP Anchor Projection
+#  Common Helpers
 # ─────────────────────────────────────────────
 
-class AnchorProjector:
+def _has_valid(features: dict, key: str) -> bool:
+    """feature가 존재하고 None이 아닌지 확인"""
+    return key in features and features[key] is not None
+
+
+def _normalize(value: float, observed_range: tuple[float, float]) -> float:
+    """관측 범위 기반 정규화. 범위 밖 값은 clamp. → [-1, 1]"""
+    lo, hi = observed_range
+    if hi <= lo:
+        return 0.0
+    value = min(max(value, lo), hi)
+    return (value - lo) / (hi - lo) * 2 - 1
+
+
+def _weighted_fallback(components: list[tuple[float, float]]) -> float:
     """
-    Projects CLIP embeddings onto interpretable axes using
-    pre-computed anchor direction vectors.
-
-    Each axis has two poles, each defined by the mean embedding
-    of ~10 reference celeb faces. The direction vector between
-    the two poles IS the axis in CLIP space.
+    사용 가능한 component만으로 가중 평균.
+    feature 미존재 시 나머지로 가중치 자동 재분배.
     """
+    if not components:
+        return 0.0
+    weight_sum = sum(w for _, w in components)
+    score = sum(v * w for v, w in components) / weight_sum
+    return max(-1.0, min(1.0, score))
 
-    def __init__(self):
-        # axis_name → (negative_pole_mean_embedding, positive_pole_mean_embedding)
-        self.anchor_vectors: dict[str, np.ndarray] = {}
-        self._fitted = False
 
-    def fit(self, anchors: dict[str, dict[str, np.ndarray]]):
-        """
-        Compute axis direction vectors from anchor embeddings.
+# ─────────────────────────────────────────────
+#  Per-Axis Structural Score Functions
+#  CLIP 의존도 0% — 전축 structural 100%
+# ─────────────────────────────────────────────
 
-        anchors: {
-            "structure": {
-                "negative": np.array([...512d...]),  # mean of 'sharp' celebs
-                "positive": np.array([...512d...]),  # mean of 'soft' celebs
-            },
-            ...
-        }
-        """
-        for axis_name, poles in anchors.items():
-            neg = poles["negative"] / (np.linalg.norm(poles["negative"]) + 1e-8)
-            pos = poles["positive"] / (np.linalg.norm(poles["positive"]) + 1e-8)
-            # Direction vector: negative → positive
-            direction = pos - neg
-            direction = direction / (np.linalg.norm(direction) + 1e-8)
-            self.anchor_vectors[axis_name] = direction
+def compute_structure(features: dict) -> float:
+    """
+    soft(-1) ↔ sharp(+1)
+    턱선 각도 + 광대 돌출 + 얼굴 종횡비가 만드는 골격 인상.
+    """
+    components = []
 
-        self._fitted = True
+    # 턱선 각도: 낮을수록 sharp
+    if _has_valid(features, "jaw_angle"):
+        val = -_normalize(features["jaw_angle"], OBSERVED_RANGES["jaw_angle"])
+        components.append((val, 0.40))
 
-    def project(self, embedding: np.ndarray) -> dict[str, float]:
-        """
-        Project a CLIP embedding onto all axes.
-        Returns scores in [-1, 1] range.
-        """
-        if not self._fitted:
-            raise RuntimeError("AnchorProjector not fitted. Call fit() first.")
+    # 광대 돌출: 높을수록 sharp
+    if _has_valid(features, "cheekbone_prominence"):
+        val = _normalize(features["cheekbone_prominence"], OBSERVED_RANGES["cheekbone_prominence"])
+        components.append((val, 0.30))
 
-        embedding_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
-        scores = {}
+    # 얼굴 종횡비: 길수록 sharp
+    if _has_valid(features, "face_length_ratio"):
+        val = _normalize(features["face_length_ratio"], OBSERVED_RANGES["face_length_ratio"])
+        components.append((val, 0.30))
 
-        for axis_name, direction in self.anchor_vectors.items():
-            # Dot product = projection onto axis direction
-            raw_score = float(np.dot(embedding_norm, direction))
-            # Scale to roughly [-1, 1] (calibrate with data later)
-            scores[axis_name] = np.clip(raw_score * 5, -1, 1)
+    return _weighted_fallback(components)
 
-        return scores
+
+def compute_impression(features: dict) -> float:
+    """
+    soft(-1) ↔ sharp(+1)
+    눈매 방향성 + 눈썹 형태 + 눈 비율 + 입술 볼륨이 만드는 전체 인상.
+    """
+    components = []
+
+    # 눈꼬리 각도: 올라갈수록 sharp
+    if _has_valid(features, "eye_tilt"):
+        val = _normalize(features["eye_tilt"], OBSERVED_RANGES["eye_tilt"])
+        components.append((val, 0.35))
+
+    # 눈썹 아치: 높을수록 sharp
+    if _has_valid(features, "brow_arch"):
+        val = _normalize(features["brow_arch"], OBSERVED_RANGES["brow_arch"])
+        components.append((val, 0.25))
+
+    # 눈 비율(높이/너비): 가로로 길수록(값이 작을수록) sharp
+    if _has_valid(features, "eye_ratio"):
+        raw = _normalize(features["eye_ratio"], OBSERVED_RANGES["eye_ratio"])
+        val = -raw  # 반전: 작을수록 sharp
+        components.append((val, 0.25))
+
+    # 입술 두께: 도톰할수록 soft
+    if _has_valid(features, "lip_fullness"):
+        val = -_normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
+        components.append((val, 0.15))
+
+    return _weighted_fallback(components)
+
+
+def compute_maturity(features: dict) -> float:
+    """
+    fresh(-1) ↔ mature(+1)
+    이마/인중 비율 + 눈 크기가 만드는 연령감.
+    """
+    components = []
+
+    # 이마 비율: 클수록 mature (넓은 이마 = 성숙한 인상)
+    if _has_valid(features, "forehead_ratio"):
+        val = _normalize(features["forehead_ratio"], OBSERVED_RANGES["forehead_ratio"])
+        components.append((val, 0.35))
+
+    # 인중 비율: 길수록 mature
+    if _has_valid(features, "philtrum_ratio"):
+        val = _normalize(features["philtrum_ratio"], OBSERVED_RANGES["philtrum_ratio"])
+        components.append((val, 0.35))
+
+    # 눈 크기: 작을수록 mature
+    if _has_valid(features, "eye_width_ratio"):
+        val = -_normalize(features["eye_width_ratio"], OBSERVED_RANGES["eye_width_ratio"])
+        components.append((val, 0.30))
+
+    return _weighted_fallback(components)
+
+
+def compute_intensity(features: dict) -> float:
+    """
+    natural(-1) ↔ bold(+1)
+    이목구비의 존재감. symmetry_score는 이 축에서 제외.
+    """
+    components = []
+
+    # 눈 크기: 클수록 bold
+    if _has_valid(features, "eye_width_ratio"):
+        val = _normalize(features["eye_width_ratio"], OBSERVED_RANGES["eye_width_ratio"])
+        components.append((val, 0.30))
+
+    # 입술 두께: 도톰할수록 bold
+    if _has_valid(features, "lip_fullness"):
+        val = _normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
+        components.append((val, 0.25))
+
+    # 코 높이: 높을수록 bold
+    if _has_valid(features, "nose_bridge_height"):
+        val = _normalize(features["nose_bridge_height"], OBSERVED_RANGES["nose_bridge_height"])
+        components.append((val, 0.25))
+
+    # 눈-눈썹 거리: 가까울수록 bold (optional feature)
+    if _has_valid(features, "brow_eye_distance"):
+        val = -_normalize(features["brow_eye_distance"], OBSERVED_RANGES["brow_eye_distance"])
+        components.append((val, 0.20))
+
+    return _weighted_fallback(components)
 
 
 # ─────────────────────────────────────────────
@@ -170,31 +227,21 @@ class AnchorProjector:
 
 def compute_coordinates(
     structural_features: dict,
-    clip_embedding: Optional[np.ndarray],
-    projector: AnchorProjector,
+    clip_embedding: Optional[np.ndarray] = None,
+    projector=None,
 ) -> dict[str, float]:
     """
-    Combine structural scores + CLIP projection into final 4-axis coordinates.
-    Uses axis-specific weights defined in AXES.
+    Structural features → 4-axis coordinates.
+    CLIP 의존 제거 완료 — clip_embedding/projector 파라미터는 하위 호환용.
 
     Returns: {"structure": 0.35, "impression": -0.22, "maturity": 0.1, "intensity": -0.45}
     """
-    structural_scores = structural_to_axis_scores(structural_features)
-
-    if clip_embedding is not None and projector._fitted:
-        clip_scores = projector.project(clip_embedding)
-    else:
-        # WoZ fallback: use structural only
-        clip_scores = {ax.name: 0.0 for ax in AXES}
-
-    coords = {}
-    for ax in AXES:
-        s_score = structural_scores.get(ax.name, 0.0)
-        c_score = clip_scores.get(ax.name, 0.0)
-        combined = s_score * ax.structural_weight + c_score * ax.clip_weight
-        coords[ax.name] = round(float(np.clip(combined, -1, 1)), 3)
-
-    return coords
+    return {
+        "structure": round(compute_structure(structural_features), 3),
+        "impression": round(compute_impression(structural_features), 3),
+        "maturity": round(compute_maturity(structural_features), 3),
+        "intensity": round(compute_intensity(structural_features), 3),
+    }
 
 
 # ─────────────────────────────────────────────
@@ -215,7 +262,7 @@ def compute_gap(
             "primary_direction": "structure",
             "primary_shift": "sharp",
             "secondary_direction": "impression",
-            "secondary_shift": "cool",
+            "secondary_shift": "sharp",
         }
     """
     vector = {}
@@ -253,17 +300,28 @@ def compute_gap(
 
 
 # ─────────────────────────────────────────────
-#  Mock CLIP for WoZ Phase
+#  Legacy compatibility (CLIP 관련 — 하위 호환)
+#  CLIP 정상화 후 점진적 복원을 위해 유지
 # ─────────────────────────────────────────────
 
 EMBEDDING_DIM = 768  # ViT-L-14 출력 차원
 
 
+class AnchorProjector:
+    """CLIP projector — 현재 미사용. 하위 호환용."""
+    def __init__(self):
+        self.anchor_vectors: dict[str, np.ndarray] = {}
+        self._fitted = False
+
+    def fit(self, anchors):
+        self._fitted = True
+
+    def project(self, embedding):
+        return {ax.name: 0.0 for ax in AXES}
+
+
 def mock_clip_embedding(image_bytes: bytes) -> np.ndarray:
-    """
-    WoZ phase: generate a deterministic pseudo-embedding from image hash.
-    NOT a real aesthetic embedding — placeholder until CLIP is integrated.
-    """
+    """WoZ phase mock — 좌표에 영향 없음."""
     import hashlib
     h = hashlib.sha256(image_bytes).digest()
     seed = int.from_bytes(h[:4], "big")
@@ -273,42 +331,10 @@ def mock_clip_embedding(image_bytes: bytes) -> np.ndarray:
 
 
 def mock_anchor_projector(gender: str = "female") -> AnchorProjector:
-    """
-    WoZ phase: create projector with random anchor vectors.
-    Replace with real celeb embeddings when CLIP pipeline is live.
-
-    Args:
-        gender: "female" or "male" — 성별별 다른 시드 사용
-    """
-    seed = 42 if gender == "female" else 99
-    rng = np.random.RandomState(seed)
-    projector = AnchorProjector()
-    anchors = {}
-    for ax in AXES:
-        anchors[ax.name] = {
-            "negative": rng.randn(EMBEDDING_DIM).astype(np.float32),
-            "positive": rng.randn(EMBEDDING_DIM).astype(np.float32),
-        }
-    projector.fit(anchors)
-    return projector
+    """WoZ phase mock projector."""
+    return AnchorProjector()
 
 
 def load_anchor_projector(gender: str = "female") -> AnchorProjector:
-    """
-    실제 앵커 임베딩에서 프로젝터를 생성한다.
-    임베딩이 없으면 mock으로 폴백.
-
-    celeb_anchors.json의 axis_roles에 따라 극별 평균 벡터를 계산하여
-    AnchorProjector.fit()에 전달한다.
-    """
-    from pipeline.similarity import build_anchor_poles
-
-    poles = build_anchor_poles(gender)
-
-    if not poles or len(poles) < len(AXES):
-        # 임베딩 부족 — mock 폴��
-        return mock_anchor_projector(gender)
-
-    projector = AnchorProjector()
-    projector.fit(poles)
-    return projector
+    """하위 호환 — CLIP 비활성 상태에서는 빈 프로젝터 반환."""
+    return AnchorProjector()

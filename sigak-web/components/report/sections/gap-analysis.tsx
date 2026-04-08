@@ -48,7 +48,7 @@ const AXIS_LABELS: Record<string, string> = {
   structure: "Structure",
   impression: "Impression",
   maturity: "Maturity",
-  intensity: "Intensity",
+  intensity: "Presence",
 };
 
 // 난이도 배지 스타일 — 프리미엄 모노크롬
@@ -111,9 +111,9 @@ function MiniAxisRow({
         />
       </div>
 
-      {/* 델타 값 */}
-      <span className="text-[10px] tabular-nums font-semibold text-[var(--color-fg)] w-[32px] shrink-0 text-right">
-        {delta > 0.01 ? (delta >= 0 ? "+" : "") + delta.toFixed(2) : "--"}
+      {/* 변화 표시 */}
+      <span className="text-[10px] text-[var(--color-muted)] w-[20px] shrink-0 text-right">
+        {delta > 0.05 ? "→" : "·"}
       </span>
     </div>
   );
@@ -140,8 +140,8 @@ function DirectionCard({ item }: { item: DirectionItem }) {
             {item.difficulty}
           </span>
         </div>
-        <span className="text-[11px] tabular-nums font-semibold text-[var(--color-fg)]">
-          {(item.delta ?? 0).toFixed(2)}
+        <span className="text-[11px] font-semibold text-[var(--color-fg)]">
+          {item.difficulty}
         </span>
       </div>
 
@@ -172,13 +172,13 @@ function DirectionCard({ item }: { item: DirectionItem }) {
             style={{ left: `${toPos}%`, marginLeft: "-4px" }}
           />
         </div>
-        {/* 점수 텍스트 */}
-        <div className="flex items-center justify-between text-[10px] tabular-nums mt-1.5">
-          <span className="text-[var(--color-muted)] font-mono">
-            {(item.from_score ?? 0).toFixed(2)}
+        {/* 라벨 텍스트 */}
+        <div className="flex items-center justify-between text-[10px] mt-1.5">
+          <span className="text-[var(--color-muted)]">
+            {item.from_label}
           </span>
-          <span className="font-semibold text-[var(--color-fg)] font-mono">
-            {(item.to_score ?? 0).toFixed(2)}
+          <span className="font-semibold text-[var(--color-fg)]">
+            {item.to_label}
           </span>
         </div>
       </div>
@@ -235,8 +235,8 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           <div className="w-10 md:w-14 h-px bg-[var(--color-border)]" />
           <span className="text-[var(--color-muted)] text-sm">&rarr;</span>
           <div className="w-10 md:w-14 h-px bg-[var(--color-border)]" />
-          <span className="text-[9px] tabular-nums text-[var(--color-muted)] mt-1 tracking-[0.5px]">
-            {(content.gap_magnitude ?? 0).toFixed(2)}
+          <span className="text-[9px] text-[var(--color-muted)] mt-1 tracking-[0.5px]">
+            {content.gap_difficulty}
           </span>
         </div>
 
@@ -268,16 +268,11 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)]">
             GAP OVERVIEW
           </h3>
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${getDifficultyStyle(content.gap_difficulty)}`}
-            >
-              {content.gap_difficulty}
-            </span>
-            <span className="text-[10px] tabular-nums font-semibold text-[var(--color-fg)]">
-              {(content.gap_magnitude ?? 0).toFixed(2)}
-            </span>
-          </div>
+          <span
+            className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${getDifficultyStyle(content.gap_difficulty)}`}
+          >
+            {content.gap_difficulty}
+          </span>
         </div>
 
         {/* 2단 레이아웃: 산점도(좌) + 미니 비교(우) — 모바일은 스택 */}

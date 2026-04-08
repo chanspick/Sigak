@@ -4,13 +4,28 @@ SIGAK API — FastAPI Application
 Endpoints for the full PI diagnostic pipeline:
   Booking → Interview → Analysis → Report → Feedback
 """
+import json
+import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
+
+# 데이터 저장 디렉토리
+DATA_DIR = Path(os.path.dirname(__file__)) / "uploads"
+DATA_DIR.mkdir(exist_ok=True)
+
+
+def _save_json(user_id: str, filename: str, data: dict):
+    """유저별 JSON 데이터를 로컬 디스크에 저장."""
+    user_dir = DATA_DIR / user_id
+    user_dir.mkdir(exist_ok=True)
+    with open(user_dir / filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
 
 from config import get_settings
 from pipeline.face import analyze_face
@@ -18,8 +33,9 @@ from pipeline.coordinate import (
     compute_coordinates, compute_gap,
     mock_clip_embedding, mock_anchor_projector, load_anchor_projector, AXES,
 )
-from pipeline.llm import interpret_interview, generate_report, interpret_face_structure
-from pipeline.similarity import find_similar_celebs, select_teaser_celeb
+from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure
+from pipeline.action_spec import build_action_spec, build_overlay_plan
+from pipeline.similarity import find_similar_types, select_teaser_type
 from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
 from pipeline.report_formatter import format_report_for_frontend, _sanitize
@@ -119,6 +135,7 @@ async def create_booking(data: BookingCreate):
         **data.model_dump(),
     }
     USERS[user_id] = user
+    _save_json(user_id, "booking.json", user)
     return {"user_id": user_id, "status": "booked", "price": user["price"]}
 
 
@@ -138,6 +155,7 @@ async def submit_interview(user_id: str, data: InterviewSubmit):
         **data.model_dump(),
     }
     INTERVIEWS[user_id] = interview
+    _save_json(user_id, "interview.json", interview)
     USERS[user_id]["status"] = "interviewed"
 
     return {"status": "interviewed", "interview_id": interview["id"]}
@@ -152,11 +170,18 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
     if user_id not in USERS:
         raise HTTPException(404, "User not found")
 
+    # 사진 로컬 저장
+    save_dir = DATA_DIR / user_id
+    save_dir.mkdir(exist_ok=True)
+
     photo_results = []
     for f in files:
         contents = await f.read()
-        # In production: upload to S3
-        # For now: store analysis result
+        # 로컬 디스크에 저장
+        save_path = save_dir / (f.filename or f"{len(photo_results)}.jpg")
+        with open(save_path, "wb") as fp:
+            fp.write(contents)
+
         face_result = analyze_face(contents)
         if face_result:
             photo_results.append({
@@ -173,6 +198,7 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
         "photos": photo_results,
         "primary_features": photo_results[0]["features"],
     }
+    _save_json(user_id, "face_analysis.json", ANALYSES[user_id])
 
     return {
         "status": "photos_processed",
@@ -188,11 +214,13 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
 @app.post("/api/v1/analyze/{user_id}")
 async def run_analysis(user_id: str):
     """
-    Triggers the full analysis pipeline:
-    1. CV features → coordinates
-    2. Interview → aspiration coordinates (LLM)
-    3. Gap calculation
-    4. Report generation (LLM)
+    Full analysis pipeline (v2 — Action Spec 기반):
+    1. CV features → coordinates (structural 100%)
+    2. Type matching + comparison
+    3. Interview → aspiration (LLM)
+    4. Gap → Action Spec → Overlay Plan
+    5. Report generation (LLM 해설) + parse fallback
+    6. Action Spec ↔ 리포트 일치 검증
     """
     if user_id not in USERS:
         raise HTTPException(404, "User not found")
@@ -203,69 +231,87 @@ async def run_analysis(user_id: str):
     interview = INTERVIEWS[user_id]
     USERS[user_id]["status"] = "analyzing"
 
-    # ── Step 1: Get face features + compute coordinates ──
+    # ── Step 1: Face analysis → coordinates (CLIP 비활성) ──
     gender = user.get("gender", "female")
-    projector = PROJECTORS.get(gender, PROJECTORS["female"])
 
     analysis = ANALYSES.get(user_id)
-    clip_embedding = None
     if analysis:
         features = analysis["primary_features"]
-        # WoZ: mock CLIP embedding (replace with real CLIP later)
-        clip_embedding = mock_clip_embedding(str(features).encode())
-        current_coords = compute_coordinates(features, clip_embedding, projector)
+        current_coords = compute_coordinates(features)
     else:
-        # No photo uploaded — use neutral coordinates (manual override needed)
         features = {}
         current_coords = {"structure": 0, "impression": 0, "maturity": 0, "intensity": 0}
 
-    # ── Step 2: Face structure interpretation (LLM 자연어 해석) ──
+    # ── Step 2: Face structure interpretation (LLM) ──
     face_interpretation = {}
     if features:
         face_interpretation = interpret_face_structure(features)
 
-    # ── Step 3: Find similar types (CLIP cosine or coord fallback) ──
-    similar_celebs = find_similar_celebs(
-        user_embedding=clip_embedding,
+    # ── Step 3: Type matching (좌표 기반) ──
+    similar_types = find_similar_types(
+        user_embedding=None,
         user_coords=current_coords,
         gender=gender,
         top_k=3,
     )
 
-    # ── Step 4: Structural comparison (유저↔앵커 핀포인트 비교) ──
-    celeb_comparisons = compare_with_top_anchors(
+    # ── Step 4: Structural comparison ──
+    type_comparisons = compare_with_top_anchors(
         user_features=features,
-        similar_celebs=similar_celebs,
+        similar_types=similar_types,
         gender=gender,
         max_compare=3,
     )
 
-    # ── Step 5: Cluster classification (미감 클러스터 배정) ──
+    # ── Step 5: Cluster classification ──
     cluster_result = classify_user(user_coords=current_coords, gender=gender)
 
-    # ── Step 6: Interpret interview → aspiration coordinates ──
+    # ── Step 6: Interview → aspiration coordinates (LLM) ──
     aspiration_result = interpret_interview(interview, gender=gender)
     aspiration_coords = aspiration_result.get("coordinates", {
         "structure": 0, "impression": 0, "maturity": 0, "intensity": 0
     })
 
-    # ── Step 7: Compute gap ──
+    # ── Step 7: Gap calculation ──
     gap = compute_gap(current_coords, aspiration_coords)
 
-    # ── Step 8: Generate report (with all analysis data) ──
-    report_content = generate_report(
-        user_name=user["name"],
-        tier=user["tier"],
+    # ── Step 8: Action Spec 생성 ★ ──
+    top_type = similar_types[0] if similar_types else {
+        "key": "type_2", "name_kr": "차갑지만 동안",
+        "similarity": 0.5, "mode": "coord",
+    }
+    action_spec = build_action_spec(
         face_features=features,
         current_coords=current_coords,
-        aspiration_coords=aspiration_coords,
+        matched_type=top_type,
+        type_delta=type_comparisons[0]["axis_impacts"] if type_comparisons else {},
         gap=gap,
-        interview_data=interview,
-        aspiration_interpretation=aspiration_result,
-        similar_celebs=similar_celebs,
-        celeb_comparisons=celeb_comparisons,
-        cluster_result=cluster_result,
+        interview_intent=aspiration_result.get("intent_tags"),
     )
+
+    # ── Step 8.5: Overlay Plan 생성 ★ ──
+    overlay_plan = build_overlay_plan(action_spec, features)
+
+    # ── Step 9: Report generation (축소된 입력) ★ ──
+    raw_report = generate_report(action_spec, {
+        "name": user["name"],
+        "face_shape": features.get("face_shape", ""),
+        "tier": user["tier"],
+        "gender": gender,
+    })
+    report_content = parse_or_fallback(raw_report, action_spec)
+
+    # ── Step 9.5: Action Spec ↔ 리포트 일치 검증 ★ ──
+    action_tips = report_content.get("action_tips", [])
+    if len(action_tips) != len(action_spec.recommended_actions):
+        # 불일치 시 fallback 리포트로 교체
+        report_content = parse_or_fallback("", action_spec)
+        action_tips = report_content.get("action_tips", [])
+
+    for tip, rec in zip(action_tips, action_spec.recommended_actions):
+        if tip.get("zone") != rec.zone:
+            # zone 불일치 시 강제 교정
+            tip["zone"] = rec.zone
 
     # ── 프론트엔드용 리포트 포매팅 ──
     formatted_report = format_report_for_frontend(
@@ -277,32 +323,35 @@ async def run_analysis(user_id: str):
         current_coords=current_coords,
         aspiration_coords=aspiration_coords,
         gap=gap,
-        similar_types=similar_celebs,
+        similar_types=similar_types,
         face_interpretation=face_interpretation,
         report_content=report_content,
         aspiration_interpretation=aspiration_result,
     )
 
     # ── Store report ──
-    teaser_celeb = select_teaser_celeb(similar_celebs)
+    from dataclasses import asdict
+    teaser_type = select_teaser_type(similar_types)
     report_id = str(uuid.uuid4())
     report = {
         "id": report_id,
         "user_id": user_id,
-
-        # 프론트엔드 ReportData 구조 (get_report에서 직접 반환)
         "formatted": formatted_report,
-
-        # 원본 파이프라인 데이터 (디버깅/대시보드용)
+        # 디버깅/대시보드용
         "face_interpretation": face_interpretation,
         "current_coords": current_coords,
         "aspiration_coords": aspiration_coords,
         "gap": gap,
         "aspiration_interpretation": aspiration_result,
-        "similar_celebs": similar_celebs,
-        "celeb_comparisons": celeb_comparisons,
+        "similar_types": similar_types,
+        "type_comparisons": type_comparisons,
         "cluster": cluster_result,
-        "teaser_celeb": teaser_celeb,
+        "teaser_type": teaser_type,
+        "action_spec_debug": action_spec._debug_trace,
+        "overlay_plan": [
+            {"zone": z.zone_name, "type": z.zone_type, "color": z.color_hex, "opacity": z.opacity}
+            for z in overlay_plan
+        ],
         "content": report_content,
         "created_at": datetime.utcnow().isoformat(),
         "access_level": "free",
@@ -311,6 +360,7 @@ async def run_analysis(user_id: str):
         "payment_2_at": None,
     }
     REPORTS[user_id] = _sanitize(report)
+    _save_json(user_id, "report.json", REPORTS[user_id])
     USERS[user_id]["status"] = "reported"
 
     return {
@@ -318,14 +368,13 @@ async def run_analysis(user_id: str):
         "report_id": report_id,
         "current_coords": current_coords,
         "aspiration_coords": aspiration_coords,
-        "gap_magnitude": gap["magnitude"],
-        "gap_primary": f"{gap['primary_direction']} \u2192 {gap['primary_shift_kr']}",
-        "similar_celebs": [
+        "similar_types": [
             {"name": c["name_kr"], "similarity_pct": c["similarity_pct"]}
-            for c in similar_celebs
+            for c in similar_types
         ],
         "cluster": cluster_result.get("cluster_label_kr") if cluster_result else None,
-        "teaser": f"{teaser_celeb['name_kr']}와 {teaser_celeb['similarity_pct']}% 유사" if teaser_celeb else None,
+        "teaser": f"{teaser_type['name_kr']}와 {teaser_type['similarity_pct']}% 유사" if teaser_type else None,
+        "action_count": len(action_spec.recommended_actions),
     }
 
 

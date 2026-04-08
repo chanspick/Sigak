@@ -95,50 +95,142 @@ FACE_STATS = {
     "nose_bridge_height":    {"mean": 0.518,  "std": 0.039},
 }
 
-# 피부톤별 추천/비추천 컬러
-SKIN_COLOR_MAP = {
-    "warm": {
-        "recommended": ["코랄", "피치", "웜베이지", "테라코타"],
-        "avoid": ["블루베이스 핑크", "쿨그레이", "라벤더"],
+# ============================================================
+# SKIN TONE CLASSIFICATION SYSTEM v2
+# undertone (warmth 기반) × chroma (C* 기반) = 6타입
+# ============================================================
+
+SKIN_TONE_THRESHOLDS = {
+    "warmth_warm_min": 8.0,
+    "warmth_cool_max": -3.0,
+    "chroma_clear_min": 18.0,
+}
+
+SKIN_PALETTES = {
+    "warm_clear": {
+        "label": "웜 클리어",
+        "description": "따뜻하고 선명한 톤이에요. 생기 있는 색이 자연스럽게 어울리는 경향이 있어요.",
+        "recommended": [
+            {"name": "코랄 레드", "hex": "#FF6B5B", "usage": "립"},
+            {"name": "오렌지 피치", "hex": "#FF8C42", "usage": "블러셔"},
+            {"name": "골드 베이지", "hex": "#C8A96E", "usage": "베이스"},
+            {"name": "아이보리", "hex": "#FFFFF0", "usage": "하이라이트"},
+        ],
+        "avoid": [
+            {"name": "블루 핑크", "hex": "#FFB6C1"},
+            {"name": "라벤더", "hex": "#B57EDC"},
+            {"name": "애쉬 그레이", "hex": "#B2BEB5"},
+        ],
+        "avoid_reason": "차가운 계열이 얼굴에서 동떨어져 보일 수 있어요.",
     },
-    "cool": {
-        "recommended": ["로즈", "라벤더", "쿨핑크", "베리"],
-        "avoid": ["오렌지", "테라코타", "골드"],
+    "warm_soft": {
+        "label": "웜 소프트",
+        "description": "따뜻하고 부드러운 톤이에요. 차분한 색이 자연스럽게 어울리는 경향이 있어요.",
+        "recommended": [
+            {"name": "살몬 핑크", "hex": "#FA8072", "usage": "립"},
+            {"name": "피치", "hex": "#FFCBA4", "usage": "블러셔"},
+            {"name": "웜 베이지", "hex": "#C8AD7F", "usage": "베이스"},
+            {"name": "테라코타", "hex": "#CC7351", "usage": "포인트"},
+        ],
+        "avoid": [
+            {"name": "블루베이스 핑크", "hex": "#FF69B4"},
+            {"name": "쿨 그레이", "hex": "#8C92AC"},
+            {"name": "네온 계열", "hex": "#39FF14"},
+        ],
+        "avoid_reason": "선명하거나 차가운 색이 피부를 칙칙하게 만들 수 있어요.",
     },
-    "neutral": {
-        "recommended": ["누드", "소프트핑크", "베이지", "모브"],
-        "avoid": ["극강 오렌지", "극강 블루핑크"],
+    "neutral_clear": {
+        "label": "뉴트럴 클리어",
+        "description": "중성적이고 선명한 톤이에요. 웜/쿨 양쪽 포인트 컬러가 다 어울리는 경향이 있어요.",
+        "recommended": [
+            {"name": "로즈", "hex": "#E75480", "usage": "립"},
+            {"name": "소프트 레드", "hex": "#C74375", "usage": "블러셔"},
+            {"name": "네이비", "hex": "#000080", "usage": "포인트"},
+            {"name": "에메랄드", "hex": "#50C878", "usage": "포인트"},
+        ],
+        "avoid": [
+            {"name": "머스타드", "hex": "#FFDB58"},
+            {"name": "올리브", "hex": "#808000"},
+            {"name": "카키", "hex": "#BDB76B"},
+        ],
+        "avoid_reason": "탁한 중간톤이 피부의 선명함을 가릴 수 있어요.",
+    },
+    "neutral_soft": {
+        "label": "뉴트럴 소프트",
+        "description": "중성적이고 부드러운 톤이에요. 저채도 색이 편안하게 어울리는 경향이 있어요.",
+        "recommended": [
+            {"name": "모브 핑크", "hex": "#D4A0A0", "usage": "립"},
+            {"name": "더스티 로즈", "hex": "#DCAE96", "usage": "블러셔"},
+            {"name": "소프트 베이지", "hex": "#D2B48C", "usage": "베이스"},
+            {"name": "세이지", "hex": "#B2AC88", "usage": "포인트"},
+        ],
+        "avoid": [
+            {"name": "비비드 오렌지", "hex": "#FF5F00"},
+            {"name": "네온 핑크", "hex": "#FF6EC7"},
+            {"name": "퓨어 블랙", "hex": "#000000"},
+        ],
+        "avoid_reason": "강한 색이 피부와 충돌해서 부담스러워 보일 수 있어요.",
+    },
+    "cool_clear": {
+        "label": "쿨 클리어",
+        "description": "차갑고 선명한 톤이에요. 고대비 컬러가 얼굴을 살려주는 경향이 있어요.",
+        "recommended": [
+            {"name": "버건디", "hex": "#800020", "usage": "립"},
+            {"name": "로즈 핑크", "hex": "#FF007F", "usage": "블러셔"},
+            {"name": "로열 블루", "hex": "#4169E1", "usage": "포인트"},
+            {"name": "퓨어 화이트", "hex": "#FFFFFF", "usage": "하이라이트"},
+        ],
+        "avoid": [
+            {"name": "카멜", "hex": "#C19A6B"},
+            {"name": "골드", "hex": "#FFD700"},
+            {"name": "테라코타", "hex": "#E2725B"},
+        ],
+        "avoid_reason": "따뜻한 계열이 피부에서 누렇게 떠 보일 수 있어요.",
+    },
+    "cool_soft": {
+        "label": "쿨 소프트",
+        "description": "차갑고 부드러운 톤이에요. 은은한 쿨톤 색이 자연스럽게 어울리는 경향이 있어요.",
+        "recommended": [
+            {"name": "라벤더 핑크", "hex": "#C4AEAD", "usage": "립"},
+            {"name": "소프트 블루", "hex": "#87CEEB", "usage": "포인트"},
+            {"name": "로즈 베이지", "hex": "#C4A882", "usage": "베이스"},
+            {"name": "그레이시 핑크", "hex": "#D8BFD8", "usage": "블러셔"},
+        ],
+        "avoid": [
+            {"name": "오렌지", "hex": "#FF8C00"},
+            {"name": "옐로 골드", "hex": "#FFD700"},
+            {"name": "웜 브라운", "hex": "#964B00"},
+        ],
+        "avoid_reason": "웜톤 계열이 피부톤과 분리되어 보일 수 있어요.",
     },
 }
 
-# #9: zone 이름 한글화 매핑
+
+def classify_skin_type(undertone: str, chroma: float) -> dict:
+    """undertone (warm/cool/neutral) × chroma (clear/soft) → 6타입 팔레트 반환."""
+    # undertone 유효성 검증
+    if undertone not in ("warm", "cool", "neutral"):
+        undertone = "neutral"
+    # chroma NaN/None 방어
+    if chroma is None or (isinstance(chroma, float) and math.isnan(chroma)):
+        chroma = 0.0
+    threshold = SKIN_TONE_THRESHOLDS["chroma_clear_min"]
+    chroma_label = "clear" if chroma >= threshold else "soft"
+    key = f"{undertone}_{chroma_label}"
+    return SKIN_PALETTES.get(key, SKIN_PALETTES["neutral_soft"])
+
+
+# zone 이름 한글화 매핑
 ZONE_NAME_KR = {
     "overall": "전체 베이스", "cheek_apple": "볼 사과존", "lip": "입술",
     "under_eye": "눈 밑", "jawline": "턱선", "forehead": "이마",
     "forehead_center": "이마 중앙", "eye_line": "아이라인", "brow": "눈썹",
-    "brow_tail": "눈썹 끝", "brow_arch": "눈썹 아치", "outer_eye": "눈꼬리",
+    "brow_tail": "눈썹 끝", "brow_arch": "눈썹", "outer_eye": "눈꼬리",
     "eye_crease": "눈두덩", "nose_bridge": "콧대", "nose_tip": "코끝",
     "mid_cheek": "볼 중앙", "cheekbone": "광대", "temple": "관자놀이",
     "lip_center": "입술 중앙", "lip_corner": "입꼬리",
+    "lip_cupid": "입술 윤곽", "cheek_center": "볼",
 }
-
-# #4: subtone 라벨 ("웜톤·보통" → "웜 소프트")
-SUBTONE_MAP = {
-    ("웜톤", "밝은 편"): ("웜 라이트", "따뜻하고 밝은 톤"),
-    ("웜톤", "보통"): ("웜 소프트", "따뜻하고 차분한 톤"),
-    ("웜톤", "어두운 편"): ("웜 딥", "따뜻하고 깊은 톤"),
-    ("쿨톤", "밝은 편"): ("쿨 라이트", "차갑고 밝은 톤"),
-    ("쿨톤", "보통"): ("쿨 소프트", "차갑고 차분한 톤"),
-    ("쿨톤", "어두운 편"): ("쿨 딥", "차갑고 깊은 톤"),
-    ("뉴트럴", "밝은 편"): ("뉴트럴 라이트", "중성적이고 밝은 톤"),
-    ("뉴트럴", "보통"): ("뉴트럴 소프트", "중성적이고 차분한 톤"),
-    ("뉴트럴", "어두운 편"): ("뉴트럴 딥", "중성적이고 깊은 톤"),
-}
-
-
-def get_subtone_label(tone_kr: str, brightness_label: str) -> tuple[str, str]:
-    """(subtone 이름, 설명) 반환."""
-    return SUBTONE_MAP.get((tone_kr, brightness_label), (f"{tone_kr} {brightness_label}", ""))
 
 
 # #5: metric context 라벨 생성 (무단위 비율은 자연어로)
@@ -205,7 +297,8 @@ def build_type_styling_tips(type_label: str, primary_axis: str, delta: float, to
     if key in DIRECTION_STYLING_TIPS:
         tips.append(DIRECTION_STYLING_TIPS[key])
     if top_zones:
-        zone_str = ", ".join(top_zones[:2])
+        zone_kr = [ZONE_NAME_KR.get(z, z) for z in top_zones[:2]]
+        zone_str = ", ".join(zone_kr)
         tips.append(f"특히 {zone_str} 부분에 집중하면 변화가 빠르게 느껴져요.")
     return tips
 
@@ -230,12 +323,45 @@ def _postposition(word: str, with_batchim: str, without_batchim: str) -> str:
 
 
 # 축 라벨 (coordinate.py AXES와 동일)
+# low = -1 방향, high = +1 방향
+# description = 소비자용 축 설명 (어떤 얼굴 특징으로 계산되는지)
 AXIS_LABELS = {
-    "structure":  {"name_kr": "구조",   "neg": "부드러운", "pos": "날카로운"},
-    "impression": {"name_kr": "인상",   "neg": "부드러운", "pos": "선명한"},
-    "maturity":   {"name_kr": "성숙도", "neg": "프레시",   "pos": "성숙"},
-    "intensity":  {"name_kr": "존재감", "neg": "내추럴",   "pos": "볼드"},
+    "structure": {
+        "name_kr": "라인",
+        "low": "부드러운", "high": "각진",
+        "description": "턱선 각도, 광대, 얼굴 길이로 본 윤곽의 부드러움과 날카로움",
+    },
+    "impression": {
+        "name_kr": "인상",
+        "low": "부드러운", "high": "선명한",
+        "description": "눈매 기울기와 눈썹 아치가 만드는 전체적인 인상",
+    },
+    "maturity": {
+        "name_kr": "분위기",
+        "low": "프레시", "high": "성숙한",
+        "description": "이마 비율, 인중 길이, 얼굴 종횡비가 주는 분위기",
+    },
+    "intensity": {
+        "name_kr": "존재감",
+        "low": "절제된", "high": "화려한",
+        "description": "눈 크기, 입술 볼륨, 코 높이가 만드는 이목구비의 존재감",
+    },
 }
+
+
+def get_position_label(axis: str, value: float) -> str:
+    """축 값(-1~+1)을 자연어 위치 라벨로 변환. 슬라이더 현재/추구 라벨에 사용."""
+    labels = AXIS_LABELS.get(axis, {})
+    abs_val = abs(value)
+    if abs_val < 0.15:
+        return "중간"
+    direction = labels.get("high", "") if value > 0 else labels.get("low", "")
+    if abs_val < 0.35:
+        return f"약간 {direction}"
+    elif abs_val < 0.65:
+        return direction
+    else:
+        return f"매우 {direction}"
 
 
 # ─────────────────────────────────────────────
@@ -284,14 +410,8 @@ def _axis_difficulty(delta: float) -> str:
 
 
 def _get_axis_label(axis: str, score: float) -> str:
-    """축 점수에 따른 극성 라벨을 반환한다."""
-    labels = AXIS_LABELS.get(axis, {})
-    if score < -0.3:
-        return labels.get("neg", "")
-    elif score > 0.3:
-        return labels.get("pos", "")
-    else:
-        return "중립"
+    """축 점수에 따른 극성 라벨을 반환한다. get_position_label의 간략 버전."""
+    return get_position_label(axis, score)
 
 
 def _safe_get(d: dict, key: str, default=None):
@@ -502,41 +622,31 @@ def _build_face_structure(face_features: dict) -> dict:
 
 
 def _build_skin_analysis(face_features: dict) -> dict:
-    """skin_analysis 섹션 -- standard 잠금."""
-    tone = face_features.get("skin_tone", "neutral")
-    brightness = face_features.get("skin_brightness", 0.5)
+    """skin_analysis 섹션 -- standard 잠금. v2: undertone × chroma 6타입."""
+    undertone = face_features.get("skin_tone", "neutral")
+    chroma = face_features.get("skin_chroma", 0.0)
     warmth = face_features.get("skin_warmth_score", 0.0)
+    brightness = face_features.get("skin_brightness", 0.5)
+    hex_sample = face_features.get("skin_hex_sample", "#999999")
 
-    # 밝기 라벨
-    if brightness > 0.65:
-        brightness_label = "밝은 편"
-    elif brightness > 0.45:
-        brightness_label = "보통"
-    else:
-        brightness_label = "어두운 편"
-
-    # 톤 한국어
-    tone_kr_map = {"warm": "웜톤", "cool": "쿨톤", "neutral": "뉴트럴"}
-    tone_kr = tone_kr_map.get(tone, tone)
-
-    color_info = SKIN_COLOR_MAP.get(tone, SKIN_COLOR_MAP["neutral"])
-
-    # #4: subtone 라벨 ("웜톤·보통" → "웜 소프트")
-    subtone_name, subtone_desc = get_subtone_label(tone_kr, brightness_label)
+    skin_type = classify_skin_type(undertone, chroma)
 
     return {
         "id": "skin_analysis",
         "locked": True,
         "unlock_level": "standard",
-        "teaser": {"headline": subtone_name},
+        "teaser": {"headline": skin_type["label"]},
         "content": {
-            "tone": tone_kr,
-            "subtone": subtone_name,
-            "subtone_description": subtone_desc,
-            "brightness": brightness_label,
-            "warmth_score": round(warmth, 2),
-            "recommended_colors": color_info["recommended"],
-            "avoid_colors": color_info["avoid"],
+            "tone": skin_type["label"],
+            "tone_description": skin_type["description"],
+            "hex_sample": hex_sample,
+            "recommended": skin_type["recommended"],
+            "avoid": skin_type["avoid"],
+            "avoid_reason": skin_type["avoid_reason"],
+            "_undertone": undertone,
+            "_chroma": round(chroma, 1),
+            "_warmth": round(warmth, 1),
+            "_brightness": round(brightness, 3),
         },
     }
 
@@ -623,6 +733,9 @@ def _build_face_interpretation(
             rank = 100 - pct
             range_label = f"상위 {rank}%" if pct > 50 else f"하위 {pct}%"
 
+            show_numeric = resolved_key in ("jaw_angle", "eye_tilt")
+            context_label = _get_context_label(resolved_key, float(value), pct)
+
             feature_items.append({
                 "feature": resolved_key,
                 "label": label,
@@ -633,6 +746,8 @@ def _build_face_interpretation(
                 "interpretation": interp,
                 "min_label": min_label,
                 "max_label": max_label,
+                "show_numeric_value": show_numeric,
+                "context_label": context_label,
             })
         else:
             # 수치 매핑 실패 — 텍스트만 전달하되 기본값 세팅 (NaN 방지)
@@ -680,6 +795,7 @@ def _build_gap_analysis(
     similar_types: list[dict],
     aspiration_interpretation: dict,
     report_content: dict,
+    aspiration_anchor: Optional[dict] = None,
 ) -> dict:
     """gap_analysis 섹션 -- standard 잠금."""
     magnitude = gap.get("magnitude", 0)
@@ -693,9 +809,24 @@ def _build_gap_analysis(
         current_type = similar_types[0].get("name_kr", "알 수 없음")
         current_type_id = similar_types[0].get("type_id", 0)
 
-    # 추구 유형: LLM 해석에서 가져오기
-    aspiration_type = _safe_get(aspiration_interpretation, "reference_base", "")
-    aspiration_type_id = 0
+    # 추구 유형: 파이프라인 상류에서 확정된 앵커 사용 (문자열 매칭 불필요)
+    if aspiration_anchor:
+        aspiration_type = aspiration_anchor.get("name_kr", "")
+        aspiration_type_id = aspiration_anchor.get("type_id", 0)
+        aspiration_description = aspiration_anchor.get("description_kr", "")
+    else:
+        # fallback: LLM 해석에서 이름만 가져오기 (type_id 미확정)
+        aspiration_type = _safe_get(aspiration_interpretation, "reference_base", "")
+        aspiration_type_id = 0
+        aspiration_description = ""
+
+    # description_kr → bullet 리스트 분리
+    aspiration_features: list[str] = []
+    if aspiration_description:
+        raw = aspiration_description.replace(". ", ", ")
+        aspiration_features = [
+            s.strip().rstrip(".") for s in raw.split(", ") if s.strip()
+        ]
 
     # 갭 요약 생성
     primary_dir = gap.get("primary_direction", "")
@@ -708,8 +839,8 @@ def _build_gap_analysis(
     # #6: 축 이름 대신 방향을 직접 서술
     primary_shift_kr = gap.get("primary_shift_kr", "")
     secondary_shift_kr = gap.get("secondary_shift_kr", "")
-    primary_neg = AXIS_LABELS.get(primary_dir, {}).get("neg", "")
-    primary_pos = AXIS_LABELS.get(primary_dir, {}).get("pos", "")
+    primary_low = AXIS_LABELS.get(primary_dir, {}).get("low", "")
+    primary_high = AXIS_LABELS.get(primary_dir, {}).get("high", "")
     # "가장 큰 변화는 볼드함을 빼고 자연스럽게 가는 거예요"
     gap_summary = f"가장 큰 변화는 더 {primary_shift_kr} 방향으로 가는 거예요."
     if secondary_shift_kr and secondary_dir != primary_dir:
@@ -724,16 +855,19 @@ def _build_gap_analysis(
             continue  # 무시할 수 있는 차이
 
         ax_labels = AXIS_LABELS.get(axis_name, {})
-        from_score = current_coords.get(axis_name, 0)
-        to_score = aspiration_coords.get(axis_name, 0)
-        from_label = _get_axis_label(axis_name, from_score)
-        to_label = _get_axis_label(axis_name, to_score)
+        from_score = max(-1.0, min(1.0, float(current_coords.get(axis_name, 0) or 0)))
+        to_score = max(-1.0, min(1.0, float(aspiration_coords.get(axis_name, 0) or 0)))
+        from_label = get_position_label(axis_name, from_score)
+        to_label = get_position_label(axis_name, to_score)
 
         recommendation = build_gap_recommendation(axis_name, delta_val)
 
         direction_items.append({
             "axis": axis_name,
             "label": ax_labels.get("name_kr", axis_name),
+            "label_low": ax_labels.get("low", ""),
+            "label_high": ax_labels.get("high", ""),
+            "axis_description": ax_labels.get("description", ""),
             "from_score": round(from_score, 2),
             "to_score": round(to_score, 2),
             "delta": round(abs(delta_val), 2),
@@ -753,6 +887,8 @@ def _build_gap_analysis(
             "current_type_id": current_type_id,
             "aspiration_type": aspiration_type or "추구미",
             "aspiration_type_id": aspiration_type_id,
+            "aspiration_description": aspiration_description,
+            "aspiration_features": aspiration_features,
             "current_coordinates": {k: round(v, 2) for k, v in current_coords.items()},
             "aspiration_coordinates": {k: round(v, 2) for k, v in aspiration_coords.items()},
             "gap_magnitude": round(magnitude, 2),
@@ -842,6 +978,25 @@ def _build_action_plan(
     }
 
 
+def build_why_this_type(current_type: str, match_score: float, axis_values: dict) -> list[str]:
+    """WHY THIS TYPE 3 bullet 구조 — LLM placeholder 방지용 deterministic fallback."""
+    bullets = []
+    if match_score >= 0.8:
+        bullets.append(f"전체적인 얼굴 구조가 '{current_type}' 유형과 높은 유사성을 보여요.")
+    else:
+        bullets.append(f"얼굴 구조의 주요 특징이 '{current_type}' 유형 경향과 맞아요.")
+
+    if axis_values:
+        strongest_axis = max(axis_values.items(), key=lambda x: abs(x[1]))
+        ax = AXIS_LABELS.get(strongest_axis[0], {})
+        axis_name = ax.get("name_kr", strongest_axis[0])
+        direction = ax.get("high", "") if strongest_axis[1] > 0 else ax.get("low", "")
+        bullets.append(f"{axis_name} 축에서 {direction} 쪽 경향이 뚜렷해요.")
+
+    bullets.append("현재 이미지의 비율, 각도, 인상이 이 유형의 전형적 특징과 잘 연결돼요.")
+    return bullets
+
+
 def _build_type_reference(similar_types: list[dict], report_content: dict, gap: dict = None) -> dict:
     """type_reference 섹션 -- full 잠금."""
     if not similar_types:
@@ -878,9 +1033,12 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
         if styling_insight:
             styling_tips.append(styling_insight)
 
-    # 폴백 이유
-    if not reasons:
-        reasons = [f"{type_name} 유형과 구조적 유사성"]
+    # bracket placeholder 감지 → deterministic fallback (1-6)
+    has_bracket = any("[" in r or "]" in r for r in reasons)
+    if not reasons or has_bracket:
+        match_score = similarity_pct / 100.0
+        axis_values = primary.get("reference_coords", {})
+        reasons = build_why_this_type(type_name, match_score, axis_values)
 
     # styling_tips deterministic 폴백
     if not styling_tips and gap:
@@ -966,6 +1124,7 @@ def format_report_for_frontend(
     face_interpretation: dict,
     report_content: dict,
     aspiration_interpretation: dict,
+    aspiration_anchor: Optional[dict] = None,
 ) -> dict:
     """
     파이프라인 분석 결과를 프론트엔드 ReportData 구조로 변환한다.
@@ -1018,6 +1177,7 @@ def format_report_for_frontend(
         _build_gap_analysis(
             current_coords, aspiration_coords, gap,
             similar_types, aspiration_interpretation, report_content,
+            aspiration_anchor=aspiration_anchor,
         ),
         _build_action_plan(gap, face_features, report_content),
         _build_type_reference(similar_types, report_content, gap=gap),

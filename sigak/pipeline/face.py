@@ -46,6 +46,8 @@ class FaceFeatures:
     skin_tone: str               # cool / warm / neutral
     skin_brightness: float       # 0–1
     skin_warmth_score: float     # LAB 기반 raw warmth 값 (양수=warm, 음수=cool)
+    skin_chroma: float           # LAB C* (채도) — undertone × chroma 분류용
+    skin_hex_sample: str         # 볼 ROI 평균 피부색 hex (예: "#D4A574")
     landmarks: list              # raw landmarks as list of [x,y] or [x,y,z]
     landmarks_106: list          # InsightFace 106점 2D landmarks [[x,y], ...] 또는 빈 리스트
     bbox: list                   # [x1, y1, x2, y2] 또는 빈 리스트
@@ -117,7 +119,10 @@ def _analyze_skin_tone_from_image(image: np.ndarray, cheek_points: list[tuple]) 
             skin_pixels.append(region.reshape(-1, 3))
 
     if not skin_pixels:
-        return {"skin_tone": "neutral", "skin_brightness": 0.5, "skin_warmth_score": 0.0}
+        return {
+            "skin_tone": "neutral", "skin_brightness": 0.5,
+            "skin_warmth_score": 0.0, "skin_chroma": 0.0, "skin_hex_sample": "#999999",
+        }
 
     pixels = np.concatenate(skin_pixels, axis=0)
     pixels_bgr = pixels.reshape(1, -1, 3).astype(np.uint8)
@@ -135,10 +140,22 @@ def _analyze_skin_tone_from_image(image: np.ndarray, cheek_points: list[tuple]) 
     else:
         tone = "neutral"
 
+    # chroma (C*) — 채도 계산
+    chroma = math.sqrt((a_mean - 128) ** 2 + (b_mean - 128) ** 2)
+
+    # 볼 ROI 평균 BGR → hex (유저 피부색 샘플)
+    avg_bgr = pixels.mean(axis=0)
+    _c = lambda v: max(0, min(255, int(v)))
+    hex_sample = "#{:02X}{:02X}{:02X}".format(
+        _c(avg_bgr[2]), _c(avg_bgr[1]), _c(avg_bgr[0])  # BGR → RGB
+    )
+
     return {
         "skin_tone": tone,
         "skin_brightness": round(float(l_mean), 3),
         "skin_warmth_score": round(float(warmth), 4),
+        "skin_chroma": round(float(chroma), 1),
+        "skin_hex_sample": hex_sample,
     }
 
 
@@ -402,6 +419,8 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_tone=skin["skin_tone"],
         skin_brightness=skin["skin_brightness"],
         skin_warmth_score=skin["skin_warmth_score"],
+        skin_chroma=skin["skin_chroma"],
+        skin_hex_sample=skin["skin_hex_sample"],
         landmarks=raw_landmarks,
         landmarks_106=raw_106,
         bbox=raw_bbox,
@@ -574,6 +593,8 @@ def _analyze_with_mediapipe(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_tone=skin["skin_tone"],
         skin_brightness=skin["skin_brightness"],
         skin_warmth_score=skin["skin_warmth_score"],
+        skin_chroma=skin["skin_chroma"],
+        skin_hex_sample=skin["skin_hex_sample"],
         landmarks=raw_landmarks,
         landmarks_106=[],  # MediaPipe에는 106점 없음
         bbox=[],

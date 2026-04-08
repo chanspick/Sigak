@@ -16,6 +16,9 @@ interface Coordinates {
 interface DirectionItem {
   axis: string;
   label: string;
+  label_low?: string;
+  label_high?: string;
+  axis_description?: string;
   from_score: number;
   to_score: number;
   delta: number;
@@ -30,6 +33,8 @@ interface GapAnalysisContent {
   current_type_id?: number;
   aspiration_type: string;
   aspiration_type_id?: number;
+  aspiration_description?: string;
+  aspiration_features?: string[];
   current_coordinates: Coordinates;
   aspiration_coordinates: Coordinates;
   gap_magnitude: number;
@@ -64,12 +69,22 @@ function scoreToPercent(score: number): number {
   return ((Math.max(-1, Math.min(1, score ?? 0)) + 1) / 2) * 100;
 }
 
-// ─── 4축 미니 비교 바 (컴팩트 24px 높이) ───
+// 축 양 끝 라벨 (백엔드 미제공 시 폴백)
+const AXIS_END_LABELS: Record<string, { low: string; high: string }> = {
+  structure: { low: "부드러운", high: "각진" },
+  impression: { low: "부드러운", high: "선명한" },
+  maturity: { low: "프레시", high: "성숙한" },
+  intensity: { low: "절제된", high: "화려한" },
+};
+
+// ─── 4축 미니 비교 바 (컴팩트) ───
 function MiniAxisRow({
+  axisKey,
   label,
   currentScore,
   aspirationScore,
 }: {
+  axisKey: string;
   label: string;
   currentScore: number;
   aspirationScore: number;
@@ -77,19 +92,25 @@ function MiniAxisRow({
   const currentPos = scoreToPercent(currentScore);
   const aspirationPos = scoreToPercent(aspirationScore);
   const delta = Math.abs(aspirationScore - currentScore);
+  const endLabels = AXIS_END_LABELS[axisKey];
 
   return (
-    <div className="flex items-center gap-2 h-[24px]">
+    <div className="flex items-center gap-2">
       {/* 축 라벨 — 고정 폭 */}
       <span className="text-[11px] text-[var(--color-muted)] w-[42px] shrink-0 text-right tracking-[0.5px]">
         {label}
       </span>
 
-      {/* 바 — 얇고 정밀한 느낌 */}
+      {/* 좌 라벨 */}
+      {endLabels && (
+        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-right opacity-60">
+          {endLabels.low}
+        </span>
+      )}
+
+      {/* 바 */}
       <div className="flex-1 relative h-[2px] bg-[var(--color-border)] rounded-full">
-        {/* 중심선 (0 위치) */}
         <div className="absolute left-1/2 top-1/2 -translate-x-px -translate-y-1/2 w-[1px] h-[6px] bg-[var(--color-border)] opacity-60" />
-        {/* 이동 범위 강조 (현재→추구 사이 얇은 바) */}
         {delta > 0.05 && (
           <div
             className="absolute h-[2px] bg-[var(--color-fg)] opacity-15 rounded-full"
@@ -99,22 +120,22 @@ function MiniAxisRow({
             }}
           />
         )}
-        {/* 현재 마커 — 빈 원 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 w-[7px] h-[7px] rounded-full border-[1.5px] border-[var(--color-muted)] bg-[var(--color-bg)]"
           style={{ left: `${currentPos}%`, marginLeft: "-3.5px" }}
         />
-        {/* 추구 마커 — 채운 원 */}
         <div
           className="absolute top-1/2 -translate-y-1/2 w-[7px] h-[7px] rounded-full bg-[var(--color-fg)]"
           style={{ left: `${aspirationPos}%`, marginLeft: "-3.5px" }}
         />
       </div>
 
-      {/* 변화 표시 */}
-      <span className="text-[10px] text-[var(--color-muted)] w-[20px] shrink-0 text-right">
-        {delta > 0.05 ? "→" : "·"}
-      </span>
+      {/* 우 라벨 */}
+      {endLabels && (
+        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-left opacity-60">
+          {endLabels.high}
+        </span>
+      )}
     </div>
   );
 }
@@ -128,8 +149,8 @@ function DirectionCard({ item }: { item: DirectionItem }) {
 
   return (
     <div className="p-4 border border-[var(--color-border)] rounded-lg">
-      {/* 상단: 축 라벨 + 난이도 배지 (Fix #15: delta 수치 제거, 난이도 라벨만) */}
-      <div className="flex items-center justify-between mb-3">
+      {/* 상단: 축 라벨 + 난이도 배지 */}
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)]">
             {AXIS_LABELS[item.axis] ?? item.label}
@@ -142,9 +163,17 @@ function DirectionCard({ item }: { item: DirectionItem }) {
         </div>
       </div>
 
+      {/* 축 설명 — 어떤 특징으로 계산되는지 */}
+      {item.axis_description && (
+        <p className="text-[10px] text-[var(--color-muted)] mb-3 opacity-70 leading-snug">
+          {item.axis_description}
+        </p>
+      )}
+
       {/* from → to 라벨 */}
       <div className="flex items-center justify-between text-[11px] mb-1.5">
         <span className="text-[var(--color-muted)]">{item.from_label}</span>
+        <span className="text-[var(--color-muted)] mx-1">→</span>
         <span className="font-semibold text-[var(--color-fg)]">
           {item.to_label}
         </span>
@@ -153,30 +182,23 @@ function DirectionCard({ item }: { item: DirectionItem }) {
       {/* 레인지 바: from→to */}
       <div className="mb-3">
         <div className="relative h-[3px] bg-[var(--color-border)] rounded-full">
-          {/* 이동 범위 강조 */}
           <div
             className="absolute h-full bg-[var(--color-fg)] rounded-full opacity-20"
             style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
           />
-          {/* 현재 마커 — 빈 원 */}
           <div
             className="absolute top-1/2 -translate-y-1/2 w-[8px] h-[8px] rounded-full border-[1.5px] border-[var(--color-muted)] bg-[var(--color-bg)]"
             style={{ left: `${fromPos}%`, marginLeft: "-4px" }}
           />
-          {/* 목표 마커 — 채운 원 */}
           <div
             className="absolute top-1/2 -translate-y-1/2 w-[8px] h-[8px] rounded-full bg-[var(--color-fg)]"
             style={{ left: `${toPos}%`, marginLeft: "-4px" }}
           />
         </div>
-        {/* 라벨 텍스트 */}
-        <div className="flex items-center justify-between text-[10px] mt-1.5">
-          <span className="text-[var(--color-muted)]">
-            {item.from_label}
-          </span>
-          <span className="font-semibold text-[var(--color-fg)]">
-            {item.to_label}
-          </span>
+        {/* 축 양 끝 라벨 */}
+        <div className="flex items-center justify-between text-[9px] mt-1.5 text-[var(--color-muted)] opacity-60">
+          <span>{item.label_low ?? AXIS_END_LABELS[item.axis]?.low ?? ""}</span>
+          <span>{item.label_high ?? AXIS_END_LABELS[item.axis]?.high ?? ""}</span>
         </div>
       </div>
 
@@ -256,6 +278,20 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           <span className="text-[13px] font-bold text-center leading-tight">
             {content.aspiration_type}
           </span>
+          {/* 추구 유형 특징 포인트 (1-12) */}
+          {content.aspiration_features && content.aspiration_features.length > 0 ? (
+            <ul className="mt-1.5 space-y-0.5 text-left">
+              {content.aspiration_features.slice(0, 4).map((feat, i) => (
+                <li key={i} className="text-[10px] text-[var(--color-muted)] leading-snug">
+                  · {feat}
+                </li>
+              ))}
+            </ul>
+          ) : content.aspiration_description ? (
+            <p className="text-[10px] text-[var(--color-muted)] text-center mt-1 leading-relaxed max-w-[120px]">
+              {content.aspiration_description}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -306,6 +342,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
               {axisKeys.map((key) => (
                 <MiniAxisRow
                   key={key}
+                  axisKey={key}
                   label={AXIS_LABELS[key]}
                   currentScore={content.current_coordinates[key]}
                   aspirationScore={content.aspiration_coordinates[key]}

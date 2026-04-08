@@ -14,6 +14,8 @@ interface FeatureInterpretation {
   interpretation: string;
   min_label?: string;
   max_label?: string;
+  show_numeric_value?: boolean;
+  context_label?: string;
 }
 
 interface FaceInterpretationContent {
@@ -62,15 +64,15 @@ export function FaceInterpretation({
                 key={fi.feature}
                 className={`py-5 ${idx < content.feature_interpretations.length - 1 ? "border-b border-[var(--color-border)] border-opacity-40" : ""}`}
               >
-                {/* 상단: 라벨 태그 + 값 배지 (백분위 텍스트 제거, Fix #12) */}
+                {/* 상단: 라벨 태그 + 값 또는 context 라벨 */}
                 <div className="flex items-center gap-2.5 flex-wrap mb-3">
-                  {/* 라벨 태그 — 깔끔한 필 스타일 */}
+                  {/* 라벨 태그 */}
                   <span className="shrink-0 px-2.5 py-1 text-[11px] font-semibold tracking-[1px] border border-[var(--color-fg)] rounded-full">
                     {fi.label}
                   </span>
-                  {/* 수치 + 단위 — 아웃라인 배지 (대비 보장) */}
+                  {/* 단위 있으면 숫자, 없으면 자연어 라벨 */}
                   <span className="px-2 py-0.5 text-[13px] font-semibold tabular-nums text-[var(--color-fg)] border border-[var(--color-border)] rounded">
-                    {formatValue(fi.value, fi.unit)}
+                    {fi.unit ? formatValue(fi.value, fi.unit) : (fi.context_label ?? fi.range_label)}
                   </span>
                 </div>
 

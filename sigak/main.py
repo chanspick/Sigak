@@ -279,6 +279,15 @@ async def run_analysis(user_id: str):
         "structure": 0, "impression": 0, "maturity": 0, "intensity": 0
     })
 
+    # ── Step 6.5: 추구미 좌표 → 가장 가까운 앵커 확정 ──
+    aspiration_similar = find_similar_types(
+        user_embedding=None,
+        user_coords=aspiration_coords,
+        gender=gender,
+        top_k=1,
+    )
+    aspiration_anchor = aspiration_similar[0] if aspiration_similar else None
+
     # ── Step 7: Gap calculation ──
     gap = compute_gap(current_coords, aspiration_coords)
 
@@ -364,6 +373,7 @@ async def run_analysis(user_id: str):
         face_interpretation=face_interpretation,
         report_content=report_content,
         aspiration_interpretation=aspiration_result,
+        aspiration_anchor=aspiration_anchor,
     )
 
     # ── Store report ──

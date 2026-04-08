@@ -20,8 +20,10 @@ interface FaceStructureContent {
   face_type: string;
   face_length_ratio: number;
   jaw_angle: number;
-  symmetry_score: number;
-  golden_ratio_score: number;
+  symmetry_score?: number;
+  golden_ratio_score?: number;
+  symmetry_label?: string;
+  golden_ratio_label?: string;
   metrics: FaceMetric[];
 }
 
@@ -113,18 +115,16 @@ export function FaceStructure({ content }: FaceStructureProps) {
             {content.face_type}
           </p>
           <div className="flex gap-5 mt-2 text-[13px] text-[var(--color-muted)]">
-            <span>
-              대칭{" "}
-              <span className="font-semibold text-[var(--color-fg)] tabular-nums text-[14px]">
-                {(content.symmetry_score ?? 0).toFixed(3)}
+            {content.symmetry_label && (
+              <span className="font-semibold text-[var(--color-fg)] text-[14px]">
+                {content.symmetry_label}
               </span>
-            </span>
-            <span>
-              황금비{" "}
-              <span className="font-semibold text-[var(--color-fg)] tabular-nums text-[14px]">
-                {(content.golden_ratio_score ?? 0).toFixed(3)}
+            )}
+            {content.golden_ratio_label && (
+              <span className="font-semibold text-[var(--color-fg)] text-[14px]">
+                {content.golden_ratio_label}
               </span>
-            </span>
+            )}
           </div>
         </div>
       </div>

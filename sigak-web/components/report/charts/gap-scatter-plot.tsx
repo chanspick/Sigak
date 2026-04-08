@@ -15,22 +15,37 @@ const AXIS_META: Record<
   string,
   { label: string; minLabel: string; maxLabel: string }
 > = {
-  structure: { label: "STRUCTURE", minLabel: "Sharp", maxLabel: "Soft" },
-  impression: { label: "IMPRESSION", minLabel: "Warm", maxLabel: "Cool" },
-  maturity: { label: "MATURITY", minLabel: "Fresh", maxLabel: "Mature" },
-  intensity: { label: "INTENSITY", minLabel: "Natural", maxLabel: "Bold" },
+  structure: { label: "라인", minLabel: "부드러운", maxLabel: "각진" },
+  impression: { label: "인상", minLabel: "부드러운", maxLabel: "선명한" },
+  maturity: { label: "분위기", minLabel: "프레시", maxLabel: "성숙한" },
+  intensity: { label: "존재감", minLabel: "절제된", maxLabel: "화려한" },
 };
 
-// 쿼드런트 라벨 조합 (topLeft, topRight, bottomLeft, bottomRight)
+// 한국어 형용사 → "~고" 연결형 (ㅂ불규칙 등 직접 매핑)
+const CONNECTIVE_MAP: Record<string, string> = {
+  "부드러운": "부드럽고",
+  "각진": "각지고",
+  "선명한": "선명하고",
+  "프레시": "프레시하고",
+  "성숙한": "성숙하고",
+  "절제된": "절제되고",
+  "화려한": "화려하고",
+};
+
+// 쿼드런트 라벨 조합 — 한글 자연어
 function getQuadrantLabels(
   xMeta: { minLabel: string; maxLabel: string },
   yMeta: { minLabel: string; maxLabel: string }
 ) {
+  const join = (a: string, b: string) => {
+    const connA = CONNECTIVE_MAP[a] ?? `${a}하고`;
+    return `${connA} ${b}`;
+  };
   return {
-    topLeft: `${yMeta.maxLabel}+${xMeta.minLabel}`,
-    topRight: `${yMeta.maxLabel}+${xMeta.maxLabel}`,
-    bottomLeft: `${yMeta.minLabel}+${xMeta.minLabel}`,
-    bottomRight: `${yMeta.minLabel}+${xMeta.maxLabel}`,
+    topLeft: join(yMeta.maxLabel, xMeta.minLabel),
+    topRight: join(yMeta.maxLabel, xMeta.maxLabel),
+    bottomLeft: join(yMeta.minLabel, xMeta.minLabel),
+    bottomRight: join(yMeta.minLabel, xMeta.maxLabel),
   };
 }
 
@@ -390,33 +405,6 @@ export function GapScatterPlot({
           />
         )}
 
-        {/* ─── 갭 크기 필 배지 (화살표 중간) ─── */}
-        {gapMagnitude !== undefined && dist > 35 && (
-          <g>
-            <rect
-              x={midX + 6}
-              y={midY - 14}
-              width={36}
-              height={14}
-              rx="7"
-              fill="var(--color-bg)"
-              stroke="var(--color-border)"
-              strokeWidth="0.5"
-            />
-            <text
-              x={midX + 24}
-              y={midY - 5}
-              fontSize="8"
-              fill="var(--color-fg)"
-              textAnchor="middle"
-              fontFamily="ui-monospace, monospace"
-              fontWeight="600"
-            >
-              {gapMagnitude.toFixed(2)}
-            </text>
-          </g>
-        )}
-
         {/* ─── 현재 위치 — 더블 링 (빈 원 + 외곽 링) ─── */}
         <circle
           cx={cx}
@@ -436,18 +424,6 @@ export function GapScatterPlot({
           stroke="var(--color-muted)"
           strokeWidth="1.5"
         />
-        {/* 현재 좌표값 */}
-        <text
-          x={cx}
-          y={cy + 16}
-          fontSize="7"
-          fill="var(--color-muted)"
-          textAnchor="middle"
-          fontFamily="ui-monospace, monospace"
-        >
-          ({cxVal.toFixed(2)}, {cyVal.toFixed(2)})
-        </text>
-
         {/* ─── 추구 위치 — 채운 원 + 글로우 ─── */}
         <circle
           cx={ax}
@@ -462,18 +438,6 @@ export function GapScatterPlot({
           r="7"
           fill="var(--color-fg)"
         />
-        {/* 추구 좌표값 */}
-        <text
-          x={ax}
-          y={ay - 12}
-          fontSize="7"
-          fill="var(--color-fg)"
-          textAnchor="middle"
-          fontFamily="ui-monospace, monospace"
-          fontWeight="600"
-        >
-          ({axVal.toFixed(2)}, {ayVal.toFixed(2)})
-        </text>
       </svg>
 
       {/* 범례 — 깔끔한 하단 범례 */}

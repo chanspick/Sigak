@@ -47,10 +47,14 @@ class FaceFeatures:
     skin_brightness: float       # 0–1
     skin_warmth_score: float     # LAB 기반 raw warmth 값 (양수=warm, 음수=cool)
     landmarks: list              # raw landmarks as list of [x,y] or [x,y,z]
+    landmarks_106: list          # InsightFace 106점 2D landmarks [[x,y], ...] 또는 빈 리스트
+    bbox: list                   # [x1, y1, x2, y2] 또는 빈 리스트
 
     def to_dict(self):
         d = asdict(self)
-        d.pop("landmarks")  # Too large for casual serialization
+        d.pop("landmarks")       # Too large for casual serialization
+        d.pop("landmarks_106")   # overlay 렌더용 — to_dict에서 제외
+        d.pop("bbox")            # overlay 렌더용
         return d
 
 
@@ -372,6 +376,11 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
     # ── 랜드마크 패키징 (68개, xyz) ──
     raw_landmarks = [[float(x), float(y), float(z)] for x, y, z in lm]
 
+    # ── 106점 2D + bbox (overlay 렌더용) ──
+    lm106 = face.landmark_2d_106
+    raw_106 = [[float(x), float(y)] for x, y in lm106] if lm106 is not None else []
+    raw_bbox = [float(v) for v in bbox] if bbox is not None else []
+
     return FaceFeatures(
         face_shape=face_shape,
         jaw_angle=round(jaw_angle, 1),
@@ -394,6 +403,8 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_brightness=skin["skin_brightness"],
         skin_warmth_score=skin["skin_warmth_score"],
         landmarks=raw_landmarks,
+        landmarks_106=raw_106,
+        bbox=raw_bbox,
     )
 
 
@@ -564,6 +575,8 @@ def _analyze_with_mediapipe(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_brightness=skin["skin_brightness"],
         skin_warmth_score=skin["skin_warmth_score"],
         landmarks=raw_landmarks,
+        landmarks_106=[],  # MediaPipe에는 106점 없음
+        bbox=[],
     )
 
 

@@ -15,6 +15,11 @@ interface ActionItem {
   recommendations: ActionRecommendation[];
 }
 
+interface OverlayData {
+  before_url: string;
+  after_url: string;
+}
+
 interface ActionPlanContent {
   items: ActionItem[];
 }
@@ -22,6 +27,7 @@ interface ActionPlanContent {
 interface ActionPlanProps {
   content: ActionPlanContent;
   locked: boolean;
+  overlay?: OverlayData | null;
 }
 
 // 존 이름 영문 → 한국어 매핑 (Fix #16)
@@ -68,14 +74,31 @@ function localizeCategory(category: string): string {
   return ZONE_KR[category] ?? category;
 }
 
+import { OverlayCompare } from "@/components/report/sections/overlay-compare";
+
 // 실행 가이드 — 우선순위 배지 + 액션 + 팁
-export function ActionPlan({ content, locked }: ActionPlanProps) {
+export function ActionPlan({ content, locked, overlay }: ActionPlanProps) {
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         ACTION PLAN
       </h2>
+
+      {/* Before/After 오버레이 비교 */}
+      {overlay?.before_url && overlay?.after_url && (
+        <div className="mb-8">
+          <OverlayCompare
+            beforeUrl={overlay.before_url}
+            afterUrl={overlay.after_url}
+            actionTags={content.items.map((item) => ({
+              label: localizeCategory(item.category),
+              priority: item.priority,
+            }))}
+            locked={locked}
+          />
+        </div>
+      )}
 
       {/* 카테고리 + 우선순위 배지 — 항상 선명 (블러 위) */}
       <div className="flex flex-wrap gap-2 mb-6">

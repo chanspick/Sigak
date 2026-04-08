@@ -103,6 +103,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           <SectionRenderer
             section={section}
             accessLevel={"full" as any} // TODO: 피드백용 임시 해제 — 배포 전 복구
+            overlay={(report as any).overlay ?? null}
           />
 
           {/* 해당 레벨 그룹의 마지막 섹션 뒤에 PaywallGate 삽입 */}

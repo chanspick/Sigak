@@ -39,6 +39,7 @@ from pipeline.similarity import find_similar_types, select_teaser_type
 from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
 from pipeline.report_formatter import format_report_for_frontend, _sanitize
+from pipeline.overlay_renderer import render_overlay
 from payment import router as payment_router, PAYMENT_ACCOUNT
 
 settings = get_settings()
@@ -188,15 +189,21 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
                 "filename": f.filename,
                 "features": face_result.to_dict(),
                 "landmarks_count": len(face_result.landmarks),
+                "landmarks_106": face_result.landmarks_106,
+                "bbox": face_result.bbox,
             })
 
     if not photo_results:
         raise HTTPException(400, "No valid face detected in uploaded photos")
 
     # Use first photo's features as primary (multi-photo averaging later)
+    # landmarks_106 + bbox도 저장 (overlay 렌더용)
+    first_face = photo_results[0].get("_face_obj")
     ANALYSES[user_id] = {
         "photos": photo_results,
         "primary_features": photo_results[0]["features"],
+        "landmarks_106": photo_results[0].get("landmarks_106", []),
+        "bbox": photo_results[0].get("bbox", []),
     }
     _save_json(user_id, "face_analysis.json", ANALYSES[user_id])
 
@@ -292,6 +299,34 @@ async def run_analysis(user_id: str):
     # ── Step 8.5: Overlay Plan 생성 ★ ──
     overlay_plan = build_overlay_plan(action_spec, features)
 
+    # ── Step 8.6: Overlay 이미지 렌더링 ★ ──
+    import cv2
+    overlay_image_url = None
+    # 유저 사진 로드 (첫 번째 사진)
+    photo_dir = DATA_DIR / user_id
+    photo_files = sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
+    if photo_files and analysis and analysis["primary_features"]:
+        photo_img = cv2.imread(str(photo_files[0]))
+        if photo_img is not None:
+            lmk106 = analysis.get("landmarks_106")
+            face_bbox = analysis.get("bbox")
+            if lmk106:
+                overlay_plan_dicts = [
+                    {"zone": z.zone_name, "type": z.zone_type, "color": z.color_hex, "opacity": z.opacity}
+                    for z in overlay_plan
+                ]
+                overlay_img = render_overlay(
+                    img=photo_img,
+                    landmarks_106=np.array(lmk106),
+                    overlay_plan=overlay_plan_dicts,
+                    face_type=features.get("face_shape", ""),
+                    bbox=np.array(face_bbox) if face_bbox else None,
+                )
+                if overlay_img is not None:
+                    overlay_path = photo_dir / "overlay.png"
+                    cv2.imwrite(str(overlay_path), overlay_img)
+                    overlay_image_url = f"/api/v1/uploads/{user_id}/overlay.png"
+
     # ── Step 9: Report generation (축소된 입력) ★ ──
     raw_report = generate_report(action_spec, {
         "name": user["name"],
@@ -335,6 +370,17 @@ async def run_analysis(user_id: str):
     from dataclasses import asdict
     teaser_type = select_teaser_type(similar_types)
     report_id = str(uuid.uuid4())
+    # overlay URL을 formatted report에 삽입
+    if overlay_image_url:
+        # 원본 사진 URL도 함께
+        original_photos = sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
+        original_photos = [p for p in original_photos if p.name != "overlay.png"]
+        original_url = f"/api/v1/uploads/{user_id}/{original_photos[0].name}" if original_photos else None
+        formatted_report["overlay"] = {
+            "before_url": original_url,
+            "after_url": overlay_image_url,
+        }
+
     report = {
         "id": report_id,
         "user_id": user_id,
@@ -354,6 +400,7 @@ async def run_analysis(user_id: str):
             {"zone": z.zone_name, "type": z.zone_type, "color": z.color_hex, "opacity": z.opacity}
             for z in overlay_plan
         ],
+        "overlay_image_url": overlay_image_url,
         "content": report_content,
         "created_at": datetime.utcnow().isoformat(),
         "access_level": "free",
@@ -526,6 +573,35 @@ async def get_axes():
 # ─────────────────────────────────────────────
 #  Health
 # ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+#  Overlay / 사진 정적 서빙
+# ─────────────────────────────────────────────
+
+from fastapi.responses import FileResponse
+
+@app.get("/api/v1/uploads/{user_id}/{filename}")
+async def serve_upload(user_id: str, filename: str):
+    """유저 사진/오버레이 이미지 서빙."""
+    file_path = DATA_DIR / user_id / filename
+    if not file_path.exists():
+        raise HTTPException(404, "File not found")
+    media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+    mt = media_types.get(file_path.suffix.lower(), "application/octet-stream")
+    return FileResponse(str(file_path), media_type=mt)
+
+
+@app.get("/api/v1/photos/{user_id}/original")
+async def get_original_photo(user_id: str):
+    """원본 사진 URL 반환 (before/after용)."""
+    photo_dir = DATA_DIR / user_id
+    for ext in ["*.jpg", "*.jpeg", "*.png"]:
+        photos = sorted(photo_dir.glob(ext))
+        photos = [p for p in photos if p.name != "overlay.png"]
+        if photos:
+            return {"url": f"/api/v1/uploads/{user_id}/{photos[0].name}"}
+    raise HTTPException(404, "No photo found")
+
 
 @app.get("/health")
 async def health():

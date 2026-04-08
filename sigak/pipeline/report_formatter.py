@@ -322,31 +322,40 @@ def _postposition(word: str, with_batchim: str, without_batchim: str) -> str:
     return with_batchim
 
 
-# 축 라벨 (coordinate.py AXES와 동일)
-# low = -1 방향, high = +1 방향
-# description = 소비자용 축 설명 (어떤 얼굴 특징으로 계산되는지)
-AXIS_LABELS = {
+# 축 라벨 — coordinate.py에서 import (SSOT)
+# 소비자용 name_kr과 description은 여기서 오버라이드 (표시 전용)
+from pipeline.coordinate import get_axis_labels as _get_raw_axis_labels, get_all_axis_labels
+
+# 소비자용 오버라이드: coordinate.py의 라벨 + UI 표시용 name_kr/description
+_AXIS_DISPLAY_OVERRIDES = {
     "structure": {
         "name_kr": "라인",
-        "low": "둥근", "high": "각진",
         "description": "턱선 각도, 광대, 얼굴 길이로 본 윤곽의 둥근 정도",
     },
     "impression": {
         "name_kr": "인상",
-        "low": "온화한", "high": "선명한",
         "description": "눈매 기울기와 눈썹 아치가 만드는 전체적인 인상",
     },
     "maturity": {
         "name_kr": "분위기",
-        "low": "프레시", "high": "성숙한",
         "description": "이마 비율, 인중 길이, 얼굴 종횡비가 주는 분위기",
     },
     "intensity": {
         "name_kr": "존재감",
-        "low": "절제된", "high": "화려한",
         "description": "눈 크기, 입술 볼륨, 코 높이가 만드는 이목구비의 존재감",
     },
 }
+
+
+def _get_axis_display(axis_name: str) -> dict:
+    """coordinate.py 라벨 + 소비자용 오버라이드 병합."""
+    base = _get_raw_axis_labels(axis_name)
+    override = _AXIS_DISPLAY_OVERRIDES.get(axis_name, {})
+    return {**base, **override}
+
+
+# 빠른 접근용 (기존 AXIS_LABELS 호환)
+AXIS_LABELS = {name: _get_axis_display(name) for name in ["structure", "impression", "maturity", "intensity"]}
 
 
 def get_position_label(axis: str, value: float) -> str:
@@ -828,22 +837,21 @@ def _build_gap_analysis(
             s.strip().rstrip(".") for s in raw.split(", ") if s.strip()
         ]
 
-    # 갭 요약 생성
+    # 갭 요약 생성 — AXIS_LABELS 기준 라벨 사용 (coordinate.py 라벨 무시)
     primary_dir = gap.get("primary_direction", "")
-    primary_kr = gap.get("primary_shift_kr", "")
     secondary_dir = gap.get("secondary_direction", "")
 
-    primary_delta = abs(gap_vector.get(primary_dir, 0))
-    secondary_delta = abs(gap_vector.get(secondary_dir, 0))
+    primary_delta_val = gap_vector.get(primary_dir, 0)
+    secondary_delta_val = gap_vector.get(secondary_dir, 0)
 
-    # #6: 축 이름 대신 방향을 직접 서술
-    primary_shift_kr = gap.get("primary_shift_kr", "")
-    secondary_shift_kr = gap.get("secondary_shift_kr", "")
-    primary_low = AXIS_LABELS.get(primary_dir, {}).get("low", "")
-    primary_high = AXIS_LABELS.get(primary_dir, {}).get("high", "")
-    # "가장 큰 변화는 볼드함을 빼고 자연스럽게 가는 거예요"
+    # AXIS_LABELS에서 방향 라벨 직접 조회 (SSOT)
+    primary_ax = AXIS_LABELS.get(primary_dir, {})
+    primary_shift_kr = primary_ax.get("high") if primary_delta_val > 0 else primary_ax.get("low", "")
+    secondary_ax = AXIS_LABELS.get(secondary_dir, {})
+    secondary_shift_kr = secondary_ax.get("high") if secondary_delta_val > 0 else secondary_ax.get("low", "")
+
     gap_summary = f"가장 큰 변화는 더 {primary_shift_kr} 방향으로 가는 거예요."
-    if secondary_shift_kr and secondary_dir != primary_dir:
+    if secondary_shift_kr and secondary_dir != primary_dir and abs(secondary_delta_val) > 0.1:
         gap_summary += f" 그리고 전체적으로 더 {secondary_shift_kr} 느낌으로요."
 
     # direction_items 생성
@@ -943,7 +951,12 @@ def _build_action_plan(
             name_kr = ax.get("name_kr", axis)
             if direction:
                 return f"더 {direction} {name_kr}으로"
-        return f"더 {gap.get('primary_shift_kr', '')} 느낌으로"
+        # SSOT 폴백: primary 축의 AXIS_LABELS 라벨
+        p_dir = gap.get("primary_direction", "")
+        p_delta = gap_vector.get(p_dir, 0)
+        p_ax = AXIS_LABELS.get(p_dir, {})
+        p_label = p_ax.get("high") if p_delta > 0 else p_ax.get("low", "")
+        return f"더 {p_label} 느낌으로"
 
     category_map: dict[str, dict] = {}
     for item in llm_items:
@@ -968,7 +981,10 @@ def _build_action_plan(
 
     # 폴백: LLM이 빈 결과를 줬을 때 기본 카테고리 생성
     if not items:
-        shift_kr = gap.get("primary_shift_kr", "")
+        _p_dir = gap.get("primary_direction", "")
+        _p_delta = gap_vector.get(_p_dir, 0)
+        _p_ax = AXIS_LABELS.get(_p_dir, {})
+        shift_kr = _p_ax.get("high") if _p_delta > 0 else _p_ax.get("low", "")
         items = [
             {
                 "category": "메이크업",

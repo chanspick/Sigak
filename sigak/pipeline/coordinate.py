@@ -51,6 +51,32 @@ AXES = [
     ),
 ]
 
+# ─────────────────────────────────────────────
+#  축 라벨 조회 함수 (Single Source of Truth)
+#  다른 모든 파일은 이 함수로만 축 라벨에 접근한다.
+# ─────────────────────────────────────────────
+
+_AXES_BY_NAME = {ax.name: ax for ax in AXES}
+
+
+def get_axis_labels(axis_name: str) -> dict:
+    """축 라벨 조회. 모든 파일의 유일한 라벨 소스."""
+    ax = _AXES_BY_NAME.get(axis_name)
+    if ax is None:
+        return {"name_kr": axis_name, "low": "", "high": "", "description": ""}
+    return {
+        "name_kr": ax.name_kr,
+        "low": ax.negative_label_kr,
+        "high": ax.positive_label_kr,
+        "low_en": ax.negative_label,
+        "high_en": ax.positive_label,
+    }
+
+
+def get_all_axis_labels() -> dict:
+    """전체 축 라벨. 프론트에 내려줄 때 사용."""
+    return {ax.name: get_axis_labels(ax.name) for ax in AXES}
+
 
 # ─────────────────────────────────────────────
 #  Observed Ranges (SCUT-FBP5500 AF 2000장, InsightFace, p10~p90)

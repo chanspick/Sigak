@@ -406,9 +406,11 @@ def get_type_reference_prompt(gender: str = "female") -> str:
     anchors_data = load_anchors()
     lines = []
 
+    # coordinate.py AxisDefinition 기준 (SSOT)
+    # -1 = negative_label, +1 = positive_label
     axis_labels = {
-        "structure": {-1: "날카로운", 1: "부드러운"},
-        "impression": {-1: "따뜻한", 1: "쿨한"},
+        "structure": {-1: "부드러운", 1: "날카로운"},
+        "impression": {-1: "부드러운", 1: "선명한"},
         "maturity": {-1: "프레시", 1: "성숙한"},
         "intensity": {-1: "자연스러운", 1: "볼드"},
     }

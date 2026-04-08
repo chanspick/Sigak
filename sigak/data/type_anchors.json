@@ -119,6 +119,53 @@
       "community_score": null,
       "embedding_path": "sigak/data/embeddings/female/type_2.npy"
     },
+    "type_3": {
+      "name_kr": "또렷한 발랄함",
+      "name_en": "Sharp Vivid",
+      "group": null,
+      "gender": "female",
+      "type_id": 3,
+      "aliases": [
+        "타입3",
+        "유형3",
+        "발랄한",
+        "샤프웜프레시"
+      ],
+      "description_kr": "하트형 얼굴, 뾰족한 턱, 또렷한 이목구비, 쌍꺼풀, 높은 코, 두꺼운 입술. 또렷하지만 따뜻하고 발랄한 인상.",
+      "axes_3d": [
+        0.8,
+        0.2,
+        0.2
+      ],
+      "anchor_version": "v2",
+      "axis_roles": {
+        "structure": "positive",
+        "impression": "positive",
+        "maturity": "negative",
+        "intensity": "positive"
+      },
+      "reference_coords": {
+        "structure": 0.5,
+        "impression": 0.3,
+        "maturity": -0.5,
+        "intensity": 0.6
+      },
+      "structural_keywords": [
+        "하트형 얼굴",
+        "뾰족한 턱",
+        "또렷한 이목구비",
+        "쌍꺼풀",
+        "높은 코",
+        "두꺼운 입술",
+        "따뜻한 느낌"
+      ],
+      "image_files": [
+        "3 (1).jpg"
+      ],
+      "image_count": 1,
+      "community_score": null,
+      "embedding_path": "sigak/data/embeddings/female/type_3.npy"
+    },
     "type_4": {
       "name_kr": "날카롭고 시크",
       "name_en": "Sharp Chic",

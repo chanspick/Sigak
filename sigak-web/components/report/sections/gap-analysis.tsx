@@ -70,11 +70,12 @@ function scoreToPercent(score: number): number {
 }
 
 // 축 양 끝 라벨 (백엔드 미제공 시 폴백)
+// coordinate.py SSOT 기준 폴백 (백엔드 label_low/label_high 미제공 시)
 const AXIS_END_LABELS: Record<string, { low: string; high: string }> = {
-  structure: { low: "둥근", high: "각진" },
-  impression: { low: "온화한", high: "선명한" },
+  structure: { low: "부드러운", high: "날카로운" },
+  impression: { low: "부드러운", high: "선명한" },
   maturity: { low: "프레시", high: "성숙한" },
-  intensity: { low: "절제된", high: "화려한" },
+  intensity: { low: "자연스러운", high: "볼드" },
 };
 
 // ─── 4축 미니 비교 바 (컴팩트) ───

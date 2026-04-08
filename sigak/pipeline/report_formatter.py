@@ -15,6 +15,38 @@ import numpy as np
 from scipy.stats import norm
 
 
+import re as _re
+
+# raw 수치 패턴 — face_interpretation 해석문 필터용
+RAW_NUMBER_PATTERNS = [
+    r"\d+(\.\d+)?°",       # 93.7°
+    r"\d+(\.\d+)?%",       # 87%
+    r"\b0\.\d{2,}\b",      # 0.644, 0.872
+    r"\b1\.\d{2,}\b",      # 1.366
+    r"\d{2,}\.\d+의\s",    # "93.7의 "
+]
+
+
+def contains_raw_metric(text: str) -> bool:
+    """해석문에 raw 수치가 포함되어 있는지 검사"""
+    return any(_re.search(p, text) for p in RAW_NUMBER_PATTERNS)
+
+
+def sanitize_interpretation(text: str) -> str:
+    """해석문에서 raw 수치 패턴을 제거하고 문장을 정리"""
+    if not contains_raw_metric(text):
+        return text
+    text = _re.sub(r"\d+(\.\d+)?°의\s*", "", text)
+    text = _re.sub(r"\b[01]\.\d+의\s*", "", text)
+    text = _re.sub(r"\d+(\.\d+)?°의?\s*", "", text)
+    text = _re.sub(r"\b0\.\d{2,}\b", "", text)
+    text = _re.sub(r"\b1\.\d{2,}\b", "", text)
+    text = _re.sub(r"\s{2,}", " ", text).strip()
+    text = _re.sub(r"^의\s+", "", text)
+    text = _re.sub(r"^는\s+", "", text)
+    return text
+
+
 def _sanitize(obj):
     """numpy 타입을 Python 네이티브 타입으로 변환 (JSON 직렬화용)."""
     if isinstance(obj, dict):
@@ -73,6 +105,72 @@ FACE_SHAPE_KR = {
     "oblong": "긴형",
 }
 
+# gap recommendation 템플릿
+GAP_RECOMMENDATION_TEMPLATES = {
+    "structure": {
+        "increase": "구조 축에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+        "decrease": "구조 축에서는 라인을 부드럽게 풀어주는 방향이 핵심이에요.",
+    },
+    "impression": {
+        "increase": "인상 축에서는 눈매와 이목구비를 또렷하게 살리는 방향이 중요해요.",
+        "decrease": "인상 축에서는 눈매와 라인을 부드럽게 풀어주는 방향이 중요해요.",
+    },
+    "maturity": {
+        "increase": "성숙도 축에서는 세련되고 성숙한 분위기를 더하는 방향이에요.",
+        "decrease": "성숙도 축에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
+    },
+    "intensity": {
+        "increase": "존재감 축에서는 존재감 있고 임팩트 있는 표현이 포인트예요.",
+        "decrease": "존재감 축에서는 자연스럽고 힘을 뺀 표현이 포인트예요.",
+    },
+}
+
+
+# type_reference styling_tips 방향별 테이블
+DIRECTION_STYLING_TIPS = {
+    ("structure", "decrease"): "각진 라인을 부드럽게 감싸는 쉐딩이 효과적이에요.",
+    ("structure", "increase"): "윤곽을 또렷하게 잡아주는 하이라이트가 효과적이에요.",
+    ("impression", "decrease"): "눈매와 눈썹 라인을 둥글게 잡아주면 인상이 부드러워져요.",
+    ("impression", "increase"): "눈꼬리와 눈썹 끝을 살려주면 인상이 선명해져요.",
+    ("maturity", "decrease"): "볼과 눈 아래에 생기를 더하면 어려 보이는 효과가 있어요.",
+    ("maturity", "increase"): "음영을 깊게 주면 세련되고 성숙한 분위기가 나요.",
+    ("intensity", "decrease"): "전체적으로 힘을 빼고 자연스럽게 마무리하는 게 좋아요.",
+    ("intensity", "increase"): "포인트 부위를 과감하게 강조하면 존재감이 살아요.",
+}
+
+
+def build_type_styling_tips(type_label: str, primary_axis: str, delta: float, top_zones: list[str]) -> list[str]:
+    tips = []
+    tips.append(f"{type_label} 유형의 장점을 살리면서 변화를 주는 게 포인트예요.")
+    direction = "decrease" if delta < 0 else "increase"
+    key = (primary_axis, direction)
+    if key in DIRECTION_STYLING_TIPS:
+        tips.append(DIRECTION_STYLING_TIPS[key])
+    if top_zones:
+        zone_str = ", ".join(top_zones[:2])
+        tips.append(f"특히 {zone_str} 부분에 집중하면 변화가 빠르게 느껴져요.")
+    return tips
+
+
+def build_gap_recommendation(axis: str, delta: float) -> str:
+    direction = "decrease" if delta < 0 else "increase"
+    return GAP_RECOMMENDATION_TEMPLATES.get(axis, {}).get(
+        direction,
+        "이 방향으로 스타일링을 조정하면 원하는 이미지에 가까워질 수 있어요."
+    )
+
+
+def _postposition(word: str, with_batchim: str, without_batchim: str) -> str:
+    """한국어 조사 자동 선택 (받침 유무 기반)"""
+    if not word:
+        return with_batchim
+    last_char = ord(word[-1])
+    if 0xAC00 <= last_char <= 0xD7A3:
+        has_batchim = (last_char - 0xAC00) % 28 != 0
+        return with_batchim if has_batchim else without_batchim
+    return with_batchim
+
+
 # 축 라벨 (coordinate.py AXES와 동일)
 AXIS_LABELS = {
     "structure":  {"name_kr": "구조",   "neg": "부드러운", "pos": "날카로운"},
@@ -87,12 +185,23 @@ AXIS_LABELS = {
 # ─────────────────────────────────────────────
 
 def _percentile(key: str, value: float) -> int:
-    """주어진 수치의 백분위를 정규분포 기반으로 계산한다."""
+    """주어진 수치의 백분위를 정규분포 기반으로 계산한다. 5~95 clamp."""
     stats = FACE_STATS.get(key)
     if stats is None or stats["std"] == 0:
         return 50
-    pct = norm.cdf(value, loc=stats["mean"], scale=stats["std"]) * 100
-    return int(round(max(1, min(99, pct))))
+    raw_p = norm.cdf(value, loc=stats["mean"], scale=stats["std"]) * 100
+    return max(5, min(95, int(round(raw_p))))
+
+
+def percentile_to_tone_kr(p: int) -> str:
+    """percentile → 서술 어휘. interpretation 생성 시 입력으로 사용."""
+    if p <= 10:  return "매우 낮은 편"
+    if p <= 25:  return "낮은 편"
+    if p <= 40:  return "다소 낮은 편"
+    if p <= 60:  return "보통 수준"
+    if p <= 75:  return "다소 높은 편"
+    if p <= 90:  return "높은 편"
+    return "매우 높은 편"
 
 
 def _gap_difficulty(magnitude: float) -> str:
@@ -454,18 +563,20 @@ def _build_face_interpretation(
 
     # 폴백: LLM이 빈 결과를 줬을 때
     if not overall:
-        jaw = face_features.get("jaw_angle", 0)
-        eye_t = face_features.get("eye_tilt", 0)
-        overall = (
-            f"턱 각도 {jaw}\u00B0와 눈꼬리 기울기 {eye_t:+.1f}\u00B0의 조합이 "
-            "만드는 인상을 분석했습니다."
-        )
+        overall = "전체적인 얼굴 구조의 조합이 만드는 인상을 분석했습니다."
+
+    # sanitize: 해석문에서 raw 수치 제거
+    overall = sanitize_interpretation(overall)
+    for fi_item in feature_items:
+        fi_item["interpretation"] = sanitize_interpretation(fi_item["interpretation"])
+    harmony = sanitize_interpretation(harmony) if harmony else harmony
+    distinctive = [sanitize_interpretation(p) for p in distinctive] if distinctive else distinctive
 
     return {
         "id": "face_interpretation",
         "locked": True,
         "unlock_level": "standard",
-        "teaser": {"headline": "수치 기반 얼굴 심층 해석"},
+        "teaser": {"headline": "얼굴 심층 해석"},
         "content": {
             "overall_impression": overall,
             "feature_interpretations": feature_items,
@@ -509,10 +620,9 @@ def _build_gap_analysis(
 
     primary_label = AXIS_LABELS.get(primary_dir, {}).get("name_kr", primary_dir)
     secondary_label = AXIS_LABELS.get(secondary_dir, {}).get("name_kr", secondary_dir)
-    gap_summary = (
-        f"주요 변화 방향은 {primary_label}이며, "
-        f"{secondary_label}이 보조 방향입니다."
-    )
+    pp1 = _postposition(primary_label, "이", "가")
+    pp2 = _postposition(secondary_label, "이", "가")
+    gap_summary = f"주요 변화 방향은 {primary_label}{pp1}고, {secondary_label}{pp2} 보조 방향이에요."
 
     # direction_items 생성
     direction_items = []
@@ -528,12 +638,7 @@ def _build_gap_analysis(
         from_label = _get_axis_label(axis_name, from_score)
         to_label = _get_axis_label(axis_name, to_score)
 
-        # 축별 방향 추천 텍스트 생성 (LLM 단일 content 재사용 → 중복 버그 수정)
-        direction_word = ax_labels.get("pos", "") if delta_val > 0 else ax_labels.get("neg", "")
-        recommendation = (
-            f"{ax_labels.get('name_kr', axis_name)} 방향에서 "
-            f"{'더 ' + direction_word if direction_word else '조정이'} 필요한 구간입니다."
-        )
+        recommendation = build_gap_recommendation(axis_name, delta_val)
 
         direction_items.append({
             "axis": axis_name,
@@ -563,6 +668,10 @@ def _build_gap_analysis(
             "gap_difficulty": difficulty,
             "gap_summary": gap_summary,
             "direction_items": direction_items,
+            # z축 필드 예약 (다음 스프린트)
+            "trend_coordinates": None,
+            "gap_to_trend": None,
+            "blend_weights": None,
         },
     }
 
@@ -601,8 +710,9 @@ def _build_action_plan(
                 "recommendations": [],
             }
 
-        # delta_contribution 추정: 전체 갭을 카테고리/추천 수로 비례 배분
-        est_contribution = round(magnitude * 0.15, 2) if magnitude > 0 else 0.1
+        # delta_contribution: priority 기반 차등 (HIGH=3, MEDIUM=2, LOW=1)
+        priority_score = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(priority, 1)
+        est_contribution = round(priority_score * 0.12, 2) if magnitude > 0 else 0.1
 
         category_map[cat]["recommendations"].append({
             "action": rec_text,
@@ -676,7 +786,7 @@ def _build_action_plan(
     }
 
 
-def _build_type_reference(similar_types: list[dict], report_content: dict) -> dict:
+def _build_type_reference(similar_types: list[dict], report_content: dict, gap: dict = None) -> dict:
     """type_reference 섹션 -- full 잠금."""
     if not similar_types:
         return {
@@ -716,6 +826,15 @@ def _build_type_reference(similar_types: list[dict], report_content: dict) -> di
     if not reasons:
         reasons = [f"{type_name} 유형과 구조적 유사성"]
 
+    # styling_tips deterministic 폴백
+    if not styling_tips and gap:
+        gap_vector = gap.get("vector", {})
+        primary_dir = gap.get("primary_direction", "structure")
+        primary_delta = gap_vector.get(primary_dir, 0)
+        action_items = _safe_get(report_content, "action_items", [])
+        top_zones = [item.get("category", "") for item in action_items[:2]]
+        styling_tips = build_type_styling_tips(type_name, primary_dir, primary_delta, top_zones)
+
     # runner_ups
     runner_ups = []
     for rt in similar_types[1:3]:
@@ -741,20 +860,30 @@ def _build_type_reference(similar_types: list[dict], report_content: dict) -> di
     }
 
 
-def _build_trend_context(report_content: dict) -> dict:
+def _build_trend_context(report_content: dict, user_name: str = "", action_spec=None) -> dict:
     """trend_context 섹션 -- full 잠금."""
     trend_text = _safe_get(report_content, "trend_context", "")
     trends = []
-    if trend_text:
+    if trend_text and len(trend_text) >= 20:
         trends.append({
-            "title": "2026 S/S 트렌드",
+            "title": "적용 가이드",
             "description": trend_text,
         })
     else:
-        # 기본 트렌드
+        # action_spec 기반 fallback
+        top_zones = []
+        if action_spec and hasattr(action_spec, 'recommended_actions'):
+            top_zones = [a.zone for a in action_spec.recommended_actions[:2]]
+        zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
+        name = user_name or "고객"
         trends.append({
-            "title": "2026 S/S 트렌드",
-            "description": "글로우 스킨, 내추럴 브로우, 소프트 코랄 립",
+            "title": "적용 가이드",
+            "description": (
+                f"{name}님의 리포트에서 가장 변화가 큰 포인트는 "
+                f"{zone_str} 부분이에요. "
+                f"하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. "
+                f"처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요."
+            ),
         })
 
     return {
@@ -839,8 +968,8 @@ def format_report_for_frontend(
             similar_types, aspiration_interpretation, report_content,
         ),
         _build_action_plan(gap, face_features, report_content),
-        _build_type_reference(similar_types, report_content),
-        _build_trend_context(report_content),
+        _build_type_reference(similar_types, report_content, gap=gap),
+        _build_trend_context(report_content, user_name=user_name),
     ]
 
     result = {

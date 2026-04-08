@@ -298,6 +298,8 @@ async def run_analysis(user_id: str):
         "face_shape": features.get("face_shape", ""),
         "tier": user["tier"],
         "gender": gender,
+        "aspiration_summary": aspiration_result.get("interpretation", ""),
+        "primary_gap_direction_kr": gap.get("primary_shift_kr", ""),
     })
     report_content = parse_or_fallback(raw_report, action_spec)
 

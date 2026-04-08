@@ -147,10 +147,17 @@ REPORT_SYSTEM_V2 = """역할: 당신은 스타일링 해설가입니다.
 2. 초보자용 적용 팁 1개 (구체적, 실행 가능)
 3. 주의할 점 (avoid가 있으면)
 
+## summary 규칙 (필수)
+- 반드시 현재 인상과 추구 방향의 차이를 1문장 이상 포함하세요
+- 핵심 action 방향을 1문장 이상 포함하세요
+- 최소 2문장, 최대 4문장
+- 금지: "스타일링을 추천해요" 수준의 일반론만으로 끝내기
+- 필수 포함: 매칭 유형명, 추구 방향, 구체적 포인트 1개 이상
+
 반드시 아래 JSON 구조로만 응답하세요. 다른 텍스트를 포함하지 마세요.
 
 {
-  "summary": "전체 요약 2~3문장",
+  "summary": "전체 요약 2~4문장 (현재 인상 + 추구 방향 + 핵심 action)",
   "action_tips": [
     {
       "zone": "영역명 (입력 그대로)",
@@ -193,10 +200,18 @@ def generate_report(action_spec, user_context: dict) -> str:
         "expected_effects": action_spec.expected_effects,
     }
 
+    # summary_context 구성
+    aspiration_summary = user_context.get("aspiration_summary", "")
+    gap_direction_kr = user_context.get("primary_gap_direction_kr", "")
+    top_goals = [a.goal for a in action_spec.recommended_actions[:2]]
+
     user_prompt = f"""{user_context.get('name', '')}님의 스타일링 추천을 설명해주세요.
 
 [매칭 유형] {prompt_payload['matched_type']}
 [주요 변화 방향] {prompt_payload['primary_change_direction']}
+[추구미 해석] {aspiration_summary}
+[변화 방향 한글] {gap_direction_kr}
+[핵심 액션 목표] {', '.join(top_goals)}
 [얼굴형] {prompt_payload['face_shape']}
 
 [추천 액션]
@@ -298,10 +313,17 @@ InsightFace 랜드마크에서 추출한 수치 데이터를 기반으로,
 
 톤:
 - 판단이 아닌 관찰. "예쁘다/못생겼다"가 아니라 "이러한 특징을 가지고 있다"
-- 각 특징이 주는 인상을 설명 (예: "128.5°의 턱 각도는 부드러운 라인으로, 친근하고 편안한 인상을 준다")
-- 반드시 수치를 인용하며 해석할 것 (예: "3.2°의 눈꼬리 기울기는...")
-- 따뜻하고 전문적인 어조, 존댓말
+- 따뜻하고 전문적인 어조, 해요체
 - 전체적인 조화와 특징적인 포인트를 함께 언급
+
+## 해석문 작성 규칙 (필수)
+- 해석 문장에 숫자, 소수점, 도(°), 퍼센트(%)를 절대 포함하지 마세요.
+- 숫자는 구조화 JSON 필드(value, percentile)에만 남기세요.
+- 서술문은 의미와 인상만 설명하세요.
+- 금지 예: "93.7°의 턱선 각도는 날카로운 편으로"
+- 허용 예: "턱선이 날카로운 편이라 또렷하고 의지적인 인상을 만들어요"
+- 금지 예: "0.719의 광대 돌출도는 상당히 뚜렷한 편으로"
+- 허용 예: "광대가 뚜렷한 편이라 입체적이고 개성 있는 인상을 줘요"
 
 [중요] feature 필드는 반드시 아래 목록에서만 선택하세요. 다른 키를 만들지 마세요:
 - jaw_angle (턱선)

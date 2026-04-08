@@ -1,891 +1,919 @@
-# SIGAK 파이프라인 리팩토링 — Claude Code 실행 지시서 (Final)
+# SIGAK v3 — Claude Code 실행 지시서
 
-> 이 문서를 CLAUDE.md와 함께 참조하여 실행.
-> 전체 목표: 최소 변경으로 리포트 품질의 최대 체감 개선.
-> 절대 금지: 새 모델 도입, 인프라 변경, 대규모 리팩토링.
-
----
-
-## 실행 순서
-
-```
-Day 0   버그픽스 (B-1~B-5)
-Day 0   Feature availability 점검 (F-0, F-0.5)
-Day 1   Phase 1: 좌표 안정화 + interpret_interview 축 보정
-Day 1   앵커 좌표 재계산 (상위 5개 타입)
-Day 2   Phase 2: build_action_spec() + build_overlay_plan()
-Day 2   Phase 3: Claude 입력 축소 + 출력 구조화 + parse fallback
-Day 3   Phase 4: run_analysis() 연결
-Day 3   검증 + 샘플 리포트 QA
-```
+> 이 문서를 Phase 단위로 순서대로 실행하세요.
+> 각 Phase 완료 후 반드시 해당 Phase의 검증을 통과한 뒤 다음으로 넘어가세요.
+> 전체 컨텍스트는 `SIGAK_ACTION_PLAN_V3.md`를 참조하세요.
 
 ---
 
-## Phase 0: 버그픽스 + 사전 점검
+# Phase 0: 사전 확인
 
-### B-1. 중복 텍스트 렌더링 버그
-- `llm.py` 프롬프트 placeholder 확인
-- `report_formatter.py`에서 같은 필드를 여러 섹션에 재사용하는지 확인
-- 강도/구조/성숙도 설명이 동일 텍스트로 반복 출력되는 원인 특정 후 수정
+## 지시
 
-### B-2. Action Plan 달성률 % 제거
-- 21% × 4 = 84% 표기 삭제
-- "우선순위 1/2/3/4" 순서 표기로 대체하거나 % 자체 제거
+아래 파일 위치와 구조를 확인하고 보고하세요.
 
-### B-3. raw delta 직접 노출 제거
-- "추 거리 0.62", "delta 0.43" 등 프론트 노출 중단
-- `report_formatter.py`에서 raw score 필터링
-- API response에서도 기본 숨김. debug mode에서만 포함
+1. `report_formatter.py` 위치 확인 — 아래 항목 찾기:
+    - `FACE_STATS` 딕셔너리 (mean/std 하드코딩)
+    - `METRIC_RANGES` 딕셔너리
+    - `scipy.stats.norm.cdf` 호출부 (percentile 계산)
+    - `gap_analysis` 섹션 포맷팅 함수 (direction_items 생성부)
+    - `face_interpretation` 섹션 포맷팅 함수
+    - `action_plan` 섹션 포맷팅 함수 (delta_contribution 계산부)
+    - `type_reference` 섹션 포맷팅 함수
+    - `trend_context` 섹션 포맷팅 함수
 
-### B-4. "강도(Intensity)" 워딩 변경
-- "존재감(Presence)"으로 변경 ("대비감"은 색/명암으로 오해 가능)
-- UI 텍스트 + 프롬프트 양쪽 반영
+2. `llm.py` 위치 확인 — 아래 항목 찾기:
+    - `generate_report()` 함수의 system prompt
+    - `generate_report()` 함수의 user message payload 구성부
+    - face_interpretation 생성 관련 프롬프트
 
-### B-5. Action Spec ↔ 리포트 일치 검증
-- Phase 2 완료 후 적용
-- 개수 일치 + zone 일치까지 검증:
-```python
-assert len(report["action_tips"]) == len(action_spec.recommended_actions)
-for tip, rec in zip(report["action_tips"], action_spec.recommended_actions):
-    assert tip["zone"] == rec.zone, f"zone mismatch: {tip['zone']} != {rec.zone}"
+3. `coordinate.py` 위치 확인:
+    - `OBSERVED_RANGES` 딕셔너리
+
+4. `action_spec.py` 위치 확인:
+    - `recommended_actions`의 score/priority 필드명
+
+## 보고 형식
+
 ```
-- `generate_report()` 직후, `format_report_for_frontend()` 이전에 배치
+report_formatter.py: [경로]
+  FACE_STATS: L{시작줄}~L{끝줄}
+  percentile 계산: L{줄번호} (함수명)
+  gap direction_items 생성: L{줄번호} (함수명)
+  face_interpretation 포맷: L{줄번호} (함수명)
+  action_plan delta_contribution: L{줄번호}
+  type_reference 포맷: L{줄번호} (함수명)
+  trend_context 포맷: L{줄번호} (함수명)
+
+llm.py: [경로]
+  generate_report system prompt: L{줄번호}
+  generate_report user payload: L{줄번호}
+
+coordinate.py: [경로]
+  OBSERVED_RANGES: L{시작줄}~L{끝줄}
+
+action_spec.py: [경로]
+  score/priority 필드: [필드명]
+```
+
+## 완료 조건
+- 위 항목 모두 위치 파악 완료
+- 못 찾는 항목 있으면 가장 가까운 코드 위치와 이유 보고
 
 ---
 
-### F-0. Feature availability 점검
+# Phase 1: percentile 즉시 안정화
 
-Phase 1에서 새로 사용할 feature가 안정적으로 존재하는지 확인.
+> 가장 적은 코드 변경으로 극단 p값 문제를 완화합니다.
+
+## 수정 1-1: percentile clamp 적용
+
+**파일:** `report_formatter.py` — percentile 계산 함수
+
+**변경:** `norm.cdf()` 결과에 clamp 적용
 
 ```python
-REQUIRED_FEATURES = [
-    "eye_tilt",           # 눈꼬리 각도
-    "brow_arch",          # 눈썹 아치 — ⚠️ 불안정 가능성
-    "eye_ratio",          # 눈 높이/너비
-    "lip_fullness",       # 입술 두께
-    "nose_bridge_height", # 코 높이 — ⚠️ 불안정 가능성
-    "eye_width_ratio",    # 눈 너비 비율
-]
+# 기존 코드 패턴 (찾아서 수정):
+# percentile = int(round(norm.cdf(value, mean, std) * 100))
 
-OPTIONAL_FEATURES = [
-    "brow_eye_distance",  # 눈-눈썹 거리 — 없을 수 있음
-]
-
-# v1에 있었으나 v2에서 제외: symmetry_score
-# 이유: intensity를 "존재감" 중심으로 재정의하면서 대칭성은 별도 축에 더 적합
+# 다음으로 교체:
+raw_p = norm.cdf(value, mean, std) * 100
+percentile = max(5, min(95, int(round(raw_p))))
 ```
 
-**체크리스트:**
-- [ ] 각 feature가 `FaceFeatures` dataclass에 존재하는가
-- [ ] InsightFace 경로와 MediaPipe 경로 모두에서 값이 나오는가
-- [ ] null, 추정치, 하드코딩이 섞이지 않는가
-- [ ] 메이크업 유무에 따라 추정 편차가 큰 feature가 있는가 (특히 `lip_fullness`, `brow_arch`)
+## 수정 1-2: percentile 기반 서술 어휘 테이블 추가
 
-**불안정한 feature가 있으면:**
-해당 feature를 축 정의에서 제외. 나머지 feature로 가중치 자동 재분배 (2-4의 fallback reweighting 패턴 적용).
+**파일:** `report_formatter.py` — 상단 상수 영역
+
+**추가:**
+
+```python
+def percentile_to_tone_kr(p: int) -> str:
+    """percentile → 서술 어휘. interpretation 생성 시 입력으로 사용."""
+    if p <= 10:  return "매우 낮은 편"
+    if p <= 25:  return "낮은 편"
+    if p <= 40:  return "다소 낮은 편"
+    if p <= 60:  return "보통 수준"
+    if p <= 75:  return "다소 높은 편"
+    if p <= 90:  return "높은 편"
+    return "매우 높은 편"
+```
+
+이 함수는 Phase 3에서 interpretation 생성 시 사용됩니다. 지금은 추가만 하세요.
+
+## 검증 1
+
+```python
+# 테스트: 홍길순/조찬형 사진으로 리포트 재생성 후
+report = generate_full_report(...)  # 기존 테스트 방식
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+fs = sections["face_structure"]["content"]
+
+for m in fs["metrics"]:
+    p = m["percentile"]
+    assert 5 <= p <= 95, f"FAIL: {m['key']} percentile={p}"
+    print(f"  ✅ {m['key']}: percentile={p}")
+
+print("Phase 1 통과")
+```
 
 ---
 
-### F-0.5. normalize range 샘플 기반 설정
+# Phase 2: gap_analysis 비문 수정
+
+> direction_items의 recommendation 문장을 deterministic 템플릿으로 교체합니다.
+
+## 수정 2-1: 축별 recommendation 템플릿 테이블 추가
+
+**파일:** `report_formatter.py` — 상단 상수 영역
 
 ```python
-# 내부 테스트 이미지 20~30장으로 실행
-for feature_name in REQUIRED_FEATURES:
-    values = [getattr(analyze_face(img), feature_name) for img in sample_images]
-    print(f"{feature_name}: min={min(values):.3f} max={max(values):.3f} "
-          f"median={sorted(values)[len(values)//2]:.3f} "
-          f"p10={sorted(values)[len(values)//10]:.3f} "
-          f"p90={sorted(values)[9*len(values)//10]:.3f}")
-```
-
-**규칙:**
-- normalize range는 p10 ~ p90 기준
-- 범위 밖 값은 clamp (최종 축에 `clip(score, -1, 1)` 적용)
-
-이 결과로 Phase 1의 `OBSERVED_RANGES`를 확정.
-
----
-
-## Phase 1: 좌표 안정화
-
-### 대상 파일: `sigak/coordinate.py`
-
-### 1-0. 전축 CLIP 의존도 제거
-
-```python
-AXIS_WEIGHTS = {
-    "structure":  {"structural": 1.0, "clip": 0.0},
-    "impression": {"structural": 1.0, "clip": 0.0},
-    "maturity":   {"structural": 1.0, "clip": 0.0},
-    "intensity":  {"structural": 1.0, "clip": 0.0},
-}
-# CLIP 정상화 후 점진적 복원을 위해 config/환경변수로 분리 권장
-```
-
-### 1-1. impression 축 재정의
-
-**내부 의미:** soft ↔ sharp (이목구비가 주는 인상의 부드러움 vs 날카로움)
-**외부 UI 라벨:** "인상 방향성" (임시 중립 표현, 다음 스프린트에서 정식 확정)
-
-```python
-def compute_impression(features: dict) -> float:
-    """
-    soft(-1) ↔ sharp(+1)
-    눈매 방향성 + 눈썹 형태 + 눈 비율 + 입술 볼륨이 만드는 전체 인상.
-    """
-    components = []
-
-    # 눈꼬리 각도: 올라갈수록 sharp
-    if _has_valid(features, "eye_tilt"):
-        val = _normalize(features["eye_tilt"], OBSERVED_RANGES["eye_tilt"])
-        components.append((val, 0.35))
-
-    # 눈썹 아치: 높을수록 sharp
-    if _has_valid(features, "brow_arch"):
-        val = _normalize(features["brow_arch"], OBSERVED_RANGES["brow_arch"])
-        components.append((val, 0.25))
-
-    # 눈 비율(높이/너비): 가로로 길수록(값이 작을수록) sharp
-    if _has_valid(features, "eye_ratio"):
-        raw = _normalize(features["eye_ratio"], OBSERVED_RANGES["eye_ratio"])
-        val = -(raw * 2 - 1)  # 반전: 작을수록 sharp
-        components.append((val, 0.25))
-
-    # 입술 두께: 도톰할수록 soft
-    if _has_valid(features, "lip_fullness"):
-        val = -_normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
-        components.append((val, 0.15))
-
-    return _weighted_fallback(components)
-```
-
-### 1-2. intensity 축 재정의
-
-```python
-def compute_intensity(features: dict) -> float:
-    """
-    natural(-1) ↔ bold(+1)
-    이목구비의 존재감. symmetry_score는 이 축에서 제외 (별도 축에 더 적합).
-    """
-    components = []
-
-    # 눈 크기: 클수록 bold
-    if _has_valid(features, "eye_width_ratio"):
-        val = _normalize(features["eye_width_ratio"], OBSERVED_RANGES["eye_width_ratio"])
-        components.append((val, 0.30))
-
-    # 입술 두께: 도톰할수록 bold
-    if _has_valid(features, "lip_fullness"):
-        val = _normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
-        components.append((val, 0.25))
-
-    # 코 높이: 높을수록 bold
-    if _has_valid(features, "nose_bridge_height"):
-        val = _normalize(features["nose_bridge_height"], OBSERVED_RANGES["nose_bridge_height"])
-        components.append((val, 0.25))
-
-    # 눈-눈썹 거리: 가까울수록 bold (optional feature)
-    if _has_valid(features, "brow_eye_distance"):
-        val = -_normalize(features["brow_eye_distance"], OBSERVED_RANGES["brow_eye_distance"])
-        components.append((val, 0.20))
-
-    return _weighted_fallback(components)
-```
-
-### 1-2.5. 공통 헬퍼 함수
-
-```python
-def _has_valid(features: dict, key: str) -> bool:
-    """feature가 존재하고 None이 아닌지 확인"""
-    return key in features and features[key] is not None
-
-def _normalize(value: float, observed_range: tuple[float, float]) -> float:
-    """관측 범위 기반 정규화. 범위 밖 값은 clamp."""
-    lo, hi = observed_range
-    if hi <= lo:
-        return 0.0
-    value = min(max(value, lo), hi)
-    return (value - lo) / (hi - lo) * 2 - 1  # → [-1, 1]
-
-def _weighted_fallback(components: list[tuple[float, float]]) -> float:
-    """
-    사용 가능한 component만으로 가중 평균. 
-    feature 미존재 시 나머지로 가중치 자동 재분배.
-    """
-    if not components:
-        return 0.0
-    weight_sum = sum(w for _, w in components)
-    score = sum(v * w for v, w in components) / weight_sum
-    return max(-1.0, min(1.0, score))
-
-# normalize range — F-0.5에서 확정한 실측값으로 교체할 것
-OBSERVED_RANGES: dict[str, tuple[float, float]] = {
-    "eye_tilt": (0.0, 10.0),          # placeholder, 실측값으로 교체
-    "brow_arch": (0.0, 1.0),
-    "eye_ratio": (0.2, 0.5),
-    "lip_fullness": (0.3, 0.8),
-    "eye_width_ratio": (0.2, 0.35),
-    "nose_bridge_height": (0.0, 1.0),
-    "brow_eye_distance": (0.1, 0.4),
-}
-```
-
-### 1-3. interpret_interview() 축 정의 보정
-
-**대상: `sigak/llm.py` → `interpret_interview()` system prompt**
-
-```python
-AXIS_DEFINITIONS_FOR_INTERVIEW = """
-4축 좌표계:
-- structure [-1, +1]: soft(둥글고 부드러운 골격) ↔ sharp(날카롭고 선명한 골격)
-- impression [-1, +1]: soft(부드럽고 온화한 인상) ↔ sharp(시원하고 선명한 인상)
-- maturity [-1, +1]: fresh(어리고 생기있는) ↔ mature(성숙하고 정돈된)
-- intensity [-1, +1]: natural(자연스럽고 담백한) ↔ bold(강렬하고 존재감 있는)
-"""
-```
-
-기존 system prompt의 축 정의 부분만 이것으로 교체. 나머지 프롬프트 구조는 유지.
-
-### 1-4. 앵커 좌표 재계산
-
-**착수 전 확인:**
-- [ ] 15개 타입 앵커 좌표의 저장 위치 (type_anchors.json? DB? 하드코딩?)
-- [ ] 수동 정의 vs 데이터 기반
-- [ ] 수정 난이도
-
-**우선 재계산 대상:**
-```python
-PRIORITY_ANCHOR_TYPES = [
-    "warm_first_love",
-    "cool_goddess",
-    "fresh_face",
-    "elegant_classic",
-    "bold_queen",
-]
-```
-
-**나머지 10개 타입 정책:**
-- temporary legacy anchor로 유지
-- 새 좌표계와 옛 앵커 사이에 왜곡 가능성 있음
-- QA는 상위 5개 빈도 케이스 중심으로 진행
-- debug trace에 `anchor_version: "v2" | "legacy"` 표시 권장
-
----
-
-## Phase 2: Action Spec 레이어 추가
-
-### 대상: 신규 파일 `sigak/action_spec.py`
-
-### 2-0. 설계 원칙
-
-**의사결정 우선순위 (코드와 문서에 명시):**
-1. 유저 목표 방향은 `gap`이 결정
-2. 어느 부위를 우선할지는 `type_delta` + `TYPE_MODIFIERS`가 보정
-3. 실행 강도는 `TYPE_MODIFIERS.shading_intensity`가 조정
-
-**함수 분리:**
-- `build_action_spec()` → 의미 레이어 (방향 + 부위 + 강도)
-- `build_overlay_plan()` → 시각 레이어 (zone name + 색상 + 투명도)
-
-### 2-1. 데이터 구조
-
-```python
-from dataclasses import dataclass, field
-
-@dataclass
-class VisualPriority:
-    zone: str
-    importance: float
-    reason: str
-    axis: str
-    delta_direction: str  # "increase" | "decrease"
-
-@dataclass
-class RecommendedAction:
-    zone: str
-    method: str
-    goal: str
-    priority: int  # 1, 2, 3, 4
-
-@dataclass
-class AvoidAction:
-    zone: str
-    method: str
-    reason: str
-
-@dataclass
-class ActionSpec:
-    matched_type_id: str
-    matched_type_label: str
-    primary_gap_axis: str
-    visual_priorities: list[VisualPriority]       # 최대 3개
-    recommended_actions: list[RecommendedAction]   # 2~4개 (최소 2개 보장)
-    avoid_actions: list[AvoidAction]               # 최대 2개
-    expected_effects: list[str]                    # 2~3문장
-    report_mode: str                               # "makeup_female_v0"
-    _debug_trace: dict = field(default_factory=dict, repr=False)
-```
-
-### 2-2. 축별 공통 Action 룰 테이블
-
-```python
-AXIS_ACTION_RULES: dict[str, dict[str, list[dict]]] = {
+GAP_RECOMMENDATION_TEMPLATES = {
     "structure": {
-        "increase": [
-            {"zone": "jawline", "method": "contour_shading", "goal": "턱선 정리로 윤곽 선명화", "base_score": 0.9},
-            {"zone": "temple", "method": "light_shading", "goal": "관자놀이 정리로 상안부 균형", "base_score": 0.7},
-            {"zone": "nose_bridge", "method": "highlight", "goal": "코 중심축 강조", "base_score": 0.6},
-        ],
-        "decrease": [
-            {"zone": "mid_cheek", "method": "soft_blush", "goal": "볼 중심 볼륨감으로 부드러운 인상", "base_score": 0.9},
-            {"zone": "jawline", "method": "highlight", "goal": "턱선 경계 완화", "base_score": 0.7},
-            {"zone": "forehead_center", "method": "highlight", "goal": "이마 중앙 볼륨으로 부드러움", "base_score": 0.6},
-        ],
+        "increase": "구조 축에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+        "decrease": "구조 축에서는 라인을 부드럽게 풀어주는 방향이 핵심이에요.",
     },
     "impression": {
-        "increase": [
-            {"zone": "outer_eye", "method": "upward_line", "goal": "눈꼬리 방향 정리로 시원한 눈매", "base_score": 0.9},
-            {"zone": "brow_tail", "method": "sharp_draw", "goal": "눈썹 끝 정리로 선명한 인상", "base_score": 0.75},
-            {"zone": "lip_corner", "method": "slight_upturn", "goal": "입꼬리 각도 정리", "base_score": 0.6},
-        ],
-        "decrease": [
-            {"zone": "under_eye", "method": "soft_highlight", "goal": "눈 아래 밝기로 부드러운 눈매", "base_score": 0.9},
-            {"zone": "brow_arch", "method": "rounded_draw", "goal": "눈썹 곡선화로 부드러운 인상", "base_score": 0.75},
-            {"zone": "lip_center", "method": "volume_highlight", "goal": "입술 중앙 볼륨감", "base_score": 0.6},
-        ],
+        "increase": "인상 축에서는 눈매와 이목구비를 또렷하게 살리는 방향이 중요해요.",
+        "decrease": "인상 축에서는 눈매와 라인을 부드럽게 풀어주는 방향이 중요해요.",
     },
     "maturity": {
-        "increase": [
-            {"zone": "cheekbone", "method": "contour_shading", "goal": "광대 음영으로 성숙한 윤곽", "base_score": 0.85},
-            {"zone": "brow", "method": "straight_draw", "goal": "일자 눈썹으로 정돈된 인상", "base_score": 0.7},
-            {"zone": "lip", "method": "defined_line", "goal": "립라인 정리로 단정한 느낌", "base_score": 0.6},
-        ],
-        "decrease": [
-            {"zone": "cheek_apple", "method": "round_blush", "goal": "볼 사과존 블러셔로 어려 보이는 효과", "base_score": 0.85},
-            {"zone": "under_eye", "method": "bright_concealer", "goal": "눈 밑 밝기로 동안 느낌", "base_score": 0.7},
-            {"zone": "lip_center", "method": "gloss_highlight", "goal": "입술 중앙 광택으로 생기", "base_score": 0.6},
-        ],
+        "increase": "성숙도 축에서는 세련되고 성숙한 분위기를 더하는 방향이에요.",
+        "decrease": "성숙도 축에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
     },
     "intensity": {
-        "increase": [
-            {"zone": "eye_crease", "method": "shadow_depth", "goal": "눈두덩 음영으로 깊은 눈매", "base_score": 0.85},
-            {"zone": "lip", "method": "full_color", "goal": "립 컬러 강조로 존재감", "base_score": 0.75},
-            {"zone": "nose_tip", "method": "subtle_shadow", "goal": "코끝 음영으로 오목한 느낌", "base_score": 0.6},
-        ],
-        "decrease": [
-            {"zone": "overall", "method": "matte_base", "goal": "전체 매트 베이스로 차분한 느낌", "base_score": 0.85},
-            {"zone": "lip", "method": "nude_tone", "goal": "자연스러운 립 톤으로 부담감 완화", "base_score": 0.75},
-            {"zone": "brow", "method": "feathered_draw", "goal": "자연스러운 눈썹결로 힘 빼기", "base_score": 0.6},
-        ],
+        "increase": "강도 축에서는 존재감 있고 임팩트 있는 표현이 포인트예요.",
+        "decrease": "강도 축에서는 자연스럽고 힘을 뺀 표현이 포인트예요.",
     },
 }
-
-MAX_TARGET_AXES = 3
-MIN_RECOMMENDED_ACTIONS = 2
-MAX_RECOMMENDED_ACTIONS = 4
 ```
 
-### 2-3. 타입별 modifier (v0: 5개만)
+## 수정 2-2: recommendation 생성 로직 교체
+
+**파일:** `report_formatter.py` — direction_items 생성부
+
+기존 f-string 조합 코드를 찾아서 아래로 교체:
 
 ```python
-TYPE_MODIFIERS: dict[str, dict] = {
-    "warm_first_love": {
-        "style_tone": "부드럽고 따뜻한",
-        "shading_intensity": "light",
-        "zone_boost": {"under_eye": 0.2, "cheek_apple": 0.15},
-        "avoid_override": [
-            {"zone": "jawline", "method": "hard_contour", "reason": "타입의 부드러운 인상과 충돌"}
-        ],
-    },
-    "cool_goddess": {
-        "style_tone": "선명하고 시크한",
-        "shading_intensity": "medium",
-        "zone_boost": {"outer_eye": 0.2, "cheekbone": 0.15},
-        "avoid_override": [],
-    },
-    "fresh_face": {
-        "style_tone": "맑고 생기있는",
-        "shading_intensity": "minimal",
-        "zone_boost": {"cheek_apple": 0.2, "lip_center": 0.1},
-        "avoid_override": [
-            {"zone": "cheekbone", "method": "contour_shading", "reason": "동안 인상이 깎일 수 있음"}
-        ],
-    },
-    "elegant_classic": {
-        "style_tone": "정돈되고 우아한",
-        "shading_intensity": "medium",
-        "zone_boost": {"brow": 0.15, "lip": 0.15},
-        "avoid_override": [],
-    },
-    "bold_queen": {
-        "style_tone": "강렬하고 존재감 있는",
-        "shading_intensity": "strong",
-        "zone_boost": {"eye_crease": 0.2, "lip": 0.15, "cheekbone": 0.1},
-        "avoid_override": [],
-    },
-}
-# 나머지 10개 타입: 공통 룰만 적용, modifier 없음
-```
-
-### 2-4. build_action_spec()
-
-```python
-def build_action_spec(
-    face_features,  # FaceFeatures
-    current_coords: dict[str, float],
-    matched_type: dict,
-    type_delta: dict[str, float],
-    gap: dict,
-    interview_intent: dict[str, str] | None = None,
-) -> ActionSpec:
-    """
-    Layer 1: gap → 목표 방향 결정
-    Layer 2: type_delta + modifier → 부위 우선순위 보정
-    """
-    debug_trace = {}
-
-    # ── Layer 1: gap에서 target axes 추출 ──
-    sorted_axes = sorted(gap["vector"].items(), key=lambda x: abs(x[1]), reverse=True)
-    target_axes = []
-    for axis, delta_val in sorted_axes:
-        if abs(delta_val) < 0.1:
-            continue
-        direction = "increase" if delta_val > 0 else "decrease"
-        target_axes.append((axis, direction, abs(delta_val)))
-    target_axes = target_axes[:MAX_TARGET_AXES]
-
-    primary_axis = target_axes[0][0] if target_axes else "structure"
-    debug_trace["target_axes"] = [(a, d, round(m, 3)) for a, d, m in target_axes]
-
-    # ── Layer 1.5: 공통 룰에서 action 후보 + base_score 수집 ──
-    candidates = []
-    for axis, direction, magnitude in target_axes:
-        rules = AXIS_ACTION_RULES.get(axis, {}).get(direction, [])
-        for rule in rules:
-            score = rule["base_score"] * magnitude
-            candidates.append({
-                **rule, "axis": axis, "direction": direction, "score": score,
-            })
-
-    # ── Layer 2: type_delta로 zone importance 보정 ──
-    type_zone_bonus = _derive_zone_bonus(type_delta)
-    for c in candidates:
-        c["score"] += type_zone_bonus.get(c["zone"], 0.0)
-    debug_trace["type_zone_bonus"] = type_zone_bonus
-
-    # ── Layer 2.5: 타입 modifier 적용 ──
-    type_id = matched_type.get("key", "")
-    modifier = TYPE_MODIFIERS.get(type_id, {})
-
-    for c in candidates:
-        c["score"] += modifier.get("zone_boost", {}).get(c["zone"], 0.0)
-
-    avoid_actions = []
-    for override in modifier.get("avoid_override", []):
-        avoid_actions.append(AvoidAction(**override))
-        candidates = [
-            c for c in candidates
-            if not (c["zone"] == override["zone"] and c["method"] == override["method"])
-        ]
-    debug_trace["modifier_applied"] = type_id or "none"
-
-    # ── 최종 선택: score 기반 정렬 + zone 중복 제거 ──
-    candidates.sort(key=lambda x: x["score"], reverse=True)
-
-    visual_priorities = []
-    recommended = []
-    seen_zones = set()
-
-    for c in candidates:
-        if c["zone"] in seen_zones:
-            continue
-        seen_zones.add(c["zone"])
-
-        if len(visual_priorities) < 3:
-            visual_priorities.append(VisualPriority(
-                zone=c["zone"], importance=round(c["score"], 2),
-                reason=c["goal"], axis=c["axis"], delta_direction=c["direction"],
-            ))
-        if len(recommended) < MAX_RECOMMENDED_ACTIONS:
-            recommended.append(RecommendedAction(
-                zone=c["zone"], method=c["method"],
-                goal=c["goal"], priority=len(recommended) + 1,
-            ))
-
-    # ── 최소 action 보장 (gap이 작거나 후보 부족 시) ──
-    if len(recommended) < MIN_RECOMMENDED_ACTIONS:
-        fallback_rules = AXIS_ACTION_RULES.get(primary_axis, {}).get("increase", [])
-        for rule in fallback_rules:
-            if rule["zone"] not in seen_zones and len(recommended) < MIN_RECOMMENDED_ACTIONS:
-                recommended.append(RecommendedAction(
-                    zone=rule["zone"], method=rule["method"],
-                    goal=rule["goal"], priority=len(recommended) + 1,
-                ))
-                seen_zones.add(rule["zone"])
-
-    debug_trace["final_actions"] = [r.zone for r in recommended]
-
-    # ── 기대 효과 ──
-    type_label = matched_type.get("name_kr", "")
-    style_tone = modifier.get("style_tone", "")
-    expected_effects = _generate_expected_effects(primary_axis, type_label, style_tone)
-
-    return ActionSpec(
-        matched_type_id=type_id,
-        matched_type_label=type_label,
-        primary_gap_axis=primary_axis,
-        visual_priorities=visual_priorities,
-        recommended_actions=recommended,
-        avoid_actions=avoid_actions,
-        expected_effects=expected_effects,
-        report_mode="makeup_female_v0",
-        _debug_trace=debug_trace,
+def build_gap_recommendation(axis: str, delta: float) -> str:
+    direction = "decrease" if delta < 0 else "increase"
+    return GAP_RECOMMENDATION_TEMPLATES.get(axis, {}).get(
+        direction, 
+        f"이 방향으로 스타일링을 조정하면 원하는 이미지에 가까워질 수 있어요."
     )
-
-
-def _derive_zone_bonus(type_delta: dict[str, float]) -> dict[str, float]:
-    """
-    타입 대비 delta가 큰 축 → 관련 zone에 bonus.
-    magnitude 기반 (v0). 방향 필터링은 다음 스프린트에서 정교화.
-    """
-    AXIS_ZONE_MAP = {
-        "structure": ["jawline", "temple", "cheekbone", "nose_bridge"],
-        "impression": ["outer_eye", "brow_tail", "under_eye", "brow_arch"],
-        "maturity": ["cheekbone", "brow", "cheek_apple"],
-        "intensity": ["eye_crease", "lip", "nose_tip"],
-    }
-    zone_bonus = {}
-    for axis, delta in type_delta.items():
-        if abs(delta) < 0.1:
-            continue
-        bonus = abs(delta) * 0.3
-        for zone in AXIS_ZONE_MAP.get(axis, []):
-            zone_bonus[zone] = zone_bonus.get(zone, 0) + bonus
-    return zone_bonus
-
-
-def _generate_expected_effects(
-    primary_axis: str, type_label: str, style_tone: str
-) -> list[str]:
-    """deterministic 기대 효과 문장 생성"""
-    axis_effect = {
-        "structure": "얼굴 윤곽이 더 정돈돼 보입니다",
-        "impression": "눈매와 인상이 더 선명해집니다",
-        "maturity": "전체적인 분위기가 달라져 보입니다",
-        "intensity": "이목구비의 존재감이 조정됩니다",
-    }
-    effects = [axis_effect.get(primary_axis, "전체 인상이 개선됩니다")]
-    if type_label and style_tone:
-        effects.append(f"{type_label} 타입의 {style_tone} 매력이 더 살아납니다")
-    effects.append("적용 순서대로 하나씩 시도해보세요")
-    return effects
 ```
 
-### 2-5. build_overlay_plan()
+direction_items 루프 안에서:
+```python
+# 기존: recommendation = f"..." (문제의 f-string)
+# 교체:
+recommendation = build_gap_recommendation(axis, delta)
+```
+
+## 수정 2-3: gap_summary 한국어 조사 처리
+
+**파일:** `report_formatter.py` — gap_summary 생성부
 
 ```python
-@dataclass
-class OverlayZone:
-    zone_name: str     # semantic name (landmark indices 없음)
-    zone_type: str     # "shading" | "blush" | "highlight"
-    color_hex: str
-    opacity: float
+def _postposition(word: str, with_batchim: str, without_batchim: str) -> str:
+    """한국어 조사 자동 선택 (받침 유무 기반)"""
+    if not word:
+        return with_batchim
+    last_char = ord(word[-1])
+    if 0xAC00 <= last_char <= 0xD7A3:
+        has_batchim = (last_char - 0xAC00) % 28 != 0
+        return with_batchim if has_batchim else without_batchim
+    return with_batchim
 
-def build_overlay_plan(
-    action_spec: ActionSpec,
-    face_features,  # FaceFeatures
-) -> list[OverlayZone]:
-    """
-    recommended_actions → 시각적 오버레이 계획.
-    zone name(semantic)까지만 확정. landmark 변환은 렌더러에서 source_model 확인 후 수행.
-    """
-    modifier = TYPE_MODIFIERS.get(action_spec.matched_type_id, {})
-    intensity = modifier.get("shading_intensity", "medium")
-    mult = {"minimal": 0.6, "light": 0.8, "medium": 1.0, "strong": 1.2}[intensity]
-
-    # zone_type은 v0에서 시각 계열 분류 (렌더링 정밀 분류 아님)
-    # "lip"은 임시로 "tint"로 처리. 향후 렌더러에서 별도 타입으로 분리 가능.
-    ZONE_VISUAL = {
-        "jawline":         ("shading",   "#8B6914", 0.25),
-        "temple":          ("shading",   "#8B6914", 0.20),
-        "cheekbone":       ("shading",   "#8B6914", 0.22),
-        "mid_cheek":       ("blush",     "#D4707A", 0.28),
-        "outer_cheek":     ("blush",     "#D4707A", 0.28),
-        "cheek_apple":     ("blush",     "#E8909A", 0.30),
-        "outer_eye":       ("shading",   "#9B7653", 0.20),
-        "under_eye":       ("highlight", "#F5E6D0", 0.25),
-        "nose_bridge":     ("highlight", "#F5E6D0", 0.30),
-        "forehead_center": ("highlight", "#F5E6D0", 0.25),
-        "brow_tail":       ("shading",   "#7B6544", 0.18),
-        "eye_crease":      ("shading",   "#8B7355", 0.22),
-        "lip":             ("tint",      "#C4616C", 0.30),
-        "lip_center":      ("highlight", "#F0D0C8", 0.25),
-        "lip_corner":      ("shading",   "#A0705A", 0.15),
-        "nose_tip":        ("shading",   "#9B8060", 0.18),
-        "brow":            ("shading",   "#6B5A3A", 0.20),
-        "brow_arch":       ("shading",   "#6B5A3A", 0.18),
-    }
-
-    zones = []
-    for action in action_spec.recommended_actions:
-        visual = ZONE_VISUAL.get(action.zone)
-        if not visual:
-            continue
-        ztype, color, opacity = visual
-        zones.append(OverlayZone(
-            zone_name=action.zone, zone_type=ztype,
-            color_hex=color, opacity=min(opacity * mult, 0.5),
-        ))
-    return zones
-```
-
-**landmark 매핑은 렌더러에서 (이번 스프린트 후반 또는 다음):**
-```python
-def resolve_landmarks(zone_name: str, source_model: str) -> list[int]:
-    """렌더링 직전에 source_model 확인 후 인덱스 변환"""
-    if source_model == "insightface":
-        return INSIGHTFACE_ZONE_LANDMARKS[zone_name]
-    else:
-        return MEDIAPIPE_ZONE_LANDMARKS[zone_name]
-    # MediaPipe 468 → dlib 68 매핑 참고:
-    # https://github.com/google-ai-edge/mediapipe/issues/4490
-```
-
----
-
-## Phase 3: Claude 입력 축소 + 출력 구조화
-
-### 대상 파일: `sigak/llm.py`
-
-### 3-1. Claude 입력
-
-```python
-def generate_report(action_spec: ActionSpec, user_context: dict) -> dict:
-    prompt_payload = {
-        "user_name": user_context["name"],
-        "face_shape": user_context["face_shape"],
-        "tier": user_context["tier"],
-        "matched_type": action_spec.matched_type_label,
-        "primary_change_direction": action_spec.primary_gap_axis,
-        "recommended_actions": [
-            {"순서": a.priority, "영역": a.zone, "방법": a.method, "효과": a.goal}
-            for a in action_spec.recommended_actions
-        ],
-        "avoid_actions": [
-            {"영역": a.zone, "이유": a.reason}
-            for a in action_spec.avoid_actions
-        ],
-        "expected_effects": action_spec.expected_effects,
-    }
-    # Claude API 호출 후 parse_or_fallback() 적용
-```
-
-**안 넘기는 것:** raw FaceFeatures, 4축 좌표값, 타입 상세 delta, comparison dump, 클러스터 수치
-
-### 3-2. Claude system prompt
-
-```
-역할: 당신은 스타일링 해설가입니다.
-아래 이미 결정된 추천을 유저 친화적으로 설명하세요.
-
-규칙:
-- 추천 항목을 임의로 추가하거나 삭제하지 마세요
-- action_tips는 recommended_actions의 순서를 그대로 유지하세요
-- 축 점수나 delta 수치를 직접 언급하지 마세요
-- "~할 수 있습니다" 대신 "~해보세요" 직접 안내
-- 같은 내용을 다른 표현으로 반복하지 마세요
-- 해요체를 사용하세요
-- action_tips 각 항목의 zone 필드는 입력값을 그대로 복사하세요 (번역/의역 금지)
-
-각 추천에 대해:
-1. 왜 이 영역인지 한 줄 이유
-2. 초보자용 적용 팁 1개 (구체적, 실행 가능)
-3. 주의할 점 (avoid가 있으면)
-```
-
-### 3-3. Claude 출력 JSON 구조
-
-```python
-OUTPUT_FORMAT = """
-반드시 아래 JSON 구조로만 응답하세요. 다른 텍스트를 포함하지 마세요.
-
-{
-  "summary": "전체 요약 2~3문장",
-  "action_tips": [
-    {
-      "zone": "영역명 (입력 그대로)",
-      "title": "추천 제목",
-      "description": "설명 2~3문장",
-      "beginner_tip": "초보자 팁 1문장"
-    }
-  ],
-  "avoid_tip": "주의할 점 1~2문장 (없으면 null)",
-  "closing": "마무리 한 줄"
+# 축 이름 한글 매핑
+AXIS_LABEL_KR = {
+    "structure": "구조",
+    "impression": "인상",
+    "maturity": "성숙도",
+    "intensity": "강도",
 }
-"""
 ```
 
-### 3-4. JSON parse fallback
+gap_summary 생성 시:
+```python
+primary_kr = AXIS_LABEL_KR.get(primary_axis, primary_axis)
+secondary_kr = AXIS_LABEL_KR.get(secondary_axis, secondary_axis)
+
+pp1 = _postposition(primary_kr, "이", "가")
+pp2 = _postposition(secondary_kr, "이", "가")
+
+gap_summary = f"주요 변화 방향은 {primary_kr}{pp1}고, {secondary_kr}{pp2} 보조 방향이에요."
+```
+
+## 검증 2
 
 ```python
-import json
 import re
 
-def parse_or_fallback(raw_text: str, action_spec: ActionSpec) -> dict:
-    """Claude JSON 파싱. 실패 시 deterministic fallback."""
-    # 1차: 직접 파싱
-    try:
-        return json.loads(raw_text)
-    except (json.JSONDecodeError, TypeError):
-        pass
+report = generate_full_report(...)
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+gap = sections["gap_analysis"]["content"]
 
-    # 2차: fenced code block 제거 후 재시도
-    try:
-        cleaned = re.sub(r'^```(?:json)?\s*', '', raw_text.strip())
-        cleaned = re.sub(r'\s*```$', '', cleaned)
-        return json.loads(cleaned)
-    except (json.JSONDecodeError, TypeError):
-        pass
+# 비문 패턴 검사
+BANNED = [
+    r"더\s+\S+\s+필요한",
+    r"방향에서 더 \S+ 필요",
+]
 
-    # 3차: deterministic fallback
-    return _build_fallback_report(action_spec)
+for item in gap["direction_items"]:
+    for pattern in BANNED:
+        assert not re.search(pattern, item["recommendation"]), \
+            f"FAIL 비문: {item['recommendation']}"
+    print(f"  ✅ {item['axis']}: {item['recommendation'][:40]}...")
 
+# 조사 검사
+assert "도이 " not in gap["gap_summary"], f"FAIL 조사: {gap['gap_summary']}"
+assert "도이보" not in gap["gap_summary"]
+print(f"  ✅ gap_summary: {gap['gap_summary']}")
 
-def _build_fallback_report(action_spec: ActionSpec) -> dict:
-    """Claude 파싱 실패 시 Action Spec으로 직접 리포트 생성"""
-    return {
-        "summary": " ".join(action_spec.expected_effects[:2]),
-        "action_tips": [
-            {
-                "zone": a.zone,
-                "title": a.goal,
-                "description": f"{a.zone} 영역에 {a.method}을 적용해보세요.",
-                "beginner_tip": "거울을 보면서 소량부터 시작해보세요.",
-            }
-            for a in action_spec.recommended_actions
-        ],
-        "avoid_tip": (
-            action_spec.avoid_actions[0].reason if action_spec.avoid_actions else None
-        ),
-        "closing": "한 가지씩 천천히 시도해보세요.",
-    }
+print("Phase 2 통과")
 ```
 
 ---
 
-## Phase 4: run_analysis() 오케스트레이션
+# Phase 3: face_interpretation raw 수치 제거
 
-### 대상 파일: `sigak/main.py`
+> 해석문에서 숫자를 제거합니다. 프롬프트 + 후처리 이중 방어.
+
+## 수정 3-1: 후처리 필터 함수 추가
+
+**파일:** `report_formatter.py` — 상단 유틸 영역
 
 ```python
-async def run_analysis(image_bytes, interview_data, user_context):
-    # Step 1: 얼굴 분석 (기존 유지)
-    features = analyze_face(image_bytes)
+import re
 
-    # Step 2: CLIP (mock 유지, 좌표에 영향 없음)
-    clip_embedding = extract_clip(image_bytes, features.bbox) if not USE_MOCK_CLIP else None
+RAW_NUMBER_PATTERNS = [
+    r"\d+(\.\d+)?°",       # 93.7°
+    r"\d+(\.\d+)?%",       # 87%
+    r"\b0\.\d{2,}\b",      # 0.644, 0.872
+    r"\b1\.\d{2,}\b",      # 1.366
+    r"\d{2,}\.\d+의\s",    # "93.7의 " — 숫자+의 패턴
+]
 
-    # Step 3: 좌표 산출 (Phase 1 변경 적용)
-    coords = compute_coordinates(features.to_dict(), clip_embedding, projector)
+def contains_raw_metric(text: str) -> bool:
+    """해석문에 raw 수치가 포함되어 있는지 검사"""
+    return any(re.search(p, text) for p in RAW_NUMBER_PATTERNS)
 
-    # Step 4: 타입 매칭 (기존 유지)
-    similar_types = find_similar_types(clip_embedding, coords, user_context["gender"])
+def sanitize_interpretation(text: str) -> str:
+    """해석문에서 raw 수치 패턴을 제거하고 문장을 정리"""
+    if not contains_raw_metric(text):
+        return text
 
-    # Step 5: 핀포인트 비교 (기존 유지)
-    type_comparisons = compare_with_top_anchors(
-        features.to_dict(), similar_types, user_context["gender"]
-    )
+    # 패턴별 제거
+    # "93.7°의 턱선 각도는" → "턱선 각도는" / "턱선은"
+    text = re.sub(r"\d+(\.\d+)?°의\s*", "", text)
+    # "0.719의 광대 돌출도는" → "광대 돌출도는"
+    text = re.sub(r"\b[01]\.\d+의\s*", "", text)
+    # "11.01°의 " → ""
+    text = re.sub(r"\d+(\.\d+)?°의?\s*", "", text)
+    # 남은 소수점 숫자
+    text = re.sub(r"\b0\.\d{2,}\b", "", text)
+    text = re.sub(r"\b1\.\d{2,}\b", "", text)
+    # 정리
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    # 문장 시작이 조사로 시작하면 제거
+    text = re.sub(r"^의\s+", "", text)
+    text = re.sub(r"^는\s+", "", text)
+    return text
+```
 
-    # Step 6: 클러스터 (기존 유지, 커버 페이지용)
-    cluster = classify_user(coords, user_context["gender"])
+## 수정 3-2: face_interpretation 포맷팅에 sanitize 적용
 
-    # Step 7: 인터뷰 해석 (축 정의 보정 완료)
-    aspiration = interpret_interview(interview_data, user_context["gender"])
+**파일:** `report_formatter.py` — face_interpretation 섹션 포맷팅 함수
 
-    # Step 7.5: 갭 계산
-    gap = compute_gap(coords, aspiration["coordinates"])
+해당 함수에서 아래 필드들에 `sanitize_interpretation()` 적용:
 
-    # Step 8: Action Spec 생성 ★
-    top_type = similar_types[0] if similar_types else {
-        "key": "fresh_face", "name_kr": "프레시 페이스",
-        "similarity": 0.5, "mode": "coord",
-    }
-    action_spec = build_action_spec(
-        face_features=features,
-        current_coords=coords,
-        matched_type=top_type,
-        type_delta=type_comparisons[0]["axis_impacts"] if type_comparisons else {},
-        gap=gap,
-        interview_intent=aspiration.get("intent_tags"),
-    )
+```python
+# overall_impression
+content["overall_impression"] = sanitize_interpretation(content["overall_impression"])
 
-    # Step 8.5: Overlay Plan 생성 ★
-    overlay_plan = build_overlay_plan(action_spec, features)
+# 각 feature_interpretation
+for feat in content["feature_interpretations"]:
+    feat["interpretation"] = sanitize_interpretation(feat["interpretation"])
 
-    # Step 9: 리포트 생성 (축소된 입력) ★
-    raw_report = generate_report(action_spec, {
-        "name": user_context["name"],
-        "face_shape": features.face_shape,
-        "tier": user_context["tier"],
-        "gender": user_context["gender"],
-    })
-    report = parse_or_fallback(raw_report, action_spec)
+# harmony_note
+if "harmony_note" in content:
+    content["harmony_note"] = sanitize_interpretation(content["harmony_note"])
 
-    # Step 9.5: Action Spec ↔ 리포트 일치 검증 ★
-    assert len(report["action_tips"]) == len(action_spec.recommended_actions), \
-        f"action count mismatch: {len(report['action_tips'])} != {len(action_spec.recommended_actions)}"
-    for tip, rec in zip(report["action_tips"], action_spec.recommended_actions):
-        assert tip["zone"] == rec.zone, f"zone mismatch: {tip['zone']} != {rec.zone}"
+# distinctive_points
+if "distinctive_points" in content:
+    content["distinctive_points"] = [
+        sanitize_interpretation(p) for p in content["distinctive_points"]
+    ]
+```
 
-    # Step 10: 포매팅
-    return format_report_for_frontend(
-        report, features, coords, action_spec, overlay_plan, cluster
-    )
+## 수정 3-3: LLM 프롬프트에 수치 금지 규칙 추가
+
+**파일:** `llm.py` — generate_report()의 system prompt
+
+기존 system prompt에 아래 규칙 블록을 추가하세요:
+
+```
+## 해석문 작성 규칙 (필수)
+- 해석 문장에 숫자, 소수점, 도(°), 퍼센트(%)를 절대 포함하지 마세요.
+- 숫자는 구조화 JSON 필드(value, percentile)에만 남기세요.
+- 서술문은 의미와 인상만 설명하세요.
+- 금지 예: "93.7°의 턱선 각도는 날카로운 편으로"
+- 허용 예: "턱선이 날카로운 편이라 또렷하고 의지적인 인상을 만들어요"
+- 금지 예: "0.719의 광대 돌출도는 상당히 뚜렷한 편으로"  
+- 허용 예: "광대가 뚜렷한 편이라 입체적이고 개성 있는 인상을 줘요"
+```
+
+## 검증 3
+
+```python
+import re
+
+report = generate_full_report(...)
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+fi = sections["face_interpretation"]["content"]
+
+# overall_impression 숫자 검사
+assert not contains_raw_metric(fi["overall_impression"]), \
+    f"FAIL: overall_impression에 수치: {fi['overall_impression']}"
+print(f"  ✅ overall_impression: {fi['overall_impression'][:50]}...")
+
+# 각 feature interpretation 숫자 검사
+for feat in fi["feature_interpretations"]:
+    assert not contains_raw_metric(feat["interpretation"]), \
+        f"FAIL: {feat['feature']} interpretation에 수치: {feat['interpretation']}"
+    print(f"  ✅ {feat['feature']}: {feat['interpretation'][:40]}...")
+
+# harmony_note
+if fi.get("harmony_note"):
+    assert not contains_raw_metric(fi["harmony_note"]), \
+        f"FAIL: harmony_note에 수치: {fi['harmony_note']}"
+
+# distinctive_points
+for dp in fi.get("distinctive_points", []):
+    assert not contains_raw_metric(dp), f"FAIL: distinctive_point에 수치: {dp}"
+
+print("Phase 3 통과")
 ```
 
 ---
 
-## 범위 밖 (이번 스프린트에서 하지 않음)
+# Phase 4: SCUT-FBP5500 캘리브레이션
 
-- CLIP 모델 실제 활성화
-- 인터뷰 해석 slot filling 전환
-- 풀 파이프라인 로깅 시스템
-- 남성 리포트 분기 (v0은 메이크업 관심 여성 타겟)
-- 오버레이 프론트 인터랙티브화
-- 타입별 modifier 15개 완성
-- 클러스터 역할 재정의
-- 변수명 정리
-- 축 라벨 프론트 정식 변경
-- overlay landmark indices 확정
-- `_derive_zone_bonus` 방향 필터링 정교화
+> FACE_STATS를 실측 기반으로 교체합니다.
+
+## 수정 4-1: 캘리브레이션 스크립트 생성
+
+**파일:** `scripts/calibrate_face_stats.py` (신규 생성)
+
+```python
+"""
+SCUT-FBP5500 AF subset → SIGAK Step 1 배치 실행 → FACE_STATS 실측값 산출
+
+사용법:
+    python scripts/calibrate_face_stats.py \
+        --image-dir ./data/scut-fbp5500/Images/ \
+        --subset AF \
+        --output ./data/calibration_result.json
+
+출력: metric별 mean, std, p5, p25, p50, p75, p95, min, max, n
+"""
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+# 프로젝트 root를 path에 추가 (경로는 실제 구조에 맞게 조정)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from sigak.face import analyze_face  # Step 1 함수 — 실제 import 경로 확인 필요
+
+METRICS_TO_CALIBRATE = [
+    "jaw_angle",
+    "face_length_ratio",
+    "symmetry_score",
+    "golden_ratio_score",
+    "cheekbone_prominence",
+    "eye_tilt",
+    "eye_width_ratio",
+    "nose_bridge_height",
+    "lip_fullness",
+    "brow_arch",
+    "eye_ratio",
+    "forehead_ratio",
+    "philtrum_ratio",
+    "nose_bridge_height",
+    "skin_brightness",
+]
+
+def run_calibration(image_dir: Path, subset: str, output_path: Path):
+    results = {m: [] for m in METRICS_TO_CALIBRATE}
+    total = 0
+    failed = 0
+
+    pattern = f"{subset}*.jpg"
+    image_files = sorted(image_dir.glob(pattern))
+    if not image_files:
+        # SCUT 파일명이 다를 수 있음 — 패턴 조정
+        image_files = sorted(image_dir.glob("*.jpg"))
+        image_files = [f for f in image_files if f.stem.startswith(subset)]
+
+    print(f"Found {len(image_files)} images matching '{pattern}'")
+
+    for i, img_path in enumerate(image_files):
+        total += 1
+        try:
+            features = analyze_face(img_path.read_bytes())
+            feat_dict = features.to_dict()
+            for m in METRICS_TO_CALIBRATE:
+                val = feat_dict.get(m)
+                if val is not None and isinstance(val, (int, float)):
+                    results[m].append(float(val))
+        except Exception as e:
+            failed += 1
+            if failed <= 5:
+                print(f"  SKIP {img_path.name}: {e}")
+            continue
+
+        if (i + 1) % 100 == 0:
+            print(f"  Processed {i + 1}/{len(image_files)} (failed: {failed})")
+
+    # 통계 산출
+    stats = {}
+    for m, values in results.items():
+        if len(values) < 10:
+            print(f"  WARNING: {m} has only {len(values)} samples, skipping")
+            continue
+        arr = np.array(values)
+        stats[m] = {
+            "mean": round(float(np.mean(arr)), 4),
+            "std": round(float(np.std(arr)), 4),
+            "p5": round(float(np.percentile(arr, 5)), 4),
+            "p10": round(float(np.percentile(arr, 10)), 4),
+            "p25": round(float(np.percentile(arr, 25)), 4),
+            "p50": round(float(np.percentile(arr, 50)), 4),
+            "p75": round(float(np.percentile(arr, 75)), 4),
+            "p90": round(float(np.percentile(arr, 90)), 4),
+            "p95": round(float(np.percentile(arr, 95)), 4),
+            "min": round(float(np.min(arr)), 4),
+            "max": round(float(np.max(arr)), 4),
+            "n": len(values),
+        }
+
+    stats["_meta"] = {
+        "source": f"SCUT-FBP5500 {subset} subset",
+        "total_attempted": total,
+        "successful": total - failed,
+        "failed": failed,
+        "note": "연구 캘리브레이션용. 유저 데이터 확보 시 교체 예정.",
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(stats, indent=2, ensure_ascii=False))
+    print(f"\nCalibration complete → {output_path}")
+
+    # FACE_STATS 교체용 코드 스니펫 출력
+    print("\n# --- FACE_STATS 교체용 (report_formatter.py에 복사) ---")
+    print("FACE_STATS = {")
+    for m in METRICS_TO_CALIBRATE:
+        if m in stats:
+            s = stats[m]
+            print(f'    "{m}": {{"mean": {s["mean"]}, "std": {s["std"]}}},')
+    print("}")
+
+    # OBSERVED_RANGES 비교용 출력
+    print("\n# --- OBSERVED_RANGES 비교용 (p10~p90) ---")
+    for m in METRICS_TO_CALIBRATE:
+        if m in stats:
+            s = stats[m]
+            print(f'#   "{m}": ({s["p10"]}, {s["p90"]}),  # measured')
+
+    return stats
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image-dir", type=Path, required=True)
+    parser.add_argument("--subset", default="AF", help="AF, AM, CF, CM")
+    parser.add_argument("--output", type=Path, default=Path("data/calibration_result.json"))
+    args = parser.parse_args()
+    run_calibration(args.image_dir, args.subset, args.output)
+```
+
+## 수정 4-2: 캘리브레이션 실행
+
+```bash
+# 1. SCUT-FBP5500 다운로드 (수동 — 학술 신청 필요)
+# 또는 Kaggle/HuggingFace에서 접근 가능한 버전 사용
+
+# 2. 실행
+python scripts/calibrate_face_stats.py \
+    --image-dir ./data/scut-fbp5500/Images/ \
+    --subset AF \
+    --output ./data/calibration_af.json
+
+# 3. 출력된 FACE_STATS 스니펫을 report_formatter.py에 복사
+```
+
+## 수정 4-3: FACE_STATS 교체
+
+**파일:** `report_formatter.py` — `FACE_STATS` 딕셔너리
+
+캘리브레이션 출력 결과로 교체합니다.
+**주의:** 기존 FACE_STATS는 주석으로 보존하세요.
+
+```python
+# AS-IS (교과서 추정값 — 보존용 주석)
+# FACE_STATS_LEGACY = {
+#     "jaw_angle": {"mean": 124.0, "std": 8.0},
+#     ...
+# }
+
+# TO-BE (SCUT-FBP5500 AF 실측값)
+FACE_STATS = {
+    # calibrate_face_stats.py 출력 결과를 여기에 붙여넣기
+}
+```
+
+## 검증 4
+
+```bash
+# 캘리브레이션 결과 확인
+python -c "
+import json
+stats = json.load(open('data/calibration_af.json'))
+meta = stats.pop('_meta')
+print(f'Source: {meta[\"source\"]}')
+print(f'Success: {meta[\"successful\"]}/{meta[\"total_attempted\"]}')
+print()
+for k, v in stats.items():
+    print(f'{k:25s}  mean={v[\"mean\"]:8.4f}  std={v[\"std\"]:8.4f}  range=[{v[\"p5\"]:.4f}, {v[\"p95\"]:.4f}]  n={v[\"n\"]}')
+"
+```
+
+FACE_STATS 교체 후 리포트 재생성:
+```python
+report = generate_full_report(...)
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+fs = sections["face_structure"]["content"]
+
+for m in fs["metrics"]:
+    p = m["percentile"]
+    assert 5 <= p <= 95, f"FAIL: {m['key']} percentile={p}"
+    # 극단 집중 해소 확인
+    print(f"  {m['key']:25s}  value={m['value']:.3f}  percentile={p}")
+
+# jaw_angle이 더 이상 1이 아닌지 확인
+jaw = next(m for m in fs["metrics"] if m["key"] == "jaw_angle")
+assert jaw["percentile"] > 5, f"jaw_angle still extreme: {jaw['percentile']}"
+print("Phase 4 통과")
+```
 
 ---
 
-## 검증 기준
+# Phase 5: executive_summary 구체성 복구
 
-### Phase 1
-- [ ] impression/intensity 값이 CLIP mock 상태와 무관하게 일관
-- [ ] 같은 사진 → 같은 좌표 (deterministic)
-- [ ] feature 미존재 시 KeyError 없이 fallback 작동
-- [ ] interpret_interview가 새 축 정의로 aspiration 산출
-- [ ] 상위 5개 타입 앵커 좌표 재계산 완료
+> summary에 추구미 방향 연결을 복구합니다.
 
-### Phase 2
-- [ ] `build_action_spec()`이 동일 입력 → 동일 출력
-- [ ] 추천 action이 얼굴형/타입에 따라 실제로 달라짐
-- [ ] type_delta가 zone 우선순위에 영향 (_debug_trace로 확인)
-- [ ] 최소 2개 action 보장 (gap이 작아도)
-- [ ] avoid_actions가 타입 modifier에 따라 적용
+## 수정 5-1: generate_report 입력 payload 확장
 
-### Phase 3
-- [ ] Claude 프롬프트 토큰 수 50% 이상 감소
-- [ ] Claude 출력이 JSON 구조를 따름
-- [ ] JSON 파싱 실패 시 fallback 리포트 정상 생성
-- [ ] 리포트 내 동일 내용 반복 없음
-- [ ] action_tips 개수 == recommended_actions 개수
-- [ ] action_tips[i].zone == recommended_actions[i].zone
+**파일:** `llm.py` — `generate_report()` user message 구성부
 
-### 전체
-- [ ] 기존 대비 리포트에 raw 수치 노출 없음
-- [ ] 기존 대비 리포트 추천이 더 구체적 (zone + method 명시)
-- [ ] 기존 대비 리포트 반복 텍스트 감소
+기존 payload에 아래 필드 추가:
+
+```python
+# generate_report()에 넘기는 payload 구성 시 추가
+summary_context = {
+    "current_type_label": matched_type["name_kr"],
+    "aspiration_summary": aspiration.get("interpretation", ""),
+    "primary_gap_axis": gap["primary_direction"],
+    "primary_gap_direction_kr": gap["primary_shift_kr"],
+    "top_action_goals": [
+        a.goal for a in action_spec.recommended_actions[:2]
+    ],
+}
+# 이 summary_context를 user message payload에 포함
+```
+
+실제 변수명은 코드 확인 후 맞추세요. 핵심은 `generate_report()`가 받는 정보에 **추구미 해석 + primary gap 방향 + top action 목표**가 포함되는 것.
+
+## 수정 5-2: system prompt에 summary 규칙 추가
+
+**파일:** `llm.py` — `generate_report()` system prompt
+
+```
+## executive_summary 규칙 (필수)
+- 반드시 현재 인상과 추구 방향의 차이를 1문장 이상 포함하세요
+- 핵심 action 방향을 1문장 이상 포함하세요
+- 최소 2문장, 최대 4문장
+- 금지: "스타일링을 추천해요" 수준의 일반론만으로 끝내기
+- 필수 포함: current_type_label, aspiration 방향, 구체적 포인트 1개 이상
+```
+
+## 검증 5
+
+```python
+report = generate_full_report(...)
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+es = sections["executive_summary"]["content"]
+
+summary = es["summary"]
+assert len(summary) >= 40, f"FAIL: summary 너무 짧음 ({len(summary)}자)"
+# 일반론만 있는지 체크 (gap 관련 키워드 최소 1개)
+direction_keywords = ["부드", "선명", "생기", "성숙", "자연", "또렷", "강한", "차가운", "따뜻"]
+has_direction = any(kw in summary for kw in direction_keywords)
+assert has_direction, f"FAIL: summary에 방향성 키워드 없음: {summary}"
+print(f"  ✅ summary ({len(summary)}자): {summary[:60]}...")
+
+print("Phase 5 통과")
+```
+
+---
+
+# Phase 6: type_reference + delta_contribution + trend_context
+
+> 남은 P1/P2 항목을 한번에 처리합니다.
+
+## 수정 6-1: type_reference styling_tips deterministic 생성
+
+**파일:** `report_formatter.py` — type_reference 포맷팅 함수
+
+```python
+DIRECTION_STYLING_TIPS = {
+    ("structure", "decrease"): "각진 라인을 부드럽게 감싸는 쉐딩이 효과적이에요.",
+    ("structure", "increase"): "윤곽을 또렷하게 잡아주는 하이라이트가 효과적이에요.",
+    ("impression", "decrease"): "눈매와 눈썹 라인을 둥글게 잡아주면 인상이 부드러워져요.",
+    ("impression", "increase"): "눈꼬리와 눈썹 끝을 살려주면 인상이 선명해져요.",
+    ("maturity", "decrease"): "볼과 눈 아래에 생기를 더하면 어려 보이는 효과가 있어요.",
+    ("maturity", "increase"): "음영을 깊게 주면 세련되고 성숙한 분위기가 나요.",
+    ("intensity", "decrease"): "전체적으로 힘을 빼고 자연스럽게 마무리하는 게 좋아요.",
+    ("intensity", "increase"): "포인트 부위를 과감하게 강조하면 존재감이 살아요.",
+}
+
+def build_type_styling_tips(type_label: str, primary_axis: str, delta: float, top_zones: list[str]) -> list[str]:
+    tips = []
+    tips.append(f"{type_label} 유형의 장점을 살리면서 변화를 주는 게 포인트예요.")
+
+    direction = "decrease" if delta < 0 else "increase"
+    key = (primary_axis, direction)
+    if key in DIRECTION_STYLING_TIPS:
+        tips.append(DIRECTION_STYLING_TIPS[key])
+
+    if top_zones:
+        zone_str = ", ".join(top_zones[:2])
+        tips.append(f"특히 {zone_str} 부분에 집중하면 변화가 빠르게 느껴져요.")
+
+    return tips
+```
+
+type_reference 포맷팅 시 `styling_tips`가 빈 배열이면 위 함수로 생성:
+
+```python
+# type_reference 포맷팅부에서
+if not content.get("styling_tips"):
+    content["styling_tips"] = build_type_styling_tips(
+        type_label=content["type_name"],
+        primary_axis=gap["primary_direction"],       # 변수명 확인 필요
+        delta=gap["vector"][gap["primary_direction"]], # 변수명 확인 필요
+        top_zones=[a["category"] for a in action_items[:2]],
+    )
+```
+
+## 수정 6-2: delta_contribution score 기반 차등화
+
+**파일:** `report_formatter.py` — action_plan 포맷팅부
+
+기존 `1/N` 균등 분배를 score 기반으로 교체:
+
+```python
+# 기존 패턴 찾기 (추정):
+# delta_contribution = round(1.0 / len(items), 2)
+
+# 교체:
+def compute_delta_contributions(action_items: list, action_spec) -> list[float]:
+    """ActionSpec의 score/priority 기반으로 contribution 차등 계산"""
+    scores = []
+    for i, item in enumerate(action_items):
+        # action_spec.recommended_actions[i]에서 score 추출
+        # 필드명은 Phase 0에서 확인한 것 사용
+        if hasattr(action_spec, 'recommended_actions') and i < len(action_spec.recommended_actions):
+            action = action_spec.recommended_actions[i]
+            score = getattr(action, 'score', None) or getattr(action, 'priority', None) or 1.0
+            # priority가 int(1=HIGH, 4=LOW)이면 반전
+            if isinstance(score, int) and 1 <= score <= 4:
+                score = 5 - score  # 1→4, 2→3, 3→2, 4→1
+            scores.append(float(score))
+        else:
+            scores.append(1.0)
+
+    total = sum(scores) or 1.0
+    return [round(s / total, 2) for s in scores]
+
+# 사용:
+contributions = compute_delta_contributions(action_items, action_spec)
+for i, item in enumerate(action_items):
+    item["recommendations"][0]["delta_contribution"] = contributions[i]
+```
+
+**주의:** `action_spec` 객체에 접근 가능한지 확인 필요. 포맷팅 함수의 인자로 받고 있는지 체크. 안 받고 있으면 인자 추가.
+
+## 수정 6-3: trend_context fallback + z축 필드 예약
+
+**파일:** `report_formatter.py` — trend_context 포맷팅부
+
+```python
+def build_trend_context_fallback(action_spec, user_name: str) -> dict:
+    """trend_context가 비어있거나 너무 짧을 때 사용하는 fallback"""
+    top_zones = []
+    if hasattr(action_spec, 'recommended_actions'):
+        top_zones = [a.zone for a in action_spec.recommended_actions[:2]]
+
+    zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
+
+    return {
+        "trends": [{
+            "title": "적용 가이드",
+            "description": (
+                f"{user_name}님의 리포트에서 가장 변화가 큰 포인트는 "
+                f"{zone_str} 부분이에요. "
+                f"하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. "
+                f"처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요."
+            ),
+        }],
+    }
+```
+
+trend_context 포맷팅 시:
+```python
+tc = content.get("trends", [])
+if not tc or len(tc[0].get("description", "")) < 20:
+    content = build_trend_context_fallback(action_spec, user_name)
+```
+
+z축 필드 예약 (gap_analysis 포맷팅부):
+```python
+# gap_analysis content에 추가 (값은 None)
+gap_content["trend_coordinates"] = None       # 다음 스프린트: 시즌별 트렌드 중심 좌표
+gap_content["gap_to_trend"] = None            # 다음 스프린트: 현재 → 트렌드 gap
+gap_content["blend_weights"] = None           # 다음 스프린트: aspiration vs trend 비율
+```
+
+## 검증 6
+
+```python
+report = generate_full_report(...)
+sections = {s["id"]: s for s in report["formatted"]["sections"]}
+
+# 6-1: styling_tips 비어있지 않음
+tr = sections["type_reference"]["content"]
+assert len(tr["styling_tips"]) >= 1, f"FAIL: styling_tips 비어있음"
+print(f"  ✅ styling_tips: {tr['styling_tips']}")
+
+# 6-2: delta_contribution 차별화
+ap = sections["action_plan"]["content"]
+contribs = [item["recommendations"][0]["delta_contribution"] for item in ap["items"]]
+assert len(set(contribs)) > 1, f"FAIL: delta_contribution 전부 동일: {contribs}"
+print(f"  ✅ delta_contributions: {contribs}")
+
+# 6-3: trend_context 최소 내용
+tc = sections["trend_context"]["content"]
+assert len(tc["trends"]) >= 1
+assert len(tc["trends"][0]["description"]) >= 20, \
+    f"FAIL: trend description 짧음: {tc['trends'][0]['description']}"
+print(f"  ✅ trend_context: {tc['trends'][0]['description'][:50]}...")
+
+# 6-3: z축 필드 존재 (null이어도 OK)
+gap = sections["gap_analysis"]["content"]
+assert "trend_coordinates" in gap, "FAIL: trend_coordinates 필드 없음"
+assert "gap_to_trend" in gap, "FAIL: gap_to_trend 필드 없음"
+print(f"  ✅ z축 필드 예약: trend_coordinates={gap['trend_coordinates']}")
+
+print("Phase 6 통과")
+```
+
+---
+
+# Phase 7: 통합 QA
+
+> 전체 수정사항 통합 검증.
+
+## 실행
+
+홍길순 사진 + 인터뷰 데이터, 조찬형 사진 + 인터뷰 데이터 각각으로 리포트 재생성 후 아래 실행.
+
+```python
+import re
+
+def qa_report_v3(report: dict, label: str = ""):
+    """v3 통합 QA — 모든 Phase 검증 항목 포함"""
+    print(f"\n{'='*50}")
+    print(f"QA v3: {label or report['formatted']['user_name']}")
+    print(f"{'='*50}")
+
+    sections = {s["id"]: s for s in report["formatted"]["sections"]}
+    passed = 0
+    failed = 0
+
+    def check(name, condition, msg=""):
+        nonlocal passed, failed
+        if condition:
+            passed += 1
+            print(f"  ✅ {name}")
+        else:
+            failed += 1
+            print(f"  ❌ {name}: {msg}")
+
+    # --- Phase 1: percentile ---
+    fs = sections["face_structure"]["content"]
+    for m in fs["metrics"]:
+        check(
+            f"percentile_{m['key']}",
+            5 <= m["percentile"] <= 95,
+            f"percentile={m['percentile']}"
+        )
+
+    # --- Phase 2: gap 비문 ---
+    gap = sections["gap_analysis"]["content"]
+    for item in gap["direction_items"]:
+        has_bad = bool(re.search(r"더\s+\S+\s+필요한", item["recommendation"]))
+        check(f"gap_rec_{item['axis']}", not has_bad, item["recommendation"][:40])
+
+    check("gap_summary_조사", "도이 " not in gap["gap_summary"], gap["gap_summary"])
+
+    # --- Phase 3: raw 수치 ---
+    fi = sections["face_interpretation"]["content"]
+    check(
+        "overall_no_numbers",
+        not contains_raw_metric(fi["overall_impression"]),
+        fi["overall_impression"][:50]
+    )
+    for feat in fi["feature_interpretations"]:
+        check(
+            f"interp_no_numbers_{feat['feature']}",
+            not contains_raw_metric(feat["interpretation"]),
+            feat["interpretation"][:40]
+        )
+
+    # --- Phase 4: percentile 분포 ---
+    percentiles = [m["percentile"] for m in fs["metrics"]]
+    all_extreme = all(p <= 10 or p >= 90 for p in percentiles)
+    check("percentile_spread", not all_extreme, f"전부 극단: {percentiles}")
+
+    # --- Phase 5: summary ---
+    es = sections["executive_summary"]["content"]
+    check("summary_length", len(es["summary"]) >= 40, f"{len(es['summary'])}자")
+    direction_kw = ["부드", "선명", "생기", "성숙", "자연", "또렷", "강한", "차가운", "따뜻"]
+    check("summary_direction", any(k in es["summary"] for k in direction_kw), es["summary"][:50])
+
+    # --- Phase 6 ---
+    tr = sections["type_reference"]["content"]
+    check("styling_tips", len(tr.get("styling_tips", [])) >= 1)
+
+    ap = sections["action_plan"]["content"]
+    contribs = [item["recommendations"][0]["delta_contribution"] for item in ap["items"]]
+    check("delta_diff", len(set(contribs)) > 1, f"{contribs}")
+
+    tc = sections["trend_context"]["content"]
+    check("trend_content", len(tc["trends"][0].get("description", "")) >= 20)
+
+    check("z_field_reserved", "trend_coordinates" in gap)
+
+    # --- 결과 ---
+    total = passed + failed
+    print(f"\n{'='*50}")
+    print(f"결과: {passed}/{total} 통과, {failed} 실패")
+    if failed == 0:
+        print("🎉 QA v3 전체 통과")
+    else:
+        print("⚠️  실패 항목 수정 필요")
+    print(f"{'='*50}")
+    return failed == 0
+
+
+# 실행
+report_hong = generate_full_report(hong_image, hong_interview, hong_context)
+report_cho = generate_full_report(cho_image, cho_interview, cho_context)
+
+ok1 = qa_report_v3(report_hong, "홍길순 (v3)")
+ok2 = qa_report_v3(report_cho, "조찬형 (v3)")
+
+assert ok1 and ok2, "QA 실패 — 위 로그 확인"
+```
+
+---
+
+# 실행 순서 요약
+
+```
+Phase 0  사전 확인 — 파일/함수 위치 파악                    (10분)
+Phase 1  percentile clamp 5~95                             (15분)
+Phase 2  gap recommendation 비문 → 템플릿 교체              (30분)
+Phase 3  interpretation raw 수치 제거 (후처리 + 프롬프트)    (30분)
+Phase 4  SCUT 캘리브레이션 → FACE_STATS 교체                (1~2시간)
+Phase 5  executive_summary 구체성 복구                      (30분)
+Phase 6  styling_tips + delta_contribution + trend_context  (45분)
+Phase 7  통합 QA (홍길순 + 조찬형)                          (15분)
+```
+
+Phase 1~3은 캘리브레이션 데이터 없이 바로 실행 가능.
+Phase 4는 SCUT-FBP5500 이미지 필요 — 없으면 Phase 5~6 먼저 진행 후 나중에 4 실행.

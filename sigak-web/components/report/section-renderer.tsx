@@ -7,7 +7,7 @@ import { ExecutiveSummary } from "./sections/executive-summary";
 import { FaceStructure } from "./sections/face-structure";
 import { SkinAnalysis } from "./sections/skin-analysis";
 import { CoordinateMap } from "./sections/coordinate-map";
-import { FaceInterpretation } from "./sections/face-interpretation";
+
 import { GapAnalysis } from "./sections/gap-analysis";
 import { ActionPlan } from "./sections/action-plan";
 import { CelebReference } from "./sections/celeb-reference";
@@ -60,13 +60,6 @@ export function SectionRenderer({ section, accessLevel, overlay }: SectionRender
       return (
         <SkinAnalysis
           content={content as Parameters<typeof SkinAnalysis>[0]["content"]}
-          locked={locked}
-        />
-      );
-    case "face_interpretation":
-      return (
-        <FaceInterpretation
-          content={content as Parameters<typeof FaceInterpretation>[0]["content"]}
           locked={locked}
         />
       );

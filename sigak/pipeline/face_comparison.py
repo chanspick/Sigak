@@ -29,7 +29,7 @@ FEATURE_META = {
     "jaw_angle": {
         "label": "턱선 각도",
         "unit": "°",
-        "axis": "structure",
+        "axis": "shape",
         "direction_map": {
             "lower": ("sharper", "더 날카로움", -1),   # 값이 낮으면 sharp
             "higher": ("softer", "더 부드러움", +1),    # 값이 높으면 soft
@@ -42,7 +42,7 @@ FEATURE_META = {
     "cheekbone_prominence": {
         "label": "광대 돌출도",
         "unit": "",
-        "axis": "structure",
+        "axis": "shape",
         "direction_map": {
             "lower": ("flatter", "더 평평함", +1),
             "higher": ("prominent", "더 돌출됨", -1),
@@ -55,10 +55,10 @@ FEATURE_META = {
     "eye_ratio": {
         "label": "눈 비율 (가로:세로)",
         "unit": "",
-        "axis": "impression",
+        "axis": "shape",
         "direction_map": {
-            "lower": ("rounder", "더 둥근 눈", -1),     # warm 방향
-            "higher": ("elongated", "더 길쭉한 눈", +1), # cool 방향
+            "lower": ("rounder", "더 둥근 눈", -1),     # soft 방향
+            "higher": ("elongated", "더 길쭉한 눈", +1), # sharp 방향
         },
         "similarity_threshold": 0.03,
         "significance_threshold": 0.06,
@@ -68,10 +68,10 @@ FEATURE_META = {
     "eye_tilt": {
         "label": "눈매 기울기",
         "unit": "°",
-        "axis": "impression",
+        "axis": "shape",
         "direction_map": {
-            "lower": ("downward", "더 처진 눈매", -1),   # warm
-            "higher": ("upward", "더 올라간 눈매", +1),   # cool
+            "lower": ("downward", "더 처진 눈매", -1),   # soft
+            "higher": ("upward", "더 올라간 눈매", +1),   # sharp
         },
         "similarity_threshold": 1.5,
         "significance_threshold": 3.0,
@@ -81,9 +81,9 @@ FEATURE_META = {
     "lip_fullness": {
         "label": "입술 볼륨",
         "unit": "",
-        "axis": "intensity",
+        "axis": "volume",
         "direction_map": {
-            "lower": ("thinner", "더 얇은 입술", -1),    # natural
+            "lower": ("thinner", "더 얇은 입술", -1),    # subtle
             "higher": ("fuller", "더 풍성한 입술", +1),   # bold
         },
         "similarity_threshold": 0.03,
@@ -94,10 +94,10 @@ FEATURE_META = {
     "face_length_ratio": {
         "label": "얼굴 종횡비",
         "unit": "",
-        "axis": "structure",
+        "axis": "age",
         "direction_map": {
-            "lower": ("wider", "더 넓은 얼굴형", +1),     # soft
-            "higher": ("longer", "더 긴 얼굴형", -1),     # sharp
+            "lower": ("wider", "더 넓은 얼굴형", +1),     # fresh
+            "higher": ("longer", "더 긴 얼굴형", -1),     # mature
         },
         "similarity_threshold": 0.04,
         "significance_threshold": 0.08,
@@ -107,7 +107,7 @@ FEATURE_META = {
     "nose_bridge_height": {
         "label": "코 높이",
         "unit": "",
-        "axis": "structure",
+        "axis": "volume",
         "direction_map": {
             "lower": ("flatter", "더 낮은 코", +1),
             "higher": ("higher", "더 높은 코", -1),
@@ -120,10 +120,10 @@ FEATURE_META = {
     "brow_arch": {
         "label": "눈썹 아치",
         "unit": "",
-        "axis": "impression",
+        "axis": "shape",
         "direction_map": {
-            "lower": ("straighter", "더 일자형 눈썹", -1),  # warm/natural
-            "higher": ("arched", "더 아치형 눈썹", +1),     # cool/bold
+            "lower": ("straighter", "더 일자형 눈썹", -1),  # soft
+            "higher": ("arched", "더 아치형 눈썹", +1),     # sharp
         },
         "similarity_threshold": 0.02,
         "significance_threshold": 0.05,
@@ -133,7 +133,7 @@ FEATURE_META = {
     "philtrum_ratio": {
         "label": "인중 비율",
         "unit": "",
-        "axis": "maturity",
+        "axis": "age",
         "direction_map": {
             "lower": ("shorter", "더 짧은 인중", -1),    # fresh
             "higher": ("longer", "더 긴 인중", +1),      # mature
@@ -146,7 +146,7 @@ FEATURE_META = {
     "forehead_ratio": {
         "label": "이마 비율",
         "unit": "",
-        "axis": "maturity",
+        "axis": "age",
         "direction_map": {
             "lower": ("smaller", "더 좁은 이마", +1),     # mature
             "higher": ("larger", "더 넓은 이마", -1),     # fresh
@@ -160,10 +160,9 @@ FEATURE_META = {
 
 # 축별 가중치 — 특정 특징이 해당 축에 미치는 영향력
 AXIS_FEATURE_WEIGHTS = {
-    "structure":  {"jaw_angle": 0.3, "cheekbone_prominence": 0.2, "face_length_ratio": 0.25, "nose_bridge_height": 0.25},
-    "impression": {"eye_ratio": 0.3, "eye_tilt": 0.35, "brow_arch": 0.35},
-    "maturity":   {"philtrum_ratio": 0.5, "forehead_ratio": 0.5},
-    "intensity":  {"lip_fullness": 0.5, "brow_arch": 0.25, "cheekbone_prominence": 0.25},
+    "shape":  {"jaw_angle": 0.25, "cheekbone_prominence": 0.25, "eye_tilt": 0.20, "brow_arch": 0.15, "eye_ratio": 0.15},
+    "volume": {"eye_width_ratio": 0.30, "lip_fullness": 0.25, "nose_bridge_height": 0.25, "brow_eye_distance": 0.20},
+    "age":    {"forehead_ratio": 0.35, "philtrum_ratio": 0.35, "face_length_ratio": 0.30},
 }
 
 
@@ -281,7 +280,7 @@ def compare_with_anchor(
             "anchor": str,
             "similarities": [...],
             "differences": [...],
-            "axis_impacts": {"structure": float, "impression": float, ...},
+            "axis_impacts": {"shape": float, "volume": float, "age": float},
             "narrative_prompt": str,
         }
     """
@@ -308,7 +307,7 @@ def compare_with_anchor(
 
     similarities = []
     differences = []
-    axis_impacts = {"structure": 0.0, "impression": 0.0, "maturity": 0.0, "intensity": 0.0}
+    axis_impacts = {"shape": 0.0, "volume": 0.0, "age": 0.0}
 
     for feat_key, meta in FEATURE_META.items():
         user_val = user_features.get(feat_key)

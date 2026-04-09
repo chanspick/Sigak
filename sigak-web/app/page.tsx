@@ -18,7 +18,7 @@ const GALLERY = [
 ] as const;
 const PROCESS = [
   { step: "01", title: "셀카 업로드", desc: "정면 사진 1장과 간단한 설문. 추구하는 이미지, 레퍼런스, 현재 고민을 자유롭게." },
-  { step: "02", title: "AI 좌표 분석", desc: "얼굴 구조, 피부톤, 스타일 취향을 4축 좌표계에 매핑해요." },
+  { step: "02", title: "AI 좌표 분석", desc: "얼굴 구조, 피부톤, 스타일 취향을 3축 좌표계에 매핑해요." },
   { step: "03", title: "맞춤 리포트", desc: "현재 위치에서 추구미까지의 구체적 경로. 메이크업, 헤어, 스타일링 실행 가이드." },
 ] as const;
 const TEAM = [
@@ -28,9 +28,9 @@ const TEAM = [
   { role: "Growth Lead", focus: "시장 검증, B2B 매칭, 데이터 전략" },
 ] as const;
 const AXES = [
-  { label: "인상", left: "부드러운", right: "선명한", current: 0.35, target: 0.7 },
-  { label: "분위기", left: "프레시", right: "시크", current: 0.6, target: 0.8 },
-  { label: "존재감", left: "자연스러운", right: "볼드", current: 0.45, target: 0.65 },
+  { label: "외형", left: "소프트", right: "샤프", current: 0.35, target: 0.7 },
+  { label: "존재감", left: "서틀", right: "볼드", current: 0.45, target: 0.65 },
+  { label: "무드", left: "프레시", right: "매추어", current: 0.6, target: 0.8 },
 ] as const;
 
 export default function HomePage() {
@@ -61,7 +61,7 @@ export default function HomePage() {
               </div>
             </div><div className="relative aspect-[2/3] w-[60%] ml-auto overflow-hidden"><Image src="/images/sculptures/deer.png" alt="사슴 조각상" fill className="object-contain" sizes="(max-width: 768px) 60vw, 30vw" priority /></div></div></Reveal></section>
       <Reveal><section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8 md:py-12"><div className="grid grid-cols-2 md:grid-cols-4 border border-black/10">
-            {(["4축", "AI 분석", "24hr", "맞춤형"] as const).map((num, i) => (
+            {(["3축", "AI 분석", "24hr", "맞춤형"] as const).map((num, i) => (
               <div key={num} className={`flex flex-col px-7 py-6 ${i < 3 ? "border-r border-black/10" : ""} ${i === 1 ? "max-md:border-r-0" : ""}`}>
                 <span className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-2.5">
                   {["좌표계", "얼굴 구조", "리포트 딜리버리", "스타일링 가이드"][i]}

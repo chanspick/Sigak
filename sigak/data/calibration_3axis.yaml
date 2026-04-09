@@ -1,0 +1,25 @@
+# SIGAK 3-Axis Calibration Data
+# coordinate.py는 이 파일에서만 observed_ranges를 로드한다.
+# 재캘리브레이션 시 이 파일만 교체하면 전체 반영.
+#
+# 초기값: SCUT-FBP5500 AF 2000장 InsightFace p10~p90 (2026-04-08)
+# brow_eye_distance는 추정값 — 캘리브레이션 후 실측으로 교체 예정.
+
+observed_ranges:
+  jaw_angle: [90.1, 117.2]
+  cheekbone_prominence: [0.522, 0.746]
+  eye_tilt: [-1.06, 5.50]
+  brow_arch: [0.026, 0.037]
+  eye_ratio: [0.284, 0.41]
+  eye_width_ratio: [0.178, 0.214]
+  lip_fullness: [0.003, 0.106]
+  nose_bridge_height: [0.472, 0.573]
+  brow_eye_distance: [0.1, 0.4]            # 추정값. 캘리브레이션 후 교체.
+  forehead_ratio: [0.354, 0.465]
+  philtrum_ratio: [0.206, 0.339]
+  face_length_ratio: [1.158, 1.293]
+
+# 캘리브레이션 스크립트 산출 영역 (초기: 비어 있음)
+axis_distribution: {}
+axis_correlation: {}
+sigma: 1.0

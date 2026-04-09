@@ -1,0 +1,70 @@
+# SIGAK 3-Axis Aesthetic Coordinate System v1
+# 이 파일은 축 정의만 담는다. 통계값은 calibration_3axis.yaml에서 관리.
+# coordinate.py의 유일한 축 정의 소스 (SSOT).
+
+version: "3axis_v1"
+
+axes:
+  shape:
+    name_kr: "외형"
+    low: "Soft"
+    high: "Sharp"
+    low_kr: "소프트"
+    high_kr: "샤프"
+    description_kr: "골격과 이목구비가 만드는 전체적인 형태"
+    features:
+      jaw_angle:
+        weight: 0.25
+        direction: "low_is_positive"       # 각도 낮을수록 sharp(+1)
+      cheekbone_prominence:
+        weight: 0.25
+        direction: "high_is_positive"      # 돌출 높을수록 sharp(+1)
+      eye_tilt:
+        weight: 0.20
+        direction: "high_is_positive"      # 올라갈수록 sharp(+1)
+      brow_arch:
+        weight: 0.15
+        direction: "high_is_positive"      # 아치 높을수록 sharp(+1)
+      eye_ratio:
+        weight: 0.15
+        direction: "low_is_positive"       # h/w 비율. 낮을수록(가로 긴 눈) sharp(+1). 높으면 둥근 눈=soft.
+
+  volume:
+    name_kr: "존재감"
+    low: "Subtle"
+    high: "Bold"
+    low_kr: "서틀"
+    high_kr: "볼드"
+    description_kr: "이목구비의 크기와 볼륨이 만드는 존재감"
+    features:
+      eye_width_ratio:
+        weight: 0.30
+        direction: "high_is_positive"      # 클수록 bold(+1)
+      lip_fullness:
+        weight: 0.25
+        direction: "high_is_positive"      # 도톰할수록 bold(+1)
+      nose_bridge_height:
+        weight: 0.25
+        direction: "high_is_positive"      # 높을수록 bold(+1)
+      brow_eye_distance:
+        weight: 0.20
+        direction: "low_is_positive"       # 가까울수록 bold(+1)
+        fallback: "reweight"               # missing이면 나머지 3피처로 재가중
+
+  age:
+    name_kr: "무드"
+    low: "Fresh"
+    high: "Mature"
+    low_kr: "프레시"
+    high_kr: "매추어"
+    description_kr: "얼굴 비율이 주는 나이 인상과 분위기"
+    features:
+      forehead_ratio:
+        weight: 0.35
+        direction: "high_is_positive"      # 클수록 mature(+1)
+      philtrum_ratio:
+        weight: 0.35
+        direction: "high_is_positive"      # 길수록 mature(+1)
+      face_length_ratio:
+        weight: 0.30
+        direction: "high_is_positive"      # 길수록 mature(+1)

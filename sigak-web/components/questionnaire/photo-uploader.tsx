@@ -177,7 +177,6 @@ export function PhotoUploader({ photos, onChange, photoFiles, onFilesChange }: P
         ref={fileRef}
         type="file"
         accept="image/*"
-        capture="user"
         className="hidden"
         onChange={handleFileChange}
       />

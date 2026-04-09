@@ -6,9 +6,10 @@ AI 유형 앵커 임베딩과 유저 임베딩 간 코사인 유사도를 계산
 
 두 가지 모드:
   1. CLIP 모드: .npy 임베딩 파일이 있으면 코사인 유사도 사용
-  2. 좌표 폴백: 임베딩 없으면 reference_coords 기반 유클리드 거리 사용
+  2. 좌표 폴백: 임베딩 없으면 coords 기반 유클리드 거리 사용
 
 v2: type_anchors.json 전환 (AI 유형 앵커, 법적 리스크 제거)
+v3: 3축 체계 전환 (shape/volume/age), coords 필드 사용
 """
 import json
 import logging
@@ -178,12 +179,12 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 def _coord_similarity(user_coords: dict[str, float], ref_coords: dict[str, float]) -> float:
     """
     좌표 기반 유사도 (폴백용).
-    4축 유클리드 거리를 가우시안 커널로 변환하여 현실적 유사도 산출.
+    3축 유클리드 거리를 가우시안 커널로 변환하여 현실적 유사도 산출.
 
     기존 선형 스케일링은 대부분 70%+ 로 나와서 비현실적이었음.
     가우시안: 거리 0 → 0.90, 거리 0.5 → 0.78, 거리 1.0 → 0.61, 거리 2.0 → 0.25
     """
-    axes = ["structure", "impression", "maturity", "intensity"]
+    axes = ["shape", "volume", "age"]
     dist_sq = sum(
         (user_coords.get(ax, 0) - ref_coords.get(ax, 0)) ** 2
         for ax in axes
@@ -213,7 +214,7 @@ def find_similar_types(
 
     Args:
         user_embedding: 유저 사진의 CLIP 768d 임베딩 (없으면 None)
-        user_coords: 유저의 4축 좌표
+        user_coords: 유저의 3축 좌표
         gender: "female" 또는 "male"
         top_k: 반환할 유형 수
 
@@ -227,7 +228,7 @@ def find_similar_types(
                 "similarity": 0.78,
                 "similarity_pct": 78,
                 "mode": "clip" | "coord",
-                "axis_delta": {"structure": 0.12, ...},
+                "axis_delta": {"shape": 0.12, ...},
                 "description_kr": "...",
             },
             ...
@@ -244,7 +245,7 @@ def find_similar_types(
         if info.get("gender") != gender:
             continue
 
-        ref_coords = info.get("reference_coords", {})
+        ref_coords = info.get("coords", {})
 
         # 유사도 계산
         if use_clip and key in anchor_embeddings:
@@ -260,7 +261,7 @@ def find_similar_types(
 
         # 축별 차이 벡터
         axis_delta = {}
-        for ax in ["structure", "impression", "maturity", "intensity"]:
+        for ax in ["shape", "volume", "age"]:
             axis_delta[ax] = round(
                 user_coords.get(ax, 0) - ref_coords.get(ax, 0), 3
             )
@@ -328,14 +329,16 @@ def select_teaser_type(similar_types: list[dict]) -> Optional[dict]:
 
 def build_anchor_poles(gender: str) -> dict[str, dict[str, np.ndarray]]:
     """
-    앵커 임베딩을 축 역할(axis_roles)에 따라 극별 평균 벡터로 집계한다.
+    앵커 임베딩을 coords 값에 따라 극별 평균 벡터로 집계한다.
     coordinate.py의 AnchorProjector.fit()에 넘길 수 있는 형태로 반환.
+
+    coords 값이 음수이면 negative 극, 양수이면 positive 극으로 분류.
 
     Returns:
         {
-            "structure": {
-                "negative": np.array(768d),  # sharp 극 평균
-                "positive": np.array(768d),  # soft 극 평균
+            "shape": {
+                "negative": np.array(768d),  # soft 극 평균
+                "positive": np.array(768d),  # sharp 극 평균
             },
             ...
         }
@@ -348,7 +351,7 @@ def build_anchor_poles(gender: str) -> dict[str, dict[str, np.ndarray]]:
 
     # 축별 극성 수집
     poles: dict[str, dict[str, list[np.ndarray]]] = {}
-    for ax_name in ["structure", "impression", "maturity", "intensity"]:
+    for ax_name in ["shape", "volume", "age"]:
         poles[ax_name] = {"negative": [], "positive": []}
 
     for key, info in anchors_data.get("anchors", {}).items():
@@ -358,11 +361,14 @@ def build_anchor_poles(gender: str) -> dict[str, dict[str, np.ndarray]]:
             continue
 
         emb = anchor_embeddings[key]
-        roles = info.get("axis_roles", {})
+        coords = info.get("coords", {})
 
-        for ax_name, role in roles.items():
-            if role in ("negative", "positive"):
-                poles[ax_name][role].append(emb)
+        for ax_name in ["shape", "volume", "age"]:
+            val = coords.get(ax_name, 0)
+            if val < 0:
+                poles[ax_name]["negative"].append(emb)
+            elif val > 0:
+                poles[ax_name]["positive"].append(emb)
 
     # 극별 평균 계산
     result: dict[str, dict[str, np.ndarray]] = {}
@@ -401,29 +407,29 @@ def get_type_reference_prompt(gender: str = "female") -> str:
     LLM 프롬프트에 삽입할 유형 좌표 레퍼런스 문자열을 생성한다.
 
     Returns:
-        "- 따뜻한 첫사랑 (Type 1): structure=0.6, impression=-0.6, ... (부드러운, 따뜻한, 프레시)"
+        "- 따뜻한 첫사랑 (Type 1): shape=-0.8, volume=-0.7, age=-0.8 (소프트, 서틀, 프레시)"
     """
+    from pipeline.coordinate import get_axis_labels as _get_axis_labels
+
     anchors_data = load_anchors()
     lines = []
 
-    # coordinate.py AxisDefinition 기준 (SSOT)
-    # -1 = negative_label, +1 = positive_label
-    axis_labels = {
-        "structure": {-1: "부드러운", 1: "날카로운"},
-        "impression": {-1: "부드러운", 1: "선명한"},
-        "maturity": {-1: "프레시", 1: "성숙한"},
-        "intensity": {-1: "자연스러운", 1: "볼드"},
-    }
+    # coordinate.py axis_config.yaml 기준 (SSOT)
+    # -1 = low_kr, +1 = high_kr
+    axis_labels = {}
+    for ax_name in ["shape", "volume", "age"]:
+        labels = _get_axis_labels(ax_name)
+        axis_labels[ax_name] = {-1: labels["low"], 1: labels["high"]}
 
     for key, info in anchors_data.get("anchors", {}).items():
         if info.get("gender") != gender:
             continue
 
-        coords = info.get("reference_coords", {})
+        coords = info.get("coords", {})
         type_id = info.get("type_id", "?")
 
         coord_str = ", ".join(
-            f"{ax}={coords.get(ax, 0)}" for ax in ["structure", "impression", "maturity", "intensity"]
+            f"{ax}={coords.get(ax, 0)}" for ax in ["shape", "volume", "age"]
         )
 
         traits = []

@@ -1,5 +1,5 @@
-// 얼굴 구조 분석 섹션 (항상 공개)
-// 프리미엄 컨설팅 리포트 스타일: 정량 메트릭 + 분포 바 + 맥락 텍스트
+// 얼굴 구조 분석 섹션: FREE 영역 + STANDARD 잠금 영역
+// 프리미엄 컨설팅 리포트 스타일: 정량 메트릭 + 분포 바 + 맥락 텍스트 + 심층 해석
 
 import { DistributionBar } from "@/components/report/charts/distribution-bar";
 
@@ -16,15 +16,35 @@ interface FaceMetric {
   context_label?: string;
 }
 
+interface FeatureInterpretation {
+  feature: string;
+  label: string;
+  value: number;
+  unit: string;
+  percentile: number;
+  range_label: string;
+  interpretation: string;
+  min_label?: string;
+  max_label?: string;
+  show_numeric_value?: boolean;
+  context_label?: string;
+}
+
 interface FaceStructureContent {
+  // FREE 영역
   face_type: string;
   face_length_ratio: number;
   jaw_angle: number;
-  symmetry_score?: number;
-  golden_ratio_score?: number;
   symmetry_label?: string;
   golden_ratio_label?: string;
   metrics: FaceMetric[];
+
+  // STANDARD 영역 (기존 face_interpretation 데이터)
+  overall_impression?: string;
+  feature_interpretations?: FeatureInterpretation[];
+  harmony_note?: string;
+  distinctive_points?: string[];
+  interpretation_unlock_level?: string;
 }
 
 interface FaceStructureProps {
@@ -91,21 +111,18 @@ function stripPercentileText(text: string): string {
     .trim();
 }
 
-// 수치 포맷 — 정수/소수점 구분
-function formatValue(value: number, unit: string): string {
-  if (value == null) return "";
-  const formatted = value >= 1 ? value.toFixed(1) : value.toFixed(3);
-  return `${formatted}${unit}`;
-}
-
-// 얼굴 구조 분석 — 프리미엄 레이아웃
-export function FaceStructure({ content }: FaceStructureProps) {
+// 얼굴 구조 분석 — 프리미엄 레이아웃 (FREE + STANDARD 통합)
+export function FaceStructure({ content, locked }: FaceStructureProps) {
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
       {/* 섹션 헤더 */}
       <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
         FACE STRUCTURE
       </h2>
+
+      {/* ═══════════════════════════════════════════════ */}
+      {/*  FREE 영역 — 항상 표시                          */}
+      {/* ═══════════════════════════════════════════════ */}
 
       {/* 얼굴형 아이콘 + 요약 정보 */}
       <div className="flex items-center gap-6 mb-10">
@@ -129,52 +146,86 @@ export function FaceStructure({ content }: FaceStructureProps) {
         </div>
       </div>
 
-      {/* ─── 정량 메트릭 리스트 ─── */}
-      <div className="flex flex-col">
-        {content.metrics.map((metric, idx) => (
-          <div
-            key={metric.key}
-            className={`py-4 ${idx > 0 ? "mt-0" : ""}`}
-            style={{
-              // 메트릭 사이 미세한 간격 (보더 대신 여백으로 구분)
-              paddingTop: idx > 0 ? "16px" : "0",
-            }}
-          >
-            {/* 상단 행: 라벨(좌) + 값 또는 맥락 라벨(우) */}
-            <div className="flex items-baseline justify-between mb-2">
-              <span className="text-[13px] text-[var(--color-muted)] tracking-[0.3px]">
-                {metric.label}
-              </span>
-              <span className="text-[15px] font-semibold tabular-nums text-[var(--color-fg)]">
-                {metric.show_numeric_value !== false
-                  ? formatValue(metric.value, metric.unit)
-                  : metric.context_label ?? ""}
-              </span>
-            </div>
+      {/* ─── 전체 인상 요약 — 항상 표시 ─── */}
+      {content.overall_impression && (
+        <p className="text-lg leading-relaxed font-serif mb-10">
+          {content.overall_impression}
+        </p>
+      )}
 
-            {/* 분포 바 — 전체 폭 */}
-            {metric.min_label && metric.max_label && (
+      {/* ─── 피처별 통합 카드: 분포바(FREE) + 해석(STANDARD) ─── */}
+      {content.feature_interpretations && content.feature_interpretations.length > 0 && (
+        <div className="flex flex-col gap-0">
+          {content.feature_interpretations.map((fi, idx) => (
+            <div
+              key={fi.feature}
+              className={`py-5 ${idx < (content.feature_interpretations?.length ?? 0) - 1 ? "border-b border-[var(--color-border)] border-opacity-40" : ""}`}
+            >
+              {/* 라벨 */}
               <div className="mb-2">
-                <DistributionBar
-                  percentile={metric.percentile}
-                  minLabel={metric.min_label}
-                  maxLabel={metric.max_label}
-                />
+                <span className="text-[13px] font-medium text-[var(--color-fg)] tracking-[0.3px]">
+                  {fi.label}
+                </span>
               </div>
-            )}
 
-            {/* 맥락 설명 — 백분위 텍스트 제거 후 표시 (Fix #12) */}
-            <p className="text-[11px] text-[var(--color-muted)] leading-relaxed opacity-80">
-              {stripPercentileText(metric.context)}
-            </p>
+              {/* 분포 바 — 항상 표시 (FREE) */}
+              {fi.min_label && fi.max_label && (
+                <div className="mb-3">
+                  <DistributionBar
+                    percentile={fi.percentile}
+                    minLabel={fi.min_label}
+                    maxLabel={fi.max_label}
+                  />
+                </div>
+              )}
 
-            {/* 미세 구분선 (마지막 항목 제외) */}
-            {idx < content.metrics.length - 1 && (
-              <div className="mt-4 h-px bg-[var(--color-border)] opacity-40" />
-            )}
+              {/* 해석 텍스트 — 잠금 시 블러 (STANDARD) */}
+              <div className={locked ? "select-none relative" : ""}>
+                <p className="text-[13px] leading-relaxed text-[var(--color-muted)]">
+                  {fi.interpretation}
+                </p>
+                {locked && idx === 0 && (
+                  <div className="absolute inset-0 blur-overlay blur-fade-out rounded" />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ─── 특징적 포인트 ─── */}
+      {content.distinctive_points && content.distinctive_points.length > 0 && (
+        <div className={`mt-8 mb-8 ${locked ? "select-none relative" : ""}`}>
+          <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
+            DISTINCTIVE POINTS
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {content.distinctive_points.map((point) => (
+              <span
+                key={point}
+                className="px-3 py-1.5 text-[13px] bg-[var(--color-fg)] text-[var(--color-bg)] rounded-full"
+              >
+                {point}
+              </span>
+            ))}
           </div>
-        ))}
-      </div>
+          {locked && (
+            <div className="absolute inset-0 blur-overlay blur-fade-out rounded-lg" />
+          )}
+        </div>
+      )}
+
+      {/* ─── 조화 노트 ─── */}
+      {content.harmony_note && (
+        <div className={`pt-5 border-t border-[var(--color-border)] ${locked ? "select-none relative" : ""}`}>
+          <p className="text-[13px] italic text-[var(--color-muted)] leading-relaxed">
+            {content.harmony_note}
+          </p>
+          {locked && (
+            <div className="absolute inset-0 blur-overlay blur-fade-out rounded-lg" />
+          )}
+        </div>
+      )}
     </section>
   );
 }

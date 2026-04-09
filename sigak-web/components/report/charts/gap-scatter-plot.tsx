@@ -1,73 +1,20 @@
-// 2D 갭 산점도 — 가장 큰 delta 두 축을 X/Y로 사용
+// 2D 갭 산점도 — 고정 축: X=형태(Shape), Y=연령대(Age), 점 크기=존재감(Volume)
 // 쿼드런트 배경 + 미세 격자 + 현재(더블 링) → 추구(글로우 원) 방향 화살표
 // 프리미엄 컨설팅 리포트 스타일
 
-interface Coordinates {
-  structure: number;
-  impression: number;
-  maturity: number;
-  intensity: number;
-}
-
-// 축 한글 라벨 — coordinate.py의 AXES 정의와 일치
-// -1 = minLabel, +1 = maxLabel
-const AXIS_META: Record<
-  string,
-  { label: string; minLabel: string; maxLabel: string }
-> = {
-  structure: { label: "라인", minLabel: "부드러운", maxLabel: "날카로운" },
-  impression: { label: "인상", minLabel: "부드러운", maxLabel: "선명한" },
-  maturity: { label: "분위기", minLabel: "프레시", maxLabel: "성숙한" },
-  intensity: { label: "존재감", minLabel: "자연스러운", maxLabel: "볼드" },
-};
-
-// 한국어 형용사 → "~고" 연결형 (ㅂ불규칙 등 직접 매핑)
-const CONNECTIVE_MAP: Record<string, string> = {
-  "부드러운": "부드럽고",
-  "날카로운": "날카롭고",
-  "선명한": "선명하고",
-  "프레시": "프레시하고",
-  "성숙한": "성숙하고",
-  "자연스러운": "자연스럽고",
-  "볼드": "볼드하고",
-};
-
-// 쿼드런트 라벨 조합 — 한글 자연어
-function getQuadrantLabels(
-  xMeta: { minLabel: string; maxLabel: string },
-  yMeta: { minLabel: string; maxLabel: string }
-) {
-  const join = (a: string, b: string) => {
-    const connA = CONNECTIVE_MAP[a] ?? `${a}하고`;
-    return `${connA} ${b}`;
-  };
-  return {
-    topLeft: join(yMeta.maxLabel, xMeta.minLabel),
-    topRight: join(yMeta.maxLabel, xMeta.maxLabel),
-    bottomLeft: join(yMeta.minLabel, xMeta.minLabel),
-    bottomRight: join(yMeta.minLabel, xMeta.maxLabel),
-  };
+interface AestheticMap {
+  current: { x: number; y: number; size: number };
+  aspiration: { x: number; y: number; size: number };
+  x_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
+  y_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
+  size_axis: { name_kr: string; low: string; high: string };
+  quadrants: { top_left: string; top_right: string; bottom_left: string; bottom_right: string };
+  description?: string;
 }
 
 interface GapScatterPlotProps {
-  current: Coordinates;
-  aspiration: Coordinates;
+  aestheticMap: AestheticMap;
   gapMagnitude?: number;
-}
-
-// delta가 가장 큰 두 축 선택
-function pickTopTwoAxes(
-  current: Coordinates,
-  aspiration: Coordinates
-): [string, string] {
-  const axes = Object.keys(current) as (keyof Coordinates)[];
-  const sorted = axes
-    .map((key) => ({
-      key,
-      delta: Math.abs(aspiration[key] - current[key]),
-    }))
-    .sort((a, b) => b.delta - a.delta);
-  return [sorted[0].key, sorted[1].key];
 }
 
 // 값 → SVG 좌표 변환 (클램프 -1~+1)
@@ -91,14 +38,10 @@ function clampVal(val: number): number {
 }
 
 export function GapScatterPlot({
-  current,
-  aspiration,
+  aestheticMap,
   gapMagnitude,
 }: GapScatterPlotProps) {
-  const [xAxis, yAxis] = pickTopTwoAxes(current, aspiration);
-  const xMeta = AXIS_META[xAxis];
-  const yMeta = AXIS_META[yAxis];
-  const quadLabels = getQuadrantLabels(xMeta, yMeta);
+  const { current, aspiration, x_axis, y_axis, size_axis, quadrants } = aestheticMap;
 
   // 넓은 사이즈 (320 max-width 기준)
   const size = 320;
@@ -106,30 +49,25 @@ export function GapScatterPlot({
   const plotSize = size - 2 * pad;
   const center = size / 2;
 
-  const cx = toSvg(current[xAxis as keyof Coordinates], size, pad);
-  const cy = toSvg(current[yAxis as keyof Coordinates], size, pad, true);
-  const ax = toSvg(aspiration[xAxis as keyof Coordinates], size, pad);
-  const ay = toSvg(aspiration[yAxis as keyof Coordinates], size, pad, true);
+  // X = shape, Y = age (inverted: Fresh at bottom, Mature at top)
+  const cx = toSvg(current.x, size, pad);
+  const cy = toSvg(current.y, size, pad, true);
+  const ax = toSvg(aspiration.x, size, pad);
+  const ay = toSvg(aspiration.y, size, pad, true);
 
-  // 원본 클램프 값 (좌표 라벨용)
-  const cxVal = clampVal(current[xAxis as keyof Coordinates]);
-  const cyVal = clampVal(current[yAxis as keyof Coordinates]);
-  const axVal = clampVal(aspiration[xAxis as keyof Coordinates]);
-  const ayVal = clampVal(aspiration[yAxis as keyof Coordinates]);
+  // 점 크기: volume [-1,1] → 반지름 [5,11]
+  const currentRadius = 5 + ((clampVal(current.size) + 1) / 2) * 6;
+  const aspirationRadius = 5 + ((clampVal(aspiration.size) + 1) / 2) * 6;
 
-  // 화살표 끝점 (원 가장자리에서 멈추도록 오프셋)
+  // 화살표 끝점 (추구 원 가장자리에서 멈추도록 오프셋)
   const dx = ax - cx;
   const dy = ay - cy;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  const arrowEndX = dist > 10 ? ax - (dx / dist) * 9 : ax;
-  const arrowEndY = dist > 10 ? ay - (dy / dist) * 9 : ay;
+  const arrowEndX = dist > 10 ? ax - (dx / dist) * aspirationRadius : ax;
+  const arrowEndY = dist > 10 ? ay - (dy / dist) * aspirationRadius : ay;
   // 화살표 시작점 (현재 원 가장자리에서 출발)
-  const arrowStartX = dist > 10 ? cx + (dx / dist) * 9 : cx;
-  const arrowStartY = dist > 10 ? cy + (dy / dist) * 9 : cy;
-
-  // 중간점 (갭 라벨 배치용)
-  const midX = (cx + ax) / 2;
-  const midY = (cy + ay) / 2;
+  const arrowStartX = dist > 10 ? cx + (dx / dist) * currentRadius : cx;
+  const arrowStartY = dist > 10 ? cy + (dy / dist) * currentRadius : cy;
 
   // 0.25 간격 격자 위치 계산
   const gridSteps = [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75];
@@ -140,7 +78,7 @@ export function GapScatterPlot({
         viewBox={`0 0 ${size} ${size}`}
         className="w-full h-auto"
         role="img"
-        aria-label={`${xMeta.label}(X)과 ${yMeta.label}(Y) 축 갭 산점도`}
+        aria-label={`${x_axis.name_kr}(X)과 ${y_axis.name_kr}(Y) 축 갭 산점도`}
       >
         <defs>
           {/* 화살표 마커 — 더 정제된 형태 */}
@@ -231,7 +169,7 @@ export function GapScatterPlot({
           opacity="0.4"
           letterSpacing="0.5"
         >
-          {quadLabels.topLeft}
+          {quadrants.top_left}
         </text>
         <text
           x={center + plotSize * 0.25}
@@ -242,7 +180,7 @@ export function GapScatterPlot({
           opacity="0.4"
           letterSpacing="0.5"
         >
-          {quadLabels.topRight}
+          {quadrants.top_right}
         </text>
         <text
           x={pad + plotSize * 0.25}
@@ -253,7 +191,7 @@ export function GapScatterPlot({
           opacity="0.4"
           letterSpacing="0.5"
         >
-          {quadLabels.bottomLeft}
+          {quadrants.bottom_left}
         </text>
         <text
           x={center + plotSize * 0.25}
@@ -264,7 +202,7 @@ export function GapScatterPlot({
           opacity="0.4"
           letterSpacing="0.5"
         >
-          {quadLabels.bottomRight}
+          {quadrants.bottom_right}
         </text>
 
         {/* ─── 미세 점선 격자 (0.25 간격) ─── */}
@@ -320,7 +258,7 @@ export function GapScatterPlot({
           textAnchor="start"
           letterSpacing="0.3"
         >
-          {xMeta.minLabel}
+          {x_axis.low}
         </text>
         <text
           x={center}
@@ -331,7 +269,7 @@ export function GapScatterPlot({
           fontWeight="600"
           letterSpacing="1"
         >
-          {xMeta.label}
+          {x_axis.name_kr}
         </text>
         {/* X축 방향 화살표 */}
         <line
@@ -352,7 +290,7 @@ export function GapScatterPlot({
           textAnchor="end"
           letterSpacing="0.3"
         >
-          {xMeta.maxLabel}
+          {x_axis.high}
         </text>
 
         {/* ─── Y축 라벨 (좌측, 플롯 영역 바깥) ─── */}
@@ -364,7 +302,7 @@ export function GapScatterPlot({
           textAnchor="middle"
           letterSpacing="0.3"
         >
-          {yMeta.minLabel}
+          {y_axis.low}
         </text>
         <text
           x={14}
@@ -377,7 +315,7 @@ export function GapScatterPlot({
           writingMode="vertical-rl"
           transform={`rotate(180, 14, ${center})`}
         >
-          {yMeta.label}
+          {y_axis.name_kr}
         </text>
         <text
           x={14}
@@ -387,7 +325,7 @@ export function GapScatterPlot({
           textAnchor="middle"
           letterSpacing="0.3"
         >
-          {yMeta.maxLabel}
+          {y_axis.high}
         </text>
 
         {/* ─── 화살표: 현재 → 추구 (그라데이션 느낌의 실선) ─── */}
@@ -405,11 +343,11 @@ export function GapScatterPlot({
           />
         )}
 
-        {/* ─── 현재 위치 — 더블 링 (빈 원 + 외곽 링) ─── */}
+        {/* ─── 현재 위치 — 더블 링 (크기 = volume 기반) ─── */}
         <circle
           cx={cx}
           cy={cy}
-          r="9"
+          r={currentRadius + 3}
           fill="none"
           stroke="var(--color-muted)"
           strokeWidth="0.5"
@@ -419,23 +357,23 @@ export function GapScatterPlot({
         <circle
           cx={cx}
           cy={cy}
-          r="6"
+          r={currentRadius}
           fill="var(--color-bg)"
           stroke="var(--color-muted)"
           strokeWidth="1.5"
         />
-        {/* ─── 추구 위치 — 채운 원 + 글로우 ─── */}
+        {/* ─── 추구 위치 — 채운 원 + 글로우 (크기 = volume 기반) ─── */}
         <circle
           cx={ax}
           cy={ay}
-          r="7"
+          r={aspirationRadius}
           fill="var(--color-fg)"
           filter="url(#aspiration-glow)"
         />
         <circle
           cx={ax}
           cy={ay}
-          r="7"
+          r={aspirationRadius}
           fill="var(--color-fg)"
         />
       </svg>
@@ -449,6 +387,10 @@ export function GapScatterPlot({
         <div className="flex items-center gap-1.5 text-[var(--color-fg)]">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-fg)]" />
           <span className="font-medium">추구</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-[var(--color-muted)]">
+          <span className="text-[9px]">&#9679;</span>
+          <span>점 크기 = {size_axis.name_kr}</span>
         </div>
       </div>
     </div>

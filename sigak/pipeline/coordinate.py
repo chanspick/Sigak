@@ -1,108 +1,79 @@
 """
-SIGAK Coordinate System — Structural Feature Projection
-
-Core IP: Maps any face into an interpretable 4-axis aesthetic space
-using structural facial features only (CLIP dependency removed).
+SIGAK 3-Axis Aesthetic Coordinate System
 
 Axes:
-  1. Structure  — soft(-1) ↔ sharp(+1)   골격의 부드러움 vs 날카로움
-  2. Impression — soft(-1) ↔ sharp(+1)    이목구비가 주는 인상
-  3. Maturity   — fresh(-1) ↔ mature(+1)  생기 vs 성숙
-  4. Intensity  — natural(-1) ↔ bold(+1)  존재감/Presence
+  1. Shape  — Soft(-1) <-> Sharp(+1)   골격과 이목구비의 형태
+  2. Volume — Subtle(-1) <-> Bold(+1)   이목구비의 크기와 볼륨
+  3. Age    — Fresh(-1) <-> Mature(+1)  비율이 주는 나이 인상
+
+All axis definitions loaded from sigak/data/axis_config.yaml (SSOT).
+All observed ranges loaded from sigak/data/calibration_3axis.yaml.
 """
-import numpy as np
-from dataclasses import dataclass
+import math
+import os
+import yaml
+from functools import lru_cache
 from typing import Optional
 
 
 # ─────────────────────────────────────────────
-#  Axis Definitions
+#  YAML Config Loading (cached)
 # ─────────────────────────────────────────────
 
-@dataclass
-class AxisDefinition:
-    name: str
-    name_kr: str
-    negative_label: str    # -1 pole
-    positive_label: str    # +1 pole
-    negative_label_kr: str
-    positive_label_kr: str
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
-AXES = [
-    AxisDefinition(
-        name="structure",    name_kr="구조",
-        negative_label="soft", positive_label="sharp",
-        negative_label_kr="부드러운", positive_label_kr="날카로운",
-    ),
-    AxisDefinition(
-        name="impression",   name_kr="인상",
-        negative_label="soft", positive_label="sharp",
-        negative_label_kr="부드러운", positive_label_kr="선명한",
-    ),
-    AxisDefinition(
-        name="maturity",     name_kr="성숙도",
-        negative_label="fresh", positive_label="mature",
-        negative_label_kr="프레시", positive_label_kr="성숙한",
-    ),
-    AxisDefinition(
-        name="intensity",    name_kr="존재감",
-        negative_label="natural", positive_label="bold",
-        negative_label_kr="자연스러운", positive_label_kr="볼드",
-    ),
-]
+
+@lru_cache(maxsize=1)
+def _load_axis_config() -> dict:
+    """Load axis definitions from axis_config.yaml. Cached after first load."""
+    path = os.path.join(_DATA_DIR, "axis_config.yaml")
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+@lru_cache(maxsize=1)
+def _load_calibration() -> dict:
+    """Load calibration data from calibration_3axis.yaml. Cached after first load."""
+    path = os.path.join(_DATA_DIR, "calibration_3axis.yaml")
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
 
 # ─────────────────────────────────────────────
-#  축 라벨 조회 함수 (Single Source of Truth)
-#  다른 모든 파일은 이 함수로만 축 라벨에 접근한다.
+#  Axis Label Access (Single Source of Truth)
+#  All other files MUST use these functions.
 # ─────────────────────────────────────────────
-
-_AXES_BY_NAME = {ax.name: ax for ax in AXES}
-
 
 def get_axis_labels(axis_name: str) -> dict:
     """축 라벨 조회. 모든 파일의 유일한 라벨 소스."""
-    ax = _AXES_BY_NAME.get(axis_name)
+    config = _load_axis_config()
+    ax = config.get("axes", {}).get(axis_name)
     if ax is None:
-        return {"name_kr": axis_name, "low": "", "high": "", "description": ""}
+        return {"name_kr": axis_name, "low": "", "high": "", "low_en": "", "high_en": "", "description": ""}
     return {
-        "name_kr": ax.name_kr,
-        "low": ax.negative_label_kr,
-        "high": ax.positive_label_kr,
-        "low_en": ax.negative_label,
-        "high_en": ax.positive_label,
+        "name_kr": ax["name_kr"],
+        "low": ax["low_kr"],
+        "high": ax["high_kr"],
+        "low_en": ax["low"],
+        "high_en": ax["high"],
+        "description": ax.get("description_kr", ""),
     }
 
 
 def get_all_axis_labels() -> dict:
     """전체 축 라벨. 프론트에 내려줄 때 사용."""
-    return {ax.name: get_axis_labels(ax.name) for ax in AXES}
+    config = _load_axis_config()
+    return {name: get_axis_labels(name) for name in config["axes"]}
+
+
+def get_axis_names() -> list[str]:
+    """현재 축 이름 목록 반환. ["shape", "volume", "age"]"""
+    config = _load_axis_config()
+    return list(config["axes"].keys())
 
 
 # ─────────────────────────────────────────────
-#  Observed Ranges (SCUT-FBP5500 AF 2000장, InsightFace, p10~p90)
-#  2026-04-08 실측 캘리브레이션
-# ─────────────────────────────────────────────
-
-OBSERVED_RANGES: dict[str, tuple[float, float]] = {
-    "eye_tilt": (-1.06, 5.50),
-    "brow_arch": (0.026, 0.037),
-    "eye_ratio": (0.284, 0.41),
-    "lip_fullness": (0.003, 0.106),
-    "eye_width_ratio": (0.178, 0.214),
-    "nose_bridge_height": (0.472, 0.573),
-    "brow_eye_distance": (0.1, 0.4),  # optional, 미존재 시 skip
-    # structure 축 전용
-    "jaw_angle": (90.1, 117.2),
-    "cheekbone_prominence": (0.522, 0.746),
-    "face_length_ratio": (1.158, 1.293),
-    # maturity 축 전용
-    "forehead_ratio": (0.354, 0.465),
-    "philtrum_ratio": (0.206, 0.339),
-}
-
-
-# ─────────────────────────────────────────────
-#  Common Helpers
+#  Common Helpers (kept from original)
 # ─────────────────────────────────────────────
 
 def _has_valid(features: dict, key: str) -> bool:
@@ -110,9 +81,15 @@ def _has_valid(features: dict, key: str) -> bool:
     return key in features and features[key] is not None
 
 
-def _normalize(value: float, observed_range: tuple[float, float]) -> float:
-    """관측 범위 기반 정규화. 범위 밖 값은 clamp. → [-1, 1]"""
-    lo, hi = observed_range
+def _normalize(value: float, observed_range) -> float:
+    """관측 범위 기반 정규화. 범위 밖 값은 clamp. -> [-1, 1]
+
+    observed_range can be a tuple (lo, hi) or a list [lo, hi].
+    """
+    if isinstance(observed_range, (list, tuple)) and len(observed_range) == 2:
+        lo, hi = observed_range
+    else:
+        return 0.0
     if hi <= lo:
         return 0.0
     value = min(max(value, lo), hi)
@@ -132,235 +109,103 @@ def _weighted_fallback(components: list[tuple[float, float]]) -> float:
 
 
 # ─────────────────────────────────────────────
-#  Per-Axis Structural Score Functions
-#  CLIP 의존도 0% — 전축 structural 100%
-# ─────────────────────────────────────────────
-
-def compute_structure(features: dict) -> float:
-    """
-    soft(-1) ↔ sharp(+1)
-    턱선 각도 + 광대 돌출 + 얼굴 종횡비가 만드는 골격 인상.
-    """
-    components = []
-
-    # 턱선 각도: 낮을수록 sharp
-    if _has_valid(features, "jaw_angle"):
-        val = -_normalize(features["jaw_angle"], OBSERVED_RANGES["jaw_angle"])
-        components.append((val, 0.40))
-
-    # 광대 돌출: 높을수록 sharp
-    if _has_valid(features, "cheekbone_prominence"):
-        val = _normalize(features["cheekbone_prominence"], OBSERVED_RANGES["cheekbone_prominence"])
-        components.append((val, 0.30))
-
-    # 얼굴 종횡비: 길수록 sharp
-    if _has_valid(features, "face_length_ratio"):
-        val = _normalize(features["face_length_ratio"], OBSERVED_RANGES["face_length_ratio"])
-        components.append((val, 0.30))
-
-    return _weighted_fallback(components)
-
-
-def compute_impression(features: dict) -> float:
-    """
-    soft(-1) ↔ sharp(+1)
-    눈매 방향성 + 눈썹 형태 + 눈 비율 + 입술 볼륨이 만드는 전체 인상.
-    """
-    components = []
-
-    # 눈꼬리 각도: 올라갈수록 sharp
-    if _has_valid(features, "eye_tilt"):
-        val = _normalize(features["eye_tilt"], OBSERVED_RANGES["eye_tilt"])
-        components.append((val, 0.35))
-
-    # 눈썹 아치: 높을수록 sharp
-    if _has_valid(features, "brow_arch"):
-        val = _normalize(features["brow_arch"], OBSERVED_RANGES["brow_arch"])
-        components.append((val, 0.25))
-
-    # 눈 비율(높이/너비): 가로로 길수록(값이 작을수록) sharp
-    if _has_valid(features, "eye_ratio"):
-        raw = _normalize(features["eye_ratio"], OBSERVED_RANGES["eye_ratio"])
-        val = -raw  # 반전: 작을수록 sharp
-        components.append((val, 0.25))
-
-    # 입술 두께: 도톰할수록 soft
-    if _has_valid(features, "lip_fullness"):
-        val = -_normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
-        components.append((val, 0.15))
-
-    return _weighted_fallback(components)
-
-
-def compute_maturity(features: dict) -> float:
-    """
-    fresh(-1) ↔ mature(+1)
-    이마/인중 비율 + 눈 크기가 만드는 연령감.
-    """
-    components = []
-
-    # 이마 비율: 클수록 mature (넓은 이마 = 성숙한 인상)
-    if _has_valid(features, "forehead_ratio"):
-        val = _normalize(features["forehead_ratio"], OBSERVED_RANGES["forehead_ratio"])
-        components.append((val, 0.35))
-
-    # 인중 비율: 길수록 mature
-    if _has_valid(features, "philtrum_ratio"):
-        val = _normalize(features["philtrum_ratio"], OBSERVED_RANGES["philtrum_ratio"])
-        components.append((val, 0.35))
-
-    # 눈 크기: 작을수록 mature
-    if _has_valid(features, "eye_width_ratio"):
-        val = -_normalize(features["eye_width_ratio"], OBSERVED_RANGES["eye_width_ratio"])
-        components.append((val, 0.30))
-
-    return _weighted_fallback(components)
-
-
-def compute_intensity(features: dict) -> float:
-    """
-    natural(-1) ↔ bold(+1)
-    이목구비의 존재감. symmetry_score는 이 축에서 제외.
-    """
-    components = []
-
-    # 눈 크기: 클수록 bold
-    if _has_valid(features, "eye_width_ratio"):
-        val = _normalize(features["eye_width_ratio"], OBSERVED_RANGES["eye_width_ratio"])
-        components.append((val, 0.30))
-
-    # 입술 두께: 도톰할수록 bold
-    if _has_valid(features, "lip_fullness"):
-        val = _normalize(features["lip_fullness"], OBSERVED_RANGES["lip_fullness"])
-        components.append((val, 0.25))
-
-    # 코 높이: 높을수록 bold
-    if _has_valid(features, "nose_bridge_height"):
-        val = _normalize(features["nose_bridge_height"], OBSERVED_RANGES["nose_bridge_height"])
-        components.append((val, 0.25))
-
-    # 눈-눈썹 거리: 가까울수록 bold (optional feature)
-    if _has_valid(features, "brow_eye_distance"):
-        val = -_normalize(features["brow_eye_distance"], OBSERVED_RANGES["brow_eye_distance"])
-        components.append((val, 0.20))
-
-    return _weighted_fallback(components)
-
-
-# ─────────────────────────────────────────────
-#  Combined Coordinate Computation
+#  Coordinate Computation (YAML-driven)
 # ─────────────────────────────────────────────
 
 def compute_coordinates(
     structural_features: dict,
-    clip_embedding: Optional[np.ndarray] = None,
-    projector=None,
+    clip_embedding=None,   # reserved for future CLIP integration
+    projector=None,        # reserved for future CLIP integration
 ) -> dict[str, float]:
     """
-    Structural features → 4-axis coordinates.
-    CLIP 의존 제거 완료 — clip_embedding/projector 파라미터는 하위 호환용.
+    12개 피처 -> 3축 좌표 계산.
+    각 피처는 calibration observed_ranges로 [-1, +1] 정규화 후 가중합.
 
-    Returns: {"structure": 0.35, "impression": -0.22, "maturity": 0.1, "intensity": -0.45}
+    Returns: {"shape": 0.35, "volume": -0.22, "age": 0.1}
     """
-    return {
-        "structure": round(compute_structure(structural_features), 3),
-        "impression": round(compute_impression(structural_features), 3),
-        "maturity": round(compute_maturity(structural_features), 3),
-        "intensity": round(compute_intensity(structural_features), 3),
-    }
+    axis_config = _load_axis_config()
+    cal = _load_calibration()
+    obs_ranges = cal.get("observed_ranges", {})
+
+    coords = {}
+    for axis_name, axis_def in axis_config["axes"].items():
+        components = []
+        for feat_name, feat_def in axis_def["features"].items():
+            raw = structural_features.get(feat_name)
+            if raw is None:
+                continue
+
+            feat_range = obs_ranges.get(feat_name)
+            if feat_range is None:
+                continue
+
+            normalized = _normalize(raw, feat_range)
+
+            if feat_def["direction"] == "low_is_positive":
+                normalized = -normalized
+
+            components.append((normalized, feat_def["weight"]))
+
+        coords[axis_name] = round(_weighted_fallback(components), 3)
+
+    return coords
 
 
 # ─────────────────────────────────────────────
-#  Gap Calculation
+#  Gap Computation
 # ─────────────────────────────────────────────
 
 def compute_gap(
-    current: dict[str, float],
-    aspiration: dict[str, float],
+    current_coords: dict[str, float],
+    aspiration_coords: dict[str, float],
 ) -> dict:
     """
-    Compute the gap vector and derive actionable directions.
+    현재 좌표와 추구미 좌표 간 gap 계산.
 
     Returns:
         {
-            "vector": {"structure": -0.45, ...},
-            "magnitude": 0.72,
-            "primary_direction": "structure",
-            "primary_shift": "sharp",
-            "secondary_direction": "impression",
-            "secondary_shift": "sharp",
+            "vector": {"shape": 0.5, "volume": -0.3, "age": 0.8},
+            "magnitude": 0.99,
+            "primary_direction": "age",
+            "primary_shift_kr": "매추어",
+            "secondary_direction": "shape",
+            "secondary_shift_kr": "샤프",
         }
     """
+    axis_names = get_axis_names()
+
+    # gap vector
     vector = {}
-    for ax in AXES:
-        vector[ax.name] = round(aspiration.get(ax.name, 0) - current.get(ax.name, 0), 3)
+    for axis in axis_names:
+        cur = current_coords.get(axis, 0.0)
+        asp = aspiration_coords.get(axis, 0.0)
+        vector[axis] = round(asp - cur, 3)
 
-    # Overall gap magnitude
-    magnitude = float(np.sqrt(sum(v**2 for v in vector.values())))
+    # magnitude
+    magnitude = math.sqrt(sum(v ** 2 for v in vector.values()))
 
-    # Find primary and secondary gap directions
+    # sort by |delta| descending
     sorted_axes = sorted(vector.items(), key=lambda x: abs(x[1]), reverse=True)
 
-    primary_name = sorted_axes[0][0]
-    primary_val = sorted_axes[0][1]
-    primary_ax = next(ax for ax in AXES if ax.name == primary_name)
-    primary_shift = primary_ax.positive_label if primary_val > 0 else primary_ax.negative_label
+    # primary direction
+    primary_axis = sorted_axes[0][0]
+    primary_delta = sorted_axes[0][1]
+    primary_labels = get_axis_labels(primary_axis)
+    primary_shift_kr = primary_labels["high"] if primary_delta > 0 else primary_labels["low"]
 
-    secondary_name = sorted_axes[1][0] if len(sorted_axes) > 1 else primary_name
-    secondary_val = sorted_axes[1][1] if len(sorted_axes) > 1 else 0
-    secondary_ax = next(ax for ax in AXES if ax.name == secondary_name)
-    secondary_shift = secondary_ax.positive_label if secondary_val > 0 else secondary_ax.negative_label
+    # secondary direction
+    secondary_axis = sorted_axes[1][0] if len(sorted_axes) > 1 else None
+    secondary_shift_kr = ""
+    if secondary_axis:
+        secondary_delta = sorted_axes[1][1]
+        secondary_labels = get_axis_labels(secondary_axis)
+        secondary_shift_kr = secondary_labels["high"] if secondary_delta > 0 else secondary_labels["low"]
 
     return {
         "vector": vector,
-        "magnitude": round(magnitude, 3),
-        "primary_direction": primary_name,
-        "primary_shift": primary_shift,
-        "primary_shift_kr": (primary_ax.positive_label_kr if primary_val > 0
-                             else primary_ax.negative_label_kr),
-        "secondary_direction": secondary_name,
-        "secondary_shift": secondary_shift,
-        "secondary_shift_kr": (secondary_ax.positive_label_kr if secondary_val > 0
-                               else secondary_ax.negative_label_kr),
+        "magnitude": round(magnitude, 2),
+        "primary_direction": primary_axis,
+        "primary_shift_kr": primary_shift_kr,
+        "secondary_direction": secondary_axis,
+        "secondary_shift_kr": secondary_shift_kr,
     }
-
-
-# ─────────────────────────────────────────────
-#  Legacy compatibility (CLIP 관련 — 하위 호환)
-#  CLIP 정상화 후 점진적 복원을 위해 유지
-# ─────────────────────────────────────────────
-
-EMBEDDING_DIM = 768  # ViT-L-14 출력 차원
-
-
-class AnchorProjector:
-    """CLIP projector — 현재 미사용. 하위 호환용."""
-    def __init__(self):
-        self.anchor_vectors: dict[str, np.ndarray] = {}
-        self._fitted = False
-
-    def fit(self, anchors):
-        self._fitted = True
-
-    def project(self, embedding):
-        return {ax.name: 0.0 for ax in AXES}
-
-
-def mock_clip_embedding(image_bytes: bytes) -> np.ndarray:
-    """WoZ phase mock — 좌표에 영향 없음."""
-    import hashlib
-    h = hashlib.sha256(image_bytes).digest()
-    seed = int.from_bytes(h[:4], "big")
-    rng = np.random.RandomState(seed)
-    emb = rng.randn(EMBEDDING_DIM).astype(np.float32)
-    return emb / (np.linalg.norm(emb) + 1e-8)
-
-
-def mock_anchor_projector(gender: str = "female") -> AnchorProjector:
-    """WoZ phase mock projector."""
-    return AnchorProjector()
-
-
-def load_anchor_projector(gender: str = "female") -> AnchorProjector:
-    """하위 호환 — CLIP 비활성 상태에서는 빈 프로젝터 반환."""
-    return AnchorProjector()

@@ -18,7 +18,7 @@
     "philtrum_ratio",
     "symmetry_score"
   ],
-  "n_anchors": 15,
+  "n_anchors": 8,
   "n_clusters": 4,
   "clusters": [
     {
@@ -26,35 +26,24 @@
       "label_kr": "쿨 갓데스",
       "label_en": "Cool Goddess",
       "members": [
-        "an_yujin",
-        "han_sohee",
-        "iu",
-        "jang_wonyoung",
-        "jisoo",
-        "kim_taeri",
-        "suzy"
+        "type_3",
+        "type_8"
       ],
       "member_names": [
-        "안유진",
-        "한소희",
-        "아이유",
-        "장원영",
-        "지수",
-        "김태리",
-        "수지"
+        "차갑지만 동안",
+        "날카로운 카리스마"
       ],
       "centroid_coords": {
-        "structure": 0.057,
-        "impression": -0.171,
-        "maturity": 0.014,
-        "intensity": -0.2
+        "shape": 0.8,
+        "volume": 0.0,
+        "age": 0.0
       },
-      "representative_key": "an_yujin",
-      "representative_name": "안유진",
+      "representative_key": "type_3",
+      "representative_name": "차갑지만 동안",
       "representative_score": 0,
-      "size": "major",
-      "n_members": 7,
-      "description": "날카로운 이목구비 + 쿨한 인상 + 성숙한 분위기의 강렬한 미감",
+      "size": "minor",
+      "n_members": 2,
+      "description": "날카로운 이목구비 + 강렬한 볼륨 + 성숙한 분위기의 미감",
       "keywords": [
         "시크",
         "도시적",
@@ -62,150 +51,27 @@
         "강렬한 눈매"
       ],
       "color_subtypes": {
-        "an_yujin": {
-          "season": "spring",
-          "label_kr": "봄 웜",
-          "label_en": "Spring Warm",
-          "tone": "밝고 따뜻한",
-          "relative_tone": "warm",
-          "original_tone": "warm",
-          "warmth_score": 15.2993,
-          "skin_brightness": 0.4683,
-          "brightness_level": "light"
-        },
-        "han_sohee": {
+        "type_3": {
           "season": "autumn",
-          "label_kr": "가을 뉴트럴",
-          "label_en": "Autumn Neutral",
-          "tone": "깊고 중성적인",
-          "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 15.2672,
-          "skin_brightness": 0.4457,
+          "label_kr": "가을 웜",
+          "label_en": "Autumn Warm",
+          "tone": "깊고 따뜻한",
+          "relative_tone": "warm",
+          "original_tone": "neutral",
+          "warmth_score": 22.1715,
+          "skin_brightness": 0.4505,
           "brightness_level": "dark"
         },
-        "iu": {
-          "season": "summer",
-          "label_kr": "여름 쿨",
-          "label_en": "Summer Cool",
-          "tone": "밝고 차가운",
-          "relative_tone": "cool",
-          "original_tone": "neutral",
-          "warmth_score": 7.6515,
-          "skin_brightness": 0.5053,
-          "brightness_level": "light"
-        },
-        "jang_wonyoung": {
-          "season": "spring",
-          "label_kr": "봄 웜",
-          "label_en": "Spring Warm",
-          "tone": "밝고 따뜻한",
-          "relative_tone": "warm",
-          "original_tone": "warm",
-          "warmth_score": 16.3124,
-          "skin_brightness": 0.47,
-          "brightness_level": "light"
-        },
-        "jisoo": {
+        "type_8": {
           "season": "winter",
           "label_kr": "겨울 쿨",
           "label_en": "Winter Cool",
           "tone": "깊고 차가운",
           "relative_tone": "cool",
           "original_tone": "neutral",
-          "warmth_score": 3.9789,
-          "skin_brightness": 0.433,
+          "warmth_score": 8.3526,
+          "skin_brightness": 0.39,
           "brightness_level": "dark"
-        },
-        "kim_taeri": {
-          "season": "autumn",
-          "label_kr": "가을 뉴트럴",
-          "label_en": "Autumn Neutral",
-          "tone": "깊고 중성적인",
-          "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 13.0441,
-          "skin_brightness": 0.3285,
-          "brightness_level": "dark"
-        },
-        "suzy": {
-          "season": "summer",
-          "label_kr": "여름 쿨",
-          "label_en": "Summer Cool",
-          "tone": "밝고 차가운",
-          "relative_tone": "cool",
-          "original_tone": "warm",
-          "warmth_score": 10.6267,
-          "skin_brightness": 0.568,
-          "brightness_level": "light"
-        }
-      }
-    },
-    {
-      "id": "ice_princess",
-      "label_kr": "아이스 프린세스",
-      "label_en": "Ice Princess",
-      "members": [
-        "haerin",
-        "minji",
-        "winter"
-      ],
-      "member_names": [
-        "해린",
-        "민지",
-        "윈터"
-      ],
-      "centroid_coords": {
-        "structure": -0.367,
-        "impression": 0.533,
-        "maturity": -0.633,
-        "intensity": 0.133
-      },
-      "representative_key": "haerin",
-      "representative_name": "해린",
-      "representative_score": 0,
-      "size": "major",
-      "n_members": 3,
-      "description": "날카로운 라인 + 쿨한 인상 + 프레시함이 공존하는 차가운 아름다움",
-      "keywords": [
-        "신비로운",
-        "몽환",
-        "청량+시크",
-        "인형같은"
-      ],
-      "color_subtypes": {
-        "haerin": {
-          "season": "spring",
-          "label_kr": "봄 뉴트럴",
-          "label_en": "Spring Neutral",
-          "tone": "밝고 중성적인",
-          "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 12.7904,
-          "skin_brightness": 0.5003,
-          "brightness_level": "light"
-        },
-        "minji": {
-          "season": "winter",
-          "label_kr": "겨울 쿨",
-          "label_en": "Winter Cool",
-          "tone": "깊고 차가운",
-          "relative_tone": "cool",
-          "original_tone": "warm",
-          "warmth_score": 10.7558,
-          "skin_brightness": 0.4497,
-          "brightness_level": "dark"
-        },
-        "winter": {
-          "season": "spring",
-          "label_kr": "봄 웜",
-          "label_en": "Spring Warm",
-          "tone": "밝고 따뜻한",
-          "relative_tone": "warm",
-          "original_tone": "warm",
-          "warmth_score": 26.6738,
-          "skin_brightness": 0.524,
-          "brightness_level": "light"
         }
       }
     },
@@ -214,27 +80,24 @@
       "label_kr": "웜 내추럴",
       "label_en": "Warm Natural",
       "members": [
-        "jennie",
-        "karina",
-        "sullyoon"
+        "type_2",
+        "type_7"
       ],
       "member_names": [
-        "제니",
-        "카리나",
-        "설윤"
+        "사랑스러운 인형",
+        "절제된 시크"
       ],
       "centroid_coords": {
-        "structure": -0.167,
-        "impression": 0.567,
-        "maturity": 0.133,
-        "intensity": 0.733
+        "shape": 0.0,
+        "volume": 0.0,
+        "age": 0.0
       },
-      "representative_key": "jennie",
-      "representative_name": "제니",
+      "representative_key": "type_2",
+      "representative_name": "사랑스러운 인형",
       "representative_score": 0,
-      "size": "major",
-      "n_members": 3,
-      "description": "부드러운 라인 + 따뜻한 인상 + 자연스러운 매력",
+      "size": "minor",
+      "n_members": 2,
+      "description": "부드러운 라인 + 은은한 볼륨 + 자연스러운 매력",
       "keywords": [
         "친근",
         "청순",
@@ -242,38 +105,27 @@
         "첫사랑"
       ],
       "color_subtypes": {
-        "jennie": {
-          "season": "autumn",
-          "label_kr": "가을 웜",
-          "label_en": "Autumn Warm",
-          "tone": "깊고 따뜻한",
-          "relative_tone": "warm",
-          "original_tone": "warm",
-          "warmth_score": 15.5252,
-          "skin_brightness": 0.4647,
-          "brightness_level": "dark"
-        },
-        "karina": {
-          "season": "spring",
-          "label_kr": "봄 뉴트럴",
-          "label_en": "Spring Neutral",
-          "tone": "밝고 중성적인",
-          "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 13.7565,
-          "skin_brightness": 0.5793,
+        "type_2": {
+          "season": "summer",
+          "label_kr": "여름 쿨",
+          "label_en": "Summer Cool",
+          "tone": "밝고 차가운",
+          "relative_tone": "cool",
+          "original_tone": "neutral",
+          "warmth_score": 0.9308,
+          "skin_brightness": 0.652,
           "brightness_level": "light"
         },
-        "sullyoon": {
-          "season": "autumn",
-          "label_kr": "가을 뉴트럴",
-          "label_en": "Autumn Neutral",
-          "tone": "깊고 중성적인",
-          "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 10.9144,
-          "skin_brightness": 0.3197,
-          "brightness_level": "dark"
+        "type_7": {
+          "season": "summer",
+          "label_kr": "여름 쿨",
+          "label_en": "Summer Cool",
+          "tone": "밝고 차가운",
+          "relative_tone": "cool",
+          "original_tone": "neutral",
+          "warmth_score": 2.5798,
+          "skin_brightness": 0.5753,
+          "brightness_level": "light"
         }
       }
     },
@@ -282,25 +134,24 @@
       "label_kr": "엘레강트 클래식",
       "label_en": "Elegant Classic",
       "members": [
-        "hwasa",
-        "kim_yoojung"
+        "type_1",
+        "type_5"
       ],
       "member_names": [
-        "화사",
-        "김유정"
+        "따뜻한 첫사랑",
+        "편안한 우아함"
       ],
       "centroid_coords": {
-        "structure": 0.25,
-        "impression": -0.55,
-        "maturity": -0.05,
-        "intensity": 0.2
+        "shape": -0.8,
+        "volume": -0.7,
+        "age": 0.0
       },
-      "representative_key": "hwasa",
-      "representative_name": "화사",
+      "representative_key": "type_1",
+      "representative_name": "따뜻한 첫사랑",
       "representative_score": 0,
       "size": "minor",
       "n_members": 2,
-      "description": "절제된 우아함 + 따뜻한 성숙미",
+      "description": "절제된 우아함 + 성숙한 분위기",
       "keywords": [
         "단아",
         "고급스러운",
@@ -308,26 +159,80 @@
         "클래식"
       ],
       "color_subtypes": {
-        "hwasa": {
+        "type_1": {
+          "season": "spring",
+          "label_kr": "봄 웜",
+          "label_en": "Spring Warm",
+          "tone": "밝고 따뜻한",
+          "relative_tone": "warm",
+          "original_tone": "neutral",
+          "warmth_score": 27.7599,
+          "skin_brightness": 0.6065,
+          "brightness_level": "light"
+        },
+        "type_5": {
+          "season": "autumn",
+          "label_kr": "가을 웜",
+          "label_en": "Autumn Warm",
+          "tone": "깊고 따뜻한",
+          "relative_tone": "warm",
+          "original_tone": "neutral",
+          "warmth_score": 20.4204,
+          "skin_brightness": 0.472,
+          "brightness_level": "dark"
+        }
+      }
+    },
+    {
+      "id": "ice_princess",
+      "label_kr": "아이스 프린세스",
+      "label_en": "Ice Princess",
+      "members": [
+        "type_4",
+        "type_6"
+      ],
+      "member_names": [
+        "또렷한 에너지",
+        "부드러운 카리스마"
+      ],
+      "centroid_coords": {
+        "shape": 0.0,
+        "volume": 0.7,
+        "age": 0.0
+      },
+      "representative_key": "type_4",
+      "representative_name": "또렷한 에너지",
+      "representative_score": 0,
+      "size": "minor",
+      "n_members": 2,
+      "description": "날카로운 라인 + 강렬한 볼륨 + 프레시함이 공존하는 차가운 아름다움",
+      "keywords": [
+        "신비로운",
+        "몽환",
+        "청량+시크",
+        "인형같은"
+      ],
+      "color_subtypes": {
+        "type_4": {
+          "season": "spring",
+          "label_kr": "봄 뉴트럴",
+          "label_en": "Spring Neutral",
+          "tone": "밝고 중성적인",
+          "relative_tone": "neutral",
+          "original_tone": "neutral",
+          "warmth_score": 15.0937,
+          "skin_brightness": 0.525,
+          "brightness_level": "light"
+        },
+        "type_6": {
           "season": "autumn",
           "label_kr": "가을 뉴트럴",
           "label_en": "Autumn Neutral",
           "tone": "깊고 중성적인",
           "relative_tone": "neutral",
-          "original_tone": "warm",
-          "warmth_score": 12.2774,
-          "skin_brightness": 0.461,
-          "brightness_level": "dark"
-        },
-        "kim_yoojung": {
-          "season": "winter",
-          "label_kr": "겨울 쿨",
-          "label_en": "Winter Cool",
-          "tone": "깊고 차가운",
-          "relative_tone": "cool",
           "original_tone": "neutral",
-          "warmth_score": 4.7992,
-          "skin_brightness": 0.265,
+          "warmth_score": 19.9577,
+          "skin_brightness": 0.4087,
           "brightness_level": "dark"
         }
       }
@@ -335,70 +240,70 @@
   ],
   "pca_loadings": {
     "PC1": {
-      "philtrum_ratio": 0.4272,
-      "eye_tilt": 0.4041,
-      "forehead_ratio": 0.3772,
-      "jaw_angle": -0.3448,
-      "nose_length_ratio": 0.3227,
-      "eye_ratio": -0.2591,
-      "lip_fullness": -0.2429,
-      "cheekbone_prominence": 0.229,
-      "face_length_ratio": -0.2276,
-      "brow_arch": -0.1713,
-      "eye_width_ratio": 0.1486,
-      "eye_spacing_ratio": 0.085,
-      "symmetry_score": 0.0012
+      "eye_width_ratio": 0.4285,
+      "eye_spacing_ratio": 0.4158,
+      "symmetry_score": 0.3907,
+      "cheekbone_prominence": -0.3308,
+      "philtrum_ratio": 0.32,
+      "eye_ratio": -0.292,
+      "eye_tilt": 0.2648,
+      "jaw_angle": 0.2384,
+      "lip_fullness": 0.2272,
+      "nose_length_ratio": 0.0882,
+      "brow_arch": -0.0853,
+      "forehead_ratio": -0.0137,
+      "face_length_ratio": -0.0
     },
     "PC2": {
-      "eye_width_ratio": 0.4858,
-      "eye_spacing_ratio": 0.4725,
-      "symmetry_score": 0.4636,
-      "cheekbone_prominence": -0.3469,
-      "face_length_ratio": 0.2929,
-      "lip_fullness": 0.2247,
-      "eye_tilt": 0.2031,
-      "eye_ratio": 0.1433,
-      "jaw_angle": -0.0606,
-      "philtrum_ratio": 0.0585,
-      "nose_length_ratio": -0.0171,
-      "forehead_ratio": 0.0078,
-      "brow_arch": 0.003
+      "nose_length_ratio": 0.4912,
+      "brow_arch": -0.4458,
+      "jaw_angle": -0.4178,
+      "eye_tilt": 0.4109,
+      "eye_ratio": 0.3067,
+      "philtrum_ratio": 0.256,
+      "cheekbone_prominence": 0.178,
+      "symmetry_score": -0.11,
+      "forehead_ratio": -0.0951,
+      "lip_fullness": 0.0511,
+      "eye_spacing_ratio": 0.0351,
+      "eye_width_ratio": -0.0199,
+      "face_length_ratio": 0.0
     },
     "PC3": {
-      "brow_arch": 0.5956,
-      "face_length_ratio": 0.3918,
-      "eye_ratio": 0.3607,
-      "lip_fullness": -0.3136,
-      "jaw_angle": -0.2841,
-      "symmetry_score": -0.2295,
-      "eye_spacing_ratio": 0.2152,
-      "cheekbone_prominence": 0.2022,
-      "nose_length_ratio": 0.1348,
-      "forehead_ratio": 0.0903,
-      "eye_width_ratio": -0.0871,
-      "philtrum_ratio": -0.0836,
-      "eye_tilt": 0.0428
+      "forehead_ratio": 0.6665,
+      "lip_fullness": -0.5885,
+      "eye_ratio": 0.2433,
+      "eye_spacing_ratio": 0.219,
+      "cheekbone_prominence": -0.1962,
+      "jaw_angle": 0.1792,
+      "eye_tilt": 0.1445,
+      "nose_length_ratio": 0.0692,
+      "brow_arch": -0.0509,
+      "eye_width_ratio": -0.0499,
+      "symmetry_score": -0.0323,
+      "philtrum_ratio": 0.0015,
+      "face_length_ratio": 0.0
     },
     "PC4": {
-      "nose_length_ratio": 0.5982,
-      "forehead_ratio": -0.4104,
-      "cheekbone_prominence": -0.3663,
-      "face_length_ratio": -0.3204,
-      "philtrum_ratio": -0.2508,
-      "eye_tilt": 0.2438,
-      "lip_fullness": -0.2114,
-      "brow_arch": 0.1669,
-      "symmetry_score": 0.1505,
-      "eye_width_ratio": -0.1252,
-      "jaw_angle": 0.0511,
-      "eye_spacing_ratio": -0.0316,
-      "eye_ratio": 0.0106
+      "brow_arch": 0.5355,
+      "cheekbone_prominence": 0.4623,
+      "philtrum_ratio": 0.4433,
+      "nose_length_ratio": 0.3248,
+      "symmetry_score": 0.2928,
+      "lip_fullness": -0.173,
+      "jaw_angle": 0.1687,
+      "eye_tilt": -0.1374,
+      "eye_ratio": 0.1293,
+      "eye_width_ratio": -0.0878,
+      "forehead_ratio": -0.0841,
+      "eye_spacing_ratio": 0.0563,
+      "face_length_ratio": 0.0
     },
     "explained_variance_ratio": [
-      0.3453,
-      0.2635,
-      0.1506,
-      0.0872
+      0.4246,
+      0.2729,
+      0.152,
+      0.0796
     ]
   }
 }

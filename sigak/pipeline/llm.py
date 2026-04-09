@@ -45,13 +45,12 @@ def _build_interview_system(gender: str = "female") -> str:
     """유형 앵커 데이터에서 동적으로 인터뷰 해석 프롬프트를 생성한다."""
     type_ref = get_type_reference_prompt(gender)
     return f"""당신은 SIGAK 미감 좌표계의 해석 엔진입니다.
-유저의 인터뷰 응답을 분석해서, 미감 좌표계의 4개 축 위에 '추구미 좌표'를 산출합니다.
+유저의 인터뷰 응답을 분석해서, 미감 좌표계의 3개 축 위에 '추구미 좌표'를 산출합니다.
 
-4축 좌표계:
-- structure [-1, +1]: soft(둥글고 부드러운 골격) ↔ sharp(날카롭고 선명한 골격)
-- impression [-1, +1]: soft(부드럽고 온화한 인상) ↔ sharp(시원하고 선명한 인상)
-- maturity [-1, +1]: fresh(어리고 생기있는) ↔ mature(성숙하고 정돈된)
-- intensity [-1, +1]: natural(자연스럽고 담백한) ↔ bold(강렬하고 존재감 있는)
+3축 좌표계:
+- shape [-1, +1]: Soft(둥글고 부드러운 골격) ↔ Sharp(날카롭고 선명한 골격)
+- volume [-1, +1]: Subtle(작고 섬세한 이목구비) ↔ Bold(크고 존재감 있는 이목구비)
+- age [-1, +1]: Fresh(어리고 생기있는 비율) ↔ Mature(성숙하고 정돈된 비율)
 
 SIGAK 인상 유형 레퍼런스:
 {type_ref}
@@ -65,7 +64,7 @@ SIGAK 인상 유형 레퍼런스:
 - 반드시 JSON만 출력, 다른 텍스트 금지
 
 출력 형식:
-{{"coordinates": {{"structure": 0.1, "impression": 0.3, "maturity": -0.3, "intensity": 0.2}},
+{{"coordinates": {{"shape": 0.1, "volume": 0.3, "age": -0.3}},
   "reference_base": "따뜻한 첫사랑",
   "interpretation": "따뜻한 첫사랑 기반에 성숙도를 높인 방향",
   "confidence": 0.8
@@ -116,7 +115,7 @@ JSON으로만 응답해주세요."""
     except json.JSONDecodeError:
         # Fallback: return neutral coordinates
         result = {
-            "coordinates": {"structure": 0, "impression": 0, "maturity": 0, "intensity": 0},
+            "coordinates": {"shape": 0, "volume": 0, "age": 0},
             "reference_base": "unknown",
             "interpretation": "파싱 실패 — 수동 보정 필요",
             "confidence": 0.0,

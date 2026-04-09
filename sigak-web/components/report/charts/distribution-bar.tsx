@@ -21,7 +21,7 @@ export function DistributionBar({
   const markerX = 6 + (pos / 100) * 188;
 
   return (
-    <div className="w-full max-w-[260px]">
+    <div className="w-full">
       {/* SVG: 벨커브 실루엣 + 트랙 + 수직 마커 + 삼각형 틱 */}
       <svg
         viewBox="0 0 200 32"
@@ -91,11 +91,11 @@ export function DistributionBar({
       </svg>
 
       {/* 양쪽 끝 라벨 — 미세한 페이드 효과를 위한 그라데이션 텍스트 */}
-      <div className="flex items-start justify-between mt-0.5 px-0.5">
-        <span className="text-[9px] leading-tight text-[var(--color-muted)] opacity-70">
+      <div className="flex items-start justify-between mt-1 px-0.5">
+        <span className="text-[11px] leading-tight text-[var(--color-muted)] opacity-80">
           {minLabel}
         </span>
-        <span className="text-[9px] leading-tight text-[var(--color-muted)] opacity-70 text-right">
+        <span className="text-[11px] leading-tight text-[var(--color-muted)] opacity-80 text-right">
           {maxLabel}
         </span>
       </div>

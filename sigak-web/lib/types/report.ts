@@ -6,7 +6,6 @@ export type SectionId =
   | "executive_summary"
   | "face_structure"
   | "skin_analysis"
-  | "face_interpretation"
   | "gap_analysis"
   | "coordinate_map"
   | "action_plan"

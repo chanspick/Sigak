@@ -97,26 +97,7 @@ export const MOCK_REPORT: ReportData = {
             max_label: "돌출 0.8",
           },
         ],
-      },
-    },
-    {
-      id: "skin_analysis",
-      locked: true,
-      unlock_level: "standard",
-      teaser: { headline: "웜톤 \u00B7 밝은 편" },
-      content: {
-        tone: "웜톤",
-        brightness: "밝은 편",
-        recommended_colors: ["코랄", "피치", "웜베이지"],
-        avoid_colors: ["블루베이스 핑크", "쿨그레이"],
-      },
-    },
-    {
-      id: "face_interpretation",
-      locked: true,
-      unlock_level: "standard",
-      teaser: { headline: "얼굴 구조 심층 분석 완료" },
-      content: {
+        interpretation_unlock_level: "standard",
         overall_impression:
           "턱 각도 128.5\u00B0(상위 38%)와 눈꼬리 기울기 +3.2\u00B0(상위 28%)의 조합이 만드는 인상 \u2014 친근함 위에 세련된 날카로움이 섞인 독특한 밸런스입니다.",
         feature_interpretations: [
@@ -167,6 +148,18 @@ export const MOCK_REPORT: ReportData = {
       },
     },
     {
+      id: "skin_analysis",
+      locked: true,
+      unlock_level: "standard",
+      teaser: { headline: "웜톤 \u00B7 밝은 편" },
+      content: {
+        tone: "웜톤",
+        brightness: "밝은 편",
+        recommended_colors: ["코랄", "피치", "웜베이지"],
+        avoid_colors: ["블루베이스 핑크", "쿨그레이"],
+      },
+    },
+    {
       id: "gap_analysis",
       locked: true,
       unlock_level: "standard",
@@ -177,45 +170,76 @@ export const MOCK_REPORT: ReportData = {
         aspiration_type: "부드럽고 성숙",
         aspiration_type_id: 5,
         current_coordinates: {
-          structure: 0.35,
-          impression: -0.22,
-          maturity: -0.41,
-          intensity: -0.15,
+          shape: 0.35,
+          volume: -0.15,
+          age: -0.41,
         },
         aspiration_coordinates: {
-          structure: 0.28,
-          impression: -0.1,
-          maturity: 0.38,
-          intensity: 0.12,
+          shape: 0.28,
+          volume: 0.12,
+          age: 0.38,
+        },
+        aesthetic_map: {
+          current: { x: 0.35, y: -0.41, size: -0.15 },
+          aspiration: { x: 0.28, y: 0.38, size: 0.12 },
+          x_axis: { name_kr: "외형", low: "소프트", high: "샤프", low_en: "Soft", high_en: "Sharp" },
+          y_axis: { name_kr: "무드", low: "프레시", high: "매추어", low_en: "Fresh", high_en: "Mature" },
+          size_axis: { name_kr: "존재감", low: "서틀", high: "볼드" },
+          quadrants: { top_left: "Soft Mature", top_right: "Sharp Mature", bottom_left: "Soft Fresh", bottom_right: "Sharp Fresh" },
+          description: "가로축은 골격과 이목구비의 형태, 세로축은 비율이 주는 무드예요. 점이 클수록 이목구비 존재감이 강해요.",
         },
         gap_magnitude: 0.89,
         gap_difficulty: "중간 난이도",
         gap_summary:
-          "4축 거리 0.89 \u2014 주 변화축은 성숙도(delta 0.79)이며, 강도(delta 0.27)가 보조축입니다. 구조와 인상은 거의 유지 가능합니다.",
+          "3축 거리 0.89 \u2014 주 변화축은 무드(delta 0.79)이며, 존재감(delta 0.27)이 보조축입니다. 외형은 거의 유지 가능합니다.",
         direction_items: [
           {
-            axis: "maturity",
-            label: "성숙도",
+            axis: "age",
+            label: "무드",
+            name_kr: "무드",
+            label_low: "프레시",
+            label_high: "매추어",
+            axis_description: "얼굴 비율이 주는 나이 인상과 분위기",
             from_score: -0.41,
             to_score: 0.38,
             delta: 0.79,
             from_label: "프레시",
-            to_label: "성숙",
+            to_label: "약간 매추어",
             difficulty: "큰 변화",
             recommendation:
-              "눈썹 아치를 현재 0.012에서 0.018 수준으로 높이면 성숙도 축에서 약 +0.3 이동 효과. 나머지 +0.49는 립 컬러(웜코랄\u2192로즈)와 헤어 볼륨 변화로 보완 가능합니다.",
+              "무드에서는 세련되고 성숙한 느낌을 더하는 방향이에요.",
           },
           {
-            axis: "intensity",
+            axis: "shape",
+            label: "외형",
+            name_kr: "외형",
+            label_low: "소프트",
+            label_high: "샤프",
+            axis_description: "골격과 이목구비가 주는 형태 인상",
+            from_score: 0.35,
+            to_score: 0.28,
+            delta: -0.07,
+            from_label: "약간 샤프",
+            to_label: "약간 샤프",
+            difficulty: "거의 유지",
+            recommendation:
+              "외형은 현재와 추구미가 가까워 큰 변화 없이 유지하면 돼요.",
+          },
+          {
+            axis: "volume",
             label: "존재감",
+            name_kr: "존재감",
+            label_low: "서틀",
+            label_high: "볼드",
+            axis_description: "이목구비의 크기와 존재감",
             from_score: -0.15,
             to_score: 0.12,
             delta: 0.27,
-            from_label: "내추럴",
-            to_label: "미디엄",
+            from_label: "서틀",
+            to_label: "약간 볼드",
             difficulty: "작은 변화",
             recommendation:
-              "아이라인 테일 2mm 연장으로 시각적 눈꼬리 각도 +1\u00B0 보정(3.2\u00B0\u2192약 4.2\u00B0). 컨투어링을 코 옆선에 가볍게 추가하면 강도 축 +0.15 정도 이동합니다.",
+              "아이라인 테일 2mm 연장으로 시각적 눈꼬리 각도 +1\u00B0 보정(3.2\u00B0\u2192약 4.2\u00B0). 컨투어링을 코 옆선에 가볍게 추가하면 존재감 축 +0.15 정도 이동합니다.",
           },
         ],
       },
@@ -232,7 +256,7 @@ export const MOCK_REPORT: ReportData = {
           {
             category: "메이크업",
             priority: "HIGH",
-            target_axis: "maturity",
+            target_axis: "age",
             target_delta: 0.79,
             recommendations: [
               {
@@ -240,7 +264,7 @@ export const MOCK_REPORT: ReportData = {
                 metric: "brow_arch",
                 current_value: 0.012,
                 target_value: 0.018,
-                expected_effect: "성숙도 축 +0.3 이동",
+                expected_effect: "무드 축 +0.3 이동",
                 delta_contribution: 0.3,
               },
               {
@@ -250,14 +274,14 @@ export const MOCK_REPORT: ReportData = {
                 target_value: 4.2,
                 unit: "\u00B0",
                 expected_effect:
-                  "강도 축 +0.1 이동, 시각적 눈꼬리 각도 보정",
+                  "존재감 축 +0.1 이동, 시각적 눈꼬리 각도 보정",
                 delta_contribution: 0.1,
               },
               {
                 action: "립 컬러 웜코랄 \u2192 로즈 전환",
                 metric: "skin_warmth_score",
                 expected_effect:
-                  "성숙도 축 +0.2 이동, 쿨톤 방향 미세 조정",
+                  "무드 축 +0.2 이동, 쿨톤 방향 미세 조정",
                 delta_contribution: 0.2,
               },
             ],
@@ -265,19 +289,19 @@ export const MOCK_REPORT: ReportData = {
           {
             category: "헤어",
             priority: "HIGH",
-            target_axis: "maturity",
+            target_axis: "age",
             target_delta: 0.79,
             recommendations: [
               {
                 action: "C컬 레이어드 \u2192 S컬 볼륨 웨이브",
                 expected_effect:
-                  "성숙도 축 +0.15 이동, 전체 실루엣 성숙화",
+                  "무드 축 +0.15 이동, 전체 실루엣 성숙화",
                 delta_contribution: 0.15,
               },
               {
                 action: "웜브라운 \u2192 다크애쉬브라운 톤다운",
                 expected_effect:
-                  "강도 축 +0.1, 인상 축 쿨 방향 미세 이동",
+                  "존재감 축 +0.1, 외형 축 쿨 방향 미세 이동",
                 delta_contribution: 0.1,
               },
             ],
@@ -285,7 +309,7 @@ export const MOCK_REPORT: ReportData = {
           {
             category: "스타일링",
             priority: "MEDIUM",
-            target_axis: "intensity",
+            target_axis: "volume",
             target_delta: 0.27,
             recommendations: [
               {
@@ -295,7 +319,7 @@ export const MOCK_REPORT: ReportData = {
               },
               {
                 action: "톤온톤 \u2192 명도 대비 코디(아이보리+차콜)",
-                expected_effect: "강도 축 +0.1 이동",
+                expected_effect: "존재감 축 +0.1 이동",
                 delta_contribution: 0.1,
               },
             ],

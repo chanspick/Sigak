@@ -257,35 +257,29 @@ FACE_SHAPE_KR = {
 
 # gap recommendation 템플릿
 GAP_RECOMMENDATION_TEMPLATES = {
-    "structure": {
-        "increase": "라인에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
-        "decrease": "라인에서는 윤곽을 둥글고 부드럽게 풀어주는 방향이 핵심이에요.",
+    "shape": {
+        "increase": "외형에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+        "decrease": "외형에서는 윤곽을 둥글고 부드럽게 풀어주는 방향이 핵심이에요.",
     },
-    "impression": {
-        "increase": "인상에서는 눈매와 이목구비를 또렷하게 살리는 방향이 중요해요.",
-        "decrease": "인상에서는 눈매를 온화하고 부드럽게 풀어주는 방향이 중요해요.",
-    },
-    "maturity": {
-        "increase": "분위기에서는 세련되고 성숙한 느낌을 더하는 방향이에요.",
-        "decrease": "분위기에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
-    },
-    "intensity": {
-        "increase": "존재감에서는 임팩트 있고 또렷한 표현이 포인트예요.",
+    "volume": {
+        "increase": "존재감에서는 이목구비를 임팩트 있고 또렷하게 강조하는 게 포인트예요.",
         "decrease": "존재감에서는 자연스럽고 힘을 뺀 표현이 포인트예요.",
+    },
+    "age": {
+        "increase": "무드에서는 세련되고 성숙한 느낌을 더하는 방향이에요.",
+        "decrease": "무드에서는 어려 보이고 생기 있는 느낌을 더하는 방향이 잘 맞아요.",
     },
 }
 
 
 # type_reference styling_tips 방향별 테이블
 DIRECTION_STYLING_TIPS = {
-    ("structure", "decrease"): "각진 라인을 부드럽게 감싸는 쉐딩이 효과적이에요.",
-    ("structure", "increase"): "윤곽을 또렷하게 잡아주는 하이라이트가 효과적이에요.",
-    ("impression", "decrease"): "눈매와 눈썹 라인을 둥글게 잡아주면 인상이 부드러워져요.",
-    ("impression", "increase"): "눈꼬리와 눈썹 끝을 살려주면 인상이 선명해져요.",
-    ("maturity", "decrease"): "볼과 눈 아래에 생기를 더하면 어려 보이는 효과가 있어요.",
-    ("maturity", "increase"): "음영을 깊게 주면 세련되고 성숙한 분위기가 나요.",
-    ("intensity", "decrease"): "전체적으로 힘을 빼고 자연스럽게 마무리하는 게 좋아요.",
-    ("intensity", "increase"): "포인트 부위를 과감하게 강조하면 존재감이 살아요.",
+    ("shape", "decrease"): "각진 라인을 부드럽게 감싸는 쉐딩이 효과적이에요.",
+    ("shape", "increase"): "윤곽을 또렷하게 잡아주는 하이라이트가 효과적이에요.",
+    ("volume", "decrease"): "전체적으로 힘을 빼고 자연스럽게 마무리하는 게 좋아요.",
+    ("volume", "increase"): "포인트 부위를 과감하게 강조하면 존재감이 살아요.",
+    ("age", "decrease"): "볼과 눈 아래에 생기를 더하면 어려 보이는 효과가 있어요.",
+    ("age", "increase"): "음영을 깊게 주면 세련되고 성숙한 분위기가 나요.",
 }
 
 
@@ -328,21 +322,17 @@ from pipeline.coordinate import get_axis_labels as _get_raw_axis_labels, get_all
 
 # 소비자용 오버라이드: coordinate.py의 라벨 + UI 표시용 name_kr/description
 _AXIS_DISPLAY_OVERRIDES = {
-    "structure": {
-        "name_kr": "라인",
-        "description": "턱선 각도, 광대, 얼굴 길이로 본 윤곽의 둥근 정도",
+    "shape": {
+        "name_kr": "외형",
+        "description": "턱선, 광대, 눈매 기울기가 만드는 전체적인 골격의 형태",
     },
-    "impression": {
-        "name_kr": "인상",
-        "description": "눈매 기울기와 눈썹 아치가 만드는 전체적인 인상",
-    },
-    "maturity": {
-        "name_kr": "분위기",
-        "description": "이마 비율, 인중 길이, 얼굴 종횡비가 주는 분위기",
-    },
-    "intensity": {
+    "volume": {
         "name_kr": "존재감",
         "description": "눈 크기, 입술 볼륨, 코 높이가 만드는 이목구비의 존재감",
+    },
+    "age": {
+        "name_kr": "무드",
+        "description": "이마 비율, 인중 길이, 얼굴 종횡비가 주는 나이 인상과 분위기",
     },
 }
 
@@ -355,7 +345,7 @@ def _get_axis_display(axis_name: str) -> dict:
 
 
 # 빠른 접근용 (기존 AXIS_LABELS 호환)
-AXIS_LABELS = {name: _get_axis_display(name) for name in ["structure", "impression", "maturity", "intensity"]}
+AXIS_LABELS = {name: _get_axis_display(name) for name in ["shape", "volume", "age"]}
 
 
 def get_position_label(axis: str, value: float) -> str:
@@ -548,8 +538,8 @@ def _build_face_metrics(features: dict) -> list[dict]:
         context = _re.sub(r"하위 \d+%\s*[—\-]\s*", "", context)
         context = context.strip()
 
-        # #5: show_numeric_value (각도 단위만 숫자 표시) + context_label
-        show_numeric = key in ("jaw_angle", "eye_tilt")
+        # #5: show_numeric_value — 전부 숫자 숨김 (자연어 라벨만 표시)
+        show_numeric = False
         context_label = _get_context_label(key, float(value), pct)
 
         metrics.append({
@@ -603,8 +593,13 @@ def _build_executive_summary(report_content: dict) -> dict:
     }
 
 
-def _build_face_structure(face_features: dict) -> dict:
-    """face_structure 섹션 -- 무료 공개 구간."""
+def _build_face_structure(face_features: dict, face_interpretation: Optional[dict] = None) -> dict:
+    """face_structure 섹션 -- FREE 영역 + STANDARD 해석 데이터 통합.
+
+    FREE 영역: 얼굴형, 대칭/황금비 라벨, 메트릭 분포 바
+    STANDARD 영역: overall_impression, feature_interpretations, harmony_note, distinctive_points
+    프론트엔드에서 locked prop에 따라 STANDARD 영역을 블러 처리한다.
+    """
     face_type_raw = face_features.get("face_shape", "oval")
     face_type = FACE_SHAPE_KR.get(face_type_raw, face_type_raw)
 
@@ -616,17 +611,38 @@ def _build_face_structure(face_features: dict) -> dict:
     gr_pct = _percentile("golden_ratio_score", float(gr_val)) if gr_val else 50
     gr_label = percentile_to_tone_kr(gr_pct)
 
+    content: dict = {
+        "face_type": face_type,
+        "face_length_ratio": face_features.get("face_length_ratio", 0),
+        "jaw_angle": face_features.get("jaw_angle", 0),
+        "symmetry_label": f"대칭 {sym_label}",
+        "golden_ratio_label": f"황금비 {gr_label}",
+        "metrics": _build_face_metrics(face_features),
+        "interpretation_unlock_level": "standard",
+    }
+
+    # STANDARD 영역: face_interpretation 데이터 병합
+    # 빈 dict({})여도 _build_face_interpretation_data 내부에서 fallback 처리
+    if face_interpretation and (
+        face_interpretation.get("overall_impression")
+        or face_interpretation.get("feature_interpretations")
+    ):
+        interp_data = _build_face_interpretation_data(face_features, face_interpretation)
+        content.update(interp_data)
+    elif face_features:
+        # LLM이 빈 결과를 줘도 수치 기반 최소한의 interpretation 생성
+        interp_data = _build_face_interpretation_data(face_features, {
+            "overall_impression": "전체적인 얼굴 구조의 조합이 만드는 인상을 분석했습니다.",
+            "feature_interpretations": [],
+            "harmony_note": "",
+            "distinctive_points": [],
+        })
+        content.update(interp_data)
+
     return {
         "id": "face_structure",
         "locked": False,
-        "content": {
-            "face_type": face_type,
-            "face_length_ratio": face_features.get("face_length_ratio", 0),
-            "jaw_angle": face_features.get("jaw_angle", 0),
-            "symmetry_label": f"대칭 {sym_label}",
-            "golden_ratio_label": f"황금비 {gr_label}",
-            "metrics": _build_face_metrics(face_features),
-        },
+        "content": content,
     }
 
 
@@ -660,11 +676,11 @@ def _build_skin_analysis(face_features: dict) -> dict:
     }
 
 
-def _build_face_interpretation(
+def _build_face_interpretation_data(
     face_features: dict,
     face_interpretation: dict,
 ) -> dict:
-    """face_interpretation 섹션 -- standard 잠금.
+    """face_interpretation 데이터를 content dict로 반환 (face_structure에 병합용).
 
     LLM 해석 결과를 프론트엔드 구조로 변환한다.
     LLM이 빈 결과를 줬으면 수치 기반 템플릿으로 폴백.
@@ -742,7 +758,7 @@ def _build_face_interpretation(
             rank = 100 - pct
             range_label = f"상위 {rank}%" if pct > 50 else f"하위 {pct}%"
 
-            show_numeric = resolved_key in ("jaw_angle", "eye_tilt")
+            show_numeric = False  # 전부 숫자 숨김
             context_label = _get_context_label(resolved_key, float(value), pct)
 
             feature_items.append({
@@ -784,16 +800,10 @@ def _build_face_interpretation(
     distinctive = [sanitize_interpretation(p) for p in distinctive] if distinctive else distinctive
 
     return {
-        "id": "face_interpretation",
-        "locked": True,
-        "unlock_level": "standard",
-        "teaser": {"headline": "얼굴 심층 해석"},
-        "content": {
-            "overall_impression": overall,
-            "feature_interpretations": feature_items,
-            "harmony_note": harmony,
-            "distinctive_points": distinctive,
-        },
+        "overall_impression": overall,
+        "feature_interpretations": feature_items,
+        "harmony_note": harmony,
+        "distinctive_points": distinctive,
     }
 
 
@@ -903,6 +913,29 @@ def _build_gap_analysis(
             "gap_difficulty": difficulty,
             "gap_summary": gap_summary,
             "direction_items": direction_items,
+            # aesthetic_map -- 2D 시각화용 고정 좌표계
+            "aesthetic_map": {
+                "current": {
+                    "x": round(float(current_coords.get("shape", 0)), 2),
+                    "y": round(float(current_coords.get("age", 0)), 2),
+                    "size": round(float(current_coords.get("volume", 0)), 2),
+                },
+                "aspiration": {
+                    "x": round(float(aspiration_coords.get("shape", 0)), 2),
+                    "y": round(float(aspiration_coords.get("age", 0)), 2),
+                    "size": round(float(aspiration_coords.get("volume", 0)), 2),
+                },
+                "x_axis": _get_raw_axis_labels("shape"),
+                "y_axis": _get_raw_axis_labels("age"),
+                "size_axis": _get_raw_axis_labels("volume"),
+                "quadrants": {
+                    "top_left": "Soft Mature",
+                    "top_right": "Sharp Mature",
+                    "bottom_left": "Soft Fresh",
+                    "bottom_right": "Sharp Fresh",
+                },
+                "description": "가로축은 골격과 이목구비의 형태, 세로축은 비율이 주는 무드예요. 점이 클수록 이목구비 존재감이 강해요.",
+            },
             # z축 필드 예약 (다음 스프린트)
             "trend_coordinates": None,
             "gap_to_trend": None,
@@ -932,12 +965,12 @@ def _build_action_plan(
 
     # zone → 주요 기여 축 매핑 (어떤 축에 영향을 주는 zone인지)
     ZONE_AXIS_MAP = {
-        "jawline": "structure", "cheekbone": "structure", "forehead": "structure",
-        "under_eye": "impression", "brow": "impression", "brow_arch": "impression",
-        "brow_tail": "impression", "eye_line": "impression", "outer_eye": "impression",
-        "cheek_apple": "maturity", "mid_cheek": "maturity",
-        "lip": "intensity", "lip_center": "intensity", "lip_corner": "intensity",
-        "nose_bridge": "intensity", "nose_tip": "intensity",
+        "jawline": "shape", "cheekbone": "shape", "forehead": "shape",
+        "under_eye": "shape", "brow": "shape", "brow_arch": "shape",
+        "brow_tail": "shape", "eye_line": "shape", "outer_eye": "shape",
+        "cheek_apple": "age", "mid_cheek": "age",
+        "lip": "volume", "lip_center": "volume", "lip_corner": "volume",
+        "nose_bridge": "volume", "nose_tip": "volume",
     }
     gap_vector = gap.get("vector", {})
 
@@ -1083,7 +1116,7 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
     # styling_tips deterministic 폴백
     if not styling_tips and gap:
         gap_vector = gap.get("vector", {})
-        primary_dir = gap.get("primary_direction", "structure")
+        primary_dir = gap.get("primary_direction", "shape")
         primary_delta = gap_vector.get(primary_dir, 0)
         action_items = _safe_get(report_content, "action_items", [])
         top_zones = [item.get("category", "") for item in action_items[:2]]
@@ -1179,8 +1212,8 @@ def format_report_for_frontend(
         tier: 진단 티어 (basic, creator, wedding)
         gender: 성별 (female, male)
         face_features: face.py의 FaceFeatures.to_dict() 결과
-        current_coords: 현재 미감 4축 좌표
-        aspiration_coords: 추구미 4축 좌표
+        current_coords: 현재 미감 3축 좌표 (shape/volume/age)
+        aspiration_coords: 추구미 3축 좌표 (shape/volume/age)
         gap: compute_gap() 결과
         similar_types: find_similar_types() 결과
         face_interpretation: interpret_face_structure() LLM 결과
@@ -1211,9 +1244,8 @@ def format_report_for_frontend(
     sections = [
         _build_cover(user_name, tier),
         _build_executive_summary(report_content),
-        _build_face_structure(face_features),
+        _build_face_structure(face_features, face_interpretation),
         _build_skin_analysis(face_features),
-        _build_face_interpretation(face_features, face_interpretation),
         _build_gap_analysis(
             current_coords, aspiration_coords, gap,
             similar_types, aspiration_interpretation, report_content,

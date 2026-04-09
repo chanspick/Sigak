@@ -16,6 +16,7 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const userId = typeof params.user_id === "string" ? params.user_id : null;
   const tier = typeof params.tier === "string" ? params.tier : null;
+  const gender = typeof params.gender === "string" ? params.gender : "female";
 
   // 필수 파라미터 누락 시 /start로 리다이렉트
   if (!userId || !tier || !["basic", "creator", "wedding"].includes(tier)) {
@@ -27,6 +28,7 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
       <QuestionnaireForm
         userId={userId}
         tier={tier as "basic" | "creator" | "wedding"}
+        gender={gender as "female" | "male"}
       />
     </div>
   );

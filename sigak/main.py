@@ -29,10 +29,7 @@ def _save_json(user_id: str, filename: str, data: dict):
 
 from config import get_settings
 from pipeline.face import analyze_face
-from pipeline.coordinate import (
-    compute_coordinates, compute_gap,
-    mock_clip_embedding, mock_anchor_projector, load_anchor_projector, AXES,
-)
+from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels, get_axis_names
 from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure
 from pipeline.action_spec import build_action_spec, build_overlay_plan
 from pipeline.similarity import find_similar_types, select_teaser_type
@@ -62,16 +59,10 @@ INTERVIEWS = {}
 ANALYSES = {}
 REPORTS = {}
 
-# ── 앵커 프로젝터 (실제 임베딩 있으면 사용, 없으면 mock 폴백) ──
-PROJECTORS = {
-    "female": load_anchor_projector("female"),
-    "male": load_anchor_projector("male"),
-}
-
-# ── 클러스터 부트스트랩 (cluster_labels.json 없으면 reference_coords로 생성) ──
+# ── 클러스터 부트스트랩 (cluster_labels.json 없으면 coords 기반 자동 생성) ──
 _cluster_data = load_cluster_labels()
 if not _cluster_data.get("clusters"):
-    print("[부트스트랩] 클러스터 라벨 없음 — reference_coords 기반 자동 생성")
+    print("[부트스트랩] 클러스터 라벨 없음 — coords 기반 자동 생성")
     discover_clusters(gender="female")
     discover_clusters(gender="male")
 
@@ -178,8 +169,9 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
     photo_results = []
     for f in files:
         contents = await f.read()
-        # 로컬 디스크에 저장
-        save_path = save_dir / (f.filename or f"{len(photo_results)}.jpg")
+        # 로컬 디스크에 저장 (한글 파일명 → ASCII로 변환)
+        ext = Path(f.filename or "photo.jpg").suffix or ".jpg"
+        save_path = save_dir / f"photo_{len(photo_results)}{ext}"
         with open(save_path, "wb") as fp:
             fp.write(contents)
 
@@ -247,7 +239,7 @@ async def run_analysis(user_id: str):
         current_coords = compute_coordinates(features)
     else:
         features = {}
-        current_coords = {"structure": 0, "impression": 0, "maturity": 0, "intensity": 0}
+        current_coords = {"shape": 0, "volume": 0, "age": 0}
 
     # ── Step 2: Face structure interpretation (LLM) ──
     face_interpretation = {}
@@ -276,7 +268,7 @@ async def run_analysis(user_id: str):
     # ── Step 6: Interview → aspiration coordinates (LLM) ──
     aspiration_result = interpret_interview(interview, gender=gender)
     aspiration_coords = aspiration_result.get("coordinates", {
-        "structure": 0, "impression": 0, "maturity": 0, "intensity": 0
+        "shape": 0, "volume": 0, "age": 0
     })
 
     # ── Step 6.5: 추구미 좌표 → 가장 가까운 앵커 확정 ──
@@ -315,7 +307,8 @@ async def run_analysis(user_id: str):
     photo_dir = DATA_DIR / user_id
     photo_files = sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
     if photo_files and analysis and analysis["primary_features"]:
-        photo_img = cv2.imread(str(photo_files[0]))
+        # Windows 한글 경로 대응: np.fromfile + imdecode
+        photo_img = cv2.imdecode(np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR)
         if photo_img is not None:
             lmk106 = analysis.get("landmarks_106")
             face_bbox = analysis.get("bbox")
@@ -569,14 +562,15 @@ async def get_stats():
 @app.get("/api/v1/axes")
 async def get_axes():
     """Return axis definitions for frontend rendering."""
+    all_labels = get_all_axis_labels()
     return [
         {
-            "name": ax.name,
-            "name_kr": ax.name_kr,
-            "negative": {"label": ax.negative_label, "label_kr": ax.negative_label_kr},
-            "positive": {"label": ax.positive_label, "label_kr": ax.positive_label_kr},
+            "name": name,
+            "name_kr": labels["name_kr"],
+            "negative": {"label": labels["low_en"], "label_kr": labels["low"]},
+            "positive": {"label": labels["high_en"], "label_kr": labels["high"]},
         }
-        for ax in AXES
+        for name, labels in all_labels.items()
     ]
 
 

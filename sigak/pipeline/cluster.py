@@ -2,7 +2,7 @@
 SIGAK Cluster Discovery & Labeling Engine
 
 앵커 유형의 **구조적 얼굴 특징**(InsightFace/MediaPipe 랜드마크 기반)에서
-자연 클러스터를 발견하고, 4축 좌표 특성 + community_score 기반으로 라벨링한다.
+자연 클러스터를 발견하고, 3축 좌표 특성(shape/volume/age) + community_score 기반으로 라벨링한다.
 
 v2: CLIP 임베딩 대신 type_features_cache.json의 13개 수치 특징 벡터를
     StandardScaler 정규화 → K-Means 클러스터링하는 structural 모드를 기본값으로 전환.
@@ -38,46 +38,46 @@ import numpy as np
 # ─────────────────────────────────────────────
 
 # 축 부호 조합 → 클러스터 라벨 후보
-# 각 튜플: (structure_sign, impression_sign, maturity_sign, intensity_sign)
+# 각 튜플: (shape_sign, volume_sign, age_sign)
 # "any"는 해당 축 값이 약해서 (|v| < 0.3) 방향성이 불분명한 경우
 LABEL_CANDIDATES = [
     {
         "id": "cool_goddess",
         "label_kr": "쿨 갓데스",
         "label_en": "Cool Goddess",
-        "signature": {"structure": "sharp", "impression": "cool", "maturity": "mature", "intensity": "bold"},
-        "description": "날카로운 이목구비 + 쿨한 인상 + 성숙한 분위기의 강렬한 미감",
+        "signature": {"shape": "sharp", "volume": "bold", "age": "mature"},
+        "description": "날카로운 이목구비 + 강렬한 볼륨 + 성숙한 분위기의 미감",
         "keywords": ["시크", "도시적", "하이엔드", "강렬한 눈매"],
     },
     {
         "id": "warm_natural",
         "label_kr": "웜 내추럴",
         "label_en": "Warm Natural",
-        "signature": {"structure": "soft", "impression": "warm", "maturity": "any", "intensity": "natural"},
-        "description": "부드러운 라인 + 따뜻한 인상 + 자연스러운 매력",
+        "signature": {"shape": "soft", "volume": "subtle", "age": "any"},
+        "description": "부드러운 라인 + 은은한 볼륨 + 자연스러운 매력",
         "keywords": ["친근", "청순", "자연스러운", "첫사랑"],
     },
     {
         "id": "ice_princess",
         "label_kr": "아이스 프린세스",
         "label_en": "Ice Princess",
-        "signature": {"structure": "sharp", "impression": "cool", "maturity": "fresh", "intensity": "bold"},
-        "description": "날카로운 라인 + 쿨한 인상 + 프레시함이 공존하는 차가운 아름다움",
+        "signature": {"shape": "sharp", "volume": "bold", "age": "fresh"},
+        "description": "날카로운 라인 + 강렬한 볼륨 + 프레시함이 공존하는 차가운 아름다움",
         "keywords": ["신비로운", "몽환", "청량+시크", "인형같은"],
     },
     {
         "id": "elegant_classic",
         "label_kr": "엘레강트 클래식",
         "label_en": "Elegant Classic",
-        "signature": {"structure": "any", "impression": "warm", "maturity": "mature", "intensity": "natural"},
-        "description": "절제된 우아함 + 따뜻한 성숙미",
+        "signature": {"shape": "any", "volume": "subtle", "age": "mature"},
+        "description": "절제된 우아함 + 성숙한 분위기",
         "keywords": ["단아", "고급스러운", "배우같은", "클래식"],
     },
     {
         "id": "fresh_face",
         "label_kr": "프레시 페이스",
         "label_en": "Fresh Face",
-        "signature": {"structure": "any", "impression": "any", "maturity": "fresh", "intensity": "any"},
+        "signature": {"shape": "any", "volume": "any", "age": "fresh"},
         "description": "연령대가 주는 생기와 청량함이 핵심",
         "keywords": ["청량", "어린", "생기발랄", "10대~20대초"],
     },
@@ -85,7 +85,7 @@ LABEL_CANDIDATES = [
         "id": "soft_bold",
         "label_kr": "소프트 볼드",
         "label_en": "Soft Bold",
-        "signature": {"structure": "soft", "impression": "any", "maturity": "any", "intensity": "bold"},
+        "signature": {"shape": "soft", "volume": "bold", "age": "any"},
         "description": "부드러운 외형에 강렬한 매력이 공존하는 반전 미감",
         "keywords": ["반전매력", "글래머러스", "자유분방", "화려하지만 부드러운"],
     },
@@ -93,7 +93,7 @@ LABEL_CANDIDATES = [
         "id": "bold_queen",
         "label_kr": "볼드 퀸",
         "label_en": "Bold Queen",
-        "signature": {"structure": "any", "impression": "any", "maturity": "mature", "intensity": "bold"},
+        "signature": {"shape": "any", "volume": "bold", "age": "mature"},
         "description": "압도적인 존재감과 대담한 스타일의 미감",
         "keywords": ["카리스마", "퍼포먼스", "무대형", "독보적"],
     },
@@ -213,7 +213,7 @@ def discover_clusters(
         gender: "female" or "male"
         method: "kmeans", "hdbscan", or "auto" (데이터 크기에 따라 선택)
         n_clusters: kmeans일 때 클러스터 수 (None이면 자동, structural 모드에서는 4~5)
-        mode: "structural" (기본, 13개 구조적 특징) or "coords" (4축 좌표 폴백)
+        mode: "structural" (기본, 13개 구조적 특징) or "coords" (3축 좌표 폴백)
               ※ CLIP 임베딩 모드("clip")는 폐기됨 — 사진 분위기가 아닌 얼굴 구조로 클러스터링
 
     Returns:
@@ -245,12 +245,11 @@ def discover_clusters(
     keys = sorted(gender_anchors.keys())
     coords_matrix = []
     for key in keys:
-        rc = gender_anchors[key].get("reference_coords", {})
+        rc = gender_anchors[key].get("coords", {})
         coords_matrix.append([
-            rc.get("structure", 0),
-            rc.get("impression", 0),
-            rc.get("maturity", 0),
-            rc.get("intensity", 0),
+            rc.get("shape", 0),
+            rc.get("volume", 0),
+            rc.get("age", 0),
         ])
     coords_array = np.array(coords_matrix, dtype=np.float32)
 
@@ -300,7 +299,7 @@ def discover_clusters(
             # structural 특징 부족 → coords 폴백
             mode = "coords"
 
-    # ─── coords 모드: 4축 좌표 기반 폴백 ───
+    # ─── coords 모드: 3축 좌표 기반 폴백 ───
     # (CLIP 임베딩 모드는 폐기 — "사진 분위기"가 아닌 "얼굴 구조"로 클러스터링해야 함)
     #
     # [폐기된 CLIP 임베딩 코드]
@@ -409,7 +408,7 @@ def compute_pca_loadings(gender: str = "female", n_components: int = 4) -> dict 
     공개 API: 구조적 특징의 PCA loadings를 계산하여 반환.
 
     각 주성분(PC)에 어떤 원래 특징이 가장 기여하는지 확인 가능.
-    예: "PC1 = jaw_angle 0.82 + cheekbone 0.61 → structure 축"
+    예: "PC1 = jaw_angle 0.82 + cheekbone 0.61 → shape 축"
 
     Args:
         gender: "female" or "male"
@@ -504,7 +503,7 @@ def _cluster_by_rules(keys: list[str], anchors: dict) -> list[int]:
     """좌표 기반 규칙 매칭으로 클러스터 할당."""
     labels = []
     for key in keys:
-        rc = anchors[key].get("reference_coords", {})
+        rc = anchors[key].get("coords", {})
         best_match = _match_label_rule(rc)
         # LABEL_CANDIDATES의 인덱스를 라벨로 사용
         labels.append(best_match)
@@ -522,17 +521,16 @@ def _get_axis_sign(value: float) -> str:
 
 # 축별 부호 → 라벨 시그니처 매핑
 _SIGN_TO_LABEL = {
-    "structure": {"negative": "sharp", "positive": "soft", "any": "any"},
-    "impression": {"negative": "warm", "positive": "cool", "any": "any"},
-    "maturity": {"negative": "fresh", "positive": "mature", "any": "any"},
-    "intensity": {"negative": "natural", "positive": "bold", "any": "any"},
+    "shape": {"negative": "soft", "positive": "sharp", "any": "any"},
+    "volume": {"negative": "subtle", "positive": "bold", "any": "any"},
+    "age": {"negative": "fresh", "positive": "mature", "any": "any"},
 }
 
 
 def _match_label_rule(coords: dict) -> int:
     """좌표를 LABEL_CANDIDATES와 매칭하여 가장 적합한 라벨 인덱스를 반환."""
     user_sig = {}
-    for axis in ["structure", "impression", "maturity", "intensity"]:
+    for axis in ["shape", "volume", "age"]:
         val = coords.get(axis, 0)
         sign = _get_axis_sign(val)
         user_sig[axis] = _SIGN_TO_LABEL[axis][sign]
@@ -543,7 +541,7 @@ def _match_label_rule(coords: dict) -> int:
     for idx, candidate in enumerate(LABEL_CANDIDATES):
         sig = candidate["signature"]
         score = 0
-        for axis in ["structure", "impression", "maturity", "intensity"]:
+        for axis in ["shape", "volume", "age"]:
             if sig[axis] == "any" or user_sig[axis] == "any":
                 score += 0.5  # 부분 매치
             elif sig[axis] == user_sig[axis]:
@@ -710,10 +708,9 @@ def _build_cluster_info(
         member_coords = coords_array[member_indices]
         centroid = np.mean(member_coords, axis=0)
         centroid_dict = {
-            "structure": round(float(centroid[0]), 3),
-            "impression": round(float(centroid[1]), 3),
-            "maturity": round(float(centroid[2]), 3),
-            "intensity": round(float(centroid[3]), 3),
+            "shape": round(float(centroid[0]), 3),
+            "volume": round(float(centroid[1]), 3),
+            "age": round(float(centroid[2]), 3),
         }
 
         # community_score 기반 대표 유형 (null이면 0으로 처리)
@@ -742,7 +739,7 @@ def _build_cluster_info(
                     continue
                 sig = candidate["signature"]
                 user_sig = {}
-                for axis in ["structure", "impression", "maturity", "intensity"]:
+                for axis in ["shape", "volume", "age"]:
                     val = centroid_dict.get(axis, 0)
                     sign = _get_axis_sign(val)
                     user_sig[axis] = _SIGN_TO_LABEL[axis][sign]
@@ -806,14 +803,12 @@ def _build_cluster_info(
 def _auto_generate_label(centroid: dict) -> dict:
     """규칙에 없는 클러스터를 centroid 좌표에서 자동 라벨링."""
     parts = []
-    if abs(centroid.get("structure", 0)) > AXIS_SIGN_THRESHOLD:
-        parts.append("Sharp" if centroid["structure"] < 0 else "Soft")
-    if abs(centroid.get("impression", 0)) > AXIS_SIGN_THRESHOLD:
-        parts.append("Cool" if centroid["impression"] > 0 else "Warm")
-    if abs(centroid.get("maturity", 0)) > AXIS_SIGN_THRESHOLD:
-        parts.append("Mature" if centroid["maturity"] > 0 else "Fresh")
-    if abs(centroid.get("intensity", 0)) > AXIS_SIGN_THRESHOLD:
-        parts.append("Bold" if centroid["intensity"] > 0 else "Natural")
+    if abs(centroid.get("shape", 0)) > AXIS_SIGN_THRESHOLD:
+        parts.append("Sharp" if centroid["shape"] > 0 else "Soft")
+    if abs(centroid.get("volume", 0)) > AXIS_SIGN_THRESHOLD:
+        parts.append("Bold" if centroid["volume"] > 0 else "Subtle")
+    if abs(centroid.get("age", 0)) > AXIS_SIGN_THRESHOLD:
+        parts.append("Mature" if centroid["age"] > 0 else "Fresh")
 
     label_en = " ".join(parts) if parts else "Neutral"
     label_kr = label_en  # 추후 번역 매핑 추가 가능
@@ -839,7 +834,7 @@ def classify_user(
     유저 좌표를 가장 가까운 클러스터에 분류한다.
 
     Args:
-        user_coords: {"structure": float, "impression": float, ...}
+        user_coords: {"shape": float, "volume": float, "age": float}
         gender: "female" or "male"
 
     Returns:
@@ -872,10 +867,9 @@ def classify_user(
         }
 
     user_vec = np.array([
-        user_coords.get("structure", 0),
-        user_coords.get("impression", 0),
-        user_coords.get("maturity", 0),
-        user_coords.get("intensity", 0),
+        user_coords.get("shape", 0),
+        user_coords.get("volume", 0),
+        user_coords.get("age", 0),
     ], dtype=np.float32)
 
     # 각 클러스터 centroid와의 거리
@@ -883,10 +877,9 @@ def classify_user(
     for c in clusters:
         centroid = c["centroid_coords"]
         c_vec = np.array([
-            centroid.get("structure", 0),
-            centroid.get("impression", 0),
-            centroid.get("maturity", 0),
-            centroid.get("intensity", 0),
+            centroid.get("shape", 0),
+            centroid.get("volume", 0),
+            centroid.get("age", 0),
         ], dtype=np.float32)
         dist = float(np.linalg.norm(user_vec - c_vec))
         distances.append((c, dist))
@@ -898,8 +891,8 @@ def classify_user(
     cluster = nearest[0]
     dist = nearest[1]
 
-    # 신뢰도: 거리가 0이면 1.0, 최대 거리(4축 × 2범위 = ~4.0)에서 0
-    max_possible_dist = 4.0
+    # 신뢰도: 거리가 0이면 1.0, 최대 거리(3축 × 2범위 = ~3.5)에서 0
+    max_possible_dist = 3.5
     confidence = round(max(0, 1.0 - dist / max_possible_dist), 3)
 
     # core vs edge: 클러스터 반경의 50% 이내면 core

@@ -5,17 +5,16 @@
 import Image from "next/image";
 import { GapScatterPlot } from "@/components/report/charts/gap-scatter-plot";
 
-// 4축 좌표 타입
 interface Coordinates {
-  structure: number;
-  impression: number;
-  maturity: number;
-  intensity: number;
+  shape: number;
+  volume: number;
+  age: number;
 }
 
 interface DirectionItem {
   axis: string;
   label: string;
+  name_kr?: string;
   label_low?: string;
   label_high?: string;
   axis_description?: string;
@@ -37,6 +36,15 @@ interface GapAnalysisContent {
   aspiration_features?: string[];
   current_coordinates: Coordinates;
   aspiration_coordinates: Coordinates;
+  aesthetic_map?: {
+    current: { x: number; y: number; size: number };
+    aspiration: { x: number; y: number; size: number };
+    x_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
+    y_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
+    size_axis: { name_kr: string; low: string; high: string };
+    quadrants: { top_left: string; top_right: string; bottom_left: string; bottom_right: string };
+    description?: string;
+  };
   gap_magnitude: number;
   gap_difficulty: string;
   gap_summary: string;
@@ -47,14 +55,6 @@ interface GapAnalysisProps {
   content: GapAnalysisContent;
   locked: boolean;
 }
-
-// 축 라벨 매핑 (영문 키 → 한글) (Fix #15)
-const AXIS_LABELS: Record<string, string> = {
-  structure: "라인",
-  impression: "인상",
-  maturity: "분위기",
-  intensity: "존재감",
-};
 
 // 난이도 배지 스타일 — 프리미엄 모노크롬
 function getDifficultyStyle(difficulty: string): string {
@@ -69,31 +69,25 @@ function scoreToPercent(score: number): number {
   return ((Math.max(-1, Math.min(1, score ?? 0)) + 1) / 2) * 100;
 }
 
-// 축 양 끝 라벨 (백엔드 미제공 시 폴백)
-// coordinate.py SSOT 기준 폴백 (백엔드 label_low/label_high 미제공 시)
-const AXIS_END_LABELS: Record<string, { low: string; high: string }> = {
-  structure: { low: "부드러운", high: "날카로운" },
-  impression: { low: "부드러운", high: "선명한" },
-  maturity: { low: "프레시", high: "성숙한" },
-  intensity: { low: "자연스러운", high: "볼드" },
-};
-
-// ─── 4축 미니 비교 바 (컴팩트) ───
+// ─── 3축 미니 비교 바 (컴팩트) ───
 function MiniAxisRow({
   axisKey,
   label,
   currentScore,
   aspirationScore,
+  labelLow,
+  labelHigh,
 }: {
   axisKey: string;
   label: string;
   currentScore: number;
   aspirationScore: number;
+  labelLow?: string;
+  labelHigh?: string;
 }) {
   const currentPos = scoreToPercent(currentScore);
   const aspirationPos = scoreToPercent(aspirationScore);
   const delta = Math.abs(aspirationScore - currentScore);
-  const endLabels = AXIS_END_LABELS[axisKey];
 
   return (
     <div className="flex items-center gap-2">
@@ -103,9 +97,9 @@ function MiniAxisRow({
       </span>
 
       {/* 좌 라벨 */}
-      {endLabels && (
+      {labelLow && (
         <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-right opacity-60">
-          {endLabels.low}
+          {labelLow}
         </span>
       )}
 
@@ -132,9 +126,9 @@ function MiniAxisRow({
       </div>
 
       {/* 우 라벨 */}
-      {endLabels && (
+      {labelHigh && (
         <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-left opacity-60">
-          {endLabels.high}
+          {labelHigh}
         </span>
       )}
     </div>
@@ -154,7 +148,7 @@ function DirectionCard({ item }: { item: DirectionItem }) {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)]">
-            {AXIS_LABELS[item.axis] ?? item.label}
+            {item.name_kr ?? item.label}
           </span>
           <span
             className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${getDifficultyStyle(item.difficulty)}`}
@@ -198,8 +192,8 @@ function DirectionCard({ item }: { item: DirectionItem }) {
         </div>
         {/* 축 양 끝 라벨 */}
         <div className="flex items-center justify-between text-[9px] mt-1.5 text-[var(--color-muted)] opacity-60">
-          <span>{item.label_low ?? AXIS_END_LABELS[item.axis]?.low ?? ""}</span>
-          <span>{item.label_high ?? AXIS_END_LABELS[item.axis]?.high ?? ""}</span>
+          <span>{item.label_low ?? ""}</span>
+          <span>{item.label_high ?? ""}</span>
         </div>
       </div>
 
@@ -217,8 +211,6 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
   const aspirationImg = content.aspiration_type_id
     ? `/images/types/type_${content.aspiration_type_id}.jpg`
     : null;
-
-  const axisKeys = Object.keys(AXIS_LABELS) as (keyof Coordinates)[];
 
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
@@ -296,7 +288,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         </div>
       </div>
 
-      {/* ─── 갭 오버뷰 카드: 산점도 + 4축 미니 비교 ─── */}
+      {/* ─── 갭 오버뷰 카드: 산점도 + 3축 미니 비교 ─── */}
       <div className="mb-8 p-5 border border-[var(--color-border)] rounded-lg">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)]">
@@ -317,15 +309,16 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         {/* 2단 레이아웃: 산점도(좌) + 미니 비교(우) — 모바일은 스택 */}
         <div className="flex flex-col md:flex-row gap-6 items-start">
           {/* 산점도 */}
-          <div className="w-full md:w-auto md:shrink-0">
-            <GapScatterPlot
-              current={content.current_coordinates}
-              aspiration={content.aspiration_coordinates}
-              gapMagnitude={content.gap_magnitude}
-            />
-          </div>
+          {content.aesthetic_map && (
+            <div className="w-full md:w-auto md:shrink-0">
+              <GapScatterPlot
+                aestheticMap={content.aesthetic_map}
+                gapMagnitude={content.gap_magnitude}
+              />
+            </div>
+          )}
 
-          {/* 4축 미니 비교 바 */}
+          {/* 3축 미니 비교 바 */}
           <div className="w-full md:flex-1 md:pt-4">
             {/* 범례 */}
             <div className="flex items-center gap-4 mb-3 text-[9px] tracking-[0.5px] text-[var(--color-muted)]">
@@ -340,22 +333,24 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
             </div>
             {/* 축별 바 */}
             <div className="flex flex-col gap-1">
-              {axisKeys.map((key) => (
+              {content.direction_items.map((item) => (
                 <MiniAxisRow
-                  key={key}
-                  axisKey={key}
-                  label={AXIS_LABELS[key]}
-                  currentScore={content.current_coordinates[key]}
-                  aspirationScore={content.aspiration_coordinates[key]}
+                  key={item.axis}
+                  axisKey={item.axis}
+                  label={item.name_kr ?? item.label}
+                  currentScore={content.current_coordinates[item.axis as keyof Coordinates] ?? 0}
+                  aspirationScore={content.aspiration_coordinates[item.axis as keyof Coordinates] ?? 0}
+                  labelLow={item.label_low}
+                  labelHigh={item.label_high}
                 />
               ))}
             </div>
           </div>
         </div>
 
-        {/* 차트 아래 안내 (Fix #14) */}
+        {/* 차트 아래 안내 */}
         <p className="text-[11px] text-[var(--color-muted)] mt-4 leading-relaxed">
-          위 차트는 성숙도(↕)와 존재감(↔) 두 축을 보여줘요. 아래에서 4축을 각각 볼 수 있어요.
+          {content.aesthetic_map?.description ?? "위 차트에서 ○가 지금 위치, ●이 가고 싶은 위치예요."}
         </p>
       </div>
 

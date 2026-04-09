@@ -40,6 +40,7 @@ class FaceFeatures:
     face_length_ratio: float     # face_h / face_w (종횡비)
     forehead_ratio: float
     brow_arch: float             # 눈썹 아치 높이 (정규화)
+    brow_eye_distance: Optional[float]  # 눈썹-눈 거리 / face_height (가까울수록 강렬한 인상)
     philtrum_ratio: float        # 인중 길이 / 하안부 길이
     symmetry_score: float        # 0–1 (1 = perfect symmetry)
     golden_ratio_score: float    # proximity to phi ratios
@@ -350,6 +351,21 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
     right_arch = abs(r_brow_mid[1] - r_brow_base_y)
     brow_arch = ((left_arch + right_arch) / 2) / face_height
 
+    # ── 눈썹-눈 거리 (106점 2D 랜드마크 기반) ──
+    brow_eye_distance_val: Optional[float] = None
+    try:
+        _lm106 = face.landmark_2d_106
+        if _lm106 is not None and _lm106.shape[0] >= 93:
+            # InsightFace 106점: 오른쪽 눈썹 [38-42], 오른쪽 눈 [33-37]
+            r_brow_pts = _lm106[38:43]  # indices 38, 39, 40, 41, 42
+            r_eye_pts = _lm106[33:38]   # indices 33, 34, 35, 36, 37
+            r_brow_center_y = float(r_brow_pts[:, 1].mean())
+            r_eye_center_y = float(r_eye_pts[:, 1].mean())
+            brow_eye_distance_val = abs(r_brow_center_y - r_eye_center_y) / face_height
+            brow_eye_distance_val = round(brow_eye_distance_val, 4)
+    except Exception:
+        brow_eye_distance_val = None
+
     # ── 인중 비율 ──
     nose_bottom = g("nose_bottom")
     chin = g("jaw_chin")
@@ -413,6 +429,7 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
         face_length_ratio=round(face_length_ratio, 3),
         forehead_ratio=round(forehead_ratio, 3),
         brow_arch=round(brow_arch, 4),
+        brow_eye_distance=brow_eye_distance_val,
         philtrum_ratio=round(philtrum_ratio, 3),
         symmetry_score=round(symmetry_score, 3),
         golden_ratio_score=round(golden_ratio_score, 3),
@@ -587,6 +604,7 @@ def _analyze_with_mediapipe(image: np.ndarray) -> Optional[FaceFeatures]:
         face_length_ratio=round(face_length_ratio, 3),
         forehead_ratio=round(forehead_ratio, 3),
         brow_arch=round(brow_arch, 4),
+        brow_eye_distance=None,  # MediaPipe에서는 106점 기반 계산 불가
         philtrum_ratio=round(philtrum_ratio, 3),
         symmetry_score=round(symmetry_score, 3),
         golden_ratio_score=round(golden_ratio_score, 3),

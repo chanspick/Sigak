@@ -242,8 +242,15 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
           </div>
           {/* 에러 메시지 */}
           {submitError && (
-            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-700 text-[13px]">
-              {submitError}
+            <div className="mb-4 p-4 border border-[var(--color-border)] text-[13px] leading-relaxed">
+              <p className="mb-2">{submitError}</p>
+              <button
+                type="button"
+                className="text-[12px] underline opacity-60 hover:opacity-100"
+                onClick={() => { setSubmitError(null); setStep(2); }}
+              >
+                사진을 다시 선택하기
+              </button>
             </div>
           )}
           {/* 제출 버튼 */}

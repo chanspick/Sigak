@@ -103,8 +103,9 @@ export function PhotoUploader({ photos, onChange, photoFiles, onFilesChange }: P
         <p className="text-[11px] font-semibold tracking-[0.5px] opacity-50 mb-1">
           얼굴 사진
         </p>
-        <p className="text-[12px] opacity-40">
-          정면을 응시하고, 밝은 조명에서 촬영해 주세요
+        <p className="text-[12px] opacity-40 leading-relaxed">
+          정면을 바라보고, 밝은 곳에서 촬영해 주세요.
+          선글라스·마스크·모자는 벗어주세요.
         </p>
       </div>
 

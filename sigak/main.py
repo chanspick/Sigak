@@ -186,7 +186,7 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
             })
 
     if not photo_results:
-        raise HTTPException(400, "No valid face detected in uploaded photos")
+        raise HTTPException(400, "얼굴을 인식하지 못했어요. 정면을 바라보고, 밝은 곳에서 선글라스/마스크 없이 다시 촬영해 주세요.")
 
     # Use first photo's features as primary (multi-photo averaging later)
     # landmarks_106 + bbox도 저장 (overlay 렌더용)

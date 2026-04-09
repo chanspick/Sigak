@@ -112,6 +112,9 @@ logs/
 .env.*
 !.env.example
 
+# User uploads (runtime data)
+sigak/uploads/
+
 # Certificate files
 *.pem
 *.p12

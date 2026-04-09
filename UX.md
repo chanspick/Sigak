@@ -18,7 +18,7 @@
     { "id": "skin_analysis", "locked": true, "unlock_level": "standard",
       "teaser": { "headline": "웜톤 · 밝은 편" } },
     { "id": "coordinate_map", "locked": true, "unlock_level": "standard",
-      "teaser": { "headline": "4축 미감 분석 완료" } },
+      "teaser": { "headline": "3축 미감 분석 완료" } },
     { "id": "action_plan", "locked": true, "unlock_level": "full",
       "teaser": { "categories": ["메이크업 HIGH", "헤어 HIGH", "스타일링 MEDIUM"] } },
     { "id": "celeb_reference", "locked": true, "unlock_level": "full",

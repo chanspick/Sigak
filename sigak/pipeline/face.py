@@ -641,14 +641,15 @@ def analyze_face(image_bytes: bytes) -> Optional[FaceFeatures]:
     if image is None:
         return None
 
-    # 1차: InsightFace
+    # InsightFace 전용 — MediaPipe 폴백 비활성
+    # MediaPipe는 106점 랜드마크/brow_eye_distance/overlay가 불가하여
+    # 품질 저하된 결과를 내보내는 것보다 실패 반환이 나음
     try:
         result = _analyze_with_insightface(image)
         if result is not None:
             return result
-        logger.info("InsightFace 얼굴 미검출, MediaPipe 폴백")
+        logger.info("InsightFace 얼굴 미검출 — 반환 None")
     except Exception as e:
-        logger.warning("InsightFace 실패, MediaPipe 폴백: %s", e)
+        logger.warning("InsightFace 실패: %s", e)
 
-    # 2차: MediaPipe 폴백
-    return _analyze_with_mediapipe(image)
+    return None

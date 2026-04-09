@@ -205,12 +205,14 @@ function DirectionCard({ item }: { item: DirectionItem }) {
 
 // ─── 메인: 추구미 갭 분석 ───
 export function GapAnalysis({ content, locked }: GapAnalysisProps) {
-  const currentImg = content.current_type_id
-    ? `/images/types/type_${content.current_type_id}.jpg`
-    : null;
-  const aspirationImg = content.aspiration_type_id
-    ? `/images/types/type_${content.aspiration_type_id}.jpg`
-    : null;
+  // type_id → 이미지 경로 (남성 11~18 → type_1m~8m, 여성 1~8 → type_1~8)
+  const typeIdToImg = (id?: number) => {
+    if (!id) return null;
+    if (id >= 11 && id <= 18) return `/images/types/type_${id - 10}m.jpg`;
+    return `/images/types/type_${id}.jpg`;
+  };
+  const currentImg = typeIdToImg(content.current_type_id);
+  const aspirationImg = typeIdToImg(content.aspiration_type_id);
 
   return (
     <section className="py-10 border-b border-[var(--color-border)]">

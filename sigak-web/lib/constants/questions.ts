@@ -35,8 +35,8 @@ export const CORE_QUESTIONS: InterviewQuestion[] = [
   {
     key: "hair_texture",
     label: "모질",
-    placeholder: "모질을 선택해주세요 (직모 / 웨이브 / 곱슬). 모발 굵기(가는 편/보통/굵은 편)도 알려주시면 좋아요.",
-    rows: 1,
+    placeholder: "모질을 알려주세요 (직모 / 웨이브 / 곱슬). 모발 굵기(가는 편/보통/굵은 편)도 함께 적어주시면 좋아요.",
+    rows: 2,
   },
 ];
 

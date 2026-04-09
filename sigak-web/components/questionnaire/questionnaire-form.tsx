@@ -157,7 +157,7 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
             기본 질문
           </h2>
           <p className="text-[12px] opacity-40 mb-5">
-            5개 중 최소 {MIN_CORE_ANSWERS}개 이상 답변해 주세요 (
+            {CORE_QUESTIONS.length}개 중 최소 {MIN_CORE_ANSWERS}개 이상 답변해 주세요 (
             {coreAnswerCount}/{CORE_QUESTIONS.length} 완료)
           </p>
           <QuestionnaireStep

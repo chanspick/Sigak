@@ -26,7 +26,11 @@ interface TypeReferenceProps {
 
 // 유형 매칭 — AI 이미지 + 유사도 시각화
 export function TypeReference({ content, locked }: TypeReferenceProps) {
-  const mainImageSrc = `/images/types/type_${content.type_id}.jpg`;
+  const typeIdToImg = (id: number) => {
+    if (id >= 11 && id <= 18) return `/images/types/type_${id - 10}m.jpg`;
+    return `/images/types/type_${id}.jpg`;
+  };
+  const mainImageSrc = typeIdToImg(content.type_id);
 
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
@@ -125,7 +129,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
                     {/* 미니 이미지 */}
                     <div className="shrink-0 w-10 h-10 relative rounded-full overflow-hidden bg-[var(--color-border)]">
                       <Image
-                        src={`/images/types/type_${ru.type_id}.jpg`}
+                        src={typeIdToImg(ru.type_id)}
                         alt={ru.type_name}
                         fill
                         className="object-cover"

@@ -67,10 +67,10 @@ class OverlayZone:
 
 
 # ─────────────────────────────────────────────
-#  축별 공통 Action 룰 테이블
+#  축별 Action 룰 테이블 — Female (메이크업)
 # ─────────────────────────────────────────────
 
-AXIS_ACTION_RULES: dict[str, dict[str, list[dict]]] = {
+AXIS_ACTION_RULES_FEMALE: dict[str, dict[str, list[dict]]] = {
     "shape": {
         "increase": [  # → Sharp
             {"zone": "jawline", "method": "contour_shading", "goal": "턱선 정리로 윤곽 선명화", "base_score": 0.9},
@@ -108,6 +108,67 @@ AXIS_ACTION_RULES: dict[str, dict[str, list[dict]]] = {
         ],
     },
 }
+
+
+# ─────────────────────────────────────────────
+#  축별 Action 룰 테이블 — Male (그루밍/헤어/스킨케어)
+# ─────────────────────────────────────────────
+
+AXIS_ACTION_RULES_MALE: dict[str, dict[str, list[dict]]] = {
+    "shape": {
+        "increase": [  # → Sharp
+            {"zone": "hair", "method": "short_sides", "goal": "사이드를 짧게 정리해 얼굴 윤곽 선명화", "base_score": 0.9},
+            {"zone": "brow", "method": "clean_trim", "goal": "눈썹 끝 라인 정리로 또렷한 인상", "base_score": 0.7},
+            {"zone": "beard", "method": "jawline_accent", "goal": "턱선 따라 수염 정리로 각진 인상 강조", "base_score": 0.6},
+            {"zone": "body", "method": "lean_diet", "goal": "체지방 감량으로 턱선과 얼굴 윤곽 선명화", "base_score": 0.5},
+        ],
+        "decrease": [  # → Soft
+            {"zone": "hair", "method": "textured_fringe", "goal": "앞머리와 질감으로 이마 라인을 부드럽게", "base_score": 0.9},
+            {"zone": "brow", "method": "natural_shape", "goal": "눈썹 자연스럽게 유지, 과도한 정리 지양", "base_score": 0.7},
+            {"zone": "skin", "method": "moisturize", "goal": "충분한 보습으로 피부결 부드럽게", "base_score": 0.6},
+        ],
+    },
+    "volume": {
+        "increase": [  # → Bold
+            {"zone": "brow", "method": "fill_shape", "goal": "눈썹 빈 곳 채워 또렷한 눈매 강조", "base_score": 0.9},
+            {"zone": "hair", "method": "volume_styling", "goal": "볼륨감 있는 스타일링으로 존재감 강화", "base_score": 0.75},
+            {"zone": "body", "method": "bulk_training", "goal": "상체 볼륨업으로 전체 존재감 강화 (어깨/가슴)", "base_score": 0.65},
+            {"zone": "skin", "method": "tone_up", "goal": "톤업 선크림으로 피부 밝기 올려 이목구비 부각", "base_score": 0.5},
+        ],
+        "decrease": [  # → Subtle
+            {"zone": "hair", "method": "neat_down", "goal": "차분하게 눌린 스타일로 절제된 느낌", "base_score": 0.9},
+            {"zone": "brow", "method": "thin_natural", "goal": "눈썹 얇게 정리해 부담 없는 인상", "base_score": 0.75},
+            {"zone": "body", "method": "lean_cardio", "goal": "유산소 위주로 슬림하고 절제된 체형 유지", "base_score": 0.55},
+            {"zone": "skin", "method": "matte_care", "goal": "매트한 피부 관리로 차분한 느낌", "base_score": 0.5},
+        ],
+    },
+    "age": {
+        "increase": [  # → Mature
+            {"zone": "hair", "method": "slick_back", "goal": "이마를 드러내는 스타일로 성숙한 인상", "base_score": 0.85},
+            {"zone": "beard", "method": "stubble_maintain", "goal": "짧은 수염으로 성숙하고 남성적인 느낌", "base_score": 0.7},
+            {"zone": "brow", "method": "straight_shape", "goal": "일자 눈썹으로 정돈된 인상", "base_score": 0.6},
+            {"zone": "body", "method": "posture_shoulder", "goal": "어깨 펴고 자세 교정으로 성숙한 체형", "base_score": 0.5},
+        ],
+        "decrease": [  # → Fresh
+            {"zone": "hair", "method": "soft_bangs", "goal": "부드러운 앞머리로 어려 보이는 효과", "base_score": 0.85},
+            {"zone": "beard", "method": "clean_shave", "goal": "깔끔한 면도로 동안 느낌", "base_score": 0.7},
+            {"zone": "skin", "method": "hydra_glow", "goal": "수분 광채 케어로 생기 있는 피부", "base_score": 0.6},
+            {"zone": "body", "method": "lean_maintain", "goal": "슬림한 체형 유지로 가벼운 인상", "base_score": 0.5},
+        ],
+    },
+}
+
+
+# ─────────────────────────────────────────────
+#  Gender별 룰 선택 헬퍼
+# ─────────────────────────────────────────────
+
+def _get_action_rules(gender: str) -> dict:
+    """gender에 따라 적절한 AXIS_ACTION_RULES 반환."""
+    if gender == "male":
+        return AXIS_ACTION_RULES_MALE
+    return AXIS_ACTION_RULES_FEMALE
+
 
 MAX_TARGET_AXES = 3
 MIN_RECOMMENDED_ACTIONS = 2
@@ -259,6 +320,7 @@ def build_action_spec(
     type_delta: dict[str, float],
     gap: dict,
     interview_intent: dict[str, str] | None = None,
+    gender: str = "female",
 ) -> ActionSpec:
     """
     Layer 1: gap → 목표 방향 결정
@@ -280,10 +342,11 @@ def build_action_spec(
     primary_axis = target_axes[0][0] if target_axes else "shape"
     debug_trace["target_axes"] = [(a, d, round(m, 3)) for a, d, m in target_axes]
 
-    # ── Layer 1.5: 공통 룰에서 action 후보 + base_score 수집 ──
+    # ── Layer 1.5: gender별 룰에서 action 후보 + base_score 수집 ──
+    action_rules = _get_action_rules(gender)
     candidates: list[dict] = []
     for axis, direction, magnitude in target_axes:
-        rules = AXIS_ACTION_RULES.get(axis, {}).get(direction, [])
+        rules = action_rules.get(axis, {}).get(direction, [])
         for rule in rules:
             score = rule["base_score"] * magnitude
             candidates.append({
@@ -337,7 +400,7 @@ def build_action_spec(
 
     # ── 최소 action 보장 (gap이 작거나 후보 부족 시) ──
     if len(recommended) < MIN_RECOMMENDED_ACTIONS:
-        fallback_rules = AXIS_ACTION_RULES.get(primary_axis, {}).get("increase", [])
+        fallback_rules = action_rules.get(primary_axis, {}).get("increase", [])
         for rule in fallback_rules:
             if rule["zone"] not in seen_zones and len(recommended) < MIN_RECOMMENDED_ACTIONS:
                 recommended.append(RecommendedAction(
@@ -361,7 +424,7 @@ def build_action_spec(
         recommended_actions=recommended,
         avoid_actions=avoid_actions,
         expected_effects=expected_effects,
-        report_mode="makeup_female_v0",
+        report_mode="grooming_male_v0" if gender == "male" else "makeup_female_v0",
         _debug_trace=debug_trace,
     )
 
@@ -377,7 +440,10 @@ def build_overlay_plan(
     """
     recommended_actions → 시각적 오버레이 계획.
     zone name(semantic)까지만 확정. landmark 변환은 렌더러에서 source_model 확인 후 수행.
+    남성(grooming_male)은 오버레이 비활성 — 빈 리스트 반환.
     """
+    if action_spec.report_mode.startswith("grooming"):
+        return []
     modifier = get_type_modifier(action_spec.matched_type_id)
     intensity = modifier.get("shading_intensity", "medium")
     mult = {"minimal": 0.6, "light": 0.8, "medium": 1.0, "strong": 1.2}.get(intensity, 1.0)

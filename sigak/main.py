@@ -295,6 +295,7 @@ async def run_analysis(user_id: str):
         type_delta=type_comparisons[0]["axis_impacts"] if type_comparisons else {},
         gap=gap,
         interview_intent=aspiration_result.get("intent_tags"),
+        gender=gender,
     )
 
     # ── Step 8.5: Overlay Plan 생성 ★ ──

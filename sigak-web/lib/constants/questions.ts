@@ -32,6 +32,12 @@ export const CORE_QUESTIONS: InterviewQuestion[] = [
     placeholder: "평소 메이크업이나 스타일링은 어떻게 되시나요? 생략하는 편이라면 생략한다고 적어주세요.",
     rows: 2,
   },
+  {
+    key: "hair_texture",
+    label: "모질",
+    placeholder: "모질을 선택해주세요 (직모 / 웨이브 / 곱슬). 모발 굵기(가는 편/보통/굵은 편)도 알려주시면 좋아요.",
+    rows: 1,
+  },
 ];
 
 // 웨딩 추가 질문

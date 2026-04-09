@@ -32,6 +32,7 @@ interface ActionPlanProps {
 
 // 존 이름 영문 → 한국어 매핑 (Fix #16)
 const ZONE_KR: Record<string, string> = {
+  // 여성 (메이크업)
   overall: "전체 베이스",
   cheek_apple: "볼 사과존",
   lip: "입술",
@@ -40,6 +41,11 @@ const ZONE_KR: Record<string, string> = {
   brow: "눈썹",
   eye_crease: "눈두덩",
   nose_bridge: "콧대",
+  // 남성 (그루밍)
+  hair: "헤어스타일",
+  beard: "수염",
+  skin: "스킨케어",
+  body: "체형 관리",
 };
 
 // 우선순위 배지 스타일 — 한국어 라벨 기반 (Fix #13)

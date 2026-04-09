@@ -876,13 +876,23 @@ def _build_gap_analysis(
         from_score = max(-1.0, min(1.0, float(current_coords.get(axis_name, 0) or 0)))
         to_score = max(-1.0, min(1.0, float(aspiration_coords.get(axis_name, 0) or 0)))
         from_label = get_position_label(axis_name, from_score)
-        to_label = get_position_label(axis_name, to_score)
 
-        recommendation = build_gap_recommendation(axis_name, delta_val)
+        # delta 작으면 "현재 유지", 아니면 목표 방향 명시
+        if abs(delta_val) < 0.15:
+            to_label = "현재 유지"
+            difficulty = "유지"
+            recommendation = f"{ax_labels.get('name_kr', axis_name)}은 현재와 추구미가 가까워 큰 변화 없이 유지하면 돼요."
+        else:
+            # "중간" 대신 이동 방향으로 표시 (예: "프레시 방향으로")
+            target_direction = ax_labels.get("high", "") if delta_val > 0 else ax_labels.get("low", "")
+            to_label = f"{target_direction} 방향으로"
+            difficulty = _axis_difficulty(delta_val)
+            recommendation = build_gap_recommendation(axis_name, delta_val)
 
         direction_items.append({
             "axis": axis_name,
             "label": ax_labels.get("name_kr", axis_name),
+            "name_kr": ax_labels.get("name_kr", axis_name),
             "label_low": ax_labels.get("low", ""),
             "label_high": ax_labels.get("high", ""),
             "axis_description": ax_labels.get("description", ""),
@@ -891,7 +901,7 @@ def _build_gap_analysis(
             "delta": round(abs(delta_val), 2),
             "from_label": from_label,
             "to_label": to_label,
-            "difficulty": _axis_difficulty(delta_val),
+            "difficulty": difficulty,
             "recommendation": recommendation,
         })
 
@@ -948,6 +958,7 @@ def _build_action_plan(
     gap: dict,
     face_features: dict,
     report_content: dict,
+    gender: str = "female",
 ) -> dict:
     """action_plan 섹션 -- full 잠금.
 
@@ -1018,23 +1029,47 @@ def _build_action_plan(
         _p_delta = gap_vector.get(_p_dir, 0)
         _p_ax = AXIS_LABELS.get(_p_dir, {})
         shift_kr = _p_ax.get("high") if _p_delta > 0 else _p_ax.get("low", "")
-        items = [
-            {
-                "category": "메이크업",
-                "priority": "핵심 포인트",
-                "recommendations": [{"action": "메이크업으로 전체 인상을 조정해보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
-            },
-            {
-                "category": "헤어",
-                "priority": "핵심 포인트",
-                "recommendations": [{"action": "헤어 스타일링으로 분위기를 바꿔보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
-            },
-            {
-                "category": "스타일링",
-                "priority": "추가하면 좋은 포인트",
-                "recommendations": [{"action": "전체 스타일링 방향을 맞춰보세요.", "expected_effect": "전체 조화"}],
-            },
-        ]
+        if gender == "male":
+            items = [
+                {
+                    "category": "헤어스타일",
+                    "priority": "핵심 포인트",
+                    "recommendations": [{"action": "헤어 스타일링으로 전체 인상을 조정해보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
+                },
+                {
+                    "category": "그루밍",
+                    "priority": "핵심 포인트",
+                    "recommendations": [{"action": "눈썹과 수염 정리로 인상을 다듬어보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
+                },
+                {
+                    "category": "체형 관리",
+                    "priority": "추가하면 좋은 포인트",
+                    "recommendations": [{"action": "체형 관리로 전체 인상의 밸런스를 맞춰보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
+                },
+                {
+                    "category": "스킨케어",
+                    "priority": "추가하면 좋은 포인트",
+                    "recommendations": [{"action": "피부 관리로 전체 분위기를 마무리해보세요.", "expected_effect": "전체 조화"}],
+                },
+            ]
+        else:
+            items = [
+                {
+                    "category": "메이크업",
+                    "priority": "핵심 포인트",
+                    "recommendations": [{"action": "메이크업으로 전체 인상을 조정해보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
+                },
+                {
+                    "category": "헤어",
+                    "priority": "핵심 포인트",
+                    "recommendations": [{"action": "헤어 스타일링으로 분위기를 바꿔보세요.", "expected_effect": f"더 {shift_kr} 느낌으로"}],
+                },
+                {
+                    "category": "스타일링",
+                    "priority": "추가하면 좋은 포인트",
+                    "recommendations": [{"action": "전체 스타일링 방향을 맞춰보세요.", "expected_effect": "전체 조화"}],
+                },
+            ]
 
     # 티저용 카테고리 요약
     teaser_categories = [item["category"] for item in items[:3]]
@@ -1251,7 +1286,7 @@ def format_report_for_frontend(
             similar_types, aspiration_interpretation, report_content,
             aspiration_anchor=aspiration_anchor,
         ),
-        _build_action_plan(gap, face_features, report_content),
+        _build_action_plan(gap, face_features, report_content, gender=gender),
         _build_type_reference(similar_types, report_content, gap=gap),
         _build_trend_context(report_content, user_name=user_name),
     ]

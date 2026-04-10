@@ -88,18 +88,60 @@ def _angle(a, b, c):
     return math.degrees(math.acos(cos_angle))
 
 
+# ── 얼굴형 분류 (v2: SCUT-FBP5500 캘리브레이션 기반) ──
+
+# 캘리브레이션 범위 (SCUT 2000 + 셀럽 42장 합산)
+# ratio max를 1.55로 확장 (셀럽에서 1.53까지 관측)
+_FACE_CAL = {
+    "ratio": (1.048, 1.55),
+    "jaw":   (84.7, 131.8),
+    "cheek": (0.336, 0.913),
+    "fore":  (0.308, 0.530),
+}
+
+_OVAL_PENALTY = 0.90
+
+_FACE_SHAPE_SIGNATURES = {
+    # target: 정규화 공간(0~1)에서 해당 유형의 이상적 위치
+    # weight: 해당 피처의 판별 중요도
+    # 셀럽 42장 + SCUT 2000장 교차 검증 후 튜닝 (2026-04-10)
+    "oval":              {"ratio": (0.55, 1.5), "jaw": (0.45, 1.5), "cheek": (0.50, 1.0), "fore": (0.50, 1.0)},
+    "round":             {"ratio": (0.20, 2.0), "jaw": (0.80, 3.0), "cheek": (0.40, 0.5), "fore": (0.55, 0.5)},
+    "oblong":            {"ratio": (0.95, 3.0), "jaw": (0.55, 0.5), "cheek": (0.45, 0.3), "fore": (0.50, 0.3)},
+    "square":            {"ratio": (0.30, 1.5), "jaw": (0.10, 3.0), "cheek": (0.40, 1.0), "fore": (0.50, 0.5)},
+    "heart":             {"ratio": (0.50, 0.5), "jaw": (0.25, 2.0), "cheek": (0.55, 1.0), "fore": (0.80, 3.0)},
+    "inverted_triangle": {"ratio": (0.50, 0.5), "jaw": (0.15, 2.5), "cheek": (0.80, 3.0), "fore": (0.55, 1.0)},
+    "diamond":           {"ratio": (0.55, 0.5), "jaw": (0.20, 1.5), "cheek": (0.90, 3.5), "fore": (0.20, 3.0)},
+}
+
+
+def _norm_feat(value: float, vmin: float, vmax: float) -> float:
+    if vmax == vmin:
+        return 0.5
+    return max(0.0, min(1.0, (value - vmin) / (vmax - vmin)))
+
+
 def _classify_face_shape(ratio, jaw_angle, cheekbone, forehead) -> str:
-    """얼굴형 분류."""
-    if ratio > 1.5 and jaw_angle < 125:
-        return "oblong"
-    elif ratio < 1.2 and jaw_angle > 140:
-        return "round"
-    elif ratio < 1.3 and jaw_angle < 120:
-        return "square"
-    elif cheekbone > 0.5 and forehead > 0.38:
-        return "heart"
-    else:
-        return "oval"
+    """얼굴형 분류 (v2: 시그니처 유사도 + oval penalty)."""
+    norms = {
+        "ratio": _norm_feat(ratio, *_FACE_CAL["ratio"]),
+        "jaw":   _norm_feat(jaw_angle, *_FACE_CAL["jaw"]),
+        "cheek": _norm_feat(cheekbone, *_FACE_CAL["cheek"]),
+        "fore":  _norm_feat(forehead, *_FACE_CAL["fore"]),
+    }
+    best_shape, best_score = "oval", -1.0
+    for shape, sig in _FACE_SHAPE_SIGNATURES.items():
+        w_sum, w_total = 0.0, 0.0
+        for feat, (target, weight) in sig.items():
+            w_sum += weight * (1.0 - abs(norms[feat] - target))
+            w_total += weight
+        score = w_sum / w_total if w_total > 0 else 0.0
+        if shape == "oval":
+            score *= _OVAL_PENALTY
+        if score > best_score:
+            best_score = score
+            best_shape = shape
+    return best_shape
 
 
 def _analyze_skin_tone_from_image(image: np.ndarray, cheek_points: list[tuple]) -> dict:
@@ -133,10 +175,16 @@ def _analyze_skin_tone_from_image(image: np.ndarray, cheek_points: list[tuple]) 
     a_mean = pixels_lab[:, 1].mean()
     b_mean = pixels_lab[:, 2].mean()
 
+    # warmth (v2: 아시안 피부 중심값 기준 z-score)
+    # 아시안 피부의 전형적 warmth가 17~37 범위라 절대값 threshold(8)로는
+    # 거의 전부 warm으로 분류됨. z-score로 상대 비교.
+    _WARMTH_CENTER = 13.0  # 아시안 피부 warmth 중앙값 (셀럽 42장 실측: 13.2)
+    _WARMTH_STD = 9.5      # warmth 표준편차 (셀럽 42장 실측: 9.5)
     warmth = (b_mean - 128) + (a_mean - 128) * 0.5
-    if warmth > 8:
+    warmth_z = (warmth - _WARMTH_CENTER) / _WARMTH_STD
+    if warmth_z > 0.5:
         tone = "warm"
-    elif warmth < -3:
+    elif warmth_z < -0.5:
         tone = "cool"
     else:
         tone = "neutral"

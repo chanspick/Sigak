@@ -52,6 +52,7 @@ class FaceFeatures:
     landmarks: list              # raw landmarks as list of [x,y] or [x,y,z]
     landmarks_106: list          # InsightFace 106점 2D landmarks [[x,y], ...] 또는 빈 리스트
     bbox: list                   # [x1, y1, x2, y2] 또는 빈 리스트
+    personal_color: Optional[dict] = None  # 4계절 퍼스널컬러 {season, subtype, label_kr, confidence}
 
     def to_dict(self):
         d = asdict(self)
@@ -199,12 +200,29 @@ def _analyze_skin_tone_from_image(image: np.ndarray, cheek_points: list[tuple]) 
         _c(avg_bgr[2]), _c(avg_bgr[1]), _c(avg_bgr[0])  # BGR → RGB
     )
 
+    # 4계절 퍼스널 컬러 분류 (v3)
+    from pipeline.personal_color import PersonalColorClassifier
+
+    pc_classifier = PersonalColorClassifier()
+    pc_result = pc_classifier.classify(
+        warmth=warmth,
+        brightness=l_mean * 100,  # 0-1 -> 0-100
+        chroma=chroma,
+        is_calibrated=False,
+    )
+
     return {
         "skin_tone": tone,
         "skin_brightness": round(float(l_mean), 3),
         "skin_warmth_score": round(float(warmth), 4),
         "skin_chroma": round(float(chroma), 1),
         "skin_hex_sample": hex_sample,
+        "personal_color": {
+            "season": pc_result.season,
+            "subtype": pc_result.subtype,
+            "label_kr": pc_result.label_kr,
+            "confidence": pc_result.confidence,
+        },
     }
 
 
@@ -486,6 +504,7 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_warmth_score=skin["skin_warmth_score"],
         skin_chroma=skin["skin_chroma"],
         skin_hex_sample=skin["skin_hex_sample"],
+        personal_color=skin.get("personal_color"),
         landmarks=raw_landmarks,
         landmarks_106=raw_106,
         bbox=raw_bbox,
@@ -661,6 +680,7 @@ def _analyze_with_mediapipe(image: np.ndarray) -> Optional[FaceFeatures]:
         skin_warmth_score=skin["skin_warmth_score"],
         skin_chroma=skin["skin_chroma"],
         skin_hex_sample=skin["skin_hex_sample"],
+        personal_color=skin.get("personal_color"),
         landmarks=raw_landmarks,
         landmarks_106=[],  # MediaPipe에는 106점 없음
         bbox=[],

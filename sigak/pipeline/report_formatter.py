@@ -647,13 +647,52 @@ def _build_face_structure(face_features: dict, face_interpretation: Optional[dic
 
 
 def _build_skin_analysis(face_features: dict) -> dict:
-    """skin_analysis 섹션 -- standard 잠금. v2: undertone × chroma 6타입."""
+    """skin_analysis 섹션 -- standard 잠금. v3: 4계절 x 서브타입 (6타입 폴백)."""
     undertone = face_features.get("skin_tone", "neutral")
     chroma = face_features.get("skin_chroma", 0.0)
     warmth = face_features.get("skin_warmth_score", 0.0)
     brightness = face_features.get("skin_brightness", 0.5)
     hex_sample = face_features.get("skin_hex_sample", "#999999")
+    personal_color = face_features.get("personal_color")
 
+    # 4계절 데이터가 있으면 새 시스템 사용, 없으면 6타입 폴백
+    if personal_color:
+        from pipeline.personal_color import get_season_palette
+
+        season = personal_color.get("season", "spring")
+        subtype = personal_color.get("subtype", "light")
+        label_kr = personal_color.get("label_kr", "")
+        confidence = personal_color.get("confidence", 0.0)
+
+        palette = get_season_palette(season, subtype)
+
+        return {
+            "id": "skin_analysis",
+            "locked": True,
+            "unlock_level": "standard",
+            "teaser": {"headline": palette["label_kr"]},
+            "content": {
+                "tone": palette["label_kr"],
+                "tone_description": palette["description"],
+                "hex_sample": hex_sample,
+                "recommended": palette["recommended"],
+                "avoid": palette["avoid"],
+                "avoid_reason": palette["avoid_reason"],
+                "season": season,
+                "subtype": subtype,
+                "lip_direction": palette.get("lip_direction", ""),
+                "cheek_direction": palette.get("cheek_direction", ""),
+                "eye_direction": palette.get("eye_direction", ""),
+                "foundation_guide": palette.get("foundation_guide", ""),
+                "confidence": confidence,
+                "_undertone": undertone,
+                "_chroma": round(chroma, 1),
+                "_warmth": round(warmth, 1),
+                "_brightness": round(brightness, 3),
+            },
+        }
+
+    # 폴백: 기존 6타입 시스템
     skin_type = classify_skin_type(undertone, chroma)
 
     return {

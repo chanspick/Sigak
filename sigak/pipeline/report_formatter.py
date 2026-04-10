@@ -253,6 +253,8 @@ FACE_SHAPE_KR = {
     "square": "각진형",
     "heart": "하트형",
     "oblong": "긴형",
+    "inverted_triangle": "역삼각형",
+    "diamond": "다이아몬드형",
 }
 
 # gap recommendation 템플릿

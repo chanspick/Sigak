@@ -9,6 +9,7 @@ import { SkinAnalysis } from "./sections/skin-analysis";
 import { CoordinateMap } from "./sections/coordinate-map";
 
 import { GapAnalysis } from "./sections/gap-analysis";
+import { HairRecommendation } from "./sections/hair-recommendation";
 import { ActionPlan } from "./sections/action-plan";
 import { CelebReference } from "./sections/celeb-reference";
 import { TypeReference } from "./sections/type-reference";
@@ -74,6 +75,13 @@ export function SectionRenderer({ section, accessLevel, overlay }: SectionRender
       return (
         <CoordinateMap
           content={content as Parameters<typeof CoordinateMap>[0]["content"]}
+          locked={locked}
+        />
+      );
+    case "hair_recommendation":
+      return (
+        <HairRecommendation
+          content={content as Parameters<typeof HairRecommendation>[0]["content"]}
           locked={locked}
         />
       );

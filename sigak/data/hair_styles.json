@@ -1,0 +1,145 @@
+{
+  "front_styles": [
+    {
+      "id": "h-f01",
+      "name_kr": "풀뱅",
+      "name_en": "Full Bangs",
+      "image": "/assets/reference/hair/front/h-f01.jpg"
+    },
+    {
+      "id": "h-f02",
+      "name_kr": "시스루뱅",
+      "name_en": "See-Through Bangs",
+      "image": "/assets/reference/hair/front/h-f02.jpg"
+    },
+    {
+      "id": "h-f03",
+      "name_kr": "5:5 사이드뱅",
+      "name_en": "Center-Parted Side Bangs",
+      "image": "/assets/reference/hair/front/h-f03.jpg"
+    },
+    {
+      "id": "h-f04",
+      "name_kr": "비대칭 사이드뱅",
+      "name_en": "Asymmetric Side Bangs",
+      "image": "/assets/reference/hair/front/h-f04.jpg"
+    },
+    {
+      "id": "h-f05",
+      "name_kr": "턱선길이 사이드뱅",
+      "name_en": "Jaw-Length Side Bangs",
+      "image": "/assets/reference/hair/front/h-f05.jpg"
+    },
+    {
+      "id": "h-f06",
+      "name_kr": "컬리뱅",
+      "name_en": "Curly Bangs",
+      "image": "/assets/reference/hair/front/h-f06.jpg"
+    },
+    {
+      "id": "h-f07",
+      "name_kr": "처피뱅",
+      "name_en": "Choppy Bangs",
+      "image": "/assets/reference/hair/front/h-f07.jpg"
+    },
+    {
+      "id": "h-f08",
+      "name_kr": "앞머리없음",
+      "name_en": "No Bangs",
+      "image": "/assets/reference/hair/front/h-f08.jpg"
+    }
+  ],
+  "back_styles": [
+    {
+      "id": "h-b01",
+      "name_kr": "숏컷",
+      "name_en": "Short Pixie Cut",
+      "image_front": "/assets/reference/hair/back-front/h-b01.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b01.jpg"
+    },
+    {
+      "id": "h-b02",
+      "name_kr": "보브단발/레이어드",
+      "name_en": "Bob Cut / Layered",
+      "image_front": "/assets/reference/hair/back-front/h-b02.png",
+      "image_rear": "/assets/reference/hair/back-rear/h-b02.jpg"
+    },
+    {
+      "id": "h-b03",
+      "name_kr": "칼단발",
+      "name_en": "Blunt Bob",
+      "image_front": "/assets/reference/hair/back-front/h-b03.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b03.jpg"
+    },
+    {
+      "id": "h-b04",
+      "name_kr": "단발 굵은펌",
+      "name_en": "Short C-Curl Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b04.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b04.jpg"
+    },
+    {
+      "id": "h-b05",
+      "name_kr": "단발 S컬펌",
+      "name_en": "Short S-Curl Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b05.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b05.jpg"
+    },
+    {
+      "id": "h-b06",
+      "name_kr": "일자 중단발",
+      "name_en": "Medium Straight",
+      "image_front": "/assets/reference/hair/back-front/h-b06.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b06.jpg"
+    },
+    {
+      "id": "h-b07",
+      "name_kr": "중단발 레이어드",
+      "name_en": "Medium Layered",
+      "image_front": "/assets/reference/hair/back-front/h-b07.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b07.jpg"
+    },
+    {
+      "id": "h-b08",
+      "name_kr": "중단발 아웃C컬",
+      "name_en": "Medium Outward C-Curl",
+      "image_front": "/assets/reference/hair/back-front/h-b08.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b08.png"
+    },
+    {
+      "id": "h-b09",
+      "name_kr": "중단발펌",
+      "name_en": "Medium S-Curl Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b09.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b09.jpg"
+    },
+    {
+      "id": "h-b10",
+      "name_kr": "긴 생머리",
+      "name_en": "Long Straight",
+      "image_front": "/assets/reference/hair/back-front/h-b10.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b10.jpg"
+    },
+    {
+      "id": "h-b11",
+      "name_kr": "긴머리펌",
+      "name_en": "Long Wave Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b11.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b11.jpg"
+    },
+    {
+      "id": "h-b12",
+      "name_kr": "긴머리 레이어드펌",
+      "name_en": "Long Layered Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b12.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b12.png"
+    },
+    {
+      "id": "h-b13",
+      "name_kr": "히피펌",
+      "name_en": "Hippie Perm",
+      "image_front": "/assets/reference/hair/back-front/h-b13.jpg",
+      "image_rear": "/assets/reference/hair/back-rear/h-b13.jpg"
+    }
+  ]
+}

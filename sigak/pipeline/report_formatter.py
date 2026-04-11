@@ -9,6 +9,7 @@ ReportData JSON 구조로 변환하는 브릿지 모듈.
 import json
 import math
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -995,6 +996,93 @@ def _build_gap_analysis(
     }
 
 
+# ─────────────────────────────────────────────
+#  헤어 레퍼런스 이미지 로더
+# ─────────────────────────────────────────────
+
+_HAIR_STYLES_PATH = Path(__file__).parent.parent / "data" / "hair_styles.json"
+_hair_styles_cache: dict | None = None
+
+
+def _load_hair_styles() -> dict:
+    """hair_styles.json 로드 (캐시)."""
+    global _hair_styles_cache
+    if _hair_styles_cache is None:
+        with open(_HAIR_STYLES_PATH, encoding="utf-8") as f:
+            _hair_styles_cache = json.load(f)
+    return _hair_styles_cache
+
+
+def _build_hair_recommendation(
+    gap: dict,
+    report_content: dict,
+    gender: str = "female",
+) -> dict:
+    """hair_recommendation 섹션 — ₩49K 잠금.
+
+    AI 레퍼런스 이미지 기반 헤어 추천.
+    파이널폼 v5: p7 TOP 3 조합 + p8~11 심화/AVOID.
+    """
+    styles = _load_hair_styles()
+    front_styles = {s["id"]: s for s in styles.get("front_styles", [])}
+    back_styles = {s["id"]: s for s in styles.get("back_styles", [])}
+
+    # LLM report_content에서 헤어 관련 데이터 추출
+    hair_data = report_content.get("hair_recommendation", {})
+    cheat_sheet = hair_data.get("cheat_sheet", "")
+    raw_combos = hair_data.get("top_combos", [])
+    raw_avoids = hair_data.get("avoid", [])
+
+    # TOP 3 조합 빌드 — LLM이 front_id/back_id를 줬으면 이미지 매칭
+    top_combos = []
+    for combo in raw_combos[:3]:
+        front_id = combo.get("front_id", "")
+        back_id = combo.get("back_id", "")
+        front = front_styles.get(front_id)
+        back = back_styles.get(back_id)
+        entry = {
+            "rank": combo.get("rank", len(top_combos) + 1),
+            "score": combo.get("score"),
+            "front": front,
+            "back": back,
+            "why": combo.get("why", ""),
+            "axis_shift": combo.get("axis_shift", {}),
+            "salon_instruction": combo.get("salon_instruction", ""),
+            "trend": combo.get("trend"),
+        }
+        top_combos.append(entry)
+
+    # AVOID 스타일 빌드
+    avoid_list = []
+    for av in raw_avoids:
+        style_id = av.get("style_id", "")
+        style = front_styles.get(style_id) or back_styles.get(style_id)
+        avoid_list.append({
+            "style": style,
+            "name_kr": av.get("name_kr", style["name_kr"] if style else ""),
+            "reason": av.get("reason", ""),
+        })
+
+    # 전체 스타일 카탈로그 (프론트엔드에서 필요 시 사용)
+    catalog = {
+        "front": list(front_styles.values()),
+        "back": list(back_styles.values()),
+    }
+
+    return {
+        "id": "hair_recommendation",
+        "locked": True,
+        "unlock_level": "full",
+        "teaser": {"headline": cheat_sheet[:60] + "..." if len(cheat_sheet) > 60 else cheat_sheet},
+        "content": {
+            "cheat_sheet": cheat_sheet,
+            "top_combos": top_combos,
+            "avoid": avoid_list,
+            "catalog": catalog,
+        },
+    }
+
+
 def _build_action_plan(
     gap: dict,
     face_features: dict,
@@ -1327,6 +1415,7 @@ def format_report_for_frontend(
             similar_types, aspiration_interpretation, report_content,
             aspiration_anchor=aspiration_anchor,
         ),
+        _build_hair_recommendation(gap, report_content, gender=gender),
         _build_action_plan(gap, face_features, report_content, gender=gender),
         _build_type_reference(similar_types, report_content, gap=gap),
         _build_trend_context(report_content, user_name=user_name),

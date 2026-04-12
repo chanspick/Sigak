@@ -245,10 +245,11 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
     _save_json(user_id, "order.json", order)
 
     # 6. Zapier 웹훅 → 관리자 알림
+    print(f"[WEBHOOK] NEW_ORDER url={'SET' if ZAPIER_WEBHOOK_NEW_ORDER else 'EMPTY'}")
     if ZAPIER_WEBHOOK_NEW_ORDER:
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
+                resp = await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
                     "order_id": order_id,
                     "user_name": submit_data.name,
                     "phone": submit_data.phone,
@@ -256,9 +257,10 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
                     "amount": amount,
                     "created_at": order["created_at"],
                     "confirm_url": f"{settings.base_url}/api/v1/confirm/{order_id}",
-                }, timeout=5.0)
-        except Exception:
-            pass  # 웹훅 실패해도 주문은 유지
+                }, timeout=10.0)
+                print(f"[WEBHOOK] NEW_ORDER response: {resp.status_code}")
+        except Exception as e:
+            print(f"[WEBHOOK] NEW_ORDER error: {e}")
 
     # 7. 응답
     return {

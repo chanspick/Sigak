@@ -78,9 +78,8 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "sigak-admin-2026")
 
 # 가격표
 PRICE_MAP = {
-    "standard": 5000,
-    "full": 49000,
-    "celeb": 100000,
+    "standard": 5000,    # 1차: 오버뷰 (AI 실행 트리거)
+    "full": 44000,       # 2차: 풀 리포트 (추가 입금)
 }
 
 PAYMENT_INFO = {
@@ -107,7 +106,7 @@ class SubmitRequest(BaseModel):
     name: str
     phone: str
     gender: str = "female"
-    tier: str = "full"  # standard | full | celeb
+    tier: str = "standard"  # 항상 standard(₩5,000)로 시작
     # Step 1: 얼굴 & 체형
     face_concerns: Optional[str] = None
     neck_length: Optional[str] = None
@@ -448,7 +447,7 @@ def _run_analysis_pipeline(user_id: str, order: dict) -> str:
         "gap": gap,
         "content": report_content,
         "created_at": datetime.utcnow().isoformat(),
-        "access_level": "full",  # 결제 완료 후 실행이므로 바로 full
+        "access_level": order.get("tier", "standard"),  # standard(₩5K) 또는 full
     }
     REPORTS[report_id] = _sanitize(report)
     # user_id로도 접근 가능하게 (하위호환)
@@ -479,12 +478,31 @@ async def get_report(report_id: str):
 
     if "formatted" in report:
         response = {**report["formatted"]}
-        response["access_level"] = report.get("access_level", "full")
-        response["pending_level"] = None
+        access = report.get("access_level", "standard")
+        response["access_level"] = access
+        response["pending_level"] = report.get("pending_level")
 
-        # 섹션 잠금 해제 (결제 후 실행이므로 전부 해제)
+        # access_level에 따라 섹션 잠금
+        level_order = {"free": 0, "standard": 1, "full": 2}
+        current = level_order.get(access, 0)
         for section in response.get("sections", []):
-            section["locked"] = False
+            unlock = section.get("unlock_level")
+            if unlock:
+                section["locked"] = current < level_order.get(unlock, 0)
+            else:
+                section["locked"] = False
+
+        # 풀 업그레이드 페이월 정보
+        if access != "full":
+            response["paywall"] = {
+                "full": {
+                    "price": 44000,
+                    "label": "풀 리포트 언락",
+                    "total_note": "기존 ₩5,000 + 추가 ₩44,000 = 총 ₩49,000",
+                    "method": "manual",
+                },
+            }
+            response["payment_account"] = PAYMENT_INFO
 
         return response
 
@@ -513,6 +531,57 @@ async def get_order_status(order_id: str):
         result["report_url"] = f"/report/{order['report_id']}"
 
     return result
+
+
+# ─────────────────────────────────────────────
+#  풀 업그레이드 (₩44,000 추가 입금 후)
+# ─────────────────────────────────────────────
+
+@app.post("/api/v1/upgrade/{report_id}")
+async def upgrade_report(report_id: str, data: ConfirmRequest):
+    """관리자가 추가 입금(₩44,000) 확인 후 호출. 블러 해제."""
+    if data.admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+
+    report = REPORTS.get(report_id)
+    if not report:
+        # user_id로도 시도
+        for rid, r in REPORTS.items():
+            if r.get("user_id") == report_id:
+                report = r
+                report_id = rid
+                break
+
+    if not report:
+        raise HTTPException(404, "리포트를 찾을 수 없습니다")
+
+    if report.get("access_level") == "full":
+        return {"status": "already_full", "report_id": report["id"]}
+
+    report["access_level"] = "full"
+    report["upgraded_at"] = datetime.utcnow().isoformat()
+
+    user_id = report.get("user_id", "")
+    if user_id:
+        _save_json(user_id, "report.json", report)
+
+    # Zapier 웹훅 → 유저에게 풀 리포트 알림
+    if ZAPIER_WEBHOOK_REPORT_READY:
+        try:
+            user = USERS.get(user_id, {})
+            async with httpx.AsyncClient() as client:
+                await client.post(ZAPIER_WEBHOOK_REPORT_READY, json={
+                    "order_id": report.get("order_id", ""),
+                    "user_phone": user.get("phone", ""),
+                    "user_name": user.get("name", ""),
+                    "report_url": f"{settings.base_url}/report/{report['id']}",
+                    "tier": "full",
+                    "message": "풀 리포트가 언락되었습니다!",
+                }, timeout=5.0)
+        except Exception:
+            pass
+
+    return {"status": "upgraded", "report_id": report["id"], "access_level": "full"}
 
 
 # ─────────────────────────────────────────────

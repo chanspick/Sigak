@@ -85,11 +85,11 @@ PRICE_MAP = {
 UPGRADE_PRICE = 44000
 
 PAYMENT_INFO = {
-    "bank": "우체국",
-    "account": "120-0001-11506",
-    "holder": "주식회사 파이컴퓨터",
-    "toss_deeplink": "supertoss://send?amount={amount}&bank=epost&account=12000011506",
-    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=epost&account=12000011506",
+    "bank": "카카오뱅크",
+    "account": "3333-19-3591206",
+    "holder": "최진규",
+    "toss_deeplink": "supertoss://send?amount={amount}&bank=kakaobank&account=3333193591206",
+    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=kakaobank&account=3333193591206",
 }
 
 # ── 클러스터 부트스트랩 ──

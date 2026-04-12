@@ -83,11 +83,11 @@ PRICE_MAP = {
 }
 
 PAYMENT_INFO = {
-    "bank": "토스뱅크",
-    "account": "1000-0000-0000",
-    "holder": "홍한진(시각)",
-    "toss_deeplink": "supertoss://send?amount={amount}&bank=toss&account=100000000000",
-    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=tossbank&account=100000000000",
+    "bank": "우체국뱅킹",
+    "account": "120-0001-11506",
+    "holder": "주식회사 파이컴퓨터",
+    "toss_deeplink": "supertoss://send?amount={amount}&bank=epost&account=12000011506",
+    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=epost&account=12000011506",
 }
 
 # ── 클러스터 부트스트랩 ──

@@ -85,7 +85,7 @@ function PaymentContent() {
           <p className="text-xs text-[var(--color-muted)] leading-relaxed">
             결제 확인 후 AI 분석을 시작합니다.<br />
             완료되면 카카오톡으로 리포트 링크를 보내드립니다.<br />
-            평균 소요 시간: 3~5분
+            평균 소요 시간: 24시간 이내
           </p>
         </div>
 

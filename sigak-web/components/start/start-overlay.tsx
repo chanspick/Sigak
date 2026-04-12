@@ -120,19 +120,22 @@ export function StartOverlay() {
             <div className="flex gap-2">
               {([
                 { id: "female" as Gender, label: "여성" },
-                { id: "male" as Gender, label: "남성" },
+                { id: "male" as Gender, label: "남성 (준비중)", disabled: true },
               ]).map((g) => {
                 const isActive = gender === g.id;
                 return (
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => setGender(g.id)}
+                    onClick={() => !(g as any).disabled && setGender(g.id)}
+                    disabled={(g as any).disabled}
                     className={[
-                      "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 text-sm font-bold tracking-[0.5px]",
-                      isActive
-                        ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
-                        : "border-black/[0.12] bg-transparent hover:border-black/40",
+                      "flex-1 py-3 text-center border transition-all duration-150 text-sm font-bold tracking-[0.5px]",
+                      (g as any).disabled
+                        ? "border-black/[0.06] opacity-30 cursor-not-allowed"
+                        : isActive
+                          ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)] cursor-pointer"
+                          : "border-black/[0.12] bg-transparent hover:border-black/40 cursor-pointer",
                     ].join(" ")}
                   >
                     {g.label}

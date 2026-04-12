@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # ── Report ──
     report_delivery_hours: int = 24
-    base_url: str = "https://sigak.kr"
+    base_url: str = "https://www.sigak.asia"
 
     class Config:
         env_file = (".env", "../.env")

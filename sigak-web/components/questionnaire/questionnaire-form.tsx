@@ -12,9 +12,7 @@ import { PhotoUploader } from "@/components/questionnaire/photo-uploader";
 import type { PhotoEntry } from "@/components/questionnaire/photo-uploader";
 import { Button } from "@/components/ui/button";
 import {
-  uploadPhotos,
-  submitInterview,
-  runAnalysis,
+  submitAll,
   ApiError,
 } from "@/lib/api/client";
 
@@ -114,33 +112,36 @@ export function QuestionnaireForm({
     if (step > 1) setStep((s) => s - 1);
   }, [step]);
 
-  // 제출 처리
+  // 제출 처리 — /submit 호출 → 송금 안내 페이지로 이동
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     setSubmitError(null);
 
     try {
-      // 1. 사진 업로드
       const files = photoFiles.map((entry) => entry.file);
-      if (files.length > 0) {
-        await uploadPhotos(userId, files);
-      }
 
-      // 2. 설문 답변 제출
-      await submitInterview(userId, answers);
+      // 통합 제출: 사진 + 질문지 한 번에
+      const result = await submitAll(
+        { ...answers, gender, tier },
+        files,
+      );
 
       // localStorage 정리
       if (typeof window !== "undefined") {
         localStorage.removeItem(storageKey);
       }
 
-      // 3. 분석 페이지 이동
-      router.push(
-        "/questionnaire/complete?user_id=" + userId + "&gender=" + gender,
-      );
-
-      // 분석 fire-and-forget
-      runAnalysis(userId).catch(() => {});
+      // 송금 안내 페이지로 이동 (order_id 전달)
+      const params = new URLSearchParams({
+        order_id: result.order_id,
+        amount: String(result.payment_info.amount),
+        bank: result.payment_info.bank,
+        account: result.payment_info.account,
+        holder: result.payment_info.holder,
+        toss: result.payment_info.toss_deeplink,
+        kakao: result.payment_info.kakao_deeplink,
+      });
+      router.push("/questionnaire/payment?" + params.toString());
     } catch (err) {
       setSubmitting(false);
       if (err instanceof ApiError) {
@@ -151,7 +152,7 @@ export function QuestionnaireForm({
         );
       }
     }
-  }, [router, userId, gender, storageKey, photoFiles, answers]);
+  }, [router, gender, tier, storageKey, photoFiles, answers]);
 
   // 현재 질문 스텝 정보
   const currentQuestionStep =

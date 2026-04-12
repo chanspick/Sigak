@@ -102,7 +102,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           {/* 섹션 렌더링 */}
           <SectionRenderer
             section={section}
-            accessLevel={"full" as any} // TODO: 피드백용 임시 해제 — 배포 전 복구
+            accessLevel={report.access_level}
             overlay={(report as any).overlay ?? null}
           />
 

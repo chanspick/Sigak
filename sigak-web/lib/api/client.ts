@@ -73,6 +73,31 @@ export interface AnalysisResponse {
   gap_magnitude: number;
 }
 
+/** 새 /submit 응답 */
+export interface SubmitResponse {
+  order_id: string;
+  user_id: string;
+  status: string;
+  payment_info: {
+    amount: number;
+    bank: string;
+    account: string;
+    holder: string;
+    toss_deeplink: string;
+    kakao_deeplink: string;
+  };
+}
+
+/** 주문 상태 */
+export interface OrderStatus {
+  order_id: string;
+  status: "pending_payment" | "processing" | "completed" | "error";
+  tier: string;
+  amount: number;
+  report_id?: string;
+  report_url?: string;
+}
+
 // --- API 함수 ---
 
 /** 예약 생성 (POST /api/v1/booking) */
@@ -152,6 +177,38 @@ export async function getReport(userId: string): Promise<ReportData> {
   });
 
   return handleResponse<ReportData>(response);
+}
+
+/** 통합 제출 — 사진+질문지 → order 생성 (POST /api/v1/submit) */
+export async function submitAll(
+  answers: Record<string, string>,
+  files: File[],
+): Promise<SubmitResponse> {
+  const formData = new FormData();
+  formData.append("data", JSON.stringify(answers));
+  for (const file of files) {
+    formData.append("files", file);
+  }
+
+  const response = await fetch(`${API_URL}/api/v1/submit`, {
+    method: "POST",
+    headers: { ...COMMON_HEADERS },
+    body: formData,
+  });
+
+  return handleResponse<SubmitResponse>(response);
+}
+
+/** 주문 상태 조회 (GET /api/v1/order/{orderId}) */
+export async function getOrderStatus(
+  orderId: string,
+): Promise<OrderStatus> {
+  const response = await fetch(`${API_URL}/api/v1/order/${orderId}`, {
+    method: "GET",
+    headers: { ...COMMON_HEADERS },
+  });
+
+  return handleResponse<OrderStatus>(response);
 }
 
 /**

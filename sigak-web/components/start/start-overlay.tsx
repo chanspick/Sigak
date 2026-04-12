@@ -1,7 +1,6 @@
 "use client";
 
-// 시작 오버레이 - 티어 선택 + 이름/연락처 입력
-// /start 페이지에서 사용
+// 시작 오버레이 - 티어 선택(₩5K/₩49K) + 이름/연락처 입력
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -11,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { createBooking, ApiError } from "@/lib/api/client";
 import type { Tier } from "@/lib/types/tier";
 
-/** 시작 오버레이 (티어 선택 + 기본 정보 입력) */
 type Gender = "female" | "male";
 
 export function StartOverlay() {
@@ -33,7 +31,6 @@ export function StartOverlay() {
       setError(null);
 
       try {
-        // 백엔드 API로 예약 생성
         const result = await createBooking({
           name: name.trim(),
           phone: phone.trim(),
@@ -58,49 +55,49 @@ export function StartOverlay() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] text-[var(--color-fg)] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-[480px] py-12"
-      >
+      <form onSubmit={handleSubmit} className="w-full max-w-[480px] py-12">
         {/* 헤더 */}
         <h1 className="font-[family-name:var(--font-serif)] text-[28px] font-normal mb-2 text-center">
           시작하기
         </h1>
         <p className="text-[13px] opacity-40 text-center mb-10">
-          진단 유형을 선택하고 기본 정보를 입력해 주세요
+          리포트 유형을 선택하고 기본 정보를 입력해 주세요
         </p>
 
         {/* 티어 선택 */}
         <div className="mb-8">
           <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-3">
-            진단 선택
+            리포트 선택
           </p>
           <div className="flex flex-col gap-2">
-            {TIERS.filter((t) => t.id === "basic").map((t) => {
+            {TIERS.map((t) => {
               const isActive = tier === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setTier(t.id)}
-                  className={
+                  className={[
+                    "w-full py-4 px-5 text-left border cursor-pointer transition-all duration-150 relative",
                     isActive
-                      ? "w-full py-4 px-5 text-left border cursor-pointer transition-all duration-150 border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
-                      : "w-full py-4 px-5 text-left border cursor-pointer transition-all duration-150 border-black/[0.12] bg-transparent hover:border-black/40"
-                  }
+                      ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
+                      : "border-black/[0.12] bg-transparent hover:border-black/40",
+                  ].join(" ")}
                 >
+                  {t.badge && (
+                    <span className={[
+                      "absolute top-2 right-3 text-[10px] font-bold tracking-[1px] uppercase px-2 py-0.5",
+                      isActive ? "bg-[var(--color-bg)] text-[var(--color-fg)]" : "bg-[var(--color-fg)] text-[var(--color-bg)]",
+                    ].join(" ")}>
+                      {t.badge}
+                    </span>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="block text-sm font-bold tracking-[0.5px]">
                         {t.name}
                       </span>
-                      <span
-                        className={
-                          isActive
-                            ? "block text-[11px] mt-0.5 opacity-70"
-                            : "block text-[11px] mt-0.5 opacity-40"
-                        }
-                      >
+                      <span className={isActive ? "block text-[11px] mt-0.5 opacity-70" : "block text-[11px] mt-0.5 opacity-40"}>
                         {t.sub}
                       </span>
                     </div>
@@ -131,11 +128,12 @@ export function StartOverlay() {
                     key={g.id}
                     type="button"
                     onClick={() => setGender(g.id)}
-                    className={
+                    className={[
+                      "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 text-sm font-bold tracking-[0.5px]",
                       isActive
-                        ? "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)] text-sm font-bold tracking-[0.5px]"
-                        : "flex-1 py-3 text-center border cursor-pointer transition-all duration-150 border-black/[0.12] bg-transparent hover:border-black/40 text-sm font-bold tracking-[0.5px]"
-                    }
+                        ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
+                        : "border-black/[0.12] bg-transparent hover:border-black/40",
+                    ].join(" ")}
                   >
                     {g.label}
                   </button>
@@ -151,20 +149,8 @@ export function StartOverlay() {
             <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-1">
               기본 정보
             </p>
-            <Input
-              label="이름"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="홍길동"
-            />
-            <Input
-              label="연락처"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="010-0000-0000"
-            />
+            <Input label="이름" required value={name} onChange={(e) => setName(e.target.value)} placeholder="홍길동" />
+            <Input label="연락처" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" />
           </div>
         )}
 
@@ -177,13 +163,7 @@ export function StartOverlay() {
 
         {/* 제출 버튼 */}
         {tier && gender && (
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            className="w-full"
-            disabled={!isValid || submitting}
-          >
+          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={!isValid || submitting}>
             {submitting ? "이동 중..." : "설문 시작하기"}
           </Button>
         )}

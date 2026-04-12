@@ -19,7 +19,8 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
   const gender = typeof params.gender === "string" ? params.gender : "female";
 
   // 필수 파라미터 누락 시 /start로 리다이렉트
-  if (!userId || !tier || !["basic", "creator", "wedding"].includes(tier)) {
+  const validTiers = ["standard", "full", "basic", "creator", "wedding"];
+  if (!userId || !tier || !validTiers.includes(tier)) {
     redirect("/start");
   }
 
@@ -27,7 +28,7 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)]">
       <QuestionnaireForm
         userId={userId as string}
-        tier={tier as "basic" | "creator" | "wedding"}
+        tier={tier as "standard" | "full"}
         gender={(gender ?? "female") as "female" | "male"}
       />
     </div>

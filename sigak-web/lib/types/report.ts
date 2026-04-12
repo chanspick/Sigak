@@ -72,8 +72,8 @@ export interface ReportData {
   access_level: AccessLevel;
   pending_level: UnlockLevel | null;
   sections: ReportSection[];
-  paywall: Record<UnlockLevel, PaywallTier>;
-  payment_account: PaymentAccount;
+  paywall?: Partial<Record<UnlockLevel, PaywallTier>>;
+  payment_account?: PaymentAccount;
 }
 
 export interface PaywallTier {

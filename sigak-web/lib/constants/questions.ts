@@ -253,7 +253,7 @@ export interface StepConfig {
 }
 
 /** 티어에 따른 전체 스텝 목록 반환 */
-export function getSteps(tier: "basic" | "creator" | "wedding"): StepConfig[] {
+export function getSteps(tier: string): StepConfig[] {
   const steps: StepConfig[] = [
     {
       title: "얼굴 & 체형",

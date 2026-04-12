@@ -18,7 +18,7 @@ import {
 
 interface QuestionnaireFormProps {
   userId: string;
-  tier: "basic" | "creator" | "wedding";
+  tier: "standard" | "full" | "basic" | "creator" | "wedding";
   gender: "female" | "male";
 }
 

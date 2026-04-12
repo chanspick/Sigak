@@ -107,11 +107,11 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           />
 
           {/* 해당 레벨 그룹의 마지막 섹션 뒤에 PaywallGate 삽입 */}
-          {lastSectionMap[section.id] && (
+          {lastSectionMap[section.id] && report.paywall?.[lastSectionMap[section.id]] && report.payment_account && (
             <PaywallGate
               level={lastSectionMap[section.id]}
               accessLevel={report.access_level}
-              paywall={report.paywall[lastSectionMap[section.id]]}
+              paywall={report.paywall[lastSectionMap[section.id]]!}
               paymentAccount={report.payment_account}
               pendingAt={pendingAt}
               onPaymentComplete={() =>

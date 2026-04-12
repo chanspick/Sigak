@@ -78,9 +78,11 @@ ADMIN_KEY = os.getenv("ADMIN_KEY", "sigak-admin-2026")
 
 # 가격표
 PRICE_MAP = {
-    "standard": 5000,    # 1차: 오버뷰 (AI 실행 트리거)
-    "full": 44000,       # 2차: 풀 리포트 (추가 입금)
+    "standard": 5000,    # 오버뷰 (블러 해제는 추가 결제)
+    "full": 49000,       # 풀 리포트 (처음부터 전부 열림)
 }
+# 오버뷰 → 풀 업그레이드 가격
+UPGRADE_PRICE = 44000
 
 PAYMENT_INFO = {
     "bank": "우체국",

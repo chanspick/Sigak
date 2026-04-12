@@ -18,7 +18,7 @@ export function TierSection({ tier, onStart }: TierSectionProps) {
           {/* 1열: 이름 */}
           <div>
             <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-              {tier.nameUp}
+              {tier.name}
             </h2>
           </div>
 
@@ -34,9 +34,11 @@ export function TierSection({ tier, onStart }: TierSectionProps) {
 
           {/* 3열: 타겟 + 설명 + CTA */}
           <div>
-            <p className="text-[13px] font-semibold opacity-40 mb-2">
-              {tier.target}
-            </p>
+            {tier.badge && (
+              <span className="inline-block text-[10px] font-bold tracking-[1px] uppercase px-2 py-0.5 bg-[var(--color-fg)] text-[var(--color-bg)] mb-2">
+                {tier.badge}
+              </span>
+            )}
             <p className="text-[15px] leading-[1.7] opacity-70">
               {tier.desc}
             </p>

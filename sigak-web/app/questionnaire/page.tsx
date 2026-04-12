@@ -26,9 +26,9 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)]">
       <QuestionnaireForm
-        userId={userId}
+        userId={userId as string}
         tier={tier as "basic" | "creator" | "wedding"}
-        gender={gender as "female" | "male"}
+        gender={(gender ?? "female") as "female" | "male"}
       />
     </div>
   );

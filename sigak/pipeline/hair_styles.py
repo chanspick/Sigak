@@ -1,0 +1,328 @@
+"""
+SIGAK Hair Style Catalog
+========================
+8 앞머리(front) + 13 뒷머리(back) + 3 기타(etc)
+레어리 헤어 보고서 구조 기반, SIGAK 3축 시스템 연동
+
+Each style has:
+- id, category, name_kr, name_en
+- description: 스타일 설명
+- base_score: 0.5 (모든 스타일 동일 출발)
+- curl_intensity: none/light_c/heavy_c/light_s/heavy_s/hippy
+- has_layers: bool
+- image_vector: [러블리, 청순, 도도시크, 우아차분, 개성] (0~1)
+- gaze_effect: {blocks, attracts, diverts, covers, extends}
+"""
+
+HAIR_STYLES = {
+    # ============================================================
+    # FRONT STYLES (앞머리) — 8종
+    # ============================================================
+    "h-f01": {
+        "id": "h-f01",
+        "category": "front",
+        "name_kr": "풀뱅",
+        "name_en": "full_bang",
+        "description": "이마가 전혀 보이지 않을 정도의 빽빽한 앞머리. 눈썹이나 그보다 살짝 긴 기장.",
+        "base_score": 0.5,
+        "curl_intensity": "none",
+        "volume_at_jaw": "none",
+        "forehead_coverage": 1.0,
+        "image_vector": [0.8, 0.6, 0.2, 0.2, 0.4],
+        "gaze_effect": {
+            "blocks": ["forehead", "eyebrow"],
+            "emphasizes": ["nose", "mouth", "midface"],
+            "attracts": [],
+            "diverts": [],
+            "covers": [],
+        },
+    },
+    "h-f02": {
+        "id": "h-f02",
+        "category": "front",
+        "name_kr": "시스루뱅",
+        "name_en": "see_through",
+        "description": "이마가 30% 이상 드러나는 앞머리. 눈썹보다 살짝 긴 기장, 양끝이 더 길고 숱이 많아지는 형태.",
+        "base_score": 0.5,
+        "curl_intensity": "none",
+        "volume_at_jaw": "none",
+        "forehead_coverage": 0.7,
+        "image_vector": [0.7, 0.7, 0.3, 0.3, 0.3],
+        "gaze_effect": {
+            "blocks": ["forehead_partial"],
+            "emphasizes": [],
+            "attracts": ["eyes"],
+            "diverts": ["nose_tip"],
+            "covers": [],
+        },
+    },
+    "h-f03": {
+        "id": "h-f03",
+        "category": "front",
+        "name_kr": "5:5 사이드뱅",
+        "name_en": "symmetric_side",
+        "description": "인중~입술 길이 앞머리, S컬 정가르마.",
+        "base_score": 0.5,
+        "curl_intensity": "light_s",
+        "volume_at_jaw": "light",
+        "forehead_coverage": 0.3,
+        "image_vector": [0.4, 0.4, 0.6, 0.6, 0.4],
+        "gaze_effect": {
+            "blocks": [],
+            "emphasizes": ["midface_center"],
+            "attracts": ["eyes"],
+            "diverts": ["philtrum"],
+            "covers": ["partial_cheek_both"],
+        },
+    },
+    "h-f04": {
+        "id": "h-f04",
+        "category": "front",
+        "name_kr": "비대칭 사이드뱅",
+        "name_en": "asymmetric_side",
+        "description": "인중~입술 길이 앞머리, S컬 6:4~7:3 비대칭 가르마. 숱 적은 쪽은 귀 뒤로.",
+        "base_score": 0.5,
+        "curl_intensity": "light_s",
+        "volume_at_jaw": "light",
+        "forehead_coverage": 0.4,
+        "image_vector": [0.4, 0.5, 0.6, 0.7, 0.4],
+        "gaze_effect": {
+            "blocks": [],
+            "emphasizes": [],
+            "attracts": ["eyes"],
+            "diverts": ["mouth", "jaw"],
+            "covers": ["one_side_jaw"],
+        },
+    },
+    "h-f05": {
+        "id": "h-f05",
+        "category": "front",
+        "name_kr": "턱선길이 사이드뱅",
+        "name_en": "jawline_side",
+        "description": "앞턱 끝 정도의 기장, 6:4~7:3 비대칭, 얼굴 한쪽 면을 감싸는 디자인.",
+        "base_score": 0.5,
+        "curl_intensity": "light_c",
+        "volume_at_jaw": "medium",
+        "forehead_coverage": 0.2,
+        "image_vector": [0.3, 0.4, 0.7, 0.7, 0.3],
+        "gaze_effect": {
+            "blocks": [],
+            "emphasizes": [],
+            "attracts": [],
+            "diverts": [],
+            "covers": ["one_side_cheekbone", "one_side_jaw"],
+        },
+    },
+    "h-f06": {
+        "id": "h-f06",
+        "category": "front",
+        "name_kr": "컬리뱅",
+        "name_en": "curly_bang",
+        "description": "이마를 가리는 뱅 스타일에 잔컬. 기장 제한 없음. 짧을수록 러블리 강화.",
+        "base_score": 0.5,
+        "curl_intensity": "light_s",
+        "volume_at_jaw": "none",
+        "forehead_coverage": 0.6,
+        "image_vector": [0.9, 0.4, 0.2, 0.2, 0.9],
+        "gaze_effect": {
+            "blocks": ["forehead_partial"],
+            "emphasizes": [],
+            "attracts": ["forehead_area"],
+            "diverts": ["philtrum", "mouth"],
+            "covers": [],
+        },
+    },
+    "h-f07": {
+        "id": "h-f07",
+        "category": "front",
+        "name_kr": "처피뱅",
+        "name_en": "choppy_bang",
+        "description": "눈썹 위로 오는 짧은 앞머리. 유니크하고 개성 강한 이미지.",
+        "base_score": 0.5,
+        "curl_intensity": "none",
+        "volume_at_jaw": "none",
+        "forehead_coverage": 0.5,
+        "image_vector": [0.6, 0.3, 0.3, 0.2, 0.9],
+        "gaze_effect": {
+            "blocks": ["forehead_upper"],
+            "emphasizes": ["face_width"],
+            "attracts": ["forehead_area"],
+            "diverts": [],
+            "covers": [],
+        },
+    },
+    "h-f08": {
+        "id": "h-f08",
+        "category": "front",
+        "name_kr": "앞머리 없음",
+        "name_en": "no_bangs",
+        "description": "묶음머리/푼 머리 모두에서 앞머리가 없는 스타일.",
+        "base_score": 0.5,
+        "curl_intensity": "none",
+        "volume_at_jaw": "none",
+        "forehead_coverage": 0.0,
+        "image_vector": [0.3, 0.5, 0.6, 0.7, 0.3],
+        "gaze_effect": {
+            "blocks": [],
+            "emphasizes": ["midface", "nose", "mouth", "philtrum"],
+            "attracts": [],
+            "diverts": [],
+            "covers": [],
+        },
+    },
+
+    # ============================================================
+    # BACK STYLES (뒷머리) — 13종
+    # ============================================================
+    "h-b01": {
+        "id": "h-b01", "category": "back",
+        "name_kr": "숏컷", "name_en": "short_cut",
+        "description": "턱선보다 짧은 기장.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "short", "volume_at_jaw": "none", "volume_at_neck": "none",
+        "image_vector": [0.2, 0.3, 0.7, 0.3, 0.6],
+    },
+    "h-b02": {
+        "id": "h-b02", "category": "back",
+        "name_kr": "보브단발/단발 레이어드컷", "name_en": "bob_layered",
+        "description": "턱선 근처 단발, 끝단 층으로 둥근 형태.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": True,
+        "length_category": "bob", "volume_at_jaw": "light", "volume_at_neck": "none",
+        "image_vector": [0.4, 0.6, 0.7, 0.5, 0.4],
+    },
+    "h-b03": {
+        "id": "h-b03", "category": "back",
+        "name_kr": "칼단발", "name_en": "blunt_bob",
+        "description": "턱선 근처 단발, 층/컬 없이 일자.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "bob", "volume_at_jaw": "medium", "volume_at_neck": "none",
+        "image_vector": [0.3, 0.5, 0.7, 0.5, 0.4],
+    },
+    "h-b04": {
+        "id": "h-b04", "category": "back",
+        "name_kr": "단발 굵은 펌", "name_en": "bob_thick_perm",
+        "description": "턱선 근처 단발에 굵은 C컬/S컬 혼합.",
+        "base_score": 0.5, "curl_intensity": "heavy_c", "has_layers": False,
+        "length_category": "bob", "volume_at_jaw": "heavy", "volume_at_neck": "medium",
+        "image_vector": [0.7, 0.5, 0.4, 0.4, 0.5],
+    },
+    "h-b05": {
+        "id": "h-b05", "category": "back",
+        "name_kr": "단발 S컬펌", "name_en": "bob_s_curl",
+        "description": "턱선 근처 단발, 작은 S컬 강하게.",
+        "base_score": 0.5, "curl_intensity": "heavy_s", "has_layers": False,
+        "length_category": "bob", "volume_at_jaw": "heavy", "volume_at_neck": "medium",
+        "image_vector": [0.8, 0.3, 0.2, 0.2, 0.6],
+    },
+    "h-b06": {
+        "id": "h-b06", "category": "back",
+        "name_kr": "일자 중단발", "name_en": "straight_mid",
+        "description": "어깨선/쇄골 근처, 층 없이 일자.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "mid", "volume_at_jaw": "medium", "volume_at_neck": "medium",
+        "image_vector": [0.4, 0.6, 0.5, 0.5, 0.3],
+    },
+    "h-b07": {
+        "id": "h-b07", "category": "back",
+        "name_kr": "중단발 레이어드컷", "name_en": "mid_layered",
+        "description": "쇄골/어깨선 기장에 끝머리 3-4cm 레이어드.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": True,
+        "length_category": "mid", "volume_at_jaw": "light", "volume_at_neck": "light",
+        "image_vector": [0.6, 0.7, 0.5, 0.6, 0.4],
+    },
+    "h-b08": {
+        "id": "h-b08", "category": "back",
+        "name_kr": "중단발 아웃C컬펌", "name_en": "mid_out_c_curl",
+        "description": "쇄골/어깨선 기장, 끝머리에 아웃C컬.",
+        "base_score": 0.5, "curl_intensity": "light_c", "has_layers": False,
+        "length_category": "mid", "volume_at_jaw": "light", "volume_at_neck": "medium",
+        "image_vector": [0.4, 0.5, 0.6, 0.7, 0.3],
+    },
+    "h-b09": {
+        "id": "h-b09", "category": "back",
+        "name_kr": "중단발펌", "name_en": "mid_s_curl_perm",
+        "description": "목 중간~쇄골 기장, S컬 강하게.",
+        "base_score": 0.5, "curl_intensity": "heavy_s", "has_layers": False,
+        "length_category": "mid", "volume_at_jaw": "heavy", "volume_at_neck": "heavy",
+        "image_vector": [0.8, 0.3, 0.3, 0.3, 0.5],
+    },
+    "h-b10": {
+        "id": "h-b10", "category": "back",
+        "name_kr": "긴 생머리", "name_en": "long_straight",
+        "description": "겨드랑이선 이상 긴 생머리.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "long", "volume_at_jaw": "light", "volume_at_neck": "light",
+        "image_vector": [0.5, 0.7, 0.4, 0.5, 0.3],
+    },
+    "h-b11": {
+        "id": "h-b11", "category": "back",
+        "name_kr": "긴머리펌", "name_en": "long_perm",
+        "description": "겨드랑이선 이상 긴머리, C컬/굵은S컬.",
+        "base_score": 0.5, "curl_intensity": "heavy_c", "has_layers": False,
+        "length_category": "long", "volume_at_jaw": "medium", "volume_at_neck": "medium",
+        "image_vector": [0.6, 0.6, 0.4, 0.5, 0.4],
+    },
+    "h-b12": {
+        "id": "h-b12", "category": "back",
+        "name_kr": "긴머리 레이어드펌", "name_en": "long_layered_perm",
+        "description": "겨드랑이선 이상 긴머리, 쇄골 아래 레이어드 + 열펌.",
+        "base_score": 0.5, "curl_intensity": "heavy_c", "has_layers": True,
+        "length_category": "long", "volume_at_jaw": "light", "volume_at_neck": "light",
+        "image_vector": [0.5, 0.5, 0.7, 0.8, 0.4],
+    },
+    "h-b13": {
+        "id": "h-b13", "category": "back",
+        "name_kr": "히피펌", "name_en": "hippy_perm",
+        "description": "가슴 닿는 긴머리에 아주 작은 컬 강하게.",
+        "base_score": 0.5, "curl_intensity": "hippy", "has_layers": False,
+        "length_category": "long", "volume_at_jaw": "heavy", "volume_at_neck": "heavy",
+        "image_vector": [0.6, 0.5, 0.3, 0.3, 0.9],
+    },
+
+    # ============================================================
+    # ETC STYLES (기타) — 3종
+    # ============================================================
+    "h-e01": {
+        "id": "h-e01", "category": "etc",
+        "name_kr": "가르마", "name_en": "parting",
+        "description": "대칭/비대칭 가르마.",
+        "base_score": 0.5, "has_rating": False,
+    },
+    "h-e02": {
+        "id": "h-e02", "category": "etc",
+        "name_kr": "똥머리/하이포니테일", "name_en": "high_ponytail",
+        "description": "정수리 위쪽에 높게 묶은 디자인.",
+        "base_score": 0.5,
+        "volume_at_jaw": "none", "volume_at_neck": "none",
+        "image_vector": [0.7, 0.8, 0.4, 0.4, 0.3],
+        "gaze_effect": {
+            "blocks": [], "emphasizes": [],
+            "attracts": ["crown"], "diverts": ["jaw", "mouth"],
+            "covers": [], "extends": ["neck_line"],
+        },
+    },
+    "h-e03": {
+        "id": "h-e03", "category": "etc",
+        "name_kr": "양갈래 머리", "name_en": "twin_tails",
+        "description": "양쪽으로 머리를 갈라서 묶는 스타일.",
+        "base_score": 0.5,
+        "volume_at_jaw": "none", "volume_at_neck": "none",
+        "image_vector": [0.8, 0.5, 0.1, 0.1, 0.7],
+        "gaze_effect": {
+            "blocks": [], "emphasizes": ["face_width"],
+            "attracts": ["sides"], "diverts": [], "covers": [],
+        },
+    },
+}
+
+
+def get_front_styles():
+    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "front"}
+
+
+def get_back_styles():
+    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "back"}
+
+
+def get_etc_styles():
+    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "etc"}

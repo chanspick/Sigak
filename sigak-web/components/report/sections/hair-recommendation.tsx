@@ -57,33 +57,47 @@ export function HairRecommendation({ content, locked }: HairRecommendationProps)
                     )}
                   </div>
 
-                  {/* 레퍼런스 이미지 2장 (앞머리 + 뒷머리 정면) */}
-                  <div className="flex gap-3">
+                  {/* 레퍼런스 이미지 3장 (앞머리 + 뒷머리 정면 + 뒷머리 뒷모습) */}
+                  <div className="flex gap-3 overflow-x-auto">
                     {combo.front?.image && (
-                      <div className="relative w-[140px] aspect-[3/4] rounded-lg overflow-hidden bg-[var(--color-surface)]">
+                      <div className="relative w-[120px] shrink-0 aspect-[3/4] rounded-lg overflow-hidden bg-[var(--color-surface)]">
                         <Image
                           src={combo.front.image}
                           alt={combo.front.name_kr}
                           fill
                           className="object-cover"
-                          sizes="140px"
+                          sizes="120px"
                         />
                         <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                          {combo.front.name_kr}
+                          앞머리
                         </span>
                       </div>
                     )}
                     {combo.back?.image_front && (
-                      <div className="relative w-[140px] aspect-[3/4] rounded-lg overflow-hidden bg-[var(--color-surface)]">
+                      <div className="relative w-[120px] shrink-0 aspect-[3/4] rounded-lg overflow-hidden bg-[var(--color-surface)]">
                         <Image
                           src={combo.back.image_front}
-                          alt={combo.back.name_kr}
+                          alt={combo.back.name_kr + " 정면"}
                           fill
                           className="object-cover"
-                          sizes="140px"
+                          sizes="120px"
                         />
                         <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
-                          {combo.back.name_kr}
+                          정면
+                        </span>
+                      </div>
+                    )}
+                    {combo.back?.image_rear && (
+                      <div className="relative w-[120px] shrink-0 aspect-[3/4] rounded-lg overflow-hidden bg-[var(--color-surface)]">
+                        <Image
+                          src={combo.back.image_rear}
+                          alt={combo.back.name_kr + " 뒷모습"}
+                          fill
+                          className="object-cover"
+                          sizes="120px"
+                        />
+                        <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded">
+                          뒷모습
                         </span>
                       </div>
                     )}

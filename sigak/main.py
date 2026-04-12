@@ -32,6 +32,7 @@ from pipeline.face import analyze_face
 from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels, get_axis_names
 from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure
 from pipeline.action_spec import build_action_spec, build_overlay_plan
+from pipeline.hair_spec import build_hair_spec
 from pipeline.similarity import find_similar_types, select_teaser_type
 from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
@@ -85,11 +86,27 @@ class BookingCreate(BaseModel):
 
 class InterviewSubmit(BaseModel):
     interviewer_name: Optional[str] = None
+    # Step 1: 얼굴 & 체형
+    face_concerns: Optional[str] = None        # 쉼표 구분 multi_select
+    neck_length: Optional[str] = None          # short | medium | long
+    shoulder_width: Optional[str] = None       # narrow | medium | wide
+    # Step 2: 현재 헤어
+    hair_texture: Optional[str] = None         # straight | wavy | curly
+    hair_thickness: Optional[str] = None       # thin | medium | thick
+    hair_volume: Optional[str] = None          # low | medium | high
+    current_length: Optional[str] = None       # short | bob | medium | long
+    current_bangs: Optional[str] = None        # full | see_through | side | grown_out | none
+    current_perm: Optional[str] = None         # none | c_curl | s_curl | hippie | volume | other
+    root_volume_experience: Optional[str] = None  # yes | no
+    # Step 3: 스타일 & 추구미
     self_perception: Optional[str] = None
     desired_image: Optional[str] = None
     reference_celebs: Optional[str] = None
-    style_keywords: Optional[str] = None
+    style_image_keywords: Optional[str] = None  # 쉼표 구분 multi_select
+    makeup_level: Optional[str] = None         # minimal | basic | intermediate | advanced
     current_concerns: Optional[str] = None
+    # Legacy (하위호환)
+    style_keywords: Optional[str] = None
     daily_routine: Optional[str] = None
     raw_notes: Optional[str] = None
     # Wedding
@@ -340,6 +357,15 @@ async def run_analysis(user_id: str):
         "primary_gap_direction_kr": gap.get("primary_shift_kr", ""),
     })
     report_content = parse_or_fallback(raw_report, action_spec)
+
+    # ── Step 9.3: Hair Spec 생성 (룰 기반 스코어링) ★ ──
+    hair_spec = build_hair_spec(
+        face_features=features,
+        interview=interview,
+        gap=gap,
+        gender=gender,
+    )
+    report_content["hair_recommendation"] = hair_spec
 
     # ── Step 9.5: Action Spec ↔ 리포트 일치 검증 ★ ──
     action_tips = report_content.get("action_tips", [])

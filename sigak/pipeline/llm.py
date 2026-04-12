@@ -83,6 +83,9 @@ def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
         ...
     }
     """
+    # 이미지 키워드: style_image_keywords(신규) 또는 style_keywords(레거시) 사용
+    image_kw = interview_data.get('style_image_keywords') or interview_data.get('style_keywords', '없음')
+
     user_prompt = f"""다음 인터뷰 응답에서 추구미 좌표를 산출해주세요.
 
 [추구 이미지]
@@ -91,14 +94,20 @@ def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
 [레퍼런스]
 {interview_data.get('reference_celebs', '없음')}
 
-[스타일 키워드]
-{interview_data.get('style_keywords', '없음')}
+[이미지 키워드]
+{image_kw}
 
 [현재 고민]
 {interview_data.get('current_concerns', '없음')}
 
 [자기 인식]
 {interview_data.get('self_perception', '없음')}
+
+[얼굴 고민 영역]
+{interview_data.get('face_concerns', '없음')}
+
+[메이크업 레벨]
+{interview_data.get('makeup_level', '없음')}
 
 JSON으로만 응답해주세요."""
 

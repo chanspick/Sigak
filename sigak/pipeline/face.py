@@ -695,8 +695,8 @@ def analyze_face(image_bytes: bytes) -> Optional[FaceFeatures]:
     """
     얼굴 분석 메인 함수.
 
-    InsightFace (buffalo_l 106 랜드마크)를 우선 시도하고,
-    실패 시 MediaPipe (FaceMesh 468 랜드마크)로 폴백한다.
+    InsightFace (buffalo_l 106 랜드마크) 전용.
+    실패 시 None 반환 → 호출부에서 에러 처리.
 
     Args:
         image_bytes: JPEG/PNG 이미지 바이트

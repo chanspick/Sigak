@@ -1033,16 +1033,28 @@ def _build_hair_recommendation(
     raw_combos = hair_data.get("top_combos", [])
     raw_avoids = hair_data.get("avoid", [])
 
-    # TOP 3 조합 빌드 — LLM이 front_id/back_id를 줬으면 이미지 매칭
+    # 스코어 정규화: raw score(1.0 초과 가능) → 0.80~0.99 범위로 매핑
+    if raw_combos:
+        raw_scores = [c.get("combined_score", 0) for c in raw_combos[:3]]
+        max_raw = max(raw_scores) if raw_scores else 1.0
+        min_raw = min(raw_scores) if len(raw_scores) > 1 else max_raw - 0.1
+        score_range = max(max_raw - min_raw, 0.01)  # 0 나누기 방지
+
+    # TOP 3 조합 빌드 — hair_spec 엔진 출력 직접 소비
     top_combos = []
     for combo in raw_combos[:3]:
         front_id = combo.get("front_id", "")
         back_id = combo.get("back_id", "")
         front = front_styles.get(front_id)
         back = back_styles.get(back_id)
+
+        # 스코어 정규화 (0.80~0.99)
+        raw_s = combo.get("combined_score", 0)
+        normalized = 0.80 + (raw_s - min_raw) / score_range * 0.19 if raw_combos else 0
+
         entry = {
             "rank": combo.get("rank", len(top_combos) + 1),
-            "score": combo.get("score"),
+            "score": round(normalized, 2),
             "front": front,
             "back": back,
             "why": combo.get("why", ""),
@@ -1060,7 +1072,7 @@ def _build_hair_recommendation(
         avoid_list.append({
             "style": style,
             "name_kr": av.get("name_kr", style["name_kr"] if style else ""),
-            "reason": av.get("reason", ""),
+            "reason": av.get("primary_reason") or av.get("reason", ""),
         })
 
     # 전체 스타일 카탈로그 (프론트엔드에서 필요 시 사용)

@@ -1,21 +1,22 @@
 "use client";
 
 // 설문 진단 멀티스텝 폼 오케스트레이터
-// 3페이지: 핵심 질문 -> 티어별 추가 질문 + 사진 -> 확인/제출
+// 스텝: 얼굴&체형 → 현재헤어 → 스타일&추구미 → (티어별) → 사진 → 확인/제출
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CORE_QUESTIONS,
-  WEDDING_QUESTIONS,
-  CREATOR_QUESTIONS,
-} from "@/lib/constants/questions";
+import { getSteps, type StepConfig } from "@/lib/constants/questions";
 import { QuestionnaireStep } from "@/components/questionnaire/questionnaire-step";
 import { ProgressBar } from "@/components/questionnaire/progress-bar";
 import { PhotoUploader } from "@/components/questionnaire/photo-uploader";
 import type { PhotoEntry } from "@/components/questionnaire/photo-uploader";
 import { Button } from "@/components/ui/button";
-import { uploadPhotos, submitInterview, runAnalysis, ApiError } from "@/lib/api/client";
+import {
+  uploadPhotos,
+  submitInterview,
+  runAnalysis,
+  ApiError,
+} from "@/lib/api/client";
 
 interface QuestionnaireFormProps {
   userId: string;
@@ -23,18 +24,13 @@ interface QuestionnaireFormProps {
   gender: "female" | "male";
 }
 
-const TOTAL_STEPS = 3;
 const STORAGE_PREFIX = "questionnaire-";
-// 핵심 질문 5개 중 최소 3개 답변 필수
-const MIN_CORE_ANSWERS = 3;
 
 interface SavedState {
   step: number;
   answers: Record<string, string>;
-  photos: string[];
 }
 
-// localStorage에서 저장된 상태 복원
 function loadSavedState(storageKey: string): SavedState | null {
   if (typeof window === "undefined") return null;
   try {
@@ -46,12 +42,39 @@ function loadSavedState(storageKey: string): SavedState | null {
   return null;
 }
 
+/** 스텝의 필수 질문이 충분히 답변되었는지 확인 */
+function isStepValid(
+  stepConfig: StepConfig,
+  answers: Record<string, string>,
+): boolean {
+  const required = stepConfig.questions.filter((q) => q.required !== false);
+  if (required.length === 0) return true;
+
+  // 필수 질문의 60% 이상 답변 시 통과 (최소 1개)
+  const threshold = Math.max(1, Math.ceil(required.length * 0.6));
+  const answered = required.filter((q) => {
+    const val = answers[q.key];
+    return val && val.trim().length > 0;
+  }).length;
+
+  return answered >= threshold;
+}
+
 /** 설문 진단 멀티스텝 폼 */
-export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormProps) {
+export function QuestionnaireForm({
+  userId,
+  tier,
+  gender,
+}: QuestionnaireFormProps) {
   const router = useRouter();
   const storageKey = STORAGE_PREFIX + userId;
 
-  // lazy initializer로 localStorage 복원 (useEffect 내 setState 회피)
+  // 스텝 목록: 질문 스텝들 + 사진 + 확인
+  const questionSteps = useMemo(() => getSteps(tier), [tier]);
+  const PHOTO_STEP = questionSteps.length + 1;
+  const CONFIRM_STEP = questionSteps.length + 2;
+  const TOTAL_STEPS = CONFIRM_STEP;
+
   const [step, setStep] = useState(() => loadSavedState(storageKey)?.step ?? 1);
   const [answers, setAnswers] = useState<Record<string, string>>(
     () => loadSavedState(storageKey)?.answers ?? {},
@@ -61,65 +84,49 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // 티어별 추가 질문
-  const tierQuestions = useMemo(() => {
-    if (tier === "wedding") return WEDDING_QUESTIONS;
-    if (tier === "creator") return CREATOR_QUESTIONS;
-    return [];
-  }, [tier]);
-
   // 상태 변경 시 localStorage 자동 저장
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const data: SavedState = { step, answers, photos: [] };
+    const data: SavedState = { step, answers };
     localStorage.setItem(storageKey, JSON.stringify(data));
   }, [step, answers, storageKey]);
 
-  // 답변 변경 핸들러
   const handleAnswerChange = useCallback((key: string, value: string) => {
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  // 핵심 질문 답변 수
-  const coreAnswerCount = useMemo(() => {
-    return CORE_QUESTIONS.filter(
-      (q) => answers[q.key] && answers[q.key].trim().length > 0,
-    ).length;
-  }, [answers]);
+  // 현재 스텝 유효성
+  const isCurrentStepValid = useMemo(() => {
+    if (step <= questionSteps.length) {
+      return isStepValid(questionSteps[step - 1], answers);
+    }
+    if (step === PHOTO_STEP) {
+      return photos.length >= 1;
+    }
+    return true;
+  }, [step, questionSteps, answers, photos, PHOTO_STEP]);
 
-  // 페이지 1 유효성: 핵심 질문 4/6 이상 답변
-  const isPage1Valid = coreAnswerCount >= MIN_CORE_ANSWERS;
-
-  // 페이지 2 유효성: 사진 1장 이상 (정면 필수)
-  const isPage2Valid = photos.length >= 1;
-
-  // 다음 버튼 클릭
   const handleNext = useCallback(() => {
-    if (step < TOTAL_STEPS) {
-      setStep((s) => s + 1);
-    }
-  }, [step]);
+    if (step < TOTAL_STEPS) setStep((s) => s + 1);
+  }, [step, TOTAL_STEPS]);
 
-  // 이전 버튼 클릭
   const handlePrev = useCallback(() => {
-    if (step > 1) {
-      setStep((s) => s - 1);
-    }
+    if (step > 1) setStep((s) => s - 1);
   }, [step]);
 
-  // 제출 처리 - 백엔드 API 호출
+  // 제출 처리
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     setSubmitError(null);
 
     try {
-      // 1단계: 사진 업로드
+      // 1. 사진 업로드
       const files = photoFiles.map((entry) => entry.file);
       if (files.length > 0) {
         await uploadPhotos(userId, files);
       }
 
-      // 2단계: 설문 답변 제출
+      // 2. 설문 답변 제출
       await submitInterview(userId, answers);
 
       // localStorage 정리
@@ -127,65 +134,67 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
         localStorage.removeItem(storageKey);
       }
 
-      // 3단계: 바로 분석 페이지로 이동 (analyze는 백그라운드 실행)
-      router.push("/questionnaire/complete?user_id=" + userId + "&gender=" + gender);
+      // 3. 분석 페이지 이동
+      router.push(
+        "/questionnaire/complete?user_id=" + userId + "&gender=" + gender,
+      );
 
-      // 분석 파이프라인은 fire-and-forget (완료 페이지에서 폴링)
+      // 분석 fire-and-forget
       runAnalysis(userId).catch(() => {});
     } catch (err) {
       setSubmitting(false);
       if (err instanceof ApiError) {
         setSubmitError(err.message);
       } else {
-        setSubmitError("제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        setSubmitError(
+          "제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        );
       }
     }
   }, [router, userId, gender, storageKey, photoFiles, answers]);
 
-  // 다음 버튼 비활성화 조건
-  const isNextDisabled = (step === 1 && !isPage1Valid) || (step === 2 && !isPage2Valid);
+  // 현재 질문 스텝 정보
+  const currentQuestionStep =
+    step <= questionSteps.length ? questionSteps[step - 1] : null;
+
+  // 답변 완료 수 (전체 질문 중)
+  const allQuestions = questionSteps.flatMap((s) => s.questions);
+  const totalAnswered = allQuestions.filter((q) => {
+    const val = answers[q.key];
+    return val && val.trim().length > 0;
+  }).length;
 
   return (
     <div className="max-w-[560px] mx-auto px-[var(--spacing-page-x-mobile)] md:px-0 py-10">
       {/* 진행 표시기 */}
       <ProgressBar current={step} total={TOTAL_STEPS} />
 
-      {/* 페이지 1: 핵심 질문 */}
-      {step === 1 && (
+      {/* 질문 스텝들 */}
+      {currentQuestionStep && (
         <div>
-          <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-1">
-            기본 질문
+          <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-0.5">
+            {currentQuestionStep.title}
           </h2>
-          <p className="text-[12px] opacity-40 mb-5">
-            {CORE_QUESTIONS.length}개 중 최소 {MIN_CORE_ANSWERS}개 이상 답변해 주세요 (
-            {coreAnswerCount}/{CORE_QUESTIONS.length} 완료)
+          <p className="text-[12px] opacity-40 mb-6">
+            {currentQuestionStep.subtitle}
           </p>
           <QuestionnaireStep
-            questions={CORE_QUESTIONS}
+            questions={currentQuestionStep.questions}
             answers={answers}
             onChange={handleAnswerChange}
           />
         </div>
       )}
 
-      {/* 페이지 2: 티어별 추가 질문 + 사진 업로드 */}
-      {step === 2 && (
+      {/* 사진 업로드 스텝 */}
+      {step === PHOTO_STEP && (
         <div>
-          {tierQuestions.length > 0 && (
-            <div className="mb-8">
-              <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-1">
-                추가 질문
-              </h2>
-              <p className="text-[12px] opacity-40 mb-5">
-                {tier === "wedding" ? "웨딩" : "크리에이터"} 맞춤 질문입니다
-              </p>
-              <QuestionnaireStep
-                questions={tierQuestions}
-                answers={answers}
-                onChange={handleAnswerChange}
-              />
-            </div>
-          )}
+          <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-0.5">
+            사진
+          </h2>
+          <p className="text-[12px] opacity-40 mb-6">
+            AI 분석을 위한 사진을 올려주세요
+          </p>
           <PhotoUploader
             photos={photos}
             onChange={setPhotos}
@@ -195,34 +204,49 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
         </div>
       )}
 
-      {/* 페이지 3: 확인 + 제출 */}
-      {step === 3 && (
+      {/* 확인 & 제출 스텝 */}
+      {step === CONFIRM_STEP && (
         <div>
-          <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-1">
+          <h2 className="font-[family-name:var(--font-serif)] text-lg font-normal mb-0.5">
             제출 확인
           </h2>
-          <p className="text-[12px] opacity-40 mb-5">
-            입력 내용을 확인하고 제출해 주세요
+          <p className="text-[12px] opacity-40 mb-6">
+            입력 내용을 확인하고 제출해 주세요 ({totalAnswered}/
+            {allQuestions.length} 답변)
           </p>
-          {/* 답변 요약 */}
-          <div className="border border-black/10 p-5 mb-6">
-            <p className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-3">
-              답변 요약
-            </p>
-            {[...CORE_QUESTIONS, ...tierQuestions]
-              .filter((q) => answers[q.key]?.trim())
-              .map((q) => (
-                <div
-                  key={q.key}
-                  className="py-2.5 border-b border-black/[0.06] last:border-b-0"
-                >
-                  <p className="text-[11px] font-semibold opacity-50 mb-1">
-                    {q.label}
-                  </p>
-                  <p className="text-sm">{answers[q.key]}</p>
-                </div>
-              ))}
-          </div>
+
+          {/* 스텝별 답변 요약 */}
+          {questionSteps.map((stepConfig) => {
+            const answered = stepConfig.questions.filter(
+              (q) => answers[q.key]?.trim(),
+            );
+            if (answered.length === 0) return null;
+
+            return (
+              <div
+                key={stepConfig.title}
+                className="border border-black/10 p-5 mb-4"
+              >
+                <p className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-3">
+                  {stepConfig.title}
+                </p>
+                {answered.map((q) => (
+                  <div
+                    key={q.key}
+                    className="py-2 border-b border-black/[0.06] last:border-b-0"
+                  >
+                    <p className="text-[11px] font-semibold opacity-50 mb-0.5">
+                      {q.label}
+                    </p>
+                    <p className="text-sm">
+                      {formatAnswer(q, answers[q.key])}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
           {/* 사진 요약 */}
           <div className="border border-black/10 p-5 mb-6">
             <p className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-3">
@@ -240,6 +264,7 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
               ))}
             </div>
           </div>
+
           {/* 에러 메시지 */}
           {submitError && (
             <div className="mb-4 p-4 border border-[var(--color-border)] text-[13px] leading-relaxed">
@@ -247,12 +272,16 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
               <button
                 type="button"
                 className="text-[12px] underline opacity-60 hover:opacity-100"
-                onClick={() => { setSubmitError(null); setStep(2); }}
+                onClick={() => {
+                  setSubmitError(null);
+                  setStep(PHOTO_STEP);
+                }}
               >
                 사진을 다시 선택하기
               </button>
             </div>
           )}
+
           {/* 제출 버튼 */}
           <Button
             variant="primary"
@@ -266,8 +295,8 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
         </div>
       )}
 
-      {/* 이전 / 다음 네비게이션 (페이지 3 제외) */}
-      {step < TOTAL_STEPS && (
+      {/* 이전 / 다음 네비게이션 */}
+      {step < CONFIRM_STEP && (
         <div className="flex justify-between mt-8">
           <Button
             variant="ghost"
@@ -280,14 +309,14 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
           <Button
             variant="primary"
             size="sm"
-            disabled={isNextDisabled}
+            disabled={!isCurrentStepValid}
             onClick={handleNext}
           >
             다음
           </Button>
         </div>
       )}
-      {step === TOTAL_STEPS && step > 1 && (
+      {step === CONFIRM_STEP && (
         <div className="flex justify-start mt-4">
           <Button variant="ghost" size="sm" onClick={handlePrev}>
             이전
@@ -296,4 +325,27 @@ export function QuestionnaireForm({ userId, tier, gender }: QuestionnaireFormPro
       )}
     </div>
   );
+}
+
+/** 답변값을 사람이 읽을 수 있는 형태로 변환 */
+function formatAnswer(
+  q: { type?: string; options?: { value: string; label: string }[] },
+  value: string,
+): string {
+  if (!value) return "";
+
+  const type = q.type ?? "text";
+
+  if (type === "yes_no") {
+    return value === "yes" ? "네" : "아니오";
+  }
+
+  if ((type === "single_select" || type === "multi_select") && q.options) {
+    const values = value.split(",").filter(Boolean);
+    return values
+      .map((v) => q.options!.find((o) => o.value === v)?.label ?? v)
+      .join(", ");
+  }
+
+  return value;
 }

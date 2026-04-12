@@ -57,12 +57,30 @@ class InterviewData(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     interviewer_name = Column(String(50))
 
-    # Core Questions
+    # Step 1: 얼굴 & 체형
+    face_concerns = Column(Text)               # 쉼표 구분 multi_select
+    neck_length = Column(String(20))           # short | medium | long
+    shoulder_width = Column(String(20))        # narrow | medium | wide
+
+    # Step 2: 현재 헤어
+    hair_texture = Column(String(20))          # straight | wavy | curly
+    hair_thickness = Column(String(20))        # thin | medium | thick
+    hair_volume = Column(String(20))           # low | medium | high
+    current_length = Column(String(20))        # short | bob | medium | long
+    current_bangs = Column(String(20))         # full | see_through | side | grown_out | none
+    current_perm = Column(String(20))          # none | c_curl | s_curl | hippie | volume | other
+    root_volume_experience = Column(String(10))  # yes | no
+
+    # Step 3: 스타일 & 추구미
     self_perception = Column(Text)
     desired_image = Column(Text)
     reference_celebs = Column(Text)
-    style_keywords = Column(Text)
+    style_image_keywords = Column(Text)        # 쉼표 구분 multi_select
+    makeup_level = Column(String(20))          # minimal | basic | intermediate | advanced
     current_concerns = Column(Text)
+
+    # Legacy (하위호환)
+    style_keywords = Column(Text)
     daily_routine = Column(Text)
 
     # Tier-Specific: Wedding

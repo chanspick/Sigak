@@ -1,79 +1,291 @@
 import type { InterviewQuestion } from "@/lib/types/dashboard";
 
-// 핵심 인터뷰 질문 (sigak_dashboard.jsx에서 추출)
-export const CORE_QUESTIONS: InterviewQuestion[] = [
+// ─────────────────────────────────────────────
+//  STEP 1: 얼굴 & 체형 (스코어링 엔진 입력)
+// ─────────────────────────────────────────────
+
+export const FACE_BODY_QUESTIONS: InterviewQuestion[] = [
   {
-    key: "self_perception",
-    label: "자기 인식",
-    placeholder: "주변에서 어떤 이미지라는 말을 자주 들으세요? 본인이 느끼는 이미지도 함께 알려주세요.",
-    rows: 3,
+    key: "face_concerns",
+    type: "multi_select",
+    label: "얼굴 고민 영역",
+    description: "고민되는 부분을 모두 선택해 주세요",
+    options: [
+      { value: "wide_face", label: "넓은 얼굴" },
+      { value: "long_face", label: "긴 얼굴" },
+      { value: "short_face", label: "짧은 얼굴" },
+      { value: "square_jaw", label: "각진 턱" },
+      { value: "prominent_cheekbone", label: "광대" },
+      { value: "short_forehead", label: "짧은 이마" },
+      { value: "wide_forehead", label: "넓은 이마" },
+      { value: "large_nose", label: "코가 큰 편" },
+      { value: "mouth_protrusion", label: "돌출입" },
+      { value: "long_midface", label: "긴 중안부" },
+      { value: "asymmetry", label: "좌우 비대칭" },
+      { value: "none", label: "특별한 고민 없음" },
+    ],
   },
   {
-    key: "desired_image",
-    label: "추구미",
-    placeholder: "되고 싶은 이미지를 자유롭게 적어주세요. 예를 들면 '뉴진스 같은데 좀 더 성숙한 느낌'처럼요.",
-    rows: 3,
+    key: "neck_length",
+    type: "single_select",
+    label: "목 길이",
+    options: [
+      { value: "short", label: "짧은 편" },
+      { value: "medium", label: "보통" },
+      { value: "long", label: "긴 편" },
+    ],
   },
   {
-    key: "reference_celebs",
-    label: "레퍼런스 셀럽",
-    placeholder: "닮았다는 말을 듣는 셀럽이 있다면 적어주세요. 여러 명도 좋습니다. 닮고 싶은 셀럽은 '추구미' 칸에 적어주시면 돼요.",
-    rows: 2,
-  },
-  {
-    key: "style_keywords",
-    label: "스타일 키워드",
-    placeholder: "본인 스타일을 나타내는 키워드는 무엇인가요? (시크, 캐주얼, 모던 등)",
-    rows: 2,
-  },
-  {
-    key: "daily_routine",
-    label: "일상 루틴",
-    placeholder: "평소 메이크업이나 스타일링은 어떻게 되시나요? 생략하는 편이라면 생략한다고 적어주세요.",
-    rows: 2,
-  },
-  {
-    key: "hair_texture",
-    label: "모질",
-    placeholder: "모질을 알려주세요 (직모 / 웨이브 / 곱슬). 모발 굵기(가는 편/보통/굵은 편)도 함께 적어주시면 좋아요.",
-    rows: 2,
+    key: "shoulder_width",
+    type: "single_select",
+    label: "어깨 너비",
+    options: [
+      { value: "narrow", label: "좁은 편" },
+      { value: "medium", label: "보통" },
+      { value: "wide", label: "넓은 편" },
+    ],
   },
 ];
 
-// 웨딩 추가 질문
+// ─────────────────────────────────────────────
+//  STEP 2: 현재 헤어 상태
+// ─────────────────────────────────────────────
+
+export const HAIR_STATE_QUESTIONS: InterviewQuestion[] = [
+  {
+    key: "hair_texture",
+    type: "single_select",
+    label: "모질",
+    options: [
+      { value: "straight", label: "직모" },
+      { value: "wavy", label: "웨이브" },
+      { value: "curly", label: "곱슬" },
+    ],
+  },
+  {
+    key: "hair_thickness",
+    type: "single_select",
+    label: "모발 굵기",
+    options: [
+      { value: "thin", label: "가는 편" },
+      { value: "medium", label: "보통" },
+      { value: "thick", label: "굵은 편" },
+    ],
+  },
+  {
+    key: "hair_volume",
+    type: "single_select",
+    label: "숱",
+    options: [
+      { value: "low", label: "적은 편" },
+      { value: "medium", label: "보통" },
+      { value: "high", label: "많은 편" },
+    ],
+  },
+  {
+    key: "current_length",
+    type: "single_select",
+    label: "현재 기장",
+    options: [
+      { value: "short", label: "숏컷" },
+      { value: "bob", label: "단발 (턱선)" },
+      { value: "medium", label: "중단발 (어깨~쇄골)" },
+      { value: "long", label: "긴머리 (쇄골 아래)" },
+    ],
+  },
+  {
+    key: "current_bangs",
+    type: "single_select",
+    label: "현재 앞머리",
+    options: [
+      { value: "full", label: "풀뱅" },
+      { value: "see_through", label: "시스루뱅" },
+      { value: "side", label: "사이드뱅 / 가르마" },
+      { value: "grown_out", label: "기르는 중" },
+      { value: "none", label: "없음" },
+    ],
+  },
+  {
+    key: "current_perm",
+    type: "single_select",
+    label: "현재 펌",
+    options: [
+      { value: "none", label: "없음 (생머리)" },
+      { value: "c_curl", label: "C컬펌" },
+      { value: "s_curl", label: "S컬펌" },
+      { value: "hippie", label: "히피펌 / 볼드펌" },
+      { value: "volume", label: "볼륨펌 / 뿌리펌" },
+      { value: "other", label: "기타" },
+    ],
+  },
+  {
+    key: "root_volume_experience",
+    type: "yes_no",
+    label: "뿌리볼륨 경험",
+    description: "뿌리볼륨펌이나 매직기 뿌리볼륨을 해본 적 있나요?",
+  },
+];
+
+// ─────────────────────────────────────────────
+//  STEP 3: 스타일 & 추구미
+// ─────────────────────────────────────────────
+
+export const STYLE_QUESTIONS: InterviewQuestion[] = [
+  {
+    key: "self_perception",
+    type: "text",
+    label: "주변의 평가",
+    placeholder: "주변에서 어떤 이미지라는 말을 자주 들으세요?",
+    rows: 2,
+  },
+  {
+    key: "desired_image",
+    type: "text",
+    label: "추구미",
+    placeholder: "되고 싶은 이미지를 자유롭게 적어주세요",
+    rows: 2,
+  },
+  {
+    key: "reference_celebs",
+    type: "text",
+    label: "레퍼런스",
+    placeholder: "닮았다는 말을 듣거나 닮고 싶은 셀럽",
+    rows: 2,
+    required: false,
+  },
+  {
+    key: "style_image_keywords",
+    type: "multi_select",
+    label: "원하는 이미지",
+    description: "끌리는 키워드를 최대 3개 선택해 주세요",
+    maxSelect: 3,
+    options: [
+      { value: "lovely", label: "러블리" },
+      { value: "innocent", label: "청순" },
+      { value: "chic", label: "도도 / 시크" },
+      { value: "elegant", label: "우아 / 차분" },
+      { value: "unique", label: "개성" },
+      { value: "modern", label: "모던 / 미니멀" },
+      { value: "natural", label: "내추럴" },
+      { value: "sexy", label: "섹시 / 글래머" },
+    ],
+  },
+  {
+    key: "makeup_level",
+    type: "single_select",
+    label: "메이크업 난이도",
+    description: "평소 메이크업은 어느 정도?",
+    options: [
+      { value: "minimal", label: "거의 안 함", description: "선크림+립 정도" },
+      { value: "basic", label: "기본", description: "베이스+눈썹+립" },
+      { value: "intermediate", label: "중급", description: "아이라인+블러셔까지" },
+      { value: "advanced", label: "풀 메이크업", description: "쉐딩+하이라이트까지" },
+    ],
+  },
+  {
+    key: "current_concerns",
+    type: "text",
+    label: "추가 고민",
+    placeholder: "스타일링 관련 고민이 있다면 자유롭게 적어주세요",
+    rows: 2,
+    required: false,
+  },
+];
+
+// ─────────────────────────────────────────────
+//  티어별 추가 질문
+// ─────────────────────────────────────────────
+
 export const WEDDING_QUESTIONS: InterviewQuestion[] = [
   {
     key: "wedding_concept",
+    type: "text",
     label: "웨딩 컨셉",
-    placeholder: "원하는 웨딩 분위기/컨셉?",
+    placeholder: "원하는 웨딩 분위기/컨셉은?",
     rows: 2,
   },
   {
     key: "dress_preference",
+    type: "single_select",
     label: "드레스 선호",
-    placeholder: "드레스 라인 선호? (A라인, 머메이드 등)",
-    rows: 2,
+    options: [
+      { value: "a_line", label: "A라인" },
+      { value: "mermaid", label: "머메이드" },
+      { value: "empire", label: "엠파이어" },
+      { value: "ball_gown", label: "볼가운" },
+      { value: "undecided", label: "미정" },
+    ],
   },
 ];
 
-// 크리에이터 추가 질문
 export const CREATOR_QUESTIONS: InterviewQuestion[] = [
   {
     key: "content_style",
+    type: "text",
     label: "콘텐츠 스타일",
     placeholder: "콘텐츠 장르/분위기?",
     rows: 2,
   },
   {
     key: "target_audience",
+    type: "text",
     label: "타겟 시청자",
     placeholder: "타겟 시청자층은?",
     rows: 2,
   },
   {
     key: "brand_tone",
+    type: "text",
     label: "채널 톤",
     placeholder: "채널이 추구하는 톤/이미지?",
     rows: 2,
   },
 ];
+
+// ─────────────────────────────────────────────
+//  스텝 정의
+// ─────────────────────────────────────────────
+
+export interface StepConfig {
+  title: string;
+  subtitle: string;
+  questions: InterviewQuestion[];
+}
+
+/** 티어에 따른 전체 스텝 목록 반환 */
+export function getSteps(tier: "basic" | "creator" | "wedding"): StepConfig[] {
+  const steps: StepConfig[] = [
+    {
+      title: "얼굴 & 체형",
+      subtitle: "헤어/메이크업 추천의 기초가 됩니다",
+      questions: FACE_BODY_QUESTIONS,
+    },
+    {
+      title: "현재 헤어",
+      subtitle: "지금 상태를 알아야 정확한 추천이 가능해요",
+      questions: HAIR_STATE_QUESTIONS,
+    },
+    {
+      title: "스타일 & 추구미",
+      subtitle: "원하는 방향을 알려주세요",
+      questions: STYLE_QUESTIONS,
+    },
+  ];
+
+  // 티어별 추가 스텝
+  if (tier === "wedding") {
+    steps.push({
+      title: "웨딩",
+      subtitle: "웨딩 맞춤 추천을 위한 추가 질문",
+      questions: WEDDING_QUESTIONS,
+    });
+  } else if (tier === "creator") {
+    steps.push({
+      title: "크리에이터",
+      subtitle: "채널 맞춤 추천을 위한 추가 질문",
+      questions: CREATOR_QUESTIONS,
+    });
+  }
+
+  return steps;
+}

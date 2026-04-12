@@ -9,6 +9,7 @@ Flow:
 import json
 import os
 import uuid
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -303,6 +304,7 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
     try:
         report_id = _run_analysis_pipeline(user_id, order)
     except Exception as e:
+        print(f"[CONFIRM ERROR] {traceback.format_exc()}")
         order["status"] = "error"
         order["error"] = str(e)
         raise HTTPException(500, f"분석 중 오류: {str(e)}")

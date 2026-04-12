@@ -35,7 +35,7 @@ def _categorize_face_features(face_features: dict, interview: dict) -> dict:
     cat = {}
 
     # face_concerns: 유저 자가 진단 (multi_select, 쉼표 구분)
-    concerns_raw = interview.get("face_concerns", "")
+    concerns_raw = interview.get("face_concerns") or ""
     concerns = set(concerns_raw.split(",")) if concerns_raw else set()
 
     # ── 얼굴 가로/세로 비율 ──
@@ -254,9 +254,11 @@ def score_style(style_id: str, active_features: list[str], interview: dict) -> d
 
 def _get_user_keywords(interview: dict) -> list[str]:
     """설문에서 이미지 키워드 추출 (신규 style_image_keywords 우선, 레거시 style_keywords 폴백)."""
-    raw = interview.get("style_image_keywords") or interview.get("style_keywords", "")
+    raw = interview.get("style_image_keywords") or interview.get("style_keywords") or ""
     if isinstance(raw, list):
         return raw
+    if not raw:
+        return []
     return [kw.strip() for kw in raw.split(",") if kw.strip()]
 
 

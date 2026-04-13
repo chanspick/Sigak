@@ -283,6 +283,7 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
     tier = submit_data.tier if submit_data.tier in PRICE_MAP else "full"
     amount = PRICE_MAP[tier]
+    print(f"[SUBMIT] parsed tier={submit_data.tier!r} → resolved tier={tier!r} amount={amount}")
 
     # 1. 사진 저장
     save_dir = DATA_DIR / user_id

@@ -10,6 +10,7 @@ import json
 import os
 import uuid
 import traceback
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -20,8 +21,8 @@ from pydantic import BaseModel
 import numpy as np
 import httpx
 
-# 데이터 저장 디렉토리
-DATA_DIR = Path(os.path.dirname(__file__)) / "uploads"
+# 데이터 저장 디렉토리 (Railway 볼륨 마운트 경로를 env로 지정 가능)
+DATA_DIR = Path(os.getenv("SIGAK_DATA_DIR", Path(os.path.dirname(__file__)) / "uploads"))
 DATA_DIR.mkdir(exist_ok=True)
 
 
@@ -42,6 +43,90 @@ def _load_json(user_id: str, filename: str) -> dict | None:
         return json.load(f)
 
 
+def _migrate_legacy_data():
+    """기존 /app/uploads/ 데이터를 볼륨(DATA_DIR)으로 1회 마이그레이션."""
+    import shutil
+    legacy_dir = Path(os.path.dirname(__file__)) / "uploads"
+
+    # DATA_DIR이 레거시 경로와 같으면 마이그레이션 불필요
+    if legacy_dir.resolve() == DATA_DIR.resolve():
+        return
+
+    if not legacy_dir.exists():
+        return
+
+    # 볼륨에 이미 유저 데이터가 있으면 마이그레이션 스킵
+    existing = [d for d in DATA_DIR.iterdir() if d.is_dir()] if DATA_DIR.exists() else []
+    if existing:
+        print(f"[MIGRATE] 볼륨에 이미 {len(existing)}개 디렉토리 존재, 스킵")
+        return
+
+    migrated = 0
+    for item in legacy_dir.iterdir():
+        dest = DATA_DIR / item.name
+        if item.is_dir():
+            shutil.copytree(item, dest)
+            migrated += 1
+        else:
+            shutil.copy2(item, dest)
+
+    print(f"[MIGRATE] /app/uploads/ → {DATA_DIR}: {migrated}개 유저 마이그레이션 완료")
+
+
+def _restore_stores():
+    """서버 시작 시 디스크에 저장된 JSON에서 인메모리 스토어 복원."""
+    restored = {"users": 0, "interviews": 0, "analyses": 0, "orders": 0, "reports": 0}
+
+    if not DATA_DIR.exists():
+        print("[RESTORE] DATA_DIR 없음, 스킵")
+        return
+
+    for user_dir in DATA_DIR.iterdir():
+        if not user_dir.is_dir():
+            continue
+        user_id = user_dir.name
+
+        # user.json → USERS
+        user_data = _load_json(user_id, "user.json")
+        if user_data:
+            USERS[user_id] = user_data
+            restored["users"] += 1
+
+        # booking.json → USERS (레거시 부킹 데이터도 복원)
+        if not user_data:
+            booking = _load_json(user_id, "booking.json")
+            if booking:
+                USERS[user_id] = booking
+                restored["users"] += 1
+
+        # interview.json → INTERVIEWS
+        interview = _load_json(user_id, "interview.json")
+        if interview:
+            INTERVIEWS[user_id] = interview
+            restored["interviews"] += 1
+
+        # face_analysis.json → ANALYSES
+        analysis = _load_json(user_id, "face_analysis.json")
+        if analysis:
+            ANALYSES[user_id] = analysis
+            restored["analyses"] += 1
+
+        # order.json → ORDERS
+        order = _load_json(user_id, "order.json")
+        if order and "order_id" in order:
+            ORDERS[order["order_id"]] = order
+            restored["orders"] += 1
+
+        # report.json → REPORTS (report_id + user_id 둘 다 등록)
+        report = _load_json(user_id, "report.json")
+        if report and "id" in report:
+            REPORTS[report["id"]] = report
+            REPORTS[user_id] = report  # 하위호환: user_id로도 접근
+            restored["reports"] += 1
+
+    print(f"[RESTORE] 복원 완료: {restored}")
+
+
 from config import get_settings
 from pipeline.face import analyze_face
 from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels
@@ -55,7 +140,18 @@ from pipeline.report_formatter import format_report_for_frontend, _sanitize
 from pipeline.overlay_renderer import render_overlay
 
 settings = get_settings()
-app = FastAPI(title="SIGAK PI API", version="2.0.0")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup: 레거시 → 볼륨 마이그레이션 후 인메모리 복원
+    _migrate_legacy_data()
+    _restore_stores()
+    yield
+    # shutdown: 필요 시 정리 로직 추가
+
+
+app = FastAPI(title="SIGAK PI API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -540,7 +636,70 @@ async def get_order_status(order_id: str):
 
 
 # ─────────────────────────────────────────────
-#  풀 업그레이드 (₩44,000 추가 입금 후)
+#  풀 업그레이드 요청 (유저가 송금 완료 버튼 누름)
+# ─────────────────────────────────────────────
+
+ZAPIER_WEBHOOK_UPGRADE = os.getenv("ZAPIER_WEBHOOK_UPGRADE", ZAPIER_WEBHOOK_NEW_ORDER)
+
+
+@app.post("/api/v1/upgrade-request/{report_id}")
+async def request_upgrade(report_id: str):
+    """유저가 ₩44,000 추가 결제 요청. pending 상태로 전환 + 관리자 웹훅."""
+    report = REPORTS.get(report_id)
+    if not report:
+        for rid, r in REPORTS.items():
+            if r.get("user_id") == report_id:
+                report = r
+                report_id = rid
+                break
+
+    if not report:
+        raise HTTPException(404, "리포트를 찾을 수 없습니다")
+
+    if report.get("access_level") == "full":
+        return {"status": "already_full", "report_id": report["id"]}
+
+    # pending 상태로 전환
+    report["pending_level"] = "full"
+    user_id = report.get("user_id", "")
+    if user_id:
+        _save_json(user_id, "report.json", report)
+
+    # Zapier 웹훅 → 관리자 알림 (업그레이드 요청)
+    if ZAPIER_WEBHOOK_UPGRADE:
+        try:
+            user = USERS.get(user_id, {})
+            async with httpx.AsyncClient() as client:
+                await client.post(ZAPIER_WEBHOOK_UPGRADE, json={
+                    "type": "upgrade_request",
+                    "report_id": report["id"],
+                    "order_id": report.get("order_id", ""),
+                    "user_name": user.get("name", ""),
+                    "phone": user.get("phone", ""),
+                    "amount": UPGRADE_PRICE,
+                    "current_level": report.get("access_level", "standard"),
+                    "requested_level": "full",
+                    "confirm_url": f"{settings.base_url}/api/v1/upgrade/{report['id']}",
+                    "created_at": datetime.utcnow().isoformat(),
+                }, timeout=10.0)
+                print(f"[WEBHOOK] UPGRADE_REQUEST sent for {report['id']}")
+        except Exception as e:
+            print(f"[WEBHOOK] UPGRADE_REQUEST error: {e}")
+
+    return {
+        "status": "pending",
+        "report_id": report["id"],
+        "payment_info": {
+            "amount": UPGRADE_PRICE,
+            "bank": PAYMENT_INFO["bank"],
+            "account": PAYMENT_INFO["account"],
+            "holder": PAYMENT_INFO["holder"],
+        },
+    }
+
+
+# ─────────────────────────────────────────────
+#  풀 업그레이드 확인 (관리자 전용)
 # ─────────────────────────────────────────────
 
 @app.post("/api/v1/upgrade/{report_id}")

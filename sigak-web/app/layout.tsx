@@ -25,6 +25,10 @@ const notoSerifKr = Noto_Serif_KR({
 export const metadata: Metadata = {
   title: "SIGAK - 시각",
   description: "이목구비 비율 · 얼굴형 정밀 분석, 피부톤 × 컬러 복합 매칭",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

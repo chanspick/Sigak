@@ -575,7 +575,7 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
         raise HTTPException(404, "주문을 찾을 수 없습니다")
     if order["status"] == "completed":
         return {"order_id": order_id, "status": "already_completed", "report_id": order.get("report_id")}
-    if order["status"] != "pending_payment":
+    if order["status"] not in ("pending_payment", "error"):
         raise HTTPException(400, f"확인할 수 없는 상태: {order['status']}")
 
     user_id = order["user_id"]

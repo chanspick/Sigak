@@ -216,8 +216,8 @@ if not _cluster_data.get("clusters"):
 
 class SubmitRequest(BaseModel):
     """질문지 + 메타데이터 (사진은 multipart로 별도)."""
-    name: str
-    phone: str
+    name: str = ""
+    phone: str = ""
     gender: str = "female"
     tier: str = "standard"  # 항상 standard(₩5,000)로 시작
     # Step 1: 얼굴 & 체형
@@ -284,7 +284,8 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
     tier = submit_data.tier if submit_data.tier in PRICE_MAP else "full"
     amount = PRICE_MAP[tier]
-    print(f"[SUBMIT] parsed tier={submit_data.tier!r} → resolved tier={tier!r} amount={amount}")
+
+    print(f"[SUBMIT] tier={tier!r} amount={amount}")
 
     # 1. 사진 저장
     save_dir = DATA_DIR / user_id
@@ -334,8 +335,8 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     # 4. 유저 저장
     user = {
         "id": user_id,
-        "name": submit_data.name,
-        "phone": submit_data.phone,
+        "name": submit_data.name or "익명",
+        "phone": submit_data.phone or "",
         "gender": submit_data.gender,
         "tier": tier,
         "status": "pending_payment",
@@ -363,8 +364,8 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
         try:
             db.merge(DBUser(
                 id=user_id,
-                name=submit_data.name,
-                phone=submit_data.phone,
+                name=submit_data.name or "익명",
+                phone=submit_data.phone or "",
                 gender=submit_data.gender,
                 tier=tier,
                 status="pending_payment",

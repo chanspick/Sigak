@@ -39,7 +39,7 @@ export function StartOverlay() {
         });
 
         router.push(
-          "/questionnaire?user_id=" + result.user_id + "&tier=" + tier + "&gender=" + gender,
+          "/questionnaire?user_id=" + result.user_id + "&tier=" + tier + "&gender=" + gender + "&name=" + encodeURIComponent(name.trim()) + "&phone=" + encodeURIComponent(phone.trim()),
         );
       } catch (err) {
         setSubmitting(false);

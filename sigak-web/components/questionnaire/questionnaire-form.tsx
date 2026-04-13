@@ -20,6 +20,8 @@ interface QuestionnaireFormProps {
   userId: string;
   tier: "standard" | "full" | "basic" | "creator" | "wedding";
   gender: "female" | "male";
+  userName?: string;
+  userPhone?: string;
 }
 
 const STORAGE_PREFIX = "questionnaire-";
@@ -63,6 +65,8 @@ export function QuestionnaireForm({
   userId,
   tier,
   gender,
+  userName = "",
+  userPhone = "",
 }: QuestionnaireFormProps) {
   const router = useRouter();
   const storageKey = STORAGE_PREFIX + userId;
@@ -122,7 +126,7 @@ export function QuestionnaireForm({
 
       // 통합 제출: 사진 + 질문지 한 번에
       const result = await submitAll(
-        { ...answers, gender, tier },
+        { ...answers, gender, tier, name: userName, phone: userPhone },
         files,
       );
 

@@ -29,11 +29,6 @@ const TEAM = [
   { role: "Product Designer", focus: "사용자 경험 설계, 리포트 시각화" },
   { role: "Growth Lead", focus: "시장 검증, B2B 매칭, 데이터 전략" },
 ] as const;
-const AXES = [
-  { label: "외형", left: "부드러운", right: "또렷한", current: 0.35, target: 0.7 },
-  { label: "존재감", left: "은은한", right: "강렬한", current: 0.45, target: 0.65 },
-  { label: "무드", left: "생기있는", right: "성숙한", current: 0.6, target: 0.8 },
-] as const;
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -95,37 +90,6 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      {/* COORDINATE PREVIEW */}
-      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
-        <Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start">
-            <div>
-              <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Coordinate</h2>
-            </div>
-            <div>
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">좌표계 미리보기</p>
-            </div>
-            <div>
-              <div className="space-y-0">
-                {AXES.map((axis) => (
-                  <div key={axis.label} className="py-5 border-b border-black/10 last:border-b-0">
-                    <div className="text-xs tracking-[0.15em] opacity-40 mb-3 font-medium">{axis.label}</div>
-                    <div className="relative h-1 bg-black/[0.08] rounded-sm">
-                      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full bg-fg" style={{ left: `${axis.current * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
-                      <div className="absolute top-1/2 w-2.5 h-2.5 rounded-full border-2 border-fg bg-transparent" style={{ left: `${axis.target * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
-                    </div>
-                    <div className="flex justify-between mt-2 text-[10px] opacity-40"><span>{axis.left}</span><span>{axis.right}</span></div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 flex gap-4 text-[10px] opacity-40">
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-fg" />현재 위치</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full border-2 border-fg" />추구미</span>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-      </section>
       {/* REPORT PREVIEW — Mock Report 기반 샘플 */}
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">
         <Reveal>
@@ -148,7 +112,7 @@ export default function HomePage() {
           const metrics = (face?.metrics as Array<{ key: string; label: string; value: number; percentile: number; min_label: string; max_label: string; context_label: string }>) || [];
           const recommended = (skin?.recommended as Array<{ name: string; hex: string; usage: string }>) || [];
           const directionItems = (gap?.direction_items as Array<{ label: string; label_low: string; label_high: string; from_score: number; to_score: number; difficulty: string }>) || [];
-          const topCombo = ((hair?.top_combos as Array<{ front: { name_kr: string }; back: { name_kr: string }; why: string }>) || [])[0];
+          const topCombos = (hair?.top_combos as Array<{ rank: number; front: { name_kr: string; image: string }; back: { name_kr: string; image_front: string }; why: string }>) || [];
 
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -229,21 +193,30 @@ export default function HomePage() {
                 </div>
               </Reveal>
 
-              {/* 헤어 추천 */}
+              {/* 헤어 추천 TOP 3 */}
               <Reveal delay={0.2}>
                 <div className="border border-black/10 p-6">
-                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">헤어 추천 TOP 1</p>
-                  {topCombo && (
-                    <div>
-                      <p className="text-[15px] font-semibold mb-1">{topCombo.front.name_kr} + {topCombo.back.name_kr}</p>
-                      <p className="text-[12px] opacity-50 leading-[1.7]">{topCombo.why}</p>
-                    </div>
-                  )}
-                  <div className="mt-5 pt-4 border-t border-black/[0.06]">
-                    <p className="text-[11px] opacity-40 leading-[1.6]">
-                      헤어 카탈로그 앞머리 8종 + 뒷머리 13종에서<br />
-                      얼굴형 · 추구미에 최적화된 조합을 추천합니다.
-                    </p>
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">헤어 추천 TOP 3</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {topCombos.slice(0, 3).map((combo) => (
+                      <div key={combo.rank} className="flex flex-col">
+                        <div className="relative aspect-[3/4] w-full overflow-hidden bg-black/[0.03] mb-2">
+                          <Image
+                            src={combo.back.image_front}
+                            alt={combo.back.name_kr}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 30vw, 15vw"
+                          />
+                          <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-fg text-bg px-1.5 py-0.5">{combo.rank}</span>
+                        </div>
+                        <p className="text-[11px] font-semibold leading-tight">{combo.front.name_kr}</p>
+                        <p className="text-[10px] opacity-40">{combo.back.name_kr}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-black/[0.06]">
+                    <p className="text-[11px] opacity-40">앞머리 8종 + 뒷머리 13종에서 얼굴형에 최적화된 조합 추천</p>
                   </div>
                 </div>
               </Reveal>

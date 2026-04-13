@@ -221,8 +221,8 @@ def _derive_type_modifier(coords: dict) -> dict:
     # style tone: 상위 2개 톤 조합
     tones: list[str] = []
     tones.append("부드러운" if shape_val < 0 else "또렷한")
-    tones.append("볼드한" if volume_val > 0 else "섬세한")
-    tones.append("성숙한" if age_val > 0 else "프레시한")
+    tones.append("강렬한" if volume_val > 0 else "은은한")
+    tones.append("성숙한" if age_val > 0 else "생기있는")
     style_tone = " · ".join(tones[:2])
 
     return {

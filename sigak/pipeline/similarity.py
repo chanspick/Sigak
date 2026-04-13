@@ -407,7 +407,7 @@ def get_type_reference_prompt(gender: str = "female") -> str:
     LLM 프롬프트에 삽입할 유형 좌표 레퍼런스 문자열을 생성한다.
 
     Returns:
-        "- 따뜻한 첫사랑 (Type 1): shape=-0.8, volume=-0.7, age=-0.8 (소프트, 서틀, 프레시)"
+        "- 따뜻한 첫사랑 (Type 1): shape=-0.8, volume=-0.7, age=-0.8 (부드러운, 은은한, 생기있는)"
     """
     from pipeline.coordinate import get_axis_labels as _get_axis_labels
 

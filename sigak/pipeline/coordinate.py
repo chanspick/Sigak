@@ -167,9 +167,9 @@ def compute_gap(
             "vector": {"shape": 0.5, "volume": -0.3, "age": 0.8},
             "magnitude": 0.99,
             "primary_direction": "age",
-            "primary_shift_kr": "매추어",
+            "primary_shift_kr": "성숙한",
             "secondary_direction": "shape",
-            "secondary_shift_kr": "샤프",
+            "secondary_shift_kr": "또렷한",
         }
     """
     axis_names = get_axis_names()

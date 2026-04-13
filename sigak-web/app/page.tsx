@@ -12,9 +12,9 @@ function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; 
 }
 
 const GALLERY = [
-  { id: "owl", src: "/images/sculptures/owl.png", alt: "부엉이 조각상", axis: "샤프 · 쿨글램", desc: "강렬한 인상과 선명한 윤곽. 도시적 세련미와 대담한 구조가 만들어내는 압도적 아우라." },
-  { id: "cat", src: "/images/sculptures/cat.png", alt: "고양이 조각상", axis: "소프트 · 프레시", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
-  { id: "fox", src: "/images/sculptures/fox.png", alt: "여우 조각상", axis: "성숙 · 시크", desc: "깊은 인상과 볼드한 구조. 시간이 쌓아올린 무게감과 세련된 존재감." },
+  { id: "owl", src: "/images/sculptures/owl.png", alt: "부엉이 조각상", axis: "또렷한 · 강렬한", desc: "강렬한 인상과 선명한 윤곽. 도시적 세련미와 대담한 구조가 만들어내는 압도적 아우라." },
+  { id: "cat", src: "/images/sculptures/cat.png", alt: "고양이 조각상", axis: "부드러운 · 생기있는", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
+  { id: "fox", src: "/images/sculptures/fox.png", alt: "여우 조각상", axis: "성숙한 · 강렬한", desc: "깊은 인상과 강렬한 구조. 시간이 쌓아올린 무게감과 세련된 존재감." },
 ] as const;
 const PROCESS = [
   { step: "01", title: "셀카 업로드", desc: "정면 사진 1장과 간단한 설문. 추구하는 이미지, 레퍼런스, 현재 고민을 자유롭게." },
@@ -28,9 +28,9 @@ const TEAM = [
   { role: "Growth Lead", focus: "시장 검증, B2B 매칭, 데이터 전략" },
 ] as const;
 const AXES = [
-  { label: "외형", left: "소프트", right: "샤프", current: 0.35, target: 0.7 },
-  { label: "존재감", left: "서틀", right: "볼드", current: 0.45, target: 0.65 },
-  { label: "무드", left: "프레시", right: "매추어", current: 0.6, target: 0.8 },
+  { label: "외형", left: "부드러운", right: "또렷한", current: 0.35, target: 0.7 },
+  { label: "존재감", left: "은은한", right: "강렬한", current: 0.45, target: 0.65 },
+  { label: "무드", left: "생기있는", right: "성숙한", current: 0.6, target: 0.8 },
 ] as const;
 
 export default function HomePage() {

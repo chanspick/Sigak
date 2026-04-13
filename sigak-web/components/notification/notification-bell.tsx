@@ -175,7 +175,9 @@ export function NotificationBell() {
                 ) : (
                   <>
                     <p className="text-sm font-medium text-[var(--color-fg)]">{notif.title}</p>
-                    <p className="text-xs text-[var(--color-muted)] mt-0.5">{notif.message}</p>
+                    <p className="text-xs text-[var(--color-muted)] mt-0.5">
+                      {notif.message.startsWith("{") ? "" : notif.message}
+                    </p>
                     <p className="text-[10px] text-[var(--color-muted)] mt-1">
                       {formatTime(notif.created_at)}
                     </p>

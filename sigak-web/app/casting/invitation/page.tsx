@@ -88,80 +88,64 @@ function InvitationContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center px-5 py-16">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[360px]">
         {/* 초대장 카드 */}
         <div className="border border-[var(--color-border)]">
-          {/* 헤더 */}
-          <div className="bg-[var(--color-fg)] text-[var(--color-bg)] px-10 py-12 text-center">
-            <p className="text-[9px] font-bold tracking-[5px] uppercase opacity-50 mb-4">
-              CASTING INVITATION
+          {/* 헤더 — 프리미엄 블랙 */}
+          <div className="bg-[var(--color-fg)] text-[var(--color-bg)] px-8 py-8 text-center">
+            <p className="text-[8px] tracking-[6px] uppercase opacity-40 mb-3">
+              You are invited
             </p>
-            <div className="w-12 h-px bg-[var(--color-bg)] opacity-20 mx-auto mb-4" />
-            <p className="text-[12px] tracking-[4px] uppercase opacity-30">
-              SIGAK
+            <p className="font-[family-name:var(--font-serif)] text-[18px] font-normal leading-snug">
+              캐스팅 제안이<br />도착했습니다
             </p>
           </div>
 
-          {/* 본문 */}
-          <div className="px-10 py-10">
+          {/* 본문 — 컴팩트 */}
+          <div className="px-8 py-7">
             {/* From */}
-            <div className="mb-8">
-              <p className="text-[10px] text-[var(--color-muted)] tracking-[2px] uppercase mb-2">
-                From
-              </p>
-              <p className="text-2xl font-bold tracking-tight">
-                {data.agency_name}
-              </p>
+            <div className="mb-5">
+              <p className="text-[9px] text-[var(--color-muted)] tracking-[2px] uppercase mb-1.5">From</p>
+              <p className="text-lg font-bold tracking-tight">{data.agency_name}</p>
             </div>
 
-            {/* Purpose */}
-            {data.purpose && (
-              <div className="mb-8">
-                <p className="text-[10px] text-[var(--color-muted)] tracking-[2px] uppercase mb-2">
-                  Purpose
-                </p>
-                <p className="text-[15px] leading-relaxed">
-                  {data.purpose}
-                </p>
+            {/* Purpose + Date 가로 배치 */}
+            <div className="flex gap-6 mb-5">
+              {data.purpose && (
+                <div className="flex-1">
+                  <p className="text-[9px] text-[var(--color-muted)] tracking-[2px] uppercase mb-1.5">Purpose</p>
+                  <p className="text-[13px] leading-snug">{data.purpose}</p>
+                </div>
+              )}
+              <div className="shrink-0">
+                <p className="text-[9px] text-[var(--color-muted)] tracking-[2px] uppercase mb-1.5">Date</p>
+                <p className="text-[13px]">{requestedDate}</p>
               </div>
-            )}
+            </div>
 
             {/* Divider */}
-            <div className="w-full h-px bg-[var(--color-border)] mb-8" />
-
-            {/* Date */}
-            <div className="mb-10">
-              <p className="text-[10px] text-[var(--color-muted)] tracking-[2px] uppercase mb-2">
-                Date
-              </p>
-              <p className="text-[14px]">
-                {requestedDate}
-              </p>
-            </div>
+            <div className="w-full h-px bg-[var(--color-border)] mb-5" />
 
             {/* 안내 */}
-            <div className="bg-black/[0.02] border border-[var(--color-border)] p-5 text-center mb-8">
-              <p className="text-[13px] font-medium mb-1">
-                관심이 있으시다면 알려주세요
-              </p>
-              <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
-                수락하시면 에이전시에 연락처와<br />
-                리포트 요약 정보를 전달해드립니다
-              </p>
-            </div>
+            <p className="text-[12px] text-center leading-relaxed mb-1">
+              관심이 있으시다면 수락해주세요.
+            </p>
+            <p className="text-[11px] text-[var(--color-muted)] text-center leading-relaxed mb-6">
+              수락 시 에이전시에 연락처와 리포트 요약을 전달합니다.
+            </p>
 
             {/* 수락 / 거절 */}
-            <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
               <Link
                 href="/my"
-                className="block w-full py-3.5 text-center text-[12px] font-medium tracking-[1px] bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-opacity no-underline"
+                className="flex-1 block py-3 text-center text-[11px] font-semibold tracking-[1px] bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-opacity no-underline"
               >
                 수락하기
               </Link>
               <Link
                 href="/my"
-                className="block w-full py-3.5 text-center text-[12px] font-medium tracking-[1px] border border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-fg)] hover:text-[var(--color-fg)] transition-colors no-underline"
+                className="flex-1 block py-3 text-center text-[11px] font-medium tracking-[1px] border border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-fg)] hover:text-[var(--color-fg)] transition-colors no-underline"
               >
                 괜찮습니다
               </Link>
@@ -170,8 +154,8 @@ function InvitationContent() {
         </div>
 
         {/* 하단 브랜딩 */}
-        <p className="text-center text-[10px] text-[var(--color-muted)] tracking-[2px] mt-6 opacity-40">
-          SIGAK CASTING POOL
+        <p className="text-center text-[9px] text-[var(--color-muted)] tracking-[3px] mt-5 opacity-30">
+          SIGAK
         </p>
       </div>
     </div>

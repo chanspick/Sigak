@@ -398,8 +398,8 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
             async with httpx.AsyncClient() as client:
                 resp = await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
                     "order_id": order_id,
-                    "user_name": submit_data.name,
-                    "phone": submit_data.phone,
+                    "user_name": user["name"],
+                    "phone": user["phone"],
                     "tier": tier,
                     "amount": amount,
                     "created_at": order["created_at"],

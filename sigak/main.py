@@ -170,48 +170,80 @@ def _find_user(user_id: str) -> dict | None:
     return None
 
 
+def _find_all_user_ids(user_id: str) -> list[str]:
+    """같은 kakao_id를 가진 모든 user_id를 반환 (중복 계정 병합용)."""
+    user_ids = {user_id}
+    if not _use_db():
+        return list(user_ids)
+    db = get_db()
+    try:
+        # 현재 유저의 kakao_id 조회
+        db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if db_user and db_user.kakao_id:
+            # 같은 kakao_id를 가진 모든 유저 검색
+            siblings = db.query(DBUser).filter(DBUser.kakao_id == db_user.kakao_id).all()
+            for s in siblings:
+                user_ids.add(s.id)
+    except Exception as e:
+        print(f"[FIND_ALL_IDS] error: {e}")
+    finally:
+        db.close()
+    return list(user_ids)
+
+
 def _find_reports_for_user(user_id: str) -> list[dict]:
-    """유저의 리포트를 모든 저장소에서 조회: DB → 인메모리."""
+    """유저의 리포트를 모든 저장소에서 조회. kakao_id 기반 병합."""
+    # 같은 카카오 계정의 모든 user_id 수집
+    all_ids = _find_all_user_ids(user_id)
     reports_list = []
+    seen_ids = set()
+
     # 1. DB 우선
     if _use_db():
         db = get_db()
         try:
             db_reports = db.query(DBReport)\
-                .filter(DBReport.user_id == user_id)\
+                .filter(DBReport.user_id.in_(all_ids))\
                 .order_by(DBReport.created_at.desc())\
                 .all()
             for r in db_reports:
-                reports_list.append({
-                    "id": r.id,
-                    "access_level": r.access_level,
-                    "created_at": r.created_at.isoformat() if r.created_at else "",
-                    "url": f"/report/{r.id}",
-                })
+                if r.id not in seen_ids:
+                    seen_ids.add(r.id)
+                    reports_list.append({
+                        "id": r.id,
+                        "access_level": r.access_level,
+                        "created_at": r.created_at.isoformat() if r.created_at else "",
+                        "url": f"/report/{r.id}",
+                    })
         except Exception as e:
             print(f"[FIND_REPORTS] DB error: {e}")
         finally:
             db.close()
+
     # 2. 인메모리 fallback
     if not reports_list:
         for rid, r in REPORTS.items():
-            if r.get("user_id") == user_id and rid != user_id:
+            if r.get("user_id") in all_ids and rid not in all_ids and rid not in seen_ids:
+                seen_ids.add(rid)
                 reports_list.append({
                     "id": rid,
                     "access_level": r.get("access_level", "standard"),
                     "created_at": r.get("created_at", ""),
                     "url": f"/report/{rid}",
                 })
+
     # 3. 디스크 fallback
     if not reports_list:
-        report_data = _load_json(user_id, "report.json")
-        if report_data and "id" in report_data:
-            reports_list.append({
-                "id": report_data["id"],
-                "access_level": report_data.get("access_level", "standard"),
-                "created_at": report_data.get("created_at", ""),
-                "url": f"/report/{report_data['id']}",
-            })
+        for uid in all_ids:
+            report_data = _load_json(uid, "report.json")
+            if report_data and "id" in report_data and report_data["id"] not in seen_ids:
+                seen_ids.add(report_data["id"])
+                reports_list.append({
+                    "id": report_data["id"],
+                    "access_level": report_data.get("access_level", "standard"),
+                    "created_at": report_data.get("created_at", ""),
+                    "url": f"/report/{report_data['id']}",
+                })
     return reports_list
 
 

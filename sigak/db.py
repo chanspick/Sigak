@@ -8,6 +8,13 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# 시작 시 URL 존재 여부 로깅 (비밀번호 제외)
+if DATABASE_URL:
+    _safe = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else "set"
+    print(f"[DB] DATABASE_URL detected: ...@{_safe}")
+else:
+    print("[DB] DATABASE_URL not set")
+
 Base = declarative_base()
 
 
@@ -69,11 +76,17 @@ def init_db():
     if not DATABASE_URL:
         print("[DB] DATABASE_URL not set, skipping DB init")
         return False
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
-    print("[DB] Tables created/verified")
-    return True
+    try:
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        Base.metadata.create_all(bind=engine)
+        print("[DB] Tables created/verified")
+        return True
+    except Exception as e:
+        print(f"[DB] init failed: {e}")
+        engine = None
+        SessionLocal = None
+        return False
 
 
 def get_db():

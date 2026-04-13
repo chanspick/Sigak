@@ -211,10 +211,10 @@ export async function getOrderStatus(
   return handleResponse<OrderStatus>(response);
 }
 
-/** 풀 업그레이드 요청 (POST /api/v1/upgrade-request/{reportId}) */
+/** 풀 업그레이드 요청 (POST /api/v1/upgrade-request/{reportId}) — 주문 생성 + 웹훅 */
 export async function requestUpgrade(
   reportId: string,
-): Promise<{ status: string; report_id: string; payment_info?: { amount: number; bank: string; account: string; holder: string } }> {
+): Promise<{ status: string; order_id?: string; report_id: string; payment_info?: { amount: number; bank: string; account: string; holder: string; toss_deeplink?: string; kakao_deeplink?: string } }> {
   const response = await fetch(`${API_URL}/api/v1/upgrade-request/${reportId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...COMMON_HEADERS },

@@ -644,7 +644,7 @@ ZAPIER_WEBHOOK_UPGRADE = os.getenv("ZAPIER_WEBHOOK_UPGRADE", ZAPIER_WEBHOOK_NEW_
 
 @app.post("/api/v1/upgrade-request/{report_id}")
 async def request_upgrade(report_id: str):
-    """유저가 ₩44,000 추가 결제 요청. pending 상태로 전환 + 관리자 웹훅."""
+    """유저가 ₩44,000 풀 업그레이드 요청. 주문 생성 + 웹훅 (신규 주문과 동일 플로우)."""
     report = REPORTS.get(report_id)
     if not report:
         for rid, r in REPORTS.items():
@@ -659,41 +659,53 @@ async def request_upgrade(report_id: str):
     if report.get("access_level") == "full":
         return {"status": "already_full", "report_id": report["id"]}
 
-    # pending 상태로 전환
-    report["pending_level"] = "full"
     user_id = report.get("user_id", "")
-    if user_id:
-        _save_json(user_id, "report.json", report)
+    user = USERS.get(user_id, {})
 
-    # Zapier 웹훅 → 관리자 알림 (업그레이드 요청)
-    if ZAPIER_WEBHOOK_UPGRADE:
+    # 업그레이드 주문 생성 (신규 주문과 동일 구조)
+    order_id = f"ord_{uuid.uuid4().hex[:12]}"
+    order = {
+        "order_id": order_id,
+        "user_id": user_id,
+        "tier": "full",
+        "type": "upgrade",
+        "amount": UPGRADE_PRICE,
+        "status": "pending_payment",
+        "report_id": report["id"],
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    ORDERS[order_id] = order
+    _save_json(user_id, "order.json", order)
+
+    # Zapier 웹훅 → 관리자 알림 (신규 주문과 동일 웹훅)
+    if ZAPIER_WEBHOOK_NEW_ORDER:
         try:
-            user = USERS.get(user_id, {})
             async with httpx.AsyncClient() as client:
-                await client.post(ZAPIER_WEBHOOK_UPGRADE, json={
-                    "type": "upgrade_request",
-                    "report_id": report["id"],
-                    "order_id": report.get("order_id", ""),
+                resp = await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
+                    "order_id": order_id,
+                    "type": "upgrade",
                     "user_name": user.get("name", ""),
                     "phone": user.get("phone", ""),
+                    "tier": "full",
                     "amount": UPGRADE_PRICE,
-                    "current_level": report.get("access_level", "standard"),
-                    "requested_level": "full",
+                    "created_at": order["created_at"],
                     "confirm_url": f"{settings.base_url}/api/v1/upgrade/{report['id']}",
-                    "created_at": datetime.utcnow().isoformat(),
                 }, timeout=10.0)
-                print(f"[WEBHOOK] UPGRADE_REQUEST sent for {report['id']}")
+                print(f"[WEBHOOK] UPGRADE order={order_id} response={resp.status_code}")
         except Exception as e:
-            print(f"[WEBHOOK] UPGRADE_REQUEST error: {e}")
+            print(f"[WEBHOOK] UPGRADE error: {e}")
 
     return {
-        "status": "pending",
+        "status": "pending_payment",
+        "order_id": order_id,
         "report_id": report["id"],
         "payment_info": {
             "amount": UPGRADE_PRICE,
             "bank": PAYMENT_INFO["bank"],
             "account": PAYMENT_INFO["account"],
             "holder": PAYMENT_INFO["holder"],
+            "toss_deeplink": PAYMENT_INFO["toss_deeplink"].format(amount=UPGRADE_PRICE),
+            "kakao_deeplink": PAYMENT_INFO["kakao_deeplink"].format(amount=UPGRADE_PRICE),
         },
     }
 

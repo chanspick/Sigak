@@ -8,6 +8,7 @@
 // 5. visibilitychange로 탭 비활성 시 폴링 중지
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { ReportData, UnlockLevel } from "@/lib/types/report";
 import { getLastSectionOfLevel, getPaywallGateLevels } from "@/lib/utils/report";
 import { startPolling } from "@/lib/utils/polling";
@@ -40,23 +41,38 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
     }
   }
 
-  // 결제 완료 처리 — API 호출 + pending 상태 전환
+  const router = useRouter();
+
+  // 결제 완료 처리 — 주문서 페이지로 이동 (신규 주문과 동일 플로우)
   const handlePaymentComplete = useCallback(async (level: UnlockLevel) => {
     if (level === "full") {
-      // ₩44,000 업그레이드 요청 → 백엔드 + 웹훅
       try {
-        await requestUpgrade(report.id);
+        const res = await requestUpgrade(report.id);
+        if (res.payment_info) {
+          const p = res.payment_info;
+          const params = new URLSearchParams({
+            order_id: res.order_id || "",
+            amount: String(p.amount),
+            bank: p.bank,
+            account: p.account,
+            holder: p.holder,
+            toss: (p as unknown as Record<string, string>).toss_deeplink || "",
+            kakao: (p as unknown as Record<string, string>).kakao_deeplink || "",
+          });
+          router.push(`/questionnaire/payment?${params.toString()}`);
+          return;
+        }
       } catch (e) {
         console.error("[upgrade-request]", e);
       }
     }
-    // pending 상태로 전환 (폴링 시작됨)
+    // fallback: pending 상태 전환
     setReport((prev) => ({
       ...prev,
       access_level: level === "standard" ? "standard_pending" : "full_pending",
       pending_level: level,
     }));
-  }, [report.id]);
+  }, [report.id, router]);
 
   // access_level 변경 감지 → 스크롤 위치 유지
   useEffect(() => {

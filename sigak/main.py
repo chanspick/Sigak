@@ -1495,7 +1495,8 @@ async def kakao_token(data: KakaoTokenRequest):
         )
 
     if token_resp.status_code != 200:
-        raise HTTPException(400, "카카오 인증에 실패했습니다")
+        print(f"[KAKAO] token error: {token_resp.status_code} {token_resp.text}")
+        raise HTTPException(400, f"카카오 인증 실패: {token_resp.json().get('error_description', token_resp.text[:100])}")
 
     token_data = token_resp.json()
     access_token = token_data.get("access_token")

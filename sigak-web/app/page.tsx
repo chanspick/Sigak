@@ -294,59 +294,59 @@ export default function HomePage() {
           </div>
         </Reveal>
 
-        {/* 2열: 초대장(좌) + 3단계(우) — 모바일은 스택 */}
-        <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 md:gap-12 items-start">
-          {/* 초대장 카드 */}
-          <Reveal delay={0.1}>
-            <div className="w-full max-w-[280px] mx-auto md:mx-0 border border-black/10 select-none">
-              <div className="bg-fg text-bg px-6 py-5 text-center">
-                <p className="text-[7px] tracking-[5px] uppercase opacity-40 mb-1.5">You are invited</p>
-                <p className="font-[family-name:var(--font-serif)] text-[13px] font-normal leading-snug">캐스팅 제안이<br />도착했습니다</p>
-              </div>
-              <div className="px-5 py-4">
-                <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">From</p>
-                <p className="text-[13px] font-bold mb-3">Alpha Agency</p>
-                <div className="flex gap-3 mb-3 text-[10px]">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[7px] text-black/30 tracking-[1.5px] uppercase mb-0.5">Purpose</p>
-                    <p>화보 촬영</p>
-                  </div>
-                  <div>
-                    <p className="text-[7px] text-black/30 tracking-[1.5px] uppercase mb-0.5">Fee</p>
-                    <p className="font-semibold">₩500,000</p>
-                  </div>
-                  <div>
-                    <p className="text-[7px] text-black/30 tracking-[1.5px] uppercase mb-0.5">Date</p>
-                    <p>2026. 4. 20</p>
-                  </div>
-                </div>
-                <div className="w-full h-px bg-black/10 mb-3" />
-                <div className="flex gap-2">
-                  <Link href="/start" className="flex-1 py-1.5 text-center text-[9px] font-semibold bg-fg text-bg no-underline">수락하기</Link>
-                  <div className="flex-1 py-1.5 text-center text-[9px] border border-black/10 text-black/30">괜찮습니다</div>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-
+        {/* 2열: 3단계(좌) + 초대장(우, 크게) — 모바일은 스택 */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-10 md:gap-14 items-center">
           {/* 3단계 설명 */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-8">
             {[
               { num: "01", title: "옵트인 동의", desc: "풀 리포트 하단에서 캐스팅 풀 참여를 선택할 수 있어요. 언제든 해제 가능합니다." },
               { num: "02", title: "매칭 제안", desc: "에이전시가 좌표·얼굴형·이미지 유형으로 검색 후, 출연료를 포함한 제안을 보냅니다." },
               { num: "03", title: "수락 또는 거절", desc: "수락하면 연락처와 리포트 요약이 전달됩니다. 거절 시 정보는 공유되지 않아요." },
             ].map((item, i) => (
-              <Reveal key={item.num} delay={0.15 + i * 0.1}>
-                <div className="flex items-start gap-4">
-                  <span className="font-[family-name:var(--font-serif)] text-[28px] font-light leading-none opacity-15 shrink-0 w-8">{item.num}</span>
+              <Reveal key={item.num} delay={i * 0.12}>
+                <div className="flex items-start gap-5">
+                  <span className="font-[family-name:var(--font-serif)] text-[clamp(32px,4vw,48px)] font-light leading-none opacity-15 shrink-0 w-10">{item.num}</span>
                   <div>
-                    <h3 className="text-[14px] font-semibold mb-1">{item.title}</h3>
-                    <p className="text-[12px] leading-[1.7] opacity-50">{item.desc}</p>
+                    <h3 className="text-[15px] font-semibold mb-2">{item.title}</h3>
+                    <p className="text-[12px] leading-[1.8] opacity-50">{item.desc}</p>
                   </div>
                 </div>
               </Reveal>
             ))}
           </div>
+
+          {/* 초대장 카드 — 크게 */}
+          <Reveal delay={0.2}>
+            <div className="w-full max-w-[380px] mx-auto border border-black/10 select-none">
+              <div className="bg-fg text-bg px-8 py-10 text-center">
+                <p className="text-[8px] tracking-[6px] uppercase opacity-40 mb-3">You are invited</p>
+                <p className="font-[family-name:var(--font-serif)] text-[18px] font-normal leading-snug">캐스팅 제안이<br />도착했습니다</p>
+              </div>
+              <div className="px-8 py-7">
+                <p className="text-[9px] text-black/30 tracking-[2px] uppercase mb-1.5">From</p>
+                <p className="text-lg font-bold mb-5">Alpha Agency</p>
+                <div className="flex gap-5 mb-5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[9px] text-black/30 tracking-[2px] uppercase mb-1">Purpose</p>
+                    <p className="text-[13px]">화보 촬영</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-black/30 tracking-[2px] uppercase mb-1">Fee</p>
+                    <p className="text-[13px] font-semibold">₩500,000</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-black/30 tracking-[2px] uppercase mb-1">Date</p>
+                    <p className="text-[13px]">2026. 4. 20</p>
+                  </div>
+                </div>
+                <div className="w-full h-px bg-black/10 mb-5" />
+                <div className="flex gap-3">
+                  <Link href="/start" className="flex-1 py-3 text-center text-[11px] font-semibold bg-fg text-bg no-underline hover:opacity-90 transition-opacity">수락하기</Link>
+                  <div className="flex-1 py-3 text-center text-[11px] border border-black/10 text-black/30">괜찮습니다</div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
       <section id="team" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">

@@ -29,6 +29,13 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
   // 이전 access_level 추적 (fade-out 트리거용)
   const prevAccessLevelRef = useRef(report.access_level);
 
+  // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
+  useEffect(() => {
+    if (report.user_id) {
+      localStorage.setItem("sigak_user_id", report.user_id);
+    }
+  }, [report.user_id]);
+
   // 페이월 게이트를 표시할 레벨 목록
   const gateLevels = getPaywallGateLevels(report.access_level);
 

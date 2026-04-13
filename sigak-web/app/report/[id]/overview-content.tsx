@@ -6,6 +6,7 @@
 // - CTA: 풀 업그레이드 버튼
 // - 공유 버튼 (카카오톡 + 링크 복사)
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportData, ReportSection } from "@/lib/types/report";
 import { SectionRenderer } from "@/components/report/section-renderer";
@@ -39,6 +40,16 @@ function getTeaserText(section: ReportSection): string | null {
 
 export function OverviewContent({ report, reportId }: OverviewContentProps) {
   const router = useRouter();
+
+  // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
+  useEffect(() => {
+    if (report.user_id) {
+      localStorage.setItem("sigak_user_id", report.user_id);
+      if (report.user_name && report.user_name !== "회원") {
+        localStorage.setItem("sigak_user_name", report.user_name);
+      }
+    }
+  }, [report.user_id, report.user_name]);
 
   // 이미 풀 결제 완료된 경우
   const isFullPaid = ["full_pending", "full"].includes(report.access_level);

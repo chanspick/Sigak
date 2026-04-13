@@ -1488,6 +1488,7 @@ async def kakao_token(data: KakaoTokenRequest):
             data={
                 "grant_type": "authorization_code",
                 "client_id": kakao_key,
+                "client_secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
                 "redirect_uri": redirect_uri,
                 "code": code,
             },

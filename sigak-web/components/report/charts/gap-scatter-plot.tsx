@@ -44,12 +44,12 @@ export function GapScatterPlot({
   const { current, aspiration, x_axis, y_axis, size_axis, quadrants } = aestheticMap;
 
   const W = 340;
-  const H = 340;
+  const H = 370;
   // 비대칭 패딩: 좌(Y축 라벨), 우, 상, 하(X축 라벨)
   const padL = 56;
   const padR = 16;
   const padT = 16;
-  const padB = 48;
+  const padB = 78;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const centerX = padL + plotW / 2;

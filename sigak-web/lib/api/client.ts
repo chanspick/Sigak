@@ -211,6 +211,18 @@ export async function getOrderStatus(
   return handleResponse<OrderStatus>(response);
 }
 
+/** 풀 업그레이드 요청 (POST /api/v1/upgrade-request/{reportId}) */
+export async function requestUpgrade(
+  reportId: string,
+): Promise<{ status: string; report_id: string; payment_info?: { amount: number; bank: string; account: string; holder: string } }> {
+  const response = await fetch(`${API_URL}/api/v1/upgrade-request/${reportId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
+  });
+
+  return handleResponse(response);
+}
+
 /**
  * 리포트 조회 (서버 사이드용)
  * 서버 컴포넌트에서는 브라우저 API를 사용하지 않으므로 fetch 직접 사용

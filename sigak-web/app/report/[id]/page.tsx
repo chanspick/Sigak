@@ -1,26 +1,63 @@
-// 리포트 페이지 (서버 컴포넌트)
-// - 백엔드 API에서 리포트 데이터 조회
-// - 실패 시 에러 메시지 표시
-// - ReportViewer에 initialReport 전달
+// 리포트 오버뷰 페이지 (공유용 랜딩)
+// - OG 메타태그로 카카오톡/SNS 미리보기 지원
+// - cover + executive_summary 전체 공개
+// - 나머지 섹션은 teaser(1줄 헤드라인)만 표시
+// - CTA: 잠금 해제 버튼 → /report/[id]/full 이동
+// - 공유 버튼 (카카오톡 + 링크 복사)
 
-import { getReportServerSide } from "@/lib/api/client";
-import { ReportViewer } from "@/components/report/report-viewer";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { getReportServerSide } from "@/lib/api/client";
+import { OverviewContent } from "./overview-content";
 
 interface ReportPageProps {
   params: Promise<{ id: string }>;
 }
 
-// 동적 리포트 페이지 - user_id 기반으로 리포트 데이터를 로드하여 뷰어에 전달
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://sigak.asia";
+
+// 동적 OG 메타태그 — 카카오톡/인스타/트위터 공유 미리보기
+export async function generateMetadata({ params }: ReportPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const report = await getReportServerSide(id);
+
+  if (!report) {
+    return {
+      title: "SIGAK - 리포트",
+      description: "이목구비 비율 · 얼굴형 정밀 분석",
+    };
+  }
+
+  const userName = report.user_name || "회원";
+  const summarySection = report.sections.find((s) => s.id === "executive_summary");
+  const summary = (summarySection?.content as { summary?: string })?.summary || "";
+  const description = summary.length > 100 ? summary.slice(0, 100) + "..." : summary;
+
+  return {
+    title: `${userName}님의 시각 리포트`,
+    description: description || "AI 이목구비 분석 · 퍼스널 스타일링 리포트",
+    openGraph: {
+      title: `${userName}님의 시각 리포트`,
+      description: description || "AI 이목구비 분석 · 퍼스널 스타일링 리포트",
+      url: `${SITE_URL}/report/${id}`,
+      siteName: "SIGAK",
+      type: "article",
+    },
+    twitter: {
+      card: "summary",
+      title: `${userName}님의 시각 리포트`,
+      description: description || "AI 이목구비 분석 · 퍼스널 스타일링 리포트",
+    },
+  };
+}
+
 export default async function ReportPage({ params }: ReportPageProps) {
   const { id } = await params;
-
-  // 서버 사이드에서 리포트 데이터 조회
   const report = await getReportServerSide(id);
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)]">
-      {/* 리포트 네비게이션 */}
+      {/* 네비게이션 */}
       <nav className="sticky top-0 z-[100] flex items-center px-10 h-14 bg-[var(--color-fg)] text-[var(--color-bg)]">
         <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
         <span className="ml-3 text-[10px] font-medium tracking-[2.5px] opacity-40">
@@ -28,10 +65,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
         </span>
       </nav>
 
-      {/* 리포트 뷰어 또는 에러 */}
       {report ? (
         <div className="pt-4 pb-20">
-          <ReportViewer initialReport={report} />
+          <OverviewContent report={report} reportId={id} />
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">

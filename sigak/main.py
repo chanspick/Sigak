@@ -21,6 +21,14 @@ from pydantic import BaseModel
 import numpy as np
 import httpx
 
+from db import init_db, get_db, User as DBUser, Order as DBOrder, Report as DBReport
+
+
+def _use_db() -> bool:
+    """Check if DB is available."""
+    from db import SessionLocal
+    return SessionLocal is not None
+
 # 데이터 저장 디렉토리 (Railway 볼륨 마운트 경로를 env로 지정 가능)
 DATA_DIR = Path(os.getenv("SIGAK_DATA_DIR", Path(os.path.dirname(__file__)) / "uploads"))
 DATA_DIR.mkdir(exist_ok=True)
@@ -144,7 +152,13 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup: 레거시 → 볼륨 마이그레이션 후 인메모리 복원
+    # startup: DB 초기화 시도, 실패 시 기존 파일/인메모리 폴백
+    db_ok = init_db()
+    if db_ok:
+        print("[STARTUP] PostgreSQL connected, DB is source of truth")
+    else:
+        print("[STARTUP] No DB, falling back to in-memory + JSON files")
+    # 항상 인메모리 복원 (dual-write 호환 위해)
     _migrate_legacy_data()
     _restore_stores()
     yield
@@ -341,6 +355,39 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
     ORDERS[order_id] = order
     _save_json(user_id, "order.json", order)
 
+    # 5.5. DB 저장 (dual-write)
+    if _use_db():
+        db = get_db()
+        try:
+            db.merge(DBUser(
+                id=user_id,
+                name=submit_data.name,
+                phone=submit_data.phone,
+                gender=submit_data.gender,
+                tier=tier,
+                status="pending_payment",
+                extra_data={"created_at": user["created_at"]},
+                created_at=datetime.utcnow(),
+            ))
+            db.add(DBOrder(
+                id=order_id,
+                user_id=user_id,
+                tier=tier,
+                order_type="new",
+                amount=amount,
+                status="pending_payment",
+                interview_data=interview,
+                analysis_data=analysis,
+                created_at=datetime.utcnow(),
+            ))
+            db.commit()
+            print(f"[DB] submit: user={user_id} order={order_id} saved")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] submit error: {e}")
+        finally:
+            db.close()
+
     # 6. Zapier 웹훅 → 관리자 알림
     print(f"[WEBHOOK] NEW_ORDER url={'SET' if ZAPIER_WEBHOOK_NEW_ORDER else 'EMPTY'}")
     if ZAPIER_WEBHOOK_NEW_ORDER:
@@ -385,7 +432,30 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
     if data.admin_key != ADMIN_KEY:
         raise HTTPException(403, "인증 실패")
 
-    order = ORDERS.get(order_id)
+    # DB 우선, 폴백으로 dict
+    order = None
+    db_order = None
+    if _use_db():
+        db = get_db()
+        try:
+            db_order = db.query(DBOrder).filter(DBOrder.id == order_id).first()
+            if db_order:
+                order = {
+                    "order_id": db_order.id,
+                    "user_id": db_order.user_id,
+                    "tier": db_order.tier,
+                    "amount": db_order.amount,
+                    "status": db_order.status,
+                    "report_id": db_order.report_id,
+                    "created_at": db_order.created_at.isoformat() if db_order.created_at else "",
+                }
+        except Exception as e:
+            print(f"[DB] confirm read error: {e}")
+        finally:
+            db.close()
+
+    if not order:
+        order = ORDERS.get(order_id)
     if not order:
         raise HTTPException(404, "주문을 찾을 수 없습니다")
     if order["status"] == "completed":
@@ -396,19 +466,113 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
     user_id = order["user_id"]
     order["status"] = "processing"
 
+    # DB에서 interview/analysis 데이터 가져오기 (파이프라인에 전달)
+    user_data = USERS.get(user_id, {})
+    interview_data = INTERVIEWS.get(user_id, {})
+    analysis_data = ANALYSES.get(user_id)
+
+    if _use_db():
+        db = get_db()
+        try:
+            db_ord = db.query(DBOrder).filter(DBOrder.id == order_id).first()
+            if db_ord:
+                db_ord.status = "processing"
+                # DB에 저장된 interview/analysis 우선 사용
+                if db_ord.interview_data:
+                    interview_data = db_ord.interview_data
+                if db_ord.analysis_data:
+                    analysis_data = db_ord.analysis_data
+                db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+                if db_user:
+                    user_data = {
+                        "id": db_user.id,
+                        "name": db_user.name,
+                        "phone": db_user.phone,
+                        "gender": db_user.gender or "female",
+                        "tier": db_user.tier or "standard",
+                        "status": db_user.status or "booked",
+                        "created_at": db_user.created_at.isoformat() if db_user.created_at else "",
+                    }
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] confirm processing update error: {e}")
+        finally:
+            db.close()
+
+    # 인메모리에도 user/interview/analysis 최신 반영
+    if user_data:
+        USERS.setdefault(user_id, user_data)
+    if interview_data:
+        INTERVIEWS.setdefault(user_id, interview_data)
+    if analysis_data:
+        ANALYSES.setdefault(user_id, analysis_data)
+
     # AI 파이프라인 실행
     try:
-        report_id = _run_analysis_pipeline(user_id, order)
+        report_id, report_dict = _run_analysis_pipeline(
+            user_id, order, user_data, interview_data, analysis_data
+        )
     except Exception as e:
         print(f"[CONFIRM ERROR] {traceback.format_exc()}")
         order["status"] = "error"
         order["error"] = str(e)
+        # DB 에러 상태 업데이트
+        if _use_db():
+            db = get_db()
+            try:
+                db_ord = db.query(DBOrder).filter(DBOrder.id == order_id).first()
+                if db_ord:
+                    db_ord.status = "error"
+                    db_ord.error = str(e)
+                    db.commit()
+            except Exception:
+                db.rollback()
+            finally:
+                db.close()
         raise HTTPException(500, f"분석 중 오류: {str(e)}")
 
     order["status"] = "completed"
     order["report_id"] = report_id
     order["completed_at"] = datetime.utcnow().isoformat()
     _save_json(user_id, "order.json", order)
+
+    # DB에 Report 저장 + Order 완료 업데이트
+    if _use_db():
+        db = get_db()
+        try:
+            # Report 저장
+            db.add(DBReport(
+                id=report_id,
+                user_id=user_id,
+                order_id=order_id,
+                access_level=order.get("tier", "standard"),
+                report_data=report_dict.get("formatted"),
+                raw_data={
+                    "current_coords": report_dict.get("current_coords"),
+                    "aspiration_coords": report_dict.get("aspiration_coords"),
+                    "gap": report_dict.get("gap"),
+                    "content": report_dict.get("content"),
+                },
+                created_at=datetime.utcnow(),
+            ))
+            # Order 완료 상태
+            db_ord = db.query(DBOrder).filter(DBOrder.id == order_id).first()
+            if db_ord:
+                db_ord.status = "completed"
+                db_ord.report_id = report_id
+                db_ord.completed_at = datetime.utcnow()
+            # User 상태 업데이트
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                db_user.status = "reported"
+            db.commit()
+            print(f"[DB] confirm: report={report_id} order={order_id} completed")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] confirm save error: {e}")
+        finally:
+            db.close()
 
     # Zapier 웹훅 → 유저에게 카톡 발송
     report_url = f"{settings.base_url}/report/{report_id}"
@@ -434,11 +598,21 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
     }
 
 
-def _run_analysis_pipeline(user_id: str, order: dict) -> str:
-    """기존 analyze의 Step 1~9 전체. 결제 확인된 order만 실행."""
-    user = USERS[user_id]
-    interview = INTERVIEWS[user_id]
-    analysis = ANALYSES.get(user_id)
+def _run_analysis_pipeline(
+    user_id: str,
+    order: dict,
+    user_data: dict = None,
+    interview_data: dict = None,
+    analysis_data: dict = None,
+) -> tuple:
+    """
+    기존 analyze의 Step 1~9 전체. 결제 확인된 order만 실행.
+    Returns (report_id, report_dict) tuple.
+    """
+    # 파라미터 우선, 폴백으로 인메모리 dict
+    user = user_data or USERS.get(user_id, {})
+    interview = interview_data or INTERVIEWS.get(user_id, {})
+    analysis = analysis_data or ANALYSES.get(user_id)
     gender = user.get("gender", "female")
 
     # Step 1: 좌표 계산
@@ -551,13 +725,15 @@ def _run_analysis_pipeline(user_id: str, order: dict) -> str:
         "created_at": datetime.utcnow().isoformat(),
         "access_level": order.get("tier", "standard"),  # standard(₩5K) 또는 full
     }
-    REPORTS[report_id] = _sanitize(report)
+    sanitized_report = _sanitize(report)
+    REPORTS[report_id] = sanitized_report
     # user_id로도 접근 가능하게 (하위호환)
     REPORTS[user_id] = REPORTS[report_id]
     _save_json(user_id, "report.json", REPORTS[report_id])
-    USERS[user_id]["status"] = "reported"
+    if user_id in USERS:
+        USERS[user_id]["status"] = "reported"
 
-    return report_id
+    return report_id, sanitized_report
 
 
 # ─────────────────────────────────────────────
@@ -568,8 +744,35 @@ def _run_analysis_pipeline(user_id: str, order: dict) -> str:
 async def get_report(report_id: str):
     """리포트 조회. report_id 또는 user_id로 접근 가능."""
     report = REPORTS.get(report_id)
+
+    # DB에서 조회 (report_id → user_id 순서)
+    if not report and _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+            if not db_report:
+                # user_id로도 시도
+                db_report = db.query(DBReport).filter(DBReport.user_id == report_id).first()
+            if db_report:
+                report = {
+                    "id": db_report.id,
+                    "user_id": db_report.user_id,
+                    "order_id": db_report.order_id,
+                    "formatted": db_report.report_data,
+                    "access_level": db_report.access_level,
+                    "pending_level": db_report.pending_level,
+                    "created_at": db_report.created_at.isoformat() if db_report.created_at else "",
+                    "feedback": db_report.feedback,
+                }
+                if db_report.raw_data:
+                    report.update(db_report.raw_data)
+        except Exception as e:
+            print(f"[DB] report read error: {e}")
+        finally:
+            db.close()
+
     if not report:
-        # order_id로 찾기
+        # order_id로 찾기 (인메모리 폴백)
         for o in ORDERS.values():
             if o.get("report_id") == report_id:
                 report = REPORTS.get(o["user_id"])
@@ -619,6 +822,26 @@ async def get_report(report_id: str):
 async def get_order_status(order_id: str):
     """주문 상태 조회."""
     order = ORDERS.get(order_id)
+
+    # DB 폴백
+    if not order and _use_db():
+        db = get_db()
+        try:
+            db_order = db.query(DBOrder).filter(DBOrder.id == order_id).first()
+            if db_order:
+                order = {
+                    "order_id": db_order.id,
+                    "user_id": db_order.user_id,
+                    "tier": db_order.tier,
+                    "amount": db_order.amount,
+                    "status": db_order.status,
+                    "report_id": db_order.report_id,
+                }
+        except Exception as e:
+            print(f"[DB] order read error: {e}")
+        finally:
+            db.close()
+
     if not order:
         raise HTTPException(404, "주문을 찾을 수 없습니다")
 
@@ -653,6 +876,26 @@ async def request_upgrade(report_id: str):
                 report_id = rid
                 break
 
+    # DB 폴백
+    if not report and _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+            if not db_report:
+                db_report = db.query(DBReport).filter(DBReport.user_id == report_id).first()
+            if db_report:
+                report = {
+                    "id": db_report.id,
+                    "user_id": db_report.user_id,
+                    "order_id": db_report.order_id,
+                    "access_level": db_report.access_level,
+                }
+                report_id = db_report.id
+        except Exception as e:
+            print(f"[DB] upgrade-request read error: {e}")
+        finally:
+            db.close()
+
     if not report:
         raise HTTPException(404, "리포트를 찾을 수 없습니다")
 
@@ -661,6 +904,18 @@ async def request_upgrade(report_id: str):
 
     user_id = report.get("user_id", "")
     user = USERS.get(user_id, {})
+
+    # DB에서 user 가져오기
+    if not user and _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                user = {"name": db_user.name, "phone": db_user.phone}
+        except Exception:
+            pass
+        finally:
+            db.close()
 
     # 업그레이드 주문 생성 (신규 주문과 동일 구조)
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
@@ -676,6 +931,32 @@ async def request_upgrade(report_id: str):
     }
     ORDERS[order_id] = order
     _save_json(user_id, "order.json", order)
+
+    # DB에 업그레이드 주문 저장
+    if _use_db():
+        db = get_db()
+        try:
+            db.add(DBOrder(
+                id=order_id,
+                user_id=user_id,
+                tier="full",
+                order_type="upgrade",
+                amount=UPGRADE_PRICE,
+                status="pending_payment",
+                report_id=report["id"],
+                created_at=datetime.utcnow(),
+            ))
+            # Report에 pending_level 설정
+            db_report = db.query(DBReport).filter(DBReport.id == report["id"]).first()
+            if db_report:
+                db_report.pending_level = "full"
+            db.commit()
+            print(f"[DB] upgrade-request: order={order_id} saved")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] upgrade-request save error: {e}")
+        finally:
+            db.close()
 
     # Zapier 웹훅 → 관리자 알림 (신규 주문과 동일 웹훅)
     if ZAPIER_WEBHOOK_NEW_ORDER:
@@ -729,6 +1010,27 @@ async def upgrade_report(report_id: str, data: ConfirmRequest):
                 report_id = rid
                 break
 
+    # DB 폴백
+    if not report and _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+            if not db_report:
+                db_report = db.query(DBReport).filter(DBReport.user_id == report_id).first()
+            if db_report:
+                report = {
+                    "id": db_report.id,
+                    "user_id": db_report.user_id,
+                    "order_id": db_report.order_id,
+                    "access_level": db_report.access_level,
+                    "formatted": db_report.report_data,
+                }
+                report_id = db_report.id
+        except Exception as e:
+            print(f"[DB] upgrade read error: {e}")
+        finally:
+            db.close()
+
     if not report:
         raise HTTPException(404, "리포트를 찾을 수 없습니다")
 
@@ -742,10 +1044,53 @@ async def upgrade_report(report_id: str, data: ConfirmRequest):
     if user_id:
         _save_json(user_id, "report.json", report)
 
+    # DB 업데이트
+    if _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.id == report["id"]).first()
+            if db_report:
+                db_report.access_level = "full"
+                db_report.pending_level = None
+                db_report.upgraded_at = datetime.utcnow()
+            # 해당 upgrade 주문도 완료 처리
+            upgrade_orders = db.query(DBOrder).filter(
+                DBOrder.report_id == report["id"],
+                DBOrder.order_type == "upgrade",
+                DBOrder.status == "pending_payment",
+            ).all()
+            for uo in upgrade_orders:
+                uo.status = "completed"
+                uo.confirmed_at = datetime.utcnow()
+                uo.completed_at = datetime.utcnow()
+            db.commit()
+            print(f"[DB] upgrade: report={report['id']} upgraded to full")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] upgrade save error: {e}")
+        finally:
+            db.close()
+
+    # 인메모리도 업데이트
+    if report["id"] in REPORTS:
+        REPORTS[report["id"]]["access_level"] = "full"
+    if user_id in REPORTS:
+        REPORTS[user_id]["access_level"] = "full"
+
     # Zapier 웹훅 → 유저에게 풀 리포트 알림
     if ZAPIER_WEBHOOK_REPORT_READY:
         try:
             user = USERS.get(user_id, {})
+            if not user and _use_db():
+                db = get_db()
+                try:
+                    db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+                    if db_user:
+                        user = {"name": db_user.name, "phone": db_user.phone}
+                except Exception:
+                    pass
+                finally:
+                    db.close()
             async with httpx.AsyncClient() as client:
                 await client.post(ZAPIER_WEBHOOK_REPORT_READY, json={
                     "order_id": report.get("order_id", ""),
@@ -811,23 +1156,83 @@ async def create_booking(data: BookingCreate):
     user = {"id": user_id, "status": "booked", "created_at": datetime.utcnow().isoformat(), "price": PRICE_MAP.get(data.tier, 5000), **data.model_dump()}
     USERS[user_id] = user
     _save_json(user_id, "booking.json", user)
+
+    # DB dual-write
+    if _use_db():
+        db = get_db()
+        try:
+            db.merge(DBUser(
+                id=user_id,
+                name=data.name,
+                phone=data.phone,
+                gender=data.gender,
+                tier=data.tier,
+                status="booked",
+                extra_data=user,
+                created_at=datetime.utcnow(),
+            ))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] booking error: {e}")
+        finally:
+            db.close()
+
     return {"user_id": user_id, "status": "booked", "price": user["price"]}
 
 
 @app.post("/api/v1/interview/{user_id}")
 async def submit_interview_legacy(user_id: str, data: InterviewSubmit):
-    if user_id not in USERS:
+    # 인메모리 또는 DB에서 유저 확인
+    user_exists = user_id in USERS
+    if not user_exists and _use_db():
+        db = get_db()
+        try:
+            user_exists = db.query(DBUser).filter(DBUser.id == user_id).first() is not None
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    if not user_exists:
         raise HTTPException(404, "User not found")
     interview = {"id": str(uuid.uuid4()), "user_id": user_id, "created_at": datetime.utcnow().isoformat(), **data.model_dump()}
     INTERVIEWS[user_id] = interview
     _save_json(user_id, "interview.json", interview)
-    USERS[user_id]["status"] = "interviewed"
+    if user_id in USERS:
+        USERS[user_id]["status"] = "interviewed"
+
+    # DB: 유저 상태 업데이트 (interview 데이터는 Order의 JSON에 저장)
+    if _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                db_user.status = "interviewed"
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] interview error: {e}")
+        finally:
+            db.close()
+
     return {"status": "interviewed", "interview_id": interview["id"]}
 
 
 @app.post("/api/v1/photos/{user_id}")
 async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
-    if user_id not in USERS:
+    # 인메모리 또는 DB에서 유저 확인
+    user_exists = user_id in USERS
+    if not user_exists and _use_db():
+        db = get_db()
+        try:
+            user_exists = db.query(DBUser).filter(DBUser.id == user_id).first() is not None
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    if not user_exists:
         raise HTTPException(404, "User not found")
     save_dir = DATA_DIR / user_id
     save_dir.mkdir(exist_ok=True)
@@ -851,12 +1256,39 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
 @app.post("/api/v1/analyze/{user_id}")
 async def run_analysis_legacy(user_id: str):
     """하위호환: 기존 프론트엔드에서 호출 가능."""
-    if user_id not in USERS:
+    # 인메모리 또는 DB에서 유저/인터뷰 확인
+    user_exists = user_id in USERS
+    interview_exists = user_id in INTERVIEWS
+    user_data = USERS.get(user_id, {})
+    interview_data = INTERVIEWS.get(user_id, {})
+    analysis_data = ANALYSES.get(user_id)
+
+    if not user_exists and _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                user_exists = True
+                user_data = {
+                    "id": db_user.id,
+                    "name": db_user.name,
+                    "phone": db_user.phone,
+                    "gender": db_user.gender or "female",
+                    "tier": db_user.tier or "full",
+                    "status": db_user.status or "booked",
+                }
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    if not user_exists:
         raise HTTPException(404, "User not found")
-    if user_id not in INTERVIEWS:
+    if not interview_exists:
         raise HTTPException(400, "Interview data not submitted yet")
-    order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": USERS[user_id].get("tier", "full"), "amount": 0, "status": "pending_payment"}
-    report_id = _run_analysis_pipeline(user_id, order)
+
+    order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
+    report_id, _ = _run_analysis_pipeline(user_id, order, user_data, interview_data, analysis_data)
     return {"status": "reported", "report_id": report_id}
 
 
@@ -867,11 +1299,48 @@ async def run_analysis_legacy(user_id: str):
 @app.post("/api/v1/feedback/{user_id}")
 async def submit_feedback(user_id: str, data: FeedbackSubmit):
     report = REPORTS.get(user_id)
+
+    # DB 폴백
+    if not report and _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.user_id == user_id).first()
+            if db_report:
+                report = {"id": db_report.id, "user_id": db_report.user_id}
+        except Exception:
+            pass
+        finally:
+            db.close()
+
     if not report:
         raise HTTPException(404, "Report not found")
-    report["feedback"] = data.model_dump()
+
+    feedback_data = data.model_dump()
+
+    # 인메모리 업데이트
+    if user_id in REPORTS:
+        REPORTS[user_id]["feedback"] = feedback_data
     if user_id in USERS:
         USERS[user_id]["status"] = "feedback_done"
+
+    # DB 업데이트
+    if _use_db():
+        db = get_db()
+        try:
+            db_report = db.query(DBReport).filter(DBReport.user_id == user_id).first()
+            if db_report:
+                db_report.feedback = feedback_data
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                db_user.status = "feedback_done"
+            db.commit()
+            print(f"[DB] feedback: user={user_id} saved")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] feedback save error: {e}")
+        finally:
+            db.close()
+
     return {"status": "feedback_recorded"}
 
 
@@ -881,6 +1350,29 @@ async def submit_feedback(user_id: str, data: FeedbackSubmit):
 
 @app.get("/api/v1/dashboard/queue")
 async def get_queue():
+    # DB 우선
+    if _use_db():
+        db = get_db()
+        try:
+            db_users = db.query(DBUser).all()
+            if db_users:
+                queue = [
+                    {
+                        "id": u.id,
+                        "name": u.name or "",
+                        "gender": u.gender or "female",
+                        "tier": u.tier or "",
+                        "status": u.status or "",
+                    }
+                    for u in db_users
+                ]
+                return sorted(queue, key=lambda x: x.get("name", ""))
+        except Exception as e:
+            print(f"[DB] dashboard/queue error: {e}")
+        finally:
+            db.close()
+
+    # 인메모리 폴백
     queue = []
     for uid, u in USERS.items():
         queue.append({
@@ -893,6 +1385,32 @@ async def get_queue():
 @app.get("/api/v1/dashboard/orders")
 async def get_orders():
     """관리자용: 전체 주문 목록."""
+    # DB 우선
+    if _use_db():
+        db = get_db()
+        try:
+            db_orders = db.query(DBOrder).all()
+            if db_orders is not None:
+                result = []
+                for o in db_orders:
+                    db_user = db.query(DBUser).filter(DBUser.id == o.user_id).first()
+                    result.append({
+                        "order_id": o.id,
+                        "user_name": db_user.name if db_user else "",
+                        "phone": db_user.phone if db_user else "",
+                        "tier": o.tier,
+                        "amount": o.amount,
+                        "status": o.status,
+                        "created_at": o.created_at.isoformat() if o.created_at else "",
+                        "report_id": o.report_id,
+                    })
+                return sorted(result, key=lambda x: x["created_at"], reverse=True)
+        except Exception as e:
+            print(f"[DB] dashboard/orders error: {e}")
+        finally:
+            db.close()
+
+    # 인메모리 폴백
     result = []
     for oid, o in ORDERS.items():
         user = USERS.get(o["user_id"], {})
@@ -930,4 +1448,4 @@ async def serve_upload(user_id: str, filename: str):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2.0.0", "woz_mode": settings.use_mock_clip}
+    return {"status": "ok", "version": "2.1.0", "woz_mode": settings.use_mock_clip, "db_connected": _use_db()}

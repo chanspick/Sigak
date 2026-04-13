@@ -1,238 +1,84 @@
-"""SIGAK Database Models — 3-Axis Coordinate System (shape/volume/age)"""
-import uuid
-from datetime import datetime, date
-from sqlalchemy import (
-    Column, String, Float, Integer, Boolean, DateTime, Date,
-    ForeignKey, Text, JSON, Enum as SAEnum, create_engine,
-)
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from pgvector.sqlalchemy import Vector
+"""SIGAK Database -- Sync SQLAlchemy for MVP"""
+import os
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 Base = declarative_base()
 
 
-# ─────────────────────────────────────────────
-#  Users + Bookings
-# ─────────────────────────────────────────────
-
 class User(Base):
     __tablename__ = "users"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String, primary_key=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=False)
-    instagram = Column(String(100))
-    tier = Column(String(20), nullable=False)        # basic | creator | wedding
-    booking_date = Column(Date, nullable=False)
-    booking_time = Column(String(5), nullable=False)  # "14:00"
-    price = Column(Integer, nullable=False)
-
-    # Wedding-specific
-    partner_name = Column(String(100))
-    partner_phone = Column(String(20))
-
-    # Creator-specific
-    channel_url = Column(String(300))
-
+    gender = Column(String(10), default="female")
+    tier = Column(String(20), default="standard")
     status = Column(String(20), default="booked")
-    # booked → interviewed → analyzing → reported → feedback_done
+    extra_data = Column(JSON, default=dict)  # everything else from user dict
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relations
-    interview = relationship("InterviewData", back_populates="user", uselist=False)
-    analysis = relationship("FaceAnalysis", back_populates="user", uselist=False)
-    report = relationship("Report", back_populates="user", uselist=False)
+    orders = relationship("Order", back_populates="user")
+    reports = relationship("Report", back_populates="user")
 
 
-# ─────────────────────────────────────────────
-#  Interview Data
-# ─────────────────────────────────────────────
-
-class InterviewData(Base):
-    __tablename__ = "interviews"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    interviewer_name = Column(String(50))
-
-    # Step 1: 얼굴 & 체형
-    face_concerns = Column(Text)               # 쉼표 구분 multi_select
-    neck_length = Column(String(20))           # short | medium | long
-    shoulder_width = Column(String(20))        # narrow | medium | wide
-
-    # Step 2: 현재 헤어
-    hair_texture = Column(String(20))          # straight | wavy | curly
-    hair_thickness = Column(String(20))        # thin | medium | thick
-    hair_volume = Column(String(20))           # low | medium | high
-    current_length = Column(String(20))        # short | bob | medium | long
-    current_bangs = Column(String(20))         # full | see_through | side | grown_out | none
-    current_perm = Column(String(20))          # none | c_curl | s_curl | hippie | volume | other
-    root_volume_experience = Column(String(10))  # yes | no
-
-    # Step 3: 스타일 & 추구미
-    self_perception = Column(Text)
-    desired_image = Column(Text)
-    reference_celebs = Column(Text)
-    style_image_keywords = Column(Text)        # 쉼표 구분 multi_select
-    makeup_level = Column(String(20))          # minimal | basic | intermediate | advanced
-    current_concerns = Column(Text)
-
-    # Legacy (하위호환)
-    style_keywords = Column(Text)
-    daily_routine = Column(Text)
-
-    # Tier-Specific: Wedding
-    wedding_date = Column(Date)
-    wedding_concept = Column(Text)
-    dress_preference = Column(Text)
-
-    # Tier-Specific: Creator
-    content_style = Column(Text)
-    target_audience = Column(Text)
-    brand_tone = Column(Text)
-
-    # Raw
-    raw_notes = Column(Text)
-    zoom_recording_url = Column(String(500))
-
+class Order(Base):
+    __tablename__ = "orders"
+    id = Column(String, primary_key=True)  # ord_xxx format
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    tier = Column(String(20), nullable=False)
+    order_type = Column(String(20), default="new")  # "new" or "upgrade"
+    amount = Column(Integer, nullable=False)
+    status = Column(String(20), default="pending_payment")
+    report_id = Column(String, nullable=True)
+    interview_data = Column(JSON, nullable=True)
+    analysis_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    confirmed_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error = Column(String, nullable=True)
+    user = relationship("User", back_populates="orders")
 
-    user = relationship("User", back_populates="interview")
-
-
-# ─────────────────────────────────────────────
-#  Face Analysis (CV Pipeline Output)
-# ─────────────────────────────────────────────
-
-class FaceAnalysis(Base):
-    __tablename__ = "face_analyses"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-
-    # Photo References
-    photo_urls = Column(JSON, default=list)
-
-    # Structural Features
-    face_shape = Column(String(20))
-    jaw_angle = Column(Float)
-    cheekbone_prominence = Column(Float)
-    eye_width_ratio = Column(Float)
-    eye_spacing_ratio = Column(Float)
-    eye_ratio = Column(Float)
-    eye_tilt = Column(Float)
-    nose_length_ratio = Column(Float)
-    nose_width_ratio = Column(Float)
-    nose_bridge_height = Column(Float)
-    lip_fullness = Column(Float)
-    face_length_ratio = Column(Float)
-    forehead_ratio = Column(Float)
-    brow_arch = Column(Float)
-    philtrum_ratio = Column(Float)
-    brow_eye_distance = Column(Float)
-    symmetry_score = Column(Float)
-    golden_ratio_score = Column(Float)
-
-    # CLIP Embedding
-    clip_embedding = Column(Vector(768))
-
-    # 3-Axis Coordinates (shape/volume/age)
-    coord_shape = Column(Float)      # Soft(-1) ↔ Sharp(+1)
-    coord_volume = Column(Float)     # Subtle(-1) ↔ Bold(+1)
-    coord_age = Column(Float)        # Fresh(-1) ↔ Mature(+1)
-
-    # Skin Analysis
-    skin_tone_category = Column(String(20))
-    skin_brightness = Column(Float)
-    skin_warmth_score = Column(Float)
-    skin_chroma = Column(Float)
-    skin_hex_sample = Column(String(10))
-
-    landmarks_json = Column(JSON)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    user = relationship("User", back_populates="analysis")
-
-
-# ─────────────────────────────────────────────
-#  Report
-# ─────────────────────────────────────────────
 
 class Report(Base):
     __tablename__ = "reports"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-
-    # Coordinate Summary (3-axis)
-    current_coords = Column(JSON)        # {shape, volume, age}
-    aspiration_coords = Column(JSON)
-    gap_vector = Column(JSON)
-    trend_position = Column(JSON)
-
-    # Generated Content
-    report_sections = Column(JSON)
-    executive_summary = Column(Text)
-    action_items = Column(JSON)
-
-    # Delivery
-    report_url = Column(String(500))
-    pdf_url = Column(String(500))
-    sent_at = Column(DateTime)
-    viewed_at = Column(DateTime)
-
-    # Feedback
-    satisfaction_score = Column(Integer)
-    usefulness_score = Column(Integer)
-    feedback_text = Column(Text)
-    would_repurchase = Column(Boolean)
-    would_recommend = Column(Boolean)
-
-    # B2B Opt-in
-    b2b_opt_in = Column(Boolean, default=False)
-    b2b_categories = Column(JSON)
-
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    order_id = Column(String, ForeignKey("orders.id"), nullable=False)
+    access_level = Column(String(20), default="standard")
+    pending_level = Column(String(20), nullable=True)
+    report_data = Column(JSON, nullable=True)  # the entire formatted report
+    raw_data = Column(JSON, nullable=True)  # coords, gap, content etc.
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    user = relationship("User", back_populates="report")
-
-
-# ─────────────────────────────────────────────
-#  Type Anchors (AI-generated, 8 types)
-# ─────────────────────────────────────────────
-
-class TypeAnchor(Base):
-    __tablename__ = "type_anchors"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    type_key = Column(String(20), nullable=False, unique=True)  # type_1 ~ type_8
-    name_kr = Column(String(100), nullable=False)
-    name_en = Column(String(100))
-    gender = Column(String(10))
-
-    clip_embedding = Column(Vector(768))
-
-    # 3-Axis Coordinates
-    coord_shape = Column(Float)
-    coord_volume = Column(Float)
-    coord_age = Column(Float)
-
-    quadrant = Column(String(30))
-    one_liner = Column(String(200))
-    description_kr = Column(Text)
-    photo_url = Column(String(500))
-    tags = Column(JSON, default=list)
+    upgraded_at = Column(DateTime, nullable=True)
+    feedback = Column(JSON, nullable=True)
+    user = relationship("User", back_populates="reports")
 
 
-# ─────────────────────────────────────────────
-#  DB Engine Setup
-# ─────────────────────────────────────────────
+# Engine + Session setup
+engine = None
+SessionLocal = None
 
-def get_engine(database_url: str):
-    return create_async_engine(database_url, echo=True)
 
-def get_session_factory(engine):
-    return sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+def init_db():
+    """Initialize database engine and create tables. Call on startup."""
+    global engine, SessionLocal
+    if not DATABASE_URL:
+        print("[DB] DATABASE_URL not set, skipping DB init")
+        return False
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    Base.metadata.create_all(bind=engine)
+    print("[DB] Tables created/verified")
+    return True
+
+
+def get_db():
+    """Get a database session. Returns None if DB not initialized."""
+    if SessionLocal is None:
+        return None
+    db = SessionLocal()
+    return db

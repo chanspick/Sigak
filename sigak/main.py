@@ -2073,6 +2073,27 @@ async def get_my_reports(user_id: str):
 #  Static files & Health
 # ─────────────────────────────────────────────
 
+@app.post("/api/v1/admin/reset-db")
+async def reset_db(data: ConfirmRequest):
+    """DB 전체 초기화 — 모든 테이블 DROP 후 재생성."""
+    if data.admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+    if not _use_db():
+        raise HTTPException(500, "DB 미연결")
+    from db import Base, engine
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    from db import _migrate_columns
+    _migrate_columns(engine)
+    # 인메모리도 초기화
+    USERS.clear()
+    INTERVIEWS.clear()
+    ANALYSES.clear()
+    REPORTS.clear()
+    ORDERS.clear()
+    return {"status": "reset_complete", "message": "모든 테이블 삭제 후 재생성 완료"}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.1.0", "woz_mode": settings.use_mock_clip, "db_connected": _use_db()}

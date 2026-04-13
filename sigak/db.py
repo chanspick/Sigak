@@ -4,9 +4,11 @@ from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
+import re
+
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# 모든 변형을 psycopg2용 postgresql:// 로 정규화
+DATABASE_URL = re.sub(r"^postgres(ql)?(\+\w+)?://", "postgresql://", DATABASE_URL)
 
 # 시작 시 URL 존재 여부 로깅 (비밀번호 제외)
 if DATABASE_URL:

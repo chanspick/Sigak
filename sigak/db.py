@@ -1,7 +1,7 @@
 """SIGAK Database -- Sync SQLAlchemy for MVP"""
 import os
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, create_engine
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, create_engine, text as sqlalchemy_text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 import uuid
@@ -92,6 +92,30 @@ engine = None
 SessionLocal = None
 
 
+def _migrate_columns(eng):
+    """기존 테이블에 누락된 컬럼 추가 (ALTER TABLE)."""
+    migrations = [
+        # users 테이블: 카카오 로그인 + 캐스팅 컬럼
+        ("users", "kakao_id", "VARCHAR UNIQUE"),
+        ("users", "email", "VARCHAR(255)"),
+        ("users", "kakao_nickname", "VARCHAR(100)"),
+        ("users", "kakao_profile_image", "VARCHAR(500)"),
+        ("users", "casting_opted_in", "BOOLEAN DEFAULT FALSE"),
+        ("users", "casting_opted_at", "TIMESTAMP"),
+        ("users", "casting_opted_out_at", "TIMESTAMP"),
+    ]
+    with eng.connect() as conn:
+        for table, column, col_type in migrations:
+            try:
+                conn.execute(
+                    sqlalchemy_text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {col_type}")
+                )
+            except Exception as e:
+                print(f"[MIGRATE] {table}.{column} skip: {e}")
+        conn.commit()
+    print("[DB] Column migration complete")
+
+
 def init_db():
     """Initialize database engine and create tables. Call on startup."""
     global engine, SessionLocal
@@ -102,6 +126,7 @@ def init_db():
         engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         Base.metadata.create_all(bind=engine)
+        _migrate_columns(engine)
         print("[DB] Tables created/verified")
         return True
     except Exception as e:

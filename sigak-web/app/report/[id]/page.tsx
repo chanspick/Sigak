@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getReportServerSide } from "@/lib/api/client";
 import { OverviewContent } from "./overview-content";
+import { ReportNav } from "@/components/report/report-nav";
 
 interface ReportPageProps {
   params: Promise<{ id: string }>;
@@ -58,12 +59,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
   return (
     <main className="min-h-screen bg-[var(--color-bg)]">
       {/* 네비게이션 */}
-      <nav className="sticky top-0 z-[100] flex items-center px-10 h-14 bg-[var(--color-fg)] text-[var(--color-bg)]">
-        <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
-        <span className="ml-3 text-[10px] font-medium tracking-[2.5px] opacity-40">
-          REPORT
-        </span>
-      </nav>
+      <ReportNav />
 
       {report ? (
         <div className="pt-4 pb-20">

@@ -68,6 +68,7 @@ export interface ReportSection {
 
 export interface ReportData {
   id: string;
+  user_id?: string;
   user_name: string;
   access_level: AccessLevel;
   pending_level: UnlockLevel | null;

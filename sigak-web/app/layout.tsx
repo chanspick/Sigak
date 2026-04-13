@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Serif_KR } from "next/font/google";
 // import localFont from "next/font/local";
 import "./globals.css";
+import { SiteHeader } from "@/components/ui/site-header";
 
 // 폰트 설정
 const notoSerifKr = Noto_Serif_KR({
@@ -33,7 +34,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={notoSerifKr.variable}>
-      <body>{children}</body>
+      <body>
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }

@@ -3,9 +3,10 @@
 // - 결제 완료 시 전체 섹션 표시 (기존 ReportViewer 재사용)
 
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getReportServerSide } from "@/lib/api/client";
 import { ReportViewer } from "@/components/report/report-viewer";
-import Link from "next/link";
+import { ReportNav } from "@/components/report/report-nav";
 
 interface FullReportPageProps {
   params: Promise<{ id: string }>;
@@ -18,12 +19,7 @@ export default async function FullReportPage({ params }: FullReportPageProps) {
   if (!report) {
     return (
       <main className="min-h-screen bg-[var(--color-bg)]">
-        <nav className="sticky top-0 z-[100] flex items-center px-10 h-14 bg-[var(--color-fg)] text-[var(--color-bg)]">
-          <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
-          <span className="ml-3 text-[10px] font-medium tracking-[2.5px] opacity-40">
-            REPORT
-          </span>
-        </nav>
+        <ReportNav />
         <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
           <h1 className="font-[family-name:var(--font-serif)] text-[24px] font-normal mb-3">
             리포트를 불러올 수 없습니다
@@ -50,20 +46,7 @@ export default async function FullReportPage({ params }: FullReportPageProps) {
   return (
     <main className="min-h-screen bg-[var(--color-bg)]">
       {/* 네비게이션 */}
-      <nav className="sticky top-0 z-[100] flex items-center justify-between px-10 h-14 bg-[var(--color-fg)] text-[var(--color-bg)]">
-        <div className="flex items-center">
-          <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
-          <span className="ml-3 text-[10px] font-medium tracking-[2.5px] opacity-40">
-            REPORT
-          </span>
-        </div>
-        <Link
-          href={`/report/${id}`}
-          className="text-[10px] font-medium tracking-[1px] opacity-50 hover:opacity-80 transition-opacity"
-        >
-          OVERVIEW
-        </Link>
-      </nav>
+      <ReportNav rightLink={{ href: `/report/${id}`, label: "OVERVIEW" }} />
 
       {/* 리포트 뷰어 */}
       <div className="pt-4 pb-20">

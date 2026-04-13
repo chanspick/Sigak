@@ -16,6 +16,7 @@ import { getReport, requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "./section-renderer";
 import { PaywallGate } from "./paywall-gate";
 import { ShareButtons } from "./share-buttons";
+import { CastingOptInBanner } from "./casting-opt-in-banner";
 
 interface ReportViewerProps {
   initialReport: ReportData;
@@ -154,6 +155,13 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           description="AI 이목구비 분석 · 퍼스널 스타일링 리포트"
         />
       </div>
+
+      {/* 캐스팅 풀 opt-in — full 리포트에서만 표시 */}
+      {report.access_level === "full" && report.user_id && (
+        <div className="py-8 border-t border-[var(--color-border)]">
+          <CastingOptInBanner userId={report.user_id} />
+        </div>
+      )}
 
       {/* 리포트 하단 여백 */}
       <div className="h-10" />

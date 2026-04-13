@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { NotificationBell } from "@/components/notification/notification-bell";
 
 function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -34,6 +35,9 @@ const AXES = [
 ] as const;
 
 export default function HomePage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  useEffect(() => { setIsLoggedIn(!!localStorage.getItem("sigak_user_id")); }, []);
+
   return (
     <div className="min-h-screen bg-bg text-fg antialiased">
       <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
@@ -44,6 +48,10 @@ export default function HomePage() {
         </div>
         <span className="text-[13px] font-semibold tracking-[6px] uppercase">SIGAK</span>
         <div className="flex items-center gap-5">
+          {isLoggedIn && (
+            <Link href="/my" className="text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 no-underline text-[var(--color-bg)]">내 리포트</Link>
+          )}
+          {isLoggedIn && <NotificationBell />}
           <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">진단 시작</Link>
         </div>
       </nav>

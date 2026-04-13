@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
+import uuid
 import re
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -30,6 +31,9 @@ class User(Base):
     tier = Column(String(20), default="standard")
     status = Column(String(20), default="booked")
     extra_data = Column(JSON, default=dict)  # everything else from user dict
+    casting_opted_in = Column(Boolean, default=False)
+    casting_opted_at = Column(DateTime, nullable=True)
+    casting_opted_out_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     orders = relationship("Order", back_populates="user")
     reports = relationship("Report", back_populates="user")
@@ -66,6 +70,18 @@ class Report(Base):
     upgraded_at = Column(DateTime, nullable=True)
     feedback = Column(JSON, nullable=True)
     user = relationship("User", back_populates="reports")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String, nullable=False)       # report_ready, upgrade_complete, system
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    link = Column(String, nullable=True)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # Engine + Session setup

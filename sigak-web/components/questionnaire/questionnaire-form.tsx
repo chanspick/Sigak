@@ -124,15 +124,18 @@ export function QuestionnaireForm({
     try {
       const files = photoFiles.map((entry) => entry.file);
 
-      // 통합 제출: 사진 + 질문지 한 번에
+      // 통합 제출: 사진 + 질문지 한 번에 (user_id 포함 → 카카오 유저 연결)
       const result = await submitAll(
-        { ...answers, gender, tier, name: userName, phone: userPhone },
+        { ...answers, gender, tier, name: userName, phone: userPhone, user_id: userId },
         files,
       );
 
-      // localStorage 정리
+      // localStorage: 설문 데이터 정리 + user_id 저장 (알림 연동)
       if (typeof window !== "undefined") {
         localStorage.removeItem(storageKey);
+        if (result.user_id) {
+          localStorage.setItem("sigak_user_id", result.user_id);
+        }
       }
 
       // 송금 안내 페이지로 이동 (order_id 전달)
@@ -156,7 +159,7 @@ export function QuestionnaireForm({
         );
       }
     }
-  }, [router, gender, tier, storageKey, photoFiles, answers]);
+  }, [router, gender, tier, storageKey, photoFiles, answers, userId, userName, userPhone]);
 
   // 현재 질문 스텝 정보
   const currentQuestionStep =

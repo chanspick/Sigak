@@ -21,7 +21,7 @@ from pydantic import BaseModel
 import numpy as np
 import httpx
 
-from db import init_db, get_db, User as DBUser, Order as DBOrder, Report as DBReport
+from db import init_db, get_db, User as DBUser, Order as DBOrder, Report as DBReport, Notification as DBNotification
 
 
 def _use_db() -> bool:
@@ -216,6 +216,7 @@ if not _cluster_data.get("clusters"):
 
 class SubmitRequest(BaseModel):
     """질문지 + 메타데이터 (사진은 multipart로 별도)."""
+    user_id: Optional[str] = None  # 카카오 로그인 유저의 기존 user_id
     name: str = ""
     phone: str = ""
     gender: str = "female"
@@ -280,12 +281,35 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     except Exception:
         raise HTTPException(400, "질문지를 좀 더 자세히 작성해주세요")
 
-    user_id = str(uuid.uuid4())
+    # 카카오 로그인 유저면 기존 user_id 재사용
+    existing_user = False
+    if submit_data.user_id and _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == submit_data.user_id).first()
+            if db_user:
+                existing_user = True
+                user_id = db_user.id
+                print(f"[SUBMIT] reusing kakao user: {user_id} (kakao_id={db_user.kakao_id})")
+        except Exception as e:
+            print(f"[SUBMIT] user lookup error: {e}")
+        finally:
+            db.close()
+
+    if not existing_user:
+        # 인메모리에서도 확인
+        if submit_data.user_id and submit_data.user_id in USERS:
+            user_id = submit_data.user_id
+            existing_user = True
+            print(f"[SUBMIT] reusing in-memory user: {user_id}")
+        else:
+            user_id = str(uuid.uuid4())
+
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
     tier = submit_data.tier if submit_data.tier in PRICE_MAP else "full"
     amount = PRICE_MAP[tier]
 
-    print(f"[SUBMIT] tier={tier!r} amount={amount}")
+    print(f"[SUBMIT] user_id={user_id} existing={existing_user} tier={tier!r} amount={amount}")
 
     # 1. 사진 저장
     save_dir = DATA_DIR / user_id
@@ -362,16 +386,29 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     if _use_db():
         db = get_db()
         try:
-            db.merge(DBUser(
-                id=user_id,
-                name=submit_data.name or "익명",
-                phone=submit_data.phone or "",
-                gender=submit_data.gender,
-                tier=tier,
-                status="pending_payment",
-                extra_data={"created_at": user["created_at"]},
-                created_at=datetime.utcnow(),
-            ))
+            if existing_user:
+                # 기존 카카오 유저: tier/status만 업데이트 (kakao_id 보존)
+                db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+                if db_user:
+                    db_user.tier = tier
+                    db_user.status = "pending_payment"
+                    db_user.gender = submit_data.gender
+                    if submit_data.name and submit_data.name != "익명":
+                        db_user.name = submit_data.name
+                    if submit_data.phone:
+                        db_user.phone = submit_data.phone
+            else:
+                # 신규 유저 생성
+                db.merge(DBUser(
+                    id=user_id,
+                    name=submit_data.name or "익명",
+                    phone=submit_data.phone or "",
+                    gender=submit_data.gender,
+                    tier=tier,
+                    status="pending_payment",
+                    extra_data={"created_at": user["created_at"]},
+                    created_at=datetime.utcnow(),
+                ))
             db.add(DBOrder(
                 id=order_id,
                 user_id=user_id,
@@ -569,6 +606,14 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
             db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
             if db_user:
                 db_user.status = "reported"
+            # 알림 생성
+            db.add(DBNotification(
+                user_id=user_id,
+                type="report_ready",
+                title="리포트가 완료되었습니다",
+                message="AI 분석이 완료되었어요. 지금 확인해보세요!",
+                link=f"/report/{report_id}",
+            ))
             db.commit()
             print(f"[DB] confirm: report={report_id} order={order_id} completed")
         except Exception as e:
@@ -789,6 +834,7 @@ async def get_report(report_id: str):
         access = report.get("access_level", "standard")
         response["access_level"] = access
         response["pending_level"] = report.get("pending_level")
+        response["user_id"] = report.get("user_id", "")
 
         # access_level에 따라 섹션 잠금
         level_order = {"free": 0, "standard": 1, "full": 2}
@@ -1066,6 +1112,14 @@ async def upgrade_report(report_id: str, data: ConfirmRequest):
                 uo.status = "completed"
                 uo.confirmed_at = datetime.utcnow()
                 uo.completed_at = datetime.utcnow()
+            # 알림 생성
+            db.add(DBNotification(
+                user_id=user_id,
+                type="upgrade_complete",
+                title="풀 리포트가 열렸습니다",
+                message="헤어 추천, 액션 플랜까지 모두 확인해보세요!",
+                link=f"/report/{report['id']}",
+            ))
             db.commit()
             print(f"[DB] upgrade: report={report['id']} upgraded to full")
         except Exception as e:
@@ -1645,6 +1699,354 @@ async def get_me(user_id: str = ""):
         "kakao_id": user.get("kakao_id", ""),
         "reports": reports,
     }
+
+
+# ─────────────────────────────────────────────
+#  캐스팅 풀 (Casting Pool)
+# ─────────────────────────────────────────────
+
+@app.post("/api/v1/casting/opt-in")
+async def casting_opt_in(user_id: str):
+    """풀 리포트 하단 배너에서 동의 클릭 시 호출."""
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+    db = get_db()
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            raise HTTPException(404, "유저를 찾을 수 없습니다")
+        if user.casting_opted_in:
+            return {"status": "already_opted_in"}
+        user.casting_opted_in = True
+        user.casting_opted_at = datetime.utcnow()
+        db.commit()
+        return {"status": "opted_in", "user_id": user.id}
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/casting/opt-out")
+async def casting_opt_out(user_id: str):
+    """마이페이지에서 등록 해제 시 호출. 약관 제4조 5항: 언제든 해제 가능."""
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+    db = get_db()
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            raise HTTPException(404, "유저를 찾을 수 없습니다")
+        user.casting_opted_in = False
+        user.casting_opted_out_at = datetime.utcnow()
+        db.commit()
+        return {"status": "opted_out"}
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/casting/status")
+async def casting_status(user_id: str):
+    """현재 opt-in 상태 조회."""
+    if not _use_db():
+        return {"opted_in": False, "opted_at": None}
+    db = get_db()
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            raise HTTPException(404, "유저를 찾을 수 없습니다")
+        return {
+            "opted_in": bool(user.casting_opted_in),
+            "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else None,
+        }
+    finally:
+        db.close()
+
+
+# ─────────────────────────────────────────────
+#  캐스팅 풀 Admin API (B2B Dashboard)
+# ─────────────────────────────────────────────
+
+def _find_section(report_data: dict, section_id: str) -> dict:
+    """report_data sections에서 id로 content를 찾는 헬퍼."""
+    for s in (report_data or {}).get("sections", []):
+        if s.get("id") == section_id:
+            return s.get("content", {})
+    return {}
+
+
+@app.get("/api/v1/admin/casting-pool")
+async def get_casting_pool(admin_key: str, face_shape: str = None, image_type: str = None):
+    """opt-in 유저 목록 + 얼굴 분석 데이터 (B2B 대시보드용)."""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+    if not _use_db():
+        return {"total": 0, "users": []}
+
+    db = get_db()
+    try:
+        users = db.query(DBUser).filter(DBUser.casting_opted_in == True)\
+            .order_by(DBUser.casting_opted_at.desc()).all()
+
+        result = []
+        for user in users:
+            report = db.query(DBReport)\
+                .filter(DBReport.user_id == user.id)\
+                .order_by(DBReport.created_at.desc()).first()
+
+            if not report or not report.report_data:
+                continue
+
+            data = report.report_data
+
+            # 섹션별 데이터 추출
+            face_structure = _find_section(data, "face_structure")
+            gap_analysis = _find_section(data, "gap_analysis")
+            skin_analysis = _find_section(data, "skin_analysis")
+
+            user_face_shape = face_structure.get("face_type", "")
+            user_image_type = gap_analysis.get("current_type", "")
+            skin_tone = skin_analysis.get("tone", "")
+
+            # 필터
+            if face_shape and face_shape not in user_face_shape:
+                continue
+            if image_type and image_type not in user_image_type:
+                continue
+
+            # 좌표: raw_data 우선, fallback → gap_analysis
+            coordinates = {}
+            if report.raw_data and isinstance(report.raw_data, dict):
+                coordinates = report.raw_data.get("current_coords", {})
+            if not coordinates:
+                coordinates = gap_analysis.get("current_coordinates", {})
+
+            # 이름 마스킹: 홍길동 → 홍*동
+            name = user.name or ""
+            if len(name) >= 3:
+                masked_name = name[0] + "*" * (len(name) - 2) + name[-1]
+            elif len(name) == 2:
+                masked_name = name[0] + "*"
+            else:
+                masked_name = name
+
+            result.append({
+                "user_id": user.id,
+                "name": masked_name,
+                "gender": user.gender or "",
+                "face_shape": user_face_shape,
+                "image_type": user_image_type,
+                "coordinates": coordinates,
+                "skin_tone": skin_tone,
+                "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
+                "report_id": report.id,
+                "has_photo": bool(data.get("overlay")),
+            })
+
+        return {"total": len(result), "users": result}
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/admin/casting-pool/{user_id}")
+async def get_casting_profile(user_id: str, admin_key: str):
+    """opt-in 유저 상세 프로필 (B2B 대시보드용)."""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+
+    db = get_db()
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user or not user.casting_opted_in:
+            raise HTTPException(404, "유저를 찾을 수 없거나 opt-in 상태가 아닙니다")
+
+        report = db.query(DBReport)\
+            .filter(DBReport.user_id == user_id)\
+            .order_by(DBReport.created_at.desc()).first()
+        if not report:
+            raise HTTPException(404, "리포트가 없습니다")
+
+        data = report.report_data or {}
+
+        face_structure = _find_section(data, "face_structure")
+        gap_analysis = _find_section(data, "gap_analysis")
+        skin_analysis = _find_section(data, "skin_analysis")
+
+        # 이름 마스킹
+        name = user.name or ""
+        if len(name) >= 3:
+            masked_name = name[0] + "*" * (len(name) - 2) + name[-1]
+        elif len(name) == 2:
+            masked_name = name[0] + "*"
+        else:
+            masked_name = name
+
+        # 좌표
+        coordinates = {}
+        if report.raw_data and isinstance(report.raw_data, dict):
+            coordinates = report.raw_data.get("current_coords", {})
+        if not coordinates:
+            coordinates = gap_analysis.get("current_coordinates", {})
+
+        return {
+            "user_id": user.id,
+            "name": masked_name,
+            "gender": user.gender or "",
+            "face_shape": face_structure.get("face_type", ""),
+            "image_type": gap_analysis.get("current_type", ""),
+            "coordinates": coordinates,
+            "skin_tone": skin_analysis.get("tone", ""),
+            "sections": data.get("sections", []),
+            "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
+            "report_id": report.id,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/admin/casting-pool/{user_id}/match-request")
+async def request_casting_match(user_id: str, admin_key: str, agency_name: str = "", purpose: str = ""):
+    """매칭 요청 → Zapier(Slack) 알림 전송 (B2B 대시보드용)."""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+
+    db = get_db()
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            raise HTTPException(404, "유저를 찾을 수 없습니다")
+
+        # Slack 알림 (Zapier webhook)
+        if ZAPIER_WEBHOOK_NEW_ORDER:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
+                        "type": "match_request",
+                        "user_id": user_id,
+                        "user_name": user.name,
+                        "agency_name": agency_name,
+                        "purpose": purpose,
+                        "created_at": datetime.utcnow().isoformat(),
+                    }, timeout=10.0)
+            except Exception as e:
+                print(f"[WEBHOOK] MATCH_REQUEST error: {e}")
+
+        return {"status": "requested", "user_id": user_id}
+    finally:
+        db.close()
+
+
+# ─────────────────────────────────────────────
+#  알림 (Notifications)
+# ─────────────────────────────────────────────
+
+@app.get("/api/v1/notifications")
+async def get_notifications(user_id: str):
+    """로그인한 유저의 알림 목록 조회."""
+    if not _use_db():
+        return {"notifications": [], "unread_count": 0}
+    db = get_db()
+    try:
+        notifs = db.query(DBNotification)\
+            .filter(DBNotification.user_id == user_id)\
+            .order_by(DBNotification.created_at.desc())\
+            .limit(20)\
+            .all()
+        unread = sum(1 for n in notifs if not n.is_read)
+        return {
+            "notifications": [
+                {
+                    "id": n.id,
+                    "type": n.type,
+                    "title": n.title,
+                    "message": n.message,
+                    "link": n.link,
+                    "is_read": n.is_read,
+                    "created_at": n.created_at.isoformat() if n.created_at else "",
+                }
+                for n in notifs
+            ],
+            "unread_count": unread,
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str):
+    """알림 읽음 처리."""
+    if not _use_db():
+        return {"status": "ok"}
+    db = get_db()
+    try:
+        notif = db.query(DBNotification).filter(DBNotification.id == notification_id).first()
+        if not notif:
+            raise HTTPException(404, "알림을 찾을 수 없습니다")
+        notif.is_read = True
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/notifications/read-all")
+async def mark_all_read(user_id: str):
+    """유저의 전체 알림 읽음 처리."""
+    if not _use_db():
+        return {"status": "ok"}
+    db = get_db()
+    try:
+        db.query(DBNotification)\
+            .filter(DBNotification.user_id == user_id, DBNotification.is_read.is_(False))\
+            .update({"is_read": True})
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+# ─────────────────────────────────────────────
+#  마이페이지 (내 리포트)
+# ─────────────────────────────────────────────
+
+@app.get("/api/v1/my/reports")
+async def get_my_reports(user_id: str):
+    """로그인한 유저의 리포트 목록 조회."""
+    reports_list = []
+    # DB 우선
+    if _use_db():
+        db = get_db()
+        try:
+            db_reports = db.query(DBReport)\
+                .filter(DBReport.user_id == user_id)\
+                .order_by(DBReport.created_at.desc())\
+                .all()
+            for r in db_reports:
+                reports_list.append({
+                    "id": r.id,
+                    "access_level": r.access_level,
+                    "created_at": r.created_at.isoformat() if r.created_at else "",
+                    "url": f"/report/{r.id}",
+                })
+        except Exception as e:
+            print(f"[DB] my/reports error: {e}")
+        finally:
+            db.close()
+
+    # 인메모리 폴백
+    if not reports_list:
+        for rid, r in REPORTS.items():
+            if r.get("user_id") == user_id:
+                reports_list.append({
+                    "id": rid,
+                    "access_level": r.get("access_level", "standard"),
+                    "created_at": r.get("created_at", ""),
+                    "url": f"/report/{rid}",
+                })
+
+    return {"reports": reports_list}
 
 
 # ─────────────────────────────────────────────

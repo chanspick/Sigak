@@ -157,9 +157,9 @@ export function GapScatterPlot({
         <text x={W - padR} y={H - padB + 18} fontSize="10" fill="var(--color-muted)" textAnchor="end" opacity="0.6">{x_axis.high}</text>
 
         {/* ─── Y축 라벨 (좌측, rotate 사용 — writingMode 대신) ─── */}
-        <text x={padL - 12} y={H - padB} fontSize="10" fill="var(--color-muted)" textAnchor="middle" opacity="0.6">{y_axis.low}</text>
-        <text x={16} y={centerY} fontSize="11" fill="var(--color-fg)" textAnchor="middle" fontWeight="600" letterSpacing="2" transform={`rotate(-90, 16, ${centerY})`}>{y_axis.name_kr}</text>
-        <text x={padL - 12} y={padT + 4} fontSize="10" fill="var(--color-muted)" textAnchor="middle" dominantBaseline="hanging" opacity="0.6">{y_axis.high}</text>
+        <text x={padL - 22} y={H - padB} fontSize="10" fill="var(--color-muted)" textAnchor="middle" opacity="0.6">{y_axis.low}</text>
+        <text x={14} y={centerY} fontSize="11" fill="var(--color-fg)" textAnchor="middle" fontWeight="600" letterSpacing="2" transform={`rotate(-90, 14, ${centerY})`}>{y_axis.name_kr}</text>
+        <text x={padL - 22} y={padT + 4} fontSize="10" fill="var(--color-muted)" textAnchor="middle" dominantBaseline="hanging" opacity="0.6">{y_axis.high}</text>
 
         {/* ─── 화살표: 현재 → 추구 ─── */}
         {dist > 12 && (

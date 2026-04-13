@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -266,7 +266,7 @@ class FeedbackSubmit(BaseModel):
 # ─────────────────────────────────────────────
 
 @app.post("/api/v1/submit")
-async def submit(data: str = "", files: list[UploadFile] = File(...)):
+async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     """
     사진 + 질문지 제출 → order 생성. AI 비용 0.
 

@@ -278,7 +278,7 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     try:
         submit_data = SubmitRequest.model_validate_json(data) if data else SubmitRequest(name="익명", phone="")
     except Exception:
-        raise HTTPException(400, "질문지 데이터를 파싱할 수 없습니다")
+        raise HTTPException(400, "질문지를 좀 더 자세히 작성해주세요")
 
     user_id = str(uuid.uuid4())
     order_id = f"ord_{uuid.uuid4().hex[:12]}"

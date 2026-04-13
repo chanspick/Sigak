@@ -108,7 +108,9 @@ export interface KakaoTokenResponse {
   user_id: string;
   kakao_id: string;
   name: string;
-  phone: string;
+  nickname: string;
+  email: string;
+  profile_image: string;
   reports: Array<{ id: string; access_level: string; created_at: string }>;
 }
 

@@ -25,6 +25,9 @@ class User(Base):
     __tablename__ = "users"
     id = Column(String, primary_key=True)
     kakao_id = Column(String, unique=True, nullable=True, index=True)
+    email = Column(String(255), nullable=True, index=True)
+    kakao_nickname = Column(String(100), nullable=True)
+    kakao_profile_image = Column(String(500), nullable=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=False)
     gender = Column(String(10), default="female")

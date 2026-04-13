@@ -26,7 +26,8 @@ function CallbackContent() {
         // localStorage에 유저 정보 저장
         localStorage.setItem("sigak_user_id", result.user_id);
         localStorage.setItem("sigak_user_name", result.name);
-        localStorage.setItem("sigak_user_phone", result.phone);
+        if (result.email) localStorage.setItem("sigak_user_email", result.email);
+        if (result.profile_image) localStorage.setItem("sigak_profile_image", result.profile_image);
         localStorage.setItem("sigak_kakao_id", result.kakao_id);
 
         // 리포트가 있으면 최신 리포트로 이동, 없으면 시작 페이지로

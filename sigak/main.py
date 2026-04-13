@@ -1480,6 +1480,8 @@ async def kakao_token(data: KakaoTokenRequest):
     code = data.code
     redirect_uri = data.redirect_uri
     kakao_key = os.getenv("KAKAO_REST_API_KEY", "")
+    kakao_secret = os.getenv("KAKAO_CLIENT_SECRET", "")
+    print(f"[KAKAO] key={kakao_key[:6]}... secret={'SET' if kakao_secret else 'EMPTY'} redirect={redirect_uri}")
 
     # 1. 인가 코드로 액세스 토큰 교환
     async with httpx.AsyncClient() as client:
@@ -1488,7 +1490,7 @@ async def kakao_token(data: KakaoTokenRequest):
             data={
                 "grant_type": "authorization_code",
                 "client_id": kakao_key,
-                "client_secret": os.getenv("KAKAO_CLIENT_SECRET", ""),
+                "client_secret": kakao_secret,
                 "redirect_uri": redirect_uri,
                 "code": code,
             },

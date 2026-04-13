@@ -338,15 +338,19 @@ export default function HomePage() {
               </div>
               <div className="px-6 py-5">
                 <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">From</p>
-                <p className="text-[14px] font-bold mb-4">YG Entertainment</p>
-                <div className="flex gap-4 mb-4">
-                  <div className="flex-1">
+                <p className="text-[14px] font-bold mb-4">Alpha Agency</p>
+                <div className="flex gap-3 mb-4">
+                  <div className="flex-1 min-w-0">
                     <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">Purpose</p>
-                    <p className="text-[11px]">뮤직비디오 출연</p>
+                    <p className="text-[11px]">화보 촬영</p>
                   </div>
                   <div>
                     <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">Fee</p>
                     <p className="text-[11px] font-semibold">₩500,000</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">Date</p>
+                    <p className="text-[11px]">2026. 4. 20</p>
                   </div>
                 </div>
                 <div className="w-full h-px bg-black/10 mb-4" />

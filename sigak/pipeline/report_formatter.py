@@ -911,9 +911,6 @@ def _build_gap_analysis(
     sorted_axes = sorted(gap_vector.items(), key=lambda x: abs(x[1]), reverse=True)
 
     for axis_name, delta_val in sorted_axes:
-        if abs(delta_val) < 0.05:
-            continue  # 무시할 수 있는 차이
-
         ax_labels = AXIS_LABELS.get(axis_name, {})
         from_score = max(-1.0, min(1.0, float(current_coords.get(axis_name, 0) or 0)))
         to_score = max(-1.0, min(1.0, float(aspiration_coords.get(axis_name, 0) or 0)))

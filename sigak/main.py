@@ -274,6 +274,7 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
     - files: 사진 파일 (multipart)
     """
     # JSON 파싱
+    print(f"[SUBMIT] raw data field: {data[:200] if data else '(empty)'!r}")
     try:
         submit_data = SubmitRequest.model_validate_json(data) if data else SubmitRequest(name="익명", phone="")
     except Exception:

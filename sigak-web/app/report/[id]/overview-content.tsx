@@ -6,9 +6,10 @@
 // - CTA: 풀 업그레이드 버튼
 // - 공유 버튼 (카카오톡 + 링크 복사)
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportData, ReportSection } from "@/lib/types/report";
+import { requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "@/components/report/section-renderer";
 import { ShareButtons } from "@/components/report/share-buttons";
 
@@ -40,6 +41,7 @@ function getTeaserText(section: ReportSection): string | null {
 
 export function OverviewContent({ report, reportId }: OverviewContentProps) {
   const router = useRouter();
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
   useEffect(() => {
@@ -50,6 +52,35 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
       }
     }
   }, [report.user_id, report.user_name]);
+
+  // 풀 업그레이드 — 주문 생성 + 웹훅 + 결제 페이지 이동
+  const handleUpgrade = useCallback(async () => {
+    setUpgradeLoading(true);
+    try {
+      const res = await requestUpgrade(reportId);
+      if (res.payment_info) {
+        const p = res.payment_info;
+        const params = new URLSearchParams({
+          order_id: res.order_id || "",
+          amount: String(p.amount),
+          bank: p.bank,
+          account: p.account,
+          holder: p.holder,
+          toss: (p as unknown as Record<string, string>).toss_deeplink || "",
+          kakao: (p as unknown as Record<string, string>).kakao_deeplink || "",
+        });
+        router.push(`/questionnaire/payment?${params.toString()}`);
+        return;
+      }
+      if (res.status === "already_full") {
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error("[upgrade]", e);
+      alert("주문 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      setUpgradeLoading(false);
+    }
+  }, [reportId, router]);
 
   // 이미 풀 결제 완료된 경우
   const isFullPaid = ["full_pending", "full"].includes(report.access_level);
@@ -152,13 +183,21 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
               헤어 추천, 메이크업 액션 플랜, 유형 레퍼런스까지
               나만의 스타일 가이드를 완성하세요
             </p>
+            {report.paywall?.full?.original_price && (
+              <p className="text-sm text-[var(--color-muted)] line-through">
+                ₩{report.paywall.full.original_price.toLocaleString()}
+              </p>
+            )}
             <button
-              onClick={() => router.push(`/report/${reportId}/full`)}
-              className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-colors mt-2"
+              onClick={handleUpgrade}
+              disabled={upgradeLoading}
+              className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-colors mt-2 disabled:opacity-50"
             >
-              {report.paywall?.full
-                ? `₩${report.paywall.full.price.toLocaleString()} 풀 리포트 열기`
-                : "풀 리포트 보기"}
+              {upgradeLoading
+                ? "주문서 생성 중..."
+                : report.paywall?.full
+                  ? `₩${report.paywall.full.price.toLocaleString()} 풀 리포트 열기`
+                  : "풀 리포트 보기"}
             </button>
             {report.paywall?.full?.total_note && (
               <p className="text-[10px] text-[var(--color-muted)]">

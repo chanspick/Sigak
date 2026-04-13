@@ -7,11 +7,12 @@ interface PaywallCardProps {
   price: number;
   originalPrice?: number;
   totalNote?: string;
+  loading?: boolean;
   onUnlock: () => void;
 }
 
 // 결제 유도 카드 컴포넌트
-export function PaywallCard({ label, price, originalPrice, totalNote, onUnlock }: PaywallCardProps) {
+export function PaywallCard({ label, price, originalPrice, totalNote, loading, onUnlock }: PaywallCardProps) {
   return (
     <div className="flex flex-col items-center gap-4 py-10 px-6">
       <p className="text-lg font-medium">{label}</p>
@@ -23,8 +24,8 @@ export function PaywallCard({ label, price, originalPrice, totalNote, onUnlock }
       {totalNote && (
         <p className="text-sm text-[var(--color-muted)]">{totalNote}</p>
       )}
-      <Button variant="primary" size="lg" onClick={onUnlock}>
-        {`₩${price.toLocaleString()} 잠금 해제`}
+      <Button variant="primary" size="lg" onClick={onUnlock} disabled={loading}>
+        {loading ? "주문서 생성 중..." : `₩${price.toLocaleString()} 잠금 해제`}
       </Button>
     </div>
   );

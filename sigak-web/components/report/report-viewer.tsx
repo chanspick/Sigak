@@ -51,7 +51,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
 
   const router = useRouter();
 
-  // 결제 완료 처리 — 주문서 페이지로 이동 (신규 주문과 동일 플로우)
+  // 업그레이드 결제 — 주문 생성 + 웹훅 + 결제 페이지 이동
   const handlePaymentComplete = useCallback(async (level: UnlockLevel) => {
     if (level === "full") {
       try {
@@ -70,8 +70,15 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           router.push(`/questionnaire/payment?${params.toString()}`);
           return;
         }
+        // payment_info 없으면 이미 풀 결제 완료 상태
+        if (res.status === "already_full") {
+          window.location.reload();
+          return;
+        }
       } catch (e) {
         console.error("[upgrade-request]", e);
+        alert("주문 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        return;
       }
     }
     // fallback: pending 상태 전환

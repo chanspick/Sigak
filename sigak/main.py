@@ -1000,7 +1000,7 @@ ZAPIER_WEBHOOK_UPGRADE = os.getenv("ZAPIER_WEBHOOK_UPGRADE", ZAPIER_WEBHOOK_NEW_
 
 @app.post("/api/v1/upgrade-request/{report_id}")
 async def request_upgrade(report_id: str):
-    """유저가 ₩44,000 풀 업그레이드 요청. 주문 생성 + 웹훅 (신규 주문과 동일 플로우)."""
+    """유저가 ₩26,100 풀 업그레이드 요청. 주문 생성 + 웹훅 → 결제 페이지로 이동."""
     report = REPORTS.get(report_id)
     if not report:
         for rid, r in REPORTS.items():
@@ -1036,19 +1036,7 @@ async def request_upgrade(report_id: str):
         return {"status": "already_full", "report_id": report["id"]}
 
     user_id = report.get("user_id", "")
-    user = USERS.get(user_id, {})
-
-    # DB에서 user 가져오기
-    if not user and _use_db():
-        db = get_db()
-        try:
-            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
-            if db_user:
-                user = {"name": db_user.name, "phone": db_user.phone}
-        except Exception:
-            pass
-        finally:
-            db.close()
+    user = _find_user(user_id) or {}
 
     # 업그레이드 주문 생성 (신규 주문과 동일 구조)
     order_id = f"ord_{uuid.uuid4().hex[:12]}"

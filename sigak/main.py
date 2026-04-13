@@ -2020,20 +2020,22 @@ async def request_casting_match(user_id: str, admin_key: str, agency_name: str =
         if not user:
             raise HTTPException(404, "유저를 찾을 수 없습니다")
 
-        # Slack 알림 (Zapier webhook)
-        if ZAPIER_WEBHOOK_NEW_ORDER:
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(ZAPIER_WEBHOOK_NEW_ORDER, json={
-                        "type": "match_request",
-                        "user_id": user_id,
-                        "user_name": user.name,
-                        "agency_name": agency_name,
-                        "purpose": purpose,
-                        "created_at": datetime.utcnow().isoformat(),
-                    }, timeout=10.0)
-            except Exception as e:
-                print(f"[WEBHOOK] MATCH_REQUEST error: {e}")
+        # 유저에게 캐스팅 초대 알림 생성
+        notif_id = str(uuid.uuid4())
+        db.add(DBNotification(
+            id=notif_id,
+            user_id=user_id,
+            type="casting_match",
+            title=f"{agency_name}에서 캐스팅 제안이 도착했습니다",
+            message=json.dumps({
+                "agency_name": agency_name,
+                "purpose": purpose,
+                "requested_at": datetime.utcnow().isoformat(),
+            }, ensure_ascii=False),
+            link=None,
+        ))
+        db.commit()
+        print(f"[CASTING] match notification created for user={user_id} agency={agency_name}")
 
         return {"status": "requested", "user_id": user_id}
     finally:

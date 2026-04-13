@@ -327,6 +327,37 @@ export default function HomePage() {
             </Reveal>
           ))}
         </div>
+
+        {/* 초대장 미리보기 */}
+        <Reveal delay={0.3}>
+          <div className="mt-10 flex justify-center">
+            <div className="w-full max-w-[300px] border border-black/10 select-none">
+              <div className="bg-fg text-bg px-6 py-6 text-center">
+                <p className="text-[7px] tracking-[5px] uppercase opacity-40 mb-2">You are invited</p>
+                <p className="font-[family-name:var(--font-serif)] text-[14px] font-normal leading-snug">캐스팅 제안이<br />도착했습니다</p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">From</p>
+                <p className="text-[14px] font-bold mb-4">YG Entertainment</p>
+                <div className="flex gap-4 mb-4">
+                  <div className="flex-1">
+                    <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">Purpose</p>
+                    <p className="text-[11px]">뮤직비디오 출연</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] text-black/30 tracking-[2px] uppercase mb-1">Fee</p>
+                    <p className="text-[11px] font-semibold">₩500,000</p>
+                  </div>
+                </div>
+                <div className="w-full h-px bg-black/10 mb-4" />
+                <div className="flex gap-2">
+                  <div className="flex-1 py-2 text-center text-[10px] font-semibold bg-fg text-bg">수락하기</div>
+                  <div className="flex-1 py-2 text-center text-[10px] border border-black/10 text-black/30">괜찮습니다</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Reveal>
       </section>
 
       <Reveal>

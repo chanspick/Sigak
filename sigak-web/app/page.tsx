@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { NotificationBell } from "@/components/notification/notification-bell";
+import { MOCK_REPORT } from "@/lib/constants/mock-report";
 
 function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -125,6 +126,140 @@ export default function HomePage() {
           </div>
         </Reveal>
       </section>
+      {/* REPORT PREVIEW — Mock Report 기반 샘플 */}
+      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">
+        <Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
+            <div><h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Report</h2></div>
+            <div><p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">리포트 미리보기</p></div>
+            <div><p className="text-[15px] leading-[1.7] opacity-70">AI가 분석한 얼굴 구조 지표, 퍼스널 컬러, 추구미 갭 분석, 헤어 추천까지 — 실제 리포트의 일부입니다.</p></div>
+          </div>
+        </Reveal>
+
+        {(() => {
+          const faceSection = MOCK_REPORT.sections.find(s => s.id === "face_structure");
+          const skinSection = MOCK_REPORT.sections.find(s => s.id === "skin_analysis");
+          const gapSection = MOCK_REPORT.sections.find(s => s.id === "gap_analysis");
+          const hairSection = MOCK_REPORT.sections.find(s => s.id === "hair_recommendation");
+          const face = faceSection?.content as Record<string, unknown> | undefined;
+          const skin = skinSection?.content as Record<string, unknown> | undefined;
+          const gap = gapSection?.content as Record<string, unknown> | undefined;
+          const hair = hairSection?.content as Record<string, unknown> | undefined;
+          const metrics = (face?.metrics as Array<{ key: string; label: string; value: number; percentile: number; min_label: string; max_label: string; context_label: string }>) || [];
+          const recommended = (skin?.recommended as Array<{ name: string; hex: string; usage: string }>) || [];
+          const directionItems = (gap?.direction_items as Array<{ label: string; label_low: string; label_high: string; from_score: number; to_score: number; difficulty: string }>) || [];
+          const topCombo = ((hair?.top_combos as Array<{ front: { name_kr: string }; back: { name_kr: string }; why: string }>) || [])[0];
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 얼굴 구조 지표 */}
+              <Reveal delay={0.05}>
+                <div className="border border-black/10 p-6">
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">얼굴 구조</p>
+                  <div className="space-y-4">
+                    {metrics.slice(0, 4).map(m => (
+                      <div key={m.key}>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-[12px] font-medium">{m.label}</span>
+                          <span className="text-[11px] opacity-40">{m.context_label}</span>
+                        </div>
+                        <div className="relative h-1 bg-black/[0.06] rounded-sm">
+                          <div className="absolute top-0 left-0 h-full bg-fg/30 rounded-sm" style={{ width: `${m.percentile}%` }} />
+                        </div>
+                        <div className="flex justify-between mt-1 text-[10px] opacity-30">
+                          <span>{m.min_label}</span>
+                          <span>{m.max_label}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* 퍼스널 컬러 */}
+              <Reveal delay={0.1}>
+                <div className="border border-black/10 p-6">
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">퍼스널 컬러</p>
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-12 h-12 rounded-full border border-black/10" style={{ background: skin?.hex_sample as string || "#6F4F3C" }} />
+                    <div>
+                      <p className="text-[15px] font-semibold">{skin?.tone as string}</p>
+                      <p className="text-[11px] opacity-50 mt-0.5">{skin?.tone_description as string}</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-semibold tracking-[1px] opacity-40 mb-3">추천 컬러</p>
+                  <div className="flex gap-2">
+                    {recommended.map(c => (
+                      <div key={c.name} className="flex flex-col items-center gap-1">
+                        <div className="w-8 h-8 rounded-full border border-black/10" style={{ background: c.hex }} />
+                        <span className="text-[9px] opacity-50">{c.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* 갭 분석 */}
+              <Reveal delay={0.15}>
+                <div className="border border-black/10 p-6">
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">갭 분석</p>
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="text-[13px] font-medium">{gap?.current_type as string}</span>
+                    <span className="text-[11px] opacity-30">→</span>
+                    <span className="text-[13px] font-medium">{gap?.aspiration_type as string}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {directionItems.map(d => (
+                      <div key={d.label}>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[12px] font-medium">{d.label}</span>
+                          <span className="text-[10px] opacity-40">{d.difficulty}</span>
+                        </div>
+                        <div className="relative h-1 bg-black/[0.06] rounded-sm">
+                          <div className="absolute top-1/2 w-2 h-2 rounded-full bg-fg" style={{ left: `${(d.from_score + 1) / 2 * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
+                          <div className="absolute top-1/2 w-2 h-2 rounded-full border-2 border-fg bg-transparent" style={{ left: `${(d.to_score + 1) / 2 * 100}%`, transform: "translateX(-50%) translateY(-50%)" }} />
+                        </div>
+                        <div className="flex justify-between mt-1 text-[10px] opacity-30">
+                          <span>{d.label_low}</span>
+                          <span>{d.label_high}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* 헤어 추천 */}
+              <Reveal delay={0.2}>
+                <div className="border border-black/10 p-6">
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">헤어 추천 TOP 1</p>
+                  {topCombo && (
+                    <div>
+                      <p className="text-[15px] font-semibold mb-1">{topCombo.front.name_kr} + {topCombo.back.name_kr}</p>
+                      <p className="text-[12px] opacity-50 leading-[1.7]">{topCombo.why}</p>
+                    </div>
+                  )}
+                  <div className="mt-5 pt-4 border-t border-black/[0.06]">
+                    <p className="text-[11px] opacity-40 leading-[1.6]">
+                      헤어 카탈로그 앞머리 8종 + 뒷머리 13종에서<br />
+                      얼굴형 · 추구미에 최적화된 조합을 추천합니다.
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          );
+        })()}
+
+        <Reveal delay={0.25}>
+          <div className="mt-8 text-center">
+            <Link href="/start" className="text-sm font-medium transition-opacity duration-200 hover:opacity-50">
+              → 내 리포트 받아보기
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+
       <section id="method" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
         <Reveal>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
@@ -194,7 +329,7 @@ export default function HomePage() {
           <p className="text-[clamp(24px,4vw,40px)] font-bold tracking-[1px] transition-opacity duration-200 group-hover:opacity-50">
             → 진단 시작하기
           </p>
-          <p className="mt-3 text-[11px] opacity-30">₩5,000부터</p>
+          <p className="mt-3 text-[11px] opacity-30"><span className="line-through mr-1">₩5,000</span>₩2,900부터</p>
         </Link>
       </Reveal>
       <footer className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-6 md:py-8 text-center border-t border-black/10">

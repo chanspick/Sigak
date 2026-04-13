@@ -20,12 +20,12 @@ export function ReportNav({ rightLink }: ReportNavProps) {
 
   return (
     <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-[var(--color-fg)] text-[var(--color-bg)]">
-      <div className="flex items-center">
+      <Link href="/" className="flex items-center no-underline text-[var(--color-bg)] hover:opacity-80 transition-opacity">
         <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
         <span className="ml-3 text-[10px] font-medium tracking-[2.5px] opacity-40">
           REPORT
         </span>
-      </div>
+      </Link>
 
       <div className="flex items-center gap-4">
         {rightLink && (

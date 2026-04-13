@@ -1580,36 +1580,61 @@ async def kakao_token(data: KakaoTokenRequest):
     if raw_phone:
         phone = raw_phone.replace("+82 ", "0").replace("-", "").replace(" ", "")
 
-    # 3. 유저 조회 또는 생성
+    # 3. 유저 조회 또는 생성 (병합 로직 포함)
     user_id = None
 
     if _use_db():
         db = get_db()
         try:
-            # kakao_id로 기존 유저 조회
+            # 1차: kakao_id로 기존 유저 조회
             existing = db.query(DBUser).filter(DBUser.kakao_id == kakao_id).first()
             if existing:
                 user_id = existing.id
-                # 이름/전화번호가 비어있으면 업데이트
                 if not existing.name or existing.name == "익명":
                     existing.name = nickname
                 if not existing.phone and phone:
                     existing.phone = phone
                 db.commit()
+                print(f"[AUTH] found by kakao_id: {user_id}")
             else:
-                # 신규 유저 생성
-                user_id = str(uuid.uuid4())
-                new_user = DBUser(
-                    id=user_id,
-                    kakao_id=kakao_id,
-                    name=nickname,
-                    phone=phone,
-                    gender="female",
-                    status="authenticated",
-                    created_at=datetime.utcnow(),
-                )
-                db.add(new_user)
-                db.commit()
+                # 2차: 이름+전화번호로 기존 유저 병합 (설문으로 먼저 가입한 경우)
+                merge_candidate = None
+                if nickname and phone:
+                    merge_candidate = db.query(DBUser).filter(
+                        DBUser.name == nickname,
+                        DBUser.phone == phone,
+                        DBUser.kakao_id.is_(None) | (DBUser.kakao_id == ""),
+                    ).first()
+                # 이름만으로도 병합 시도 (전화번호 없는 경우)
+                if not merge_candidate and nickname:
+                    merge_candidate = db.query(DBUser).filter(
+                        DBUser.name == nickname,
+                        DBUser.kakao_id.is_(None) | (DBUser.kakao_id == ""),
+                    ).first()
+
+                if merge_candidate:
+                    # 기존 유저에 kakao_id 연결 (리포트/주문 유지)
+                    merge_candidate.kakao_id = kakao_id
+                    if not merge_candidate.phone and phone:
+                        merge_candidate.phone = phone
+                    user_id = merge_candidate.id
+                    db.commit()
+                    print(f"[AUTH] merged kakao_id into existing user: {user_id} (name={nickname})")
+                else:
+                    # 신규 유저 생성
+                    user_id = str(uuid.uuid4())
+                    new_user = DBUser(
+                        id=user_id,
+                        kakao_id=kakao_id,
+                        name=nickname,
+                        phone=phone,
+                        gender="female",
+                        status="authenticated",
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(new_user)
+                    db.commit()
+                    print(f"[AUTH] new kakao user: {user_id}")
         except Exception as e:
             db.rollback()
             print(f"[AUTH] DB error: {e}")

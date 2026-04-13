@@ -40,13 +40,13 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg text-fg antialiased">
-      <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
+      <nav className="sticky top-0 z-[100] relative flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
         <div className="hidden md:flex items-center gap-7">
           {["About", "Method", "Team"].map((t) => (
             <a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">{t}</a>
           ))}
         </div>
-        <span className="text-[13px] font-semibold tracking-[6px] uppercase">SIGAK</span>
+        <span className="absolute left-1/2 -translate-x-1/2 text-[13px] font-semibold tracking-[6px] uppercase pointer-events-none">SIGAK</span>
         <div className="flex items-center gap-5">
           {isLoggedIn && (
             <Link href="/my" className="text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 no-underline text-[var(--color-bg)]">내 리포트</Link>

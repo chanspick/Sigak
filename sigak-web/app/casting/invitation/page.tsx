@@ -143,21 +143,29 @@ function InvitationContent() {
             {/* 안내 */}
             <div className="bg-black/[0.02] border border-[var(--color-border)] p-5 text-center mb-8">
               <p className="text-[13px] font-medium mb-1">
-                SIGAK 팀이 확인 후 연락드리겠습니다
+                관심이 있으시다면 알려주세요
               </p>
               <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
-                캐스팅 관련 상세 내용은<br />
-                카카오톡으로 안내드립니다
+                수락하시면 에이전시에 연락처와<br />
+                리포트 요약 정보를 전달해드립니다
               </p>
             </div>
 
-            {/* 홈으로 */}
-            <Link
-              href="/my"
-              className="block w-full py-3.5 text-center text-[12px] font-medium tracking-[1px] border border-[var(--color-fg)] text-[var(--color-fg)] hover:bg-[var(--color-fg)] hover:text-[var(--color-bg)] transition-colors no-underline"
-            >
-              내 리포트로 돌아가기
-            </Link>
+            {/* 수락 / 거절 */}
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/my"
+                className="block w-full py-3.5 text-center text-[12px] font-medium tracking-[1px] bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-opacity no-underline"
+              >
+                수락하기
+              </Link>
+              <Link
+                href="/my"
+                className="block w-full py-3.5 text-center text-[12px] font-medium tracking-[1px] border border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-fg)] hover:text-[var(--color-fg)] transition-colors no-underline"
+              >
+                괜찮습니다
+              </Link>
+            </div>
           </div>
         </div>
 

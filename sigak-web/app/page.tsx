@@ -38,7 +38,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-bg text-fg antialiased">
       <nav className="sticky top-0 z-[100] relative flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
         <div className="hidden md:flex items-center gap-7">
-          {["About", "Method", "Team"].map((t) => (
+          {["About", "Method", "Team", "Casting"].map((t) => (
             <a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">{t}</a>
           ))}
         </div>
@@ -304,6 +304,31 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+      <section id="casting" className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10 border-t border-black/10">
+        <Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10">
+            <div><h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">Casting</h2></div>
+            <div><p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">분석을 넘어,<br />기회로 연결</p></div>
+            <div><p className="text-[15px] leading-[1.7] opacity-70">SIGAK의 분석 데이터는 개인 스타일링에서 끝나지 않습니다. 동의한 유저에 한해, 에이전시와 브랜드가 좌표 기반으로 적합한 인재를 탐색할 수 있는 캐스팅 풀을 운영합니다.</p></div>
+          </div>
+        </Reveal>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {[
+            { num: "01", title: "옵트인 동의", desc: "풀 리포트 하단에서 캐스팅 풀 참여를 선택할 수 있어요. 언제든 해제 가능합니다." },
+            { num: "02", title: "매칭 제안", desc: "에이전시가 좌표·얼굴형·이미지 유형으로 검색 후, 목적과 출연료를 포함한 제안을 보냅니다." },
+            { num: "03", title: "수락 또는 거절", desc: "초대장을 확인하고 수락하면 연락처와 리포트 요약이 전달됩니다. 거절 시 정보는 공유되지 않아요." },
+          ].map((item, i) => (
+            <Reveal key={item.num} delay={i * 0.12}>
+              <div>
+                <div className="font-[family-name:var(--font-serif)] text-[clamp(32px,4vw,48px)] font-light leading-none opacity-20 mb-4">{item.num}</div>
+                <h3 className="text-[15px] font-semibold mb-2.5">{item.title}</h3>
+                <p className="text-[12px] leading-[1.8] opacity-50">{item.desc}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       <Reveal>
         <Link href="/start" className="block px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 md:py-14 text-center group border-t border-black/10">
           <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4] opacity-50 mb-3">셀카 한 장과 5분의 설문으로</p>

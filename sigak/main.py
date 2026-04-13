@@ -1469,9 +1469,16 @@ async def kakao_login(redirect_uri: str = "https://www.sigak.asia/auth/kakao/cal
     return {"auth_url": auth_url}
 
 
+class KakaoTokenRequest(BaseModel):
+    code: str
+    redirect_uri: str = "https://www.sigak.asia/auth/kakao/callback"
+
+
 @app.post("/api/v1/auth/kakao/token")
-async def kakao_token(code: str, redirect_uri: str = "https://www.sigak.asia/auth/kakao/callback"):
+async def kakao_token(data: KakaoTokenRequest):
     """카카오 인가 코드 → 액세스 토큰 교환 → 유저 조회/생성."""
+    code = data.code
+    redirect_uri = data.redirect_uri
     kakao_key = os.getenv("KAKAO_REST_API_KEY", "")
 
     # 1. 인가 코드로 액세스 토큰 교환

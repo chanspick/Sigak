@@ -154,7 +154,7 @@ def _find_user(user_id: str) -> dict | None:
                     "tier": db_user.tier or "standard",
                     "kakao_id": db_user.kakao_id or "",
                     "status": db_user.status or "booked",
-                    "created_at": db_user.created_at.isoformat() if db_user.created_at else "",
+                    "created_at": db_user.created_at.isoformat() + "Z" if db_user.created_at else "",
                 }
                 USERS[user_id] = user  # 인메모리 캐시
                 return user
@@ -212,7 +212,7 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
                     reports_list.append({
                         "id": r.id,
                         "access_level": r.access_level,
-                        "created_at": r.created_at.isoformat() if r.created_at else "",
+                        "created_at": r.created_at.isoformat() + "Z" if r.created_at else "",
                         "url": f"/report/{r.id}",
                     })
         except Exception as e:
@@ -457,7 +457,7 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     interview = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
         **submit_data.model_dump(),
     }
     INTERVIEWS[user_id] = interview
@@ -471,7 +471,7 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
         "gender": submit_data.gender,
         "tier": tier,
         "status": "pending_payment",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
     }
     USERS[user_id] = user
     _save_json(user_id, "user.json", user)
@@ -483,7 +483,7 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
         "tier": tier,
         "amount": amount,
         "status": "pending_payment",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
         "report_id": None,
     }
     ORDERS[order_id] = order
@@ -594,7 +594,7 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
                     "amount": db_order.amount,
                     "status": db_order.status,
                     "report_id": db_order.report_id,
-                    "created_at": db_order.created_at.isoformat() if db_order.created_at else "",
+                    "created_at": db_order.created_at.isoformat() + "Z" if db_order.created_at else "",
                 }
         except Exception as e:
             print(f"[DB] confirm read error: {e}")
@@ -638,7 +638,7 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
                         "gender": db_user.gender or "female",
                         "tier": db_user.tier or "standard",
                         "status": db_user.status or "booked",
-                        "created_at": db_user.created_at.isoformat() if db_user.created_at else "",
+                        "created_at": db_user.created_at.isoformat() + "Z" if db_user.created_at else "",
                     }
                 db.commit()
         except Exception as e:
@@ -681,7 +681,7 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
 
     order["status"] = "completed"
     order["report_id"] = report_id
-    order["completed_at"] = datetime.utcnow().isoformat()
+    order["completed_at"] = datetime.utcnow().isoformat() + "Z"
     _save_json(user_id, "order.json", order)
 
     # DB에 Report 저장 + Order 완료 업데이트
@@ -877,7 +877,7 @@ def _run_analysis_pipeline(
         "aspiration_coords": aspiration_coords,
         "gap": gap,
         "content": report_content,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
         "access_level": order.get("tier", "standard"),  # standard(₩5K) 또는 full
     }
     sanitized_report = _sanitize(report)
@@ -916,7 +916,7 @@ async def get_report(report_id: str):
                     "formatted": db_report.report_data,
                     "access_level": db_report.access_level,
                     "pending_level": db_report.pending_level,
-                    "created_at": db_report.created_at.isoformat() if db_report.created_at else "",
+                    "created_at": db_report.created_at.isoformat() + "Z" if db_report.created_at else "",
                     "feedback": db_report.feedback,
                 }
                 if db_report.raw_data:
@@ -1080,7 +1080,7 @@ async def request_upgrade(report_id: str):
         "amount": UPGRADE_PRICE,
         "status": "pending_payment",
         "report_id": report["id"],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat() + "Z",
     }
     ORDERS[order_id] = order
     _save_json(user_id, "order.json", order)
@@ -1191,7 +1191,7 @@ async def upgrade_report(report_id: str, data: ConfirmRequest):
         return {"status": "already_full", "report_id": report["id"]}
 
     report["access_level"] = "full"
-    report["upgraded_at"] = datetime.utcnow().isoformat()
+    report["upgraded_at"] = datetime.utcnow().isoformat() + "Z"
 
     user_id = report.get("user_id", "")
     if user_id:
@@ -1314,7 +1314,7 @@ class InterviewSubmit(BaseModel):
 @app.post("/api/v1/booking")
 async def create_booking(data: BookingCreate):
     user_id = str(uuid.uuid4())
-    user = {"id": user_id, "status": "booked", "created_at": datetime.utcnow().isoformat(), "price": PRICE_MAP.get(data.tier, 2900), **data.model_dump()}
+    user = {"id": user_id, "status": "booked", "created_at": datetime.utcnow().isoformat() + "Z", "price": PRICE_MAP.get(data.tier, 2900), **data.model_dump()}
     USERS[user_id] = user
     _save_json(user_id, "user.json", user)  # booking.json → user.json 통일
 
@@ -1346,7 +1346,7 @@ async def create_booking(data: BookingCreate):
 async def submit_interview_legacy(user_id: str, data: InterviewSubmit):
     if not _find_user(user_id):
         raise HTTPException(404, "User not found")
-    interview = {"id": str(uuid.uuid4()), "user_id": user_id, "created_at": datetime.utcnow().isoformat(), **data.model_dump()}
+    interview = {"id": str(uuid.uuid4()), "user_id": user_id, "created_at": datetime.utcnow().isoformat() + "Z", **data.model_dump()}
     INTERVIEWS[user_id] = interview
     _save_json(user_id, "interview.json", interview)
     if user_id in USERS:
@@ -1519,7 +1519,7 @@ async def get_orders():
                         "tier": o.tier,
                         "amount": o.amount,
                         "status": o.status,
-                        "created_at": o.created_at.isoformat() if o.created_at else "",
+                        "created_at": o.created_at.isoformat() + "Z" if o.created_at else "",
                         "report_id": o.report_id,
                     })
                 return sorted(result, key=lambda x: x["created_at"], reverse=True)
@@ -1727,7 +1727,7 @@ async def kakao_token(data: KakaoTokenRequest):
             "phone": "",
             "gender": "female",
             "status": "authenticated",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.utcnow().isoformat() + "Z",
         }
 
     # 디스크 저장 (서버 재시작 시 복원용)
@@ -1827,7 +1827,7 @@ async def casting_status(user_id: str):
             raise HTTPException(404, "유저를 찾을 수 없습니다")
         return {
             "opted_in": bool(user.casting_opted_in),
-            "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else None,
+            "opted_at": user.casting_opted_at.isoformat() + "Z" if user.casting_opted_at else None,
         }
     finally:
         db.close()
@@ -1921,7 +1921,7 @@ async def get_casting_pool(admin_key: str, face_shape: str = None, image_type: s
                 "image_type": user_image_type,
                 "coordinates": coordinates,
                 "skin_tone": skin_tone,
-                "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
+                "opted_at": user.casting_opted_at.isoformat() + "Z" if user.casting_opted_at else "",
                 "report_id": report.id,
                 "has_photo": bool(photo_url),
                 "photo_url": photo_url,
@@ -1997,7 +1997,7 @@ async def get_casting_profile(user_id: str, admin_key: str):
             "coordinates": coordinates,
             "skin_tone": skin_analysis.get("tone", ""),
             "sections": data.get("sections", []),
-            "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
+            "opted_at": user.casting_opted_at.isoformat() + "Z" if user.casting_opted_at else "",
             "report_id": report.id,
             "photo_url": photo_url,
             "overlay_url": overlay_url,
@@ -2031,7 +2031,7 @@ async def request_casting_match(user_id: str, admin_key: str, agency_name: str =
                 "purpose": purpose,
                 "fee": fee,
                 "response": "pending",
-                "requested_at": datetime.utcnow().isoformat(),
+                "requested_at": datetime.utcnow().isoformat() + "Z",
             }, ensure_ascii=False),
             link=f"/casting/invitation?id={notif_id}",
         ))
@@ -2060,7 +2060,7 @@ async def respond_casting(notification_id: str, response: str, user_id: str = ""
         # message JSON 업데이트
         data = json.loads(notif.message) if notif.message else {}
         data["response"] = response
-        data["responded_at"] = datetime.utcnow().isoformat()
+        data["responded_at"] = datetime.utcnow().isoformat() + "Z"
         notif.message = json.dumps(data, ensure_ascii=False)
         notif.is_read = True
         db.commit()
@@ -2142,7 +2142,7 @@ async def get_notifications(user_id: str):
                     "message": n.message,
                     "link": n.link,
                     "is_read": n.is_read,
-                    "created_at": n.created_at.isoformat() if n.created_at else "",
+                    "created_at": n.created_at.isoformat() + "Z" if n.created_at else "",
                 }
                 for n in notifs
             ],

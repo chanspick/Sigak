@@ -355,7 +355,7 @@ export default function HomePage() {
                 </div>
                 <div className="w-full h-px bg-black/10 mb-4" />
                 <div className="flex gap-2">
-                  <div className="flex-1 py-2 text-center text-[10px] font-semibold bg-fg text-bg">수락하기</div>
+                  <Link href="/start" className="flex-1 py-2 text-center text-[10px] font-semibold bg-fg text-bg no-underline">수락하기</Link>
                   <div className="flex-1 py-2 text-center text-[10px] border border-black/10 text-black/30">괜찮습니다</div>
                 </div>
               </div>

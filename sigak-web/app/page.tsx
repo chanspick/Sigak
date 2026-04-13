@@ -112,7 +112,8 @@ export default function HomePage() {
           const metrics = (face?.metrics as Array<{ key: string; label: string; value: number; percentile: number; min_label: string; max_label: string; context_label: string }>) || [];
           const recommended = (skin?.recommended as Array<{ name: string; hex: string; usage: string }>) || [];
           const directionItems = (gap?.direction_items as Array<{ label: string; label_low: string; label_high: string; from_score: number; to_score: number; difficulty: string }>) || [];
-          const topCombos = (hair?.top_combos as Array<{ rank: number; front: { name_kr: string; image: string }; back: { name_kr: string; image_front: string }; why: string }>) || [];
+          const topCombo = ((hair?.top_combos as Array<{ rank: number; front: { name_kr: string; image: string }; back: { name_kr: string; image_front: string }; why: string }>) || [])[0];
+          const catalog = hair?.catalog as { front: Array<{ id: string; name_kr: string; image: string }>; back: Array<{ id: string; name_kr: string; image_front: string }> } | undefined;
 
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -193,28 +194,35 @@ export default function HomePage() {
                 </div>
               </Reveal>
 
-              {/* 헤어 추천 TOP 3 */}
+              {/* 헤어 추천 */}
               <Reveal delay={0.2}>
                 <div className="border border-black/10 p-6">
-                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">헤어 추천 TOP 3</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {topCombos.slice(0, 3).map((combo) => (
-                      <div key={combo.rank} className="flex flex-col">
+                  <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-5">헤어 추천</p>
+                  {topCombo && (
+                    <p className="text-[13px] font-semibold mb-4">{topCombo.front.name_kr} + {topCombo.back.name_kr}</p>
+                  )}
+                  {catalog && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* 추천 앞머리 */}
+                      <div className="flex flex-col">
                         <div className="relative aspect-[3/4] w-full overflow-hidden bg-black/[0.03] mb-2">
-                          <Image
-                            src={combo.back.image_front}
-                            alt={combo.back.name_kr}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 30vw, 15vw"
-                          />
-                          <span className="absolute top-1.5 left-1.5 text-[9px] font-bold bg-fg text-bg px-1.5 py-0.5">{combo.rank}</span>
+                          <Image src={topCombo?.front.image || catalog.front[3].image} alt={topCombo?.front.name_kr || ""} fill className="object-cover" sizes="(max-width: 768px) 30vw, 15vw" />
+                          <span className="absolute top-1.5 left-1.5 text-[8px] font-bold bg-fg text-bg px-1.5 py-0.5">앞머리</span>
                         </div>
-                        <p className="text-[11px] font-semibold leading-tight">{combo.front.name_kr}</p>
-                        <p className="text-[10px] opacity-40">{combo.back.name_kr}</p>
+                        <p className="text-[11px] font-semibold leading-tight">{topCombo?.front.name_kr || catalog.front[3].name_kr}</p>
                       </div>
-                    ))}
-                  </div>
+                      {/* 카탈로그 뒷머리 2종 (서로 다른 길이) */}
+                      {[catalog.back[1], catalog.back[10]].map((style) => (
+                        <div key={style.id} className="flex flex-col">
+                          <div className="relative aspect-[3/4] w-full overflow-hidden bg-black/[0.03] mb-2">
+                            <Image src={style.image_front} alt={style.name_kr} fill className="object-cover" sizes="(max-width: 768px) 30vw, 15vw" />
+                            <span className="absolute top-1.5 left-1.5 text-[8px] font-bold bg-fg text-bg px-1.5 py-0.5">뒷머리</span>
+                          </div>
+                          <p className="text-[11px] font-semibold leading-tight">{style.name_kr}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-4 pt-3 border-t border-black/[0.06]">
                     <p className="text-[11px] opacity-40">앞머리 8종 + 뒷머리 13종에서 얼굴형에 최적화된 조합 추천</p>
                   </div>

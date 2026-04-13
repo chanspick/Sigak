@@ -2032,7 +2032,7 @@ async def request_casting_match(user_id: str, admin_key: str, agency_name: str =
                 "purpose": purpose,
                 "requested_at": datetime.utcnow().isoformat(),
             }, ensure_ascii=False),
-            link=None,
+            link=f"/casting/invitation?id={notif_id}",
         ))
         db.commit()
         print(f"[CASTING] match notification created for user={user_id} agency={agency_name}")

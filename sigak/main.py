@@ -1900,6 +1900,19 @@ async def get_casting_pool(admin_key: str, face_shape: str = None, image_type: s
             else:
                 masked_name = name
 
+            # 사진 URL 생성
+            photo_url = None
+            overlay = data.get("overlay")
+            if overlay and overlay.get("before_url"):
+                photo_url = overlay["before_url"]
+            else:
+                # 디스크에서 사진 찾기
+                photo_dir = DATA_DIR / user.id
+                if photo_dir.exists():
+                    photos = sorted(photo_dir.glob("photo_*.*"))
+                    if photos:
+                        photo_url = f"/api/v1/uploads/{user.id}/{photos[0].name}"
+
             result.append({
                 "user_id": user.id,
                 "name": masked_name,
@@ -1910,7 +1923,8 @@ async def get_casting_pool(admin_key: str, face_shape: str = None, image_type: s
                 "skin_tone": skin_tone,
                 "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
                 "report_id": report.id,
-                "has_photo": bool(data.get("overlay")),
+                "has_photo": bool(photo_url),
+                "photo_url": photo_url,
             })
 
         return {"total": len(result), "users": result}
@@ -1960,6 +1974,20 @@ async def get_casting_profile(user_id: str, admin_key: str):
         if not coordinates:
             coordinates = gap_analysis.get("current_coordinates", {})
 
+        # 사진 URL
+        photo_url = None
+        overlay_url = None
+        overlay = data.get("overlay")
+        if overlay:
+            photo_url = overlay.get("before_url")
+            overlay_url = overlay.get("after_url")
+        if not photo_url:
+            photo_dir = DATA_DIR / user.id
+            if photo_dir.exists():
+                photos = sorted(photo_dir.glob("photo_*.*"))
+                if photos:
+                    photo_url = f"/api/v1/uploads/{user.id}/{photos[0].name}"
+
         return {
             "user_id": user.id,
             "name": masked_name,
@@ -1971,6 +1999,8 @@ async def get_casting_profile(user_id: str, admin_key: str):
             "sections": data.get("sections", []),
             "opted_at": user.casting_opted_at.isoformat() if user.casting_opted_at else "",
             "report_id": report.id,
+            "photo_url": photo_url,
+            "overlay_url": overlay_url,
         }
     finally:
         db.close()

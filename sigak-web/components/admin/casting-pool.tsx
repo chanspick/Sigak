@@ -27,10 +27,12 @@ interface CastingUser {
   opted_at: string;
   report_id: string;
   has_photo: boolean;
+  photo_url: string | null;
 }
 
 interface CastingUserDetail extends CastingUser {
   sections: Record<string, unknown>;
+  overlay_url: string | null;
 }
 
 interface PoolResponse {
@@ -199,6 +201,24 @@ function CastingProfileModal({
           </div>
         ) : detail ? (
           <div className="px-6 py-5">
+            {/* 사진 */}
+            {(detail.photo_url || detail.overlay_url) && (
+              <div className="flex gap-3 mb-6">
+                {detail.photo_url && (
+                  <div className="w-28 h-36 bg-black/[0.04] overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`${API_URL}${detail.photo_url}`} alt="원본" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                {detail.overlay_url && (
+                  <div className="w-28 h-36 bg-black/[0.04] overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`${API_URL}${detail.overlay_url}`} alt="오버레이" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 이름 + 성별 */}
             <div className="flex items-baseline gap-3 mb-6">
               <span className="text-lg font-bold">{detail.name}</span>
@@ -470,31 +490,46 @@ export function CastingPool() {
                 onClick={() => setSelectedUserId(user.user_id)}
                 className="w-full text-left border border-[var(--color-border)] bg-transparent px-5 py-4 hover:border-[var(--color-fg)] transition-colors cursor-pointer"
               >
-                {/* 1행: 이름 + 날짜 */}
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[13px] font-medium">{user.name}</span>
-                  <span className="text-[10px] text-[var(--color-muted)]">
-                    {new Date(user.opted_at).toLocaleDateString("ko-KR")}
-                  </span>
-                </div>
-
-                {/* 2행: 얼굴형 + 피부톤 */}
-                <p className="text-[11px] text-[var(--color-muted)] mb-3">
-                  {user.face_shape} · {user.skin_tone}
-                </p>
-
-                {/* 좌표 바 */}
-                <div className="space-y-1">
-                  {(Object.keys(AXIS_LABELS) as (keyof Coordinates)[]).map(
-                    (axis) => (
-                      <CoordinateBar
-                        key={axis}
-                        axis={axis}
-                        value={user.coordinates[axis]}
-                        compact
+                <div className="flex gap-4">
+                  {/* 썸네일 */}
+                  {user.photo_url && (
+                    <div className="w-16 h-20 shrink-0 bg-black/[0.04] overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${API_URL}${user.photo_url}`}
+                        alt=""
+                        className="w-full h-full object-cover"
                       />
-                    )
+                    </div>
                   )}
+                  <div className="flex-1 min-w-0">
+                    {/* 1행: 이름 + 날짜 */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[13px] font-medium">{user.name}</span>
+                      <span className="text-[10px] text-[var(--color-muted)]">
+                        {new Date(user.opted_at).toLocaleDateString("ko-KR")}
+                      </span>
+                    </div>
+
+                    {/* 2행: 얼굴형 + 피부톤 */}
+                    <p className="text-[11px] text-[var(--color-muted)] mb-3">
+                      {user.face_shape} · {user.skin_tone}
+                    </p>
+
+                    {/* 좌표 바 */}
+                    <div className="space-y-1">
+                      {(Object.keys(AXIS_LABELS) as (keyof Coordinates)[]).map(
+                        (axis) => (
+                          <CoordinateBar
+                            key={axis}
+                            axis={axis}
+                            value={user.coordinates[axis]}
+                            compact
+                          />
+                        )
+                      )}
+                    </div>
+                  </div>
                 </div>
               </button>
             ))}

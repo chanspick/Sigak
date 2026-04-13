@@ -377,8 +377,8 @@ async def submit(data: str = "", files: list[UploadFile] = File(...)):
                 order_type="new",
                 amount=amount,
                 status="pending_payment",
-                interview_data=_sanitize(interview),
-                analysis_data=_sanitize(analysis),
+                interview_data=json.loads(json.dumps(_sanitize(interview), default=str)),
+                analysis_data=json.loads(json.dumps(_sanitize(analysis), default=str)),
                 created_at=datetime.utcnow(),
             ))
             db.commit()

@@ -277,6 +277,35 @@ export async function requestUpgrade(
   return handleResponse(response);
 }
 
+/** 내 리포트 목록 조회 (GET /api/v1/my/reports?user_id=xxx) */
+export async function getMyReports(
+  userId: string,
+): Promise<{ reports: Array<{ id: string; access_level: string; created_at: string; url: string }> }> {
+  const response = await fetch(`${API_URL}/api/v1/my/reports?user_id=${userId}`, {
+    headers: COMMON_HEADERS,
+  });
+  return handleResponse(response);
+}
+
+/** 캐스팅 풀 상태 조회 (GET /api/v1/casting/status?user_id=xxx) */
+export async function getCastingStatus(
+  userId: string,
+): Promise<{ opted_in: boolean; opted_at: string | null }> {
+  const response = await fetch(`${API_URL}/api/v1/casting/status?user_id=${userId}`, {
+    headers: COMMON_HEADERS,
+  });
+  return handleResponse(response);
+}
+
+/** 캐스팅 풀 탈퇴 (POST /api/v1/casting/opt-out?user_id=xxx) */
+export async function castingOptOut(userId: string): Promise<{ status: string }> {
+  const response = await fetch(`${API_URL}/api/v1/casting/opt-out?user_id=${userId}`, {
+    method: "POST",
+    headers: COMMON_HEADERS,
+  });
+  return handleResponse(response);
+}
+
 /**
  * 리포트 조회 (서버 사이드용)
  * 서버 컴포넌트에서는 브라우저 API를 사용하지 않으므로 fetch 직접 사용

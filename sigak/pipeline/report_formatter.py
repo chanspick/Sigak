@@ -1441,14 +1441,16 @@ def format_report_for_frontend(
         "sections": sections,
         "paywall": {
             "standard": {
-                "price": 5000,
-                "label": "\u20A95,000 잠금 해제",
+                "price": 2900,
+                "original_price": 5000,
+                "label": "\u20A92,900 잠금 해제",
                 "method": "manual",
             },
             "full": {
-                "price": 15000,
-                "label": "+\u20A915,000 잠금 해제",
-                "total_note": "이전 결제 포함 총 \u20A920,000",
+                "price": 26100,
+                "original_price": 44000,
+                "label": "+\u20A926,100 잠금 해제",
+                "total_note": "이전 결제 포함 총 \u20A929,000",
                 "method": "manual",
             },
         },

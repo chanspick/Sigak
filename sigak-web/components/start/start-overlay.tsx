@@ -1,6 +1,6 @@
 "use client";
 
-// 시작 오버레이 - 카카오 로그인 → 티어 선택(₩5K/₩49K) + 이름/연락처 입력
+// 시작 오버레이 - 카카오 로그인 → 티어 선택(₩2.9K/₩29K) + 이름/연락처 입력
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -191,6 +191,11 @@ export function StartOverlay() {
                       </span>
                     </div>
                     <span className="font-[family-name:var(--font-serif)] text-base font-normal">
+                      {t.originalPrice && (
+                        <span className="line-through opacity-30 mr-1.5 text-sm">
+                          {"\u20A9"}{t.originalPrice.toLocaleString()}
+                        </span>
+                      )}
                       {"\u20A9"}{t.price.toLocaleString()}
                     </span>
                   </div>

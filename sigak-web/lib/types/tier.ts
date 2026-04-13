@@ -4,6 +4,7 @@ export interface Tier {
   name: string;
   sub: string;
   price: number;
+  originalPrice?: number;
   desc: string;
   badge?: string;
 }

@@ -79,6 +79,7 @@ export interface ReportData {
 
 export interface PaywallTier {
   price: number;
+  original_price?: number;
   label: string;
   total_note?: string;
   method: "manual" | "auto";

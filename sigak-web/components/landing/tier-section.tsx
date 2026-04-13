@@ -27,8 +27,15 @@ export function TierSection({ tier, onStart }: TierSectionProps) {
             <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
               {tier.sub}
             </p>
-            <p className="mt-2 font-[family-name:var(--font-serif)] text-[clamp(14px,1.5vw,18px)] font-semibold opacity-50">
-              ₩{tier.price.toLocaleString()}
+            <p className="mt-2 font-[family-name:var(--font-serif)] text-[clamp(14px,1.5vw,18px)] font-semibold">
+              {tier.originalPrice && (
+                <span className="line-through opacity-30 mr-2">
+                  ₩{tier.originalPrice.toLocaleString()}
+                </span>
+              )}
+              <span className="opacity-70">
+                ₩{tier.price.toLocaleString()}
+              </span>
             </p>
           </div>
 

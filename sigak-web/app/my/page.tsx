@@ -5,8 +5,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { getMyReports, getCastingStatus, castingOptOut } from "@/lib/api/client";
 
 interface MyReport {
   id: string;
@@ -48,18 +47,12 @@ export default function MyPage() {
 
     (async () => {
       try {
-        const [reportsRes, castingRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/my/reports?user_id=${userId}`),
-          fetch(`${API_URL}/api/v1/casting/status?user_id=${userId}`),
+        const [reportsData, castingData] = await Promise.all([
+          getMyReports(userId),
+          getCastingStatus(userId).catch(() => null),
         ]);
-        if (reportsRes.ok) {
-          const data = await reportsRes.json();
-          setReports(data.reports);
-        }
-        if (castingRes.ok) {
-          const data = await castingRes.json();
-          setCastingStatus(data);
-        }
+        setReports(reportsData.reports);
+        if (castingData) setCastingStatus(castingData);
       } catch (e) {
         console.error("[my]", e);
       } finally {
@@ -73,12 +66,8 @@ export default function MyPage() {
     if (!userId || optingOut) return;
     setOptingOut(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/casting/opt-out?user_id=${userId}`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        setCastingStatus({ opted_in: false, opted_at: null });
-      }
+      await castingOptOut(userId);
+      setCastingStatus({ opted_in: false, opted_at: null });
     } catch (e) {
       console.error("[casting opt-out]", e);
     } finally {

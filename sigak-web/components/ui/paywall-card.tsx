@@ -5,15 +5,21 @@ import { Button } from "./button";
 interface PaywallCardProps {
   label: string;
   price: number;
+  originalPrice?: number;
   totalNote?: string;
   onUnlock: () => void;
 }
 
 // 결제 유도 카드 컴포넌트
-export function PaywallCard({ label, price, totalNote, onUnlock }: PaywallCardProps) {
+export function PaywallCard({ label, price, originalPrice, totalNote, onUnlock }: PaywallCardProps) {
   return (
     <div className="flex flex-col items-center gap-4 py-10 px-6">
       <p className="text-lg font-medium">{label}</p>
+      {originalPrice && (
+        <p className="text-sm text-[var(--color-muted)] line-through">
+          ₩{originalPrice.toLocaleString()}
+        </p>
+      )}
       {totalNote && (
         <p className="text-sm text-[var(--color-muted)]">{totalNote}</p>
       )}

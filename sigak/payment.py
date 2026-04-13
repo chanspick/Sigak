@@ -20,8 +20,8 @@ PAYMENT_ACCOUNT = {
 }
 
 PRICE_MAP = {
-    "standard": 5000,
-    "full": 15000,
+    "standard": 2900,
+    "full": 26100,
 }
 
 AUTO_CANCEL_HOURS = 24

@@ -54,6 +54,11 @@ export function ManualPaymentFlow({
           <div className="flex justify-between border-t border-[var(--color-border)] pt-2 mt-1">
             <span className="text-[var(--color-muted)]">금액</span>
             <span className="font-bold text-base">
+              {paywall.original_price && (
+                <span className="line-through opacity-40 font-normal text-sm mr-1.5">
+                  {`\u20A9${paywall.original_price.toLocaleString()}`}
+                </span>
+              )}
               {`\u20A9${paywall.price.toLocaleString()}`}
             </span>
           </div>

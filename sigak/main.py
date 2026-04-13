@@ -135,6 +135,86 @@ def _restore_stores():
     print(f"[RESTORE] 복원 완료: {restored}")
 
 
+def _find_user(user_id: str) -> dict | None:
+    """유저를 모든 저장소에서 조회: 인메모리 → DB → 디스크."""
+    # 1. 인메모리
+    if user_id in USERS:
+        return USERS[user_id]
+    # 2. DB
+    if _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                user = {
+                    "id": db_user.id,
+                    "name": db_user.name or "",
+                    "phone": db_user.phone or "",
+                    "gender": db_user.gender or "female",
+                    "tier": db_user.tier or "standard",
+                    "kakao_id": db_user.kakao_id or "",
+                    "status": db_user.status or "booked",
+                    "created_at": db_user.created_at.isoformat() if db_user.created_at else "",
+                }
+                USERS[user_id] = user  # 인메모리 캐시
+                return user
+        except Exception as e:
+            print(f"[FIND_USER] DB error: {e}")
+        finally:
+            db.close()
+    # 3. 디스크
+    user_data = _load_json(user_id, "user.json") or _load_json(user_id, "booking.json")
+    if user_data:
+        USERS[user_id] = user_data
+        return user_data
+    return None
+
+
+def _find_reports_for_user(user_id: str) -> list[dict]:
+    """유저의 리포트를 모든 저장소에서 조회: DB → 인메모리."""
+    reports_list = []
+    # 1. DB 우선
+    if _use_db():
+        db = get_db()
+        try:
+            db_reports = db.query(DBReport)\
+                .filter(DBReport.user_id == user_id)\
+                .order_by(DBReport.created_at.desc())\
+                .all()
+            for r in db_reports:
+                reports_list.append({
+                    "id": r.id,
+                    "access_level": r.access_level,
+                    "created_at": r.created_at.isoformat() if r.created_at else "",
+                    "url": f"/report/{r.id}",
+                })
+        except Exception as e:
+            print(f"[FIND_REPORTS] DB error: {e}")
+        finally:
+            db.close()
+    # 2. 인메모리 fallback
+    if not reports_list:
+        for rid, r in REPORTS.items():
+            if r.get("user_id") == user_id and rid != user_id:
+                reports_list.append({
+                    "id": rid,
+                    "access_level": r.get("access_level", "standard"),
+                    "created_at": r.get("created_at", ""),
+                    "url": f"/report/{rid}",
+                })
+    # 3. 디스크 fallback
+    if not reports_list:
+        report_data = _load_json(user_id, "report.json")
+        if report_data and "id" in report_data:
+            reports_list.append({
+                "id": report_data["id"],
+                "access_level": report_data.get("access_level", "standard"),
+                "created_at": report_data.get("created_at", ""),
+                "url": f"/report/{report_data['id']}",
+            })
+    return reports_list
+
+
 from config import get_settings
 from pipeline.face import analyze_face
 from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels
@@ -187,13 +267,18 @@ ZAPIER_WEBHOOK_NEW_ORDER = os.getenv("ZAPIER_WEBHOOK_NEW_ORDER", "")
 ZAPIER_WEBHOOK_REPORT_READY = os.getenv("ZAPIER_WEBHOOK_REPORT_READY", "")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "sigak-admin-2026")
 
-# 가격표
+# 가격표 (세일가)
 PRICE_MAP = {
-    "standard": 5000,    # 오버뷰 (블러 해제는 추가 결제)
-    "full": 49000,       # 풀 리포트 (처음부터 전부 열림)
+    "standard": 2900,    # 오버뷰 (블러 해제는 추가 결제)
+    "full": 29000,       # 풀 리포트 (처음부터 전부 열림)
+}
+# 정가 (삭선 표시용)
+ORIGINAL_PRICE_MAP = {
+    "standard": 5000,
+    "full": 49000,
 }
 # 오버뷰 → 풀 업그레이드 가격
-UPGRADE_PRICE = 44000
+UPGRADE_PRICE = 26100
 
 PAYMENT_INFO = {
     "bank": "카카오뱅크",
@@ -281,29 +366,19 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
     except Exception:
         raise HTTPException(400, "질문지를 좀 더 자세히 작성해주세요")
 
-    # 카카오 로그인 유저면 기존 user_id 재사용
+    # 기존 유저 재사용 (통합 조회: DB → 인메모리 → 디스크)
     existing_user = False
-    if submit_data.user_id and _use_db():
-        db = get_db()
-        try:
-            db_user = db.query(DBUser).filter(DBUser.id == submit_data.user_id).first()
-            if db_user:
-                existing_user = True
-                user_id = db_user.id
-                print(f"[SUBMIT] reusing kakao user: {user_id} (kakao_id={db_user.kakao_id})")
-        except Exception as e:
-            print(f"[SUBMIT] user lookup error: {e}")
-        finally:
-            db.close()
-
-    if not existing_user:
-        # 인메모리에서도 확인
-        if submit_data.user_id and submit_data.user_id in USERS:
-            user_id = submit_data.user_id
+    if submit_data.user_id:
+        found = _find_user(submit_data.user_id)
+        if found:
             existing_user = True
-            print(f"[SUBMIT] reusing in-memory user: {user_id}")
+            user_id = submit_data.user_id
+            print(f"[SUBMIT] reusing user: {user_id} (kakao_id={found.get('kakao_id', '')})")
         else:
             user_id = str(uuid.uuid4())
+            print(f"[SUBMIT] user_id={submit_data.user_id} not found, new: {user_id}")
+    else:
+        user_id = str(uuid.uuid4())
 
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
     tier = submit_data.tier if submit_data.tier in PRICE_MAP else "full"
@@ -826,6 +901,14 @@ async def get_report(report_id: str):
                 report = REPORTS.get(o["user_id"])
                 break
 
+    # 디스크 fallback: report_id가 user_id인 경우
+    if not report:
+        disk_report = _load_json(report_id, "report.json")
+        if disk_report and "id" in disk_report:
+            REPORTS[disk_report["id"]] = disk_report
+            REPORTS[report_id] = disk_report
+            report = disk_report
+
     if not report:
         raise HTTPException(404, "리포트를 찾을 수 없습니다")
 
@@ -850,9 +933,10 @@ async def get_report(report_id: str):
         if access != "full":
             response["paywall"] = {
                 "full": {
-                    "price": 44000,
+                    "price": 26100,
+                    "original_price": 44000,
                     "label": "풀 리포트 언락",
-                    "total_note": "기존 ₩5,000 + 추가 ₩44,000 = 총 ₩49,000",
+                    "total_note": "기존 ₩2,900 + 추가 ₩26,100 = 총 ₩29,000",
                     "method": "manual",
                 },
             }
@@ -1210,9 +1294,9 @@ class InterviewSubmit(BaseModel):
 @app.post("/api/v1/booking")
 async def create_booking(data: BookingCreate):
     user_id = str(uuid.uuid4())
-    user = {"id": user_id, "status": "booked", "created_at": datetime.utcnow().isoformat(), "price": PRICE_MAP.get(data.tier, 5000), **data.model_dump()}
+    user = {"id": user_id, "status": "booked", "created_at": datetime.utcnow().isoformat(), "price": PRICE_MAP.get(data.tier, 2900), **data.model_dump()}
     USERS[user_id] = user
-    _save_json(user_id, "booking.json", user)
+    _save_json(user_id, "user.json", user)  # booking.json → user.json 통일
 
     # DB dual-write
     if _use_db():
@@ -1240,18 +1324,7 @@ async def create_booking(data: BookingCreate):
 
 @app.post("/api/v1/interview/{user_id}")
 async def submit_interview_legacy(user_id: str, data: InterviewSubmit):
-    # 인메모리 또는 DB에서 유저 확인
-    user_exists = user_id in USERS
-    if not user_exists and _use_db():
-        db = get_db()
-        try:
-            user_exists = db.query(DBUser).filter(DBUser.id == user_id).first() is not None
-        except Exception:
-            pass
-        finally:
-            db.close()
-
-    if not user_exists:
+    if not _find_user(user_id):
         raise HTTPException(404, "User not found")
     interview = {"id": str(uuid.uuid4()), "user_id": user_id, "created_at": datetime.utcnow().isoformat(), **data.model_dump()}
     INTERVIEWS[user_id] = interview
@@ -1278,18 +1351,7 @@ async def submit_interview_legacy(user_id: str, data: InterviewSubmit):
 
 @app.post("/api/v1/photos/{user_id}")
 async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
-    # 인메모리 또는 DB에서 유저 확인
-    user_exists = user_id in USERS
-    if not user_exists and _use_db():
-        db = get_db()
-        try:
-            user_exists = db.query(DBUser).filter(DBUser.id == user_id).first() is not None
-        except Exception:
-            pass
-        finally:
-            db.close()
-
-    if not user_exists:
+    if not _find_user(user_id):
         raise HTTPException(404, "User not found")
     save_dir = DATA_DIR / user_id
     save_dir.mkdir(exist_ok=True)
@@ -1313,34 +1375,13 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
 @app.post("/api/v1/analyze/{user_id}")
 async def run_analysis_legacy(user_id: str):
     """하위호환: 기존 프론트엔드에서 호출 가능."""
-    # 인메모리 또는 DB에서 유저/인터뷰 확인
-    user_exists = user_id in USERS
+    user_data = _find_user(user_id)
+    if not user_data:
+        raise HTTPException(404, "User not found")
+
     interview_exists = user_id in INTERVIEWS
-    user_data = USERS.get(user_id, {})
     interview_data = INTERVIEWS.get(user_id, {})
     analysis_data = ANALYSES.get(user_id)
-
-    if not user_exists and _use_db():
-        db = get_db()
-        try:
-            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
-            if db_user:
-                user_exists = True
-                user_data = {
-                    "id": db_user.id,
-                    "name": db_user.name,
-                    "phone": db_user.phone,
-                    "gender": db_user.gender or "female",
-                    "tier": db_user.tier or "full",
-                    "status": db_user.status or "booked",
-                }
-        except Exception:
-            pass
-        finally:
-            db.close()
-
-    if not user_exists:
-        raise HTTPException(404, "User not found")
     if not interview_exists:
         raise HTTPException(400, "Interview data not submitted yet")
 
@@ -1669,17 +1710,11 @@ async def kakao_token(data: KakaoTokenRequest):
             "created_at": datetime.utcnow().isoformat(),
         }
 
-    # 4. 유저의 리포트 조회
-    reports = []
-    if _use_db():
-        db = get_db()
-        try:
-            user_reports = db.query(DBReport).filter(DBReport.user_id == user_id).all()
-            reports = [{"id": r.id, "access_level": r.access_level, "created_at": r.created_at.isoformat() if r.created_at else ""} for r in user_reports]
-        except Exception:
-            pass
-        finally:
-            db.close()
+    # 디스크 저장 (서버 재시작 시 복원용)
+    _save_json(user_id, "user.json", USERS[user_id])
+
+    # 4. 유저의 리포트 조회 (통합 헬퍼 사용)
+    reports = _find_reports_for_user(user_id)
 
     # 응답: 본명이 있으면 본명, 없으면 카카오 닉네임
     display_name = merged_name if (merged_name and merged_name != "익명") else nickname
@@ -1701,32 +1736,13 @@ async def get_me(user_id: str = ""):
     if not user_id:
         raise HTTPException(401, "로그인이 필요합니다")
 
-    user = USERS.get(user_id)
-    if not user and _use_db():
-        db = get_db()
-        try:
-            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
-            if db_user:
-                user = {"id": db_user.id, "name": db_user.name, "phone": db_user.phone, "kakao_id": db_user.kakao_id}
-        except Exception:
-            pass
-        finally:
-            db.close()
-
+    # 통합 조회: DB → 인메모리 → 디스크
+    user = _find_user(user_id)
     if not user:
         raise HTTPException(401, "사용자를 찾을 수 없습니다")
 
-    # 리포트 조회
-    reports = []
-    if _use_db():
-        db = get_db()
-        try:
-            user_reports = db.query(DBReport).filter(DBReport.user_id == user_id).all()
-            reports = [{"id": r.id, "access_level": r.access_level, "created_at": r.created_at.isoformat() if r.created_at else ""} for r in user_reports]
-        except Exception:
-            pass
-        finally:
-            db.close()
+    # 리포트 조회 (통합 헬퍼)
+    reports = _find_reports_for_user(user_id)
 
     return {
         "user_id": user.get("id") or user_id,
@@ -2050,39 +2066,7 @@ async def mark_all_read(user_id: str):
 @app.get("/api/v1/my/reports")
 async def get_my_reports(user_id: str):
     """로그인한 유저의 리포트 목록 조회."""
-    reports_list = []
-    # DB 우선
-    if _use_db():
-        db = get_db()
-        try:
-            db_reports = db.query(DBReport)\
-                .filter(DBReport.user_id == user_id)\
-                .order_by(DBReport.created_at.desc())\
-                .all()
-            for r in db_reports:
-                reports_list.append({
-                    "id": r.id,
-                    "access_level": r.access_level,
-                    "created_at": r.created_at.isoformat() if r.created_at else "",
-                    "url": f"/report/{r.id}",
-                })
-        except Exception as e:
-            print(f"[DB] my/reports error: {e}")
-        finally:
-            db.close()
-
-    # 인메모리 폴백
-    if not reports_list:
-        for rid, r in REPORTS.items():
-            if r.get("user_id") == user_id:
-                reports_list.append({
-                    "id": rid,
-                    "access_level": r.get("access_level", "standard"),
-                    "created_at": r.get("created_at", ""),
-                    "url": f"/report/{rid}",
-                })
-
-    return {"reports": reports_list}
+    return {"reports": _find_reports_for_user(user_id)}
 
 
 # ─────────────────────────────────────────────

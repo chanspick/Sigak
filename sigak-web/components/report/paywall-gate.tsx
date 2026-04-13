@@ -68,6 +68,7 @@ export function PaywallGate({
         <PaywallCard
           label={paywall.label}
           price={paywall.price}
+          originalPrice={paywall.original_price}
           totalNote={paywall.total_note}
           onUnlock={() => setShowPaymentFlow(true)}
         />

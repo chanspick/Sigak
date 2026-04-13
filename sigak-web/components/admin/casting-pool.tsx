@@ -132,6 +132,7 @@ function CastingProfileModal({
   // 매칭 요청 폼 상태
   const [agencyName, setAgencyName] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [fee, setFee] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [matchSent, setMatchSent] = useState(false);
 
@@ -162,6 +163,7 @@ function CastingProfileModal({
         admin_key: adminKey,
         agency_name: agencyName.trim(),
         purpose: purpose.trim(),
+        fee: fee.trim(),
       });
       const res = await fetch(
         `${API_URL}/api/v1/admin/casting-pool/${userId}/match-request?${params}`,
@@ -291,6 +293,18 @@ function CastingProfileModal({
                       className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors"
                     />
                   </div>
+                  <div>
+                    <label className="block text-[11px] text-[var(--color-muted)] mb-1">
+                      회당 출연료 (예: ₩500,000)
+                    </label>
+                    <input
+                      type="text"
+                      value={fee}
+                      onChange={(e) => setFee(e.target.value)}
+                      placeholder="₩"
+                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors"
+                    />
+                  </div>
                   <button
                     onClick={handleMatchRequest}
                     disabled={!agencyName.trim() || submitting}
@@ -328,6 +342,25 @@ export function CastingPool() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [faceShape, setFaceShape] = useState("얼굴형 전체");
+
+  // 탭: pool | matches
+  const [tab, setTab] = useState<"pool" | "matches">("pool");
+
+  // 매칭 현황
+  interface MatchItem {
+    notification_id: string;
+    user_id: string;
+    user_name: string;
+    agency_name: string;
+    purpose: string;
+    fee: string;
+    response: string;
+    requested_at: string;
+    responded_at: string | null;
+  }
+  const [matches, setMatches] = useState<MatchItem[]>([]);
+  const [matchFilter, setMatchFilter] = useState("all");
+  const [matchLoading, setMatchLoading] = useState(false);
 
   // 모달 상태
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -373,12 +406,32 @@ export function CastingPool() {
     []
   );
 
+  const fetchMatches = useCallback(async (key: string) => {
+    setMatchLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/admin/casting-matches?admin_key=${encodeURIComponent(key)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMatches(data.matches);
+      }
+    } finally {
+      setMatchLoading(false);
+    }
+  }, []);
+
   // 필터 변경 시 재조회
   useEffect(() => {
     if (authenticated && adminKey) {
       fetchPool(adminKey, faceShape);
     }
   }, [faceShape, authenticated, adminKey, fetchPool]);
+
+  // 매칭 탭 전환 시 로드
+  useEffect(() => {
+    if (tab === "matches" && authenticated && adminKey) {
+      fetchMatches(adminKey);
+    }
+  }, [tab, authenticated, adminKey, fetchMatches]);
 
   // 키 입력 폼 제출
   function handleKeySubmit(e: React.FormEvent) {
@@ -434,13 +487,88 @@ export function CastingPool() {
       {/* 헤더 */}
       <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-[var(--color-fg)] text-[var(--color-bg)]">
         <span className="text-xs font-bold tracking-[5px]">SIGAK</span>
-        <span className="text-[10px] font-medium tracking-[2.5px] opacity-40">
-          CASTING POOL
-        </span>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setTab("pool")} className={`text-[10px] font-medium tracking-[1.5px] transition-opacity cursor-pointer ${tab === "pool" ? "opacity-100" : "opacity-40 hover:opacity-70"}`}>
+            POOL
+          </button>
+          <button onClick={() => setTab("matches")} className={`text-[10px] font-medium tracking-[1.5px] transition-opacity cursor-pointer ${tab === "matches" ? "opacity-100" : "opacity-40 hover:opacity-70"}`}>
+            MATCHES
+          </button>
+        </div>
       </nav>
 
       {/* 콘텐츠 */}
       <div className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8">
+
+        {/* ── MATCHES 탭 ── */}
+        {tab === "matches" && (
+          <div>
+            {/* 필터 */}
+            <div className="flex items-center gap-2 mb-6">
+              {[
+                { key: "all", label: "전체" },
+                { key: "pending", label: "대기" },
+                { key: "accept", label: "수락" },
+                { key: "decline", label: "거절" },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setMatchFilter(f.key)}
+                  className={`px-3 py-1.5 text-[11px] font-medium tracking-[0.5px] border transition-colors cursor-pointer ${
+                    matchFilter === f.key
+                      ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
+                      : "border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-fg)]"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {matchLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-5 h-5 border-2 border-[var(--color-border)] border-t-[var(--color-fg)] animate-spin" />
+              </div>
+            ) : matches.filter((m) => matchFilter === "all" || m.response === matchFilter).length === 0 ? (
+              <div className="text-center py-20 text-[12px] text-[var(--color-muted)]">
+                매칭 요청이 없습니다
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {matches
+                  .filter((m) => matchFilter === "all" || m.response === matchFilter)
+                  .map((m) => (
+                    <div key={m.notification_id} className="border border-[var(--color-border)] px-5 py-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[13px] font-medium">{m.user_name || m.user_id.slice(0, 8)}</span>
+                        <span className={`text-[10px] font-bold tracking-[1px] px-2 py-0.5 ${
+                          m.response === "accept"
+                            ? "bg-green-100 text-green-700"
+                            : m.response === "decline"
+                              ? "bg-red-50 text-red-500"
+                              : "bg-black/[0.06] text-[var(--color-muted)]"
+                        }`}>
+                          {m.response === "accept" ? "수락" : m.response === "decline" ? "거절" : "대기"}
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-[11px] text-[var(--color-muted)]">
+                        <span>{m.agency_name}</span>
+                        {m.purpose && <span>{m.purpose}</span>}
+                        {m.fee && <span className="font-medium text-[var(--color-fg)]">{m.fee}</span>}
+                      </div>
+                      <p className="text-[10px] text-[var(--color-muted)] mt-1.5">
+                        {m.requested_at ? new Date(m.requested_at).toLocaleDateString("ko-KR") : ""}
+                        {m.responded_at && ` · 응답 ${new Date(m.responded_at).toLocaleDateString("ko-KR")}`}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── POOL 탭 ── */}
+        {tab === "pool" && <>
         {/* 필터 + 카운트 */}
         <div className="flex items-center justify-between mb-6">
           <select
@@ -535,6 +663,7 @@ export function CastingPool() {
             ))}
           </div>
         )}
+        </>}
       </div>
 
       {/* 프로필 모달 */}

@@ -2007,8 +2007,8 @@ async def get_casting_profile(user_id: str, admin_key: str):
 
 
 @app.post("/api/v1/admin/casting-pool/{user_id}/match-request")
-async def request_casting_match(user_id: str, admin_key: str, agency_name: str = "", purpose: str = ""):
-    """매칭 요청 → Zapier(Slack) 알림 전송 (B2B 대시보드용)."""
+async def request_casting_match(user_id: str, admin_key: str, agency_name: str = "", purpose: str = "", fee: str = ""):
+    """매칭 요청 → 유저에게 알림 (출연료 포함)."""
     if admin_key != ADMIN_KEY:
         raise HTTPException(403, "인증 실패")
     if not _use_db():
@@ -2020,7 +2020,6 @@ async def request_casting_match(user_id: str, admin_key: str, agency_name: str =
         if not user:
             raise HTTPException(404, "유저를 찾을 수 없습니다")
 
-        # 유저에게 캐스팅 초대 알림 생성
         notif_id = str(uuid.uuid4())
         db.add(DBNotification(
             id=notif_id,
@@ -2030,14 +2029,89 @@ async def request_casting_match(user_id: str, admin_key: str, agency_name: str =
             message=json.dumps({
                 "agency_name": agency_name,
                 "purpose": purpose,
+                "fee": fee,
+                "response": "pending",
                 "requested_at": datetime.utcnow().isoformat(),
             }, ensure_ascii=False),
             link=f"/casting/invitation?id={notif_id}",
         ))
         db.commit()
-        print(f"[CASTING] match notification created for user={user_id} agency={agency_name}")
+        print(f"[CASTING] match request: user={user_id} agency={agency_name} fee={fee}")
 
-        return {"status": "requested", "user_id": user_id}
+        return {"status": "requested", "user_id": user_id, "notification_id": notif_id}
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/casting/respond/{notification_id}")
+async def respond_casting(notification_id: str, response: str, user_id: str = ""):
+    """유저가 캐스팅 제안 수락/거절."""
+    if response not in ("accept", "decline"):
+        raise HTTPException(400, "response는 accept 또는 decline이어야 합니다")
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+
+    db = get_db()
+    try:
+        notif = db.query(DBNotification).filter(DBNotification.id == notification_id).first()
+        if not notif:
+            raise HTTPException(404, "알림을 찾을 수 없습니다")
+
+        # message JSON 업데이트
+        data = json.loads(notif.message) if notif.message else {}
+        data["response"] = response
+        data["responded_at"] = datetime.utcnow().isoformat()
+        notif.message = json.dumps(data, ensure_ascii=False)
+        notif.is_read = True
+        db.commit()
+        print(f"[CASTING] user={notif.user_id} response={response}")
+
+        return {"status": response, "notification_id": notification_id}
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/admin/casting-matches")
+async def get_casting_matches(admin_key: str, status: str = "all"):
+    """매칭 요청 목록 (어드민). status: all, pending, accept, decline"""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(403, "인증 실패")
+    if not _use_db():
+        raise HTTPException(500, "DB를 사용할 수 없습니다")
+
+    db = get_db()
+    try:
+        notifs = db.query(DBNotification)\
+            .filter(DBNotification.type == "casting_match")\
+            .order_by(DBNotification.created_at.desc())\
+            .all()
+
+        matches = []
+        for n in notifs:
+            data = json.loads(n.message) if n.message else {}
+            resp = data.get("response", "pending")
+            if status != "all" and resp != status:
+                continue
+            # 유저 이름 조회
+            user = db.query(DBUser).filter(DBUser.id == n.user_id).first()
+            user_name = user.name if user else ""
+            matches.append({
+                "notification_id": n.id,
+                "user_id": n.user_id,
+                "user_name": user_name,
+                "agency_name": data.get("agency_name", ""),
+                "purpose": data.get("purpose", ""),
+                "fee": data.get("fee", ""),
+                "response": resp,
+                "requested_at": data.get("requested_at", ""),
+                "responded_at": data.get("responded_at"),
+            })
+
+        counts = {"total": len(matches)}
+        for s in ("pending", "accept", "decline"):
+            counts[s] = sum(1 for m in matches if m["response"] == s)
+
+        return {"matches": matches, "counts": counts}
     finally:
         db.close()
 

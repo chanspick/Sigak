@@ -98,6 +98,58 @@ export interface OrderStatus {
   report_url?: string;
 }
 
+// --- 인증 관련 타입 ---
+
+export interface KakaoLoginUrlResponse {
+  auth_url: string;
+}
+
+export interface KakaoTokenResponse {
+  user_id: string;
+  kakao_id: string;
+  name: string;
+  phone: string;
+  reports: Array<{ id: string; access_level: string; created_at: string }>;
+}
+
+export interface MeResponse {
+  user_id: string;
+  name: string;
+  phone: string;
+  kakao_id: string;
+  reports: Array<{ id: string; access_level: string; created_at: string }>;
+}
+
+// --- 인증 API 함수 ---
+
+/** 카카오 로그인 URL 가져오기 */
+export async function getKakaoLoginUrl(): Promise<KakaoLoginUrlResponse> {
+  const response = await fetch(`${API_URL}/api/v1/auth/kakao/login`, {
+    headers: COMMON_HEADERS,
+  });
+  return handleResponse<KakaoLoginUrlResponse>(response);
+}
+
+/** 카카오 인증 코드로 토큰 교환 */
+export async function exchangeKakaoToken(
+  code: string,
+): Promise<KakaoTokenResponse> {
+  const response = await fetch(`${API_URL}/api/v1/auth/kakao/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
+    body: JSON.stringify({ code }),
+  });
+  return handleResponse<KakaoTokenResponse>(response);
+}
+
+/** 현재 로그인된 유저 정보 */
+export async function getMe(userId: string): Promise<MeResponse> {
+  const response = await fetch(`${API_URL}/api/v1/auth/me?user_id=${userId}`, {
+    headers: COMMON_HEADERS,
+  });
+  return handleResponse<MeResponse>(response);
+}
+
 // --- API 함수 ---
 
 /** 예약 생성 (POST /api/v1/booking) */

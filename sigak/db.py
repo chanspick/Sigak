@@ -23,6 +23,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
     id = Column(String, primary_key=True)
+    kakao_id = Column(String, unique=True, nullable=True, index=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=False)
     gender = Column(String(10), default="female")

@@ -1,13 +1,13 @@
 "use client";
 
-// 시작 오버레이 - 티어 선택(₩5K/₩49K) + 이름/연락처 입력
+// 시작 오버레이 - 카카오 로그인 → 티어 선택(₩5K/₩49K) + 이름/연락처 입력
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TIERS } from "@/lib/constants/tiers";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { createBooking, ApiError } from "@/lib/api/client";
+import { createBooking, getKakaoLoginUrl, ApiError } from "@/lib/api/client";
 import type { Tier } from "@/lib/types/tier";
 
 type Gender = "female" | "male";
@@ -21,6 +21,42 @@ export function StartOverlay() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 카카오 로그인 상태
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  const [kakaoLoading, setKakaoLoading] = useState(false);
+
+  // localStorage에서 로그인 상태 확인
+  useEffect(() => {
+    const userId = localStorage.getItem("sigak_user_id");
+    const userName = localStorage.getItem("sigak_user_name");
+    const userPhone = localStorage.getItem("sigak_user_phone");
+
+    if (userId) {
+      setIsLoggedIn(true);
+      setLoggedInUserId(userId);
+      if (userName) setName(userName);
+      if (userPhone) setPhone(userPhone);
+    }
+  }, []);
+
+  // 카카오 로그인 핸들러
+  const handleKakaoLogin = useCallback(async () => {
+    setKakaoLoading(true);
+    setError(null);
+    try {
+      const { auth_url } = await getKakaoLoginUrl();
+      window.location.href = auth_url;
+    } catch (err) {
+      setKakaoLoading(false);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("카카오 로그인 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
+  }, []);
+
   const isValid = tier && gender && name.trim().length > 0 && phone.trim().length > 0;
 
   const handleSubmit = useCallback(
@@ -31,6 +67,15 @@ export function StartOverlay() {
       setError(null);
 
       try {
+        // 로그인된 유저는 booking 생략, 바로 설문으로 이동
+        if (loggedInUserId) {
+          router.push(
+            `/questionnaire?user_id=${loggedInUserId}&tier=${tier}&gender=${gender}&name=${encodeURIComponent(name.trim())}&phone=${encodeURIComponent(phone.trim())}`,
+          );
+          return;
+        }
+
+        // 비로그인 유저는 기존 booking 플로우
         const result = await createBooking({
           name: name.trim(),
           phone: phone.trim(),
@@ -50,9 +95,53 @@ export function StartOverlay() {
         }
       }
     },
-    [isValid, tier, gender, name, phone, router],
+    [isValid, tier, gender, name, phone, router, loggedInUserId],
   );
 
+  // 로그인 전: 카카오 로그인 화면
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] text-[var(--color-fg)] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
+        <div className="w-full max-w-[480px] py-12">
+          {/* 헤더 */}
+          <h1 className="font-[family-name:var(--font-serif)] text-[28px] font-normal mb-2 text-center">
+            시작하기
+          </h1>
+          <p className="text-[13px] opacity-40 text-center mb-10">
+            카카오 계정으로 로그인하여 시작해 주세요
+          </p>
+
+          {/* 에러 메시지 */}
+          {error && (
+            <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-700 text-[13px]">
+              {error}
+            </div>
+          )}
+
+          {/* 카카오 로그인 버튼 */}
+          <button
+            onClick={handleKakaoLogin}
+            disabled={kakaoLoading}
+            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-lg bg-[#FEE500] text-[#191919] text-sm font-semibold hover:brightness-95 transition-all disabled:opacity-60"
+          >
+            {kakaoLoading ? (
+              <div className="w-4 h-4 border-2 border-[#191919] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path
+                  d="M9 1C4.582 1 1 3.79 1 7.207c0 2.21 1.47 4.152 3.684 5.248l-.937 3.467a.225.225 0 00.339.243l4.07-2.684c.276.025.557.04.844.04 4.418 0 8-2.79 8-6.314C17 3.79 13.418 1 9 1z"
+                  fill="#191919"
+                />
+              </svg>
+            )}
+            {kakaoLoading ? "연결 중..." : "카카오로 시작하기"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인 후: 티어 선택 + 기본 정보 입력 폼
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] text-[var(--color-fg)] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
       <form onSubmit={handleSubmit} className="w-full max-w-[480px] py-12">

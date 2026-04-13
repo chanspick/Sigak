@@ -1449,6 +1449,197 @@ async def serve_upload(user_id: str, filename: str):
     return FileResponse(str(file_path), media_type=media_types.get(file_path.suffix.lower(), "application/octet-stream"))
 
 
+# ─────────────────────────────────────────────
+#  Kakao OAuth 인증
+# ─────────────────────────────────────────────
+
+@app.get("/api/v1/auth/kakao/login")
+async def kakao_login(redirect_uri: str = "https://www.sigak.asia/auth/kakao/callback"):
+    """카카오 OAuth 인가 URL 반환."""
+    kakao_key = os.getenv("KAKAO_REST_API_KEY", "")
+    if not kakao_key:
+        raise HTTPException(500, "카카오 로그인이 설정되지 않았습니다")
+    auth_url = (
+        "https://kauth.kakao.com/oauth/authorize"
+        f"?client_id={kakao_key}"
+        f"&redirect_uri={redirect_uri}"
+        "&response_type=code"
+        "&scope=profile_nickname,account_email"
+    )
+    return {"auth_url": auth_url}
+
+
+@app.post("/api/v1/auth/kakao/token")
+async def kakao_token(code: str, redirect_uri: str = "https://www.sigak.asia/auth/kakao/callback"):
+    """카카오 인가 코드 → 액세스 토큰 교환 → 유저 조회/생성."""
+    kakao_key = os.getenv("KAKAO_REST_API_KEY", "")
+
+    # 1. 인가 코드로 액세스 토큰 교환
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://kauth.kakao.com/oauth/token",
+            data={
+                "grant_type": "authorization_code",
+                "client_id": kakao_key,
+                "redirect_uri": redirect_uri,
+                "code": code,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+    if token_resp.status_code != 200:
+        raise HTTPException(400, "카카오 인증에 실패했습니다")
+
+    token_data = token_resp.json()
+    access_token = token_data.get("access_token")
+
+    # 2. 카카오 사용자 정보 조회
+    async with httpx.AsyncClient() as client:
+        user_resp = await client.get(
+            "https://kapi.kakao.com/v2/user/me",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    if user_resp.status_code != 200:
+        raise HTTPException(400, "카카오 사용자 정보를 가져올 수 없습니다")
+
+    kakao_user = user_resp.json()
+    kakao_id = str(kakao_user.get("id"))
+    properties = kakao_user.get("properties", {})
+    kakao_account = kakao_user.get("kakao_account", {})
+
+    nickname = properties.get("nickname", "")
+    phone = ""
+    # phone_number 형식: "+82 10-1234-5678" → "01012345678"
+    raw_phone = kakao_account.get("phone_number", "")
+    if raw_phone:
+        phone = raw_phone.replace("+82 ", "0").replace("-", "").replace(" ", "")
+
+    # 3. 유저 조회 또는 생성
+    user_id = None
+
+    if _use_db():
+        db = get_db()
+        try:
+            # kakao_id로 기존 유저 조회
+            existing = db.query(DBUser).filter(DBUser.kakao_id == kakao_id).first()
+            if existing:
+                user_id = existing.id
+                # 이름/전화번호가 비어있으면 업데이트
+                if not existing.name or existing.name == "익명":
+                    existing.name = nickname
+                if not existing.phone and phone:
+                    existing.phone = phone
+                db.commit()
+            else:
+                # 신규 유저 생성
+                user_id = str(uuid.uuid4())
+                new_user = DBUser(
+                    id=user_id,
+                    kakao_id=kakao_id,
+                    name=nickname,
+                    phone=phone,
+                    gender="female",
+                    status="authenticated",
+                    created_at=datetime.utcnow(),
+                )
+                db.add(new_user)
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"[AUTH] DB error: {e}")
+        finally:
+            db.close()
+
+    # 폴백: 인메모리
+    if not user_id:
+        # 인메모리에서 kakao_id로 검색
+        for uid, u in USERS.items():
+            if u.get("kakao_id") == kakao_id:
+                user_id = uid
+                break
+        if not user_id:
+            user_id = str(uuid.uuid4())
+
+    # 인메모리 dict에도 저장
+    if user_id not in USERS:
+        USERS[user_id] = {
+            "id": user_id,
+            "kakao_id": kakao_id,
+            "name": nickname,
+            "phone": phone,
+            "gender": "female",
+            "status": "authenticated",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+
+    # 4. 유저의 리포트 조회
+    reports = []
+    if _use_db():
+        db = get_db()
+        try:
+            user_reports = db.query(DBReport).filter(DBReport.user_id == user_id).all()
+            reports = [{"id": r.id, "access_level": r.access_level, "created_at": r.created_at.isoformat() if r.created_at else ""} for r in user_reports]
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    return {
+        "user_id": user_id,
+        "kakao_id": kakao_id,
+        "name": nickname,
+        "phone": phone,
+        "reports": reports,
+    }
+
+
+@app.get("/api/v1/auth/me")
+async def get_me(user_id: str = ""):
+    """로그인 상태 확인 (user_id 기반)."""
+    if not user_id:
+        raise HTTPException(401, "로그인이 필요합니다")
+
+    user = USERS.get(user_id)
+    if not user and _use_db():
+        db = get_db()
+        try:
+            db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+            if db_user:
+                user = {"id": db_user.id, "name": db_user.name, "phone": db_user.phone, "kakao_id": db_user.kakao_id}
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    if not user:
+        raise HTTPException(401, "사용자를 찾을 수 없습니다")
+
+    # 리포트 조회
+    reports = []
+    if _use_db():
+        db = get_db()
+        try:
+            user_reports = db.query(DBReport).filter(DBReport.user_id == user_id).all()
+            reports = [{"id": r.id, "access_level": r.access_level, "created_at": r.created_at.isoformat() if r.created_at else ""} for r in user_reports]
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    return {
+        "user_id": user.get("id") or user_id,
+        "name": user.get("name", ""),
+        "phone": user.get("phone", ""),
+        "kakao_id": user.get("kakao_id", ""),
+        "reports": reports,
+    }
+
+
+# ─────────────────────────────────────────────
+#  Static files & Health
+# ─────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.1.0", "woz_mode": settings.use_mock_clip, "db_connected": _use_db()}

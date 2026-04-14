@@ -44,10 +44,14 @@ export default function HomePage() {
         </div>
         <span className="absolute left-1/2 -translate-x-1/2 text-[13px] font-semibold tracking-[6px] uppercase pointer-events-none">SIGAK</span>
         <div className="flex items-center gap-5">
-          {isLoggedIn && (
-            <Link href="/my" className="text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 no-underline text-[var(--color-bg)]">내 리포트</Link>
+          {isLoggedIn ? (
+            <>
+              <Link href="/my" className="text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 no-underline text-[var(--color-bg)]">내 리포트</Link>
+              <NotificationBell />
+            </>
+          ) : (
+            <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">로그인</Link>
           )}
-          {isLoggedIn && <NotificationBell />}
           <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">진단 시작</Link>
         </div>
       </nav>

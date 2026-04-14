@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getMyReports, getCastingStatus, castingOptOut } from "@/lib/api/client";
+import { logout } from "@/lib/auth";
 
 interface MyReport {
   id: string;
@@ -155,6 +156,14 @@ export default function MyPage() {
             ))}
           </div>
         )}
+
+        {/* 로그아웃 */}
+        <button
+          onClick={logout}
+          className="mt-12 text-xs text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors cursor-pointer"
+        >
+          로그아웃
+        </button>
       </div>
     </div>
   );

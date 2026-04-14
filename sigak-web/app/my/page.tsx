@@ -251,9 +251,10 @@ export default function MyPage() {
                     {castingMatches.map((match) => {
                       const status = RESPONSE_LABELS[match.response] || RESPONSE_LABELS.pending;
                       return (
-                        <div
+                        <Link
                           key={match.id}
-                          className="px-5 py-4 border border-[var(--color-border)]"
+                          href={`/casting/invitation?id=${match.id}`}
+                          className="block px-5 py-4 border border-[var(--color-border)] hover:border-[var(--color-fg)] transition-colors no-underline text-[var(--color-fg)]"
                         >
                           <div className="flex items-start justify-between mb-2">
                             <p className="text-[13px] font-semibold">{match.agency_name}</p>
@@ -280,44 +281,11 @@ export default function MyPage() {
                               : ""}
                           </p>
 
-                          {/* 대기 중이면 수락/거절 버튼 */}
+                          {/* 대기 중이면 안내 */}
                           {match.response === "pending" && (
-                            <div className="flex gap-2 mt-3">
-                              <button
-                                onClick={async () => {
-                                  const res = await fetch(
-                                    `${API_URL}/api/v1/casting/respond/${match.id}?response=accept&user_id=${localStorage.getItem("sigak_user_id")}`,
-                                    { method: "POST" }
-                                  );
-                                  if (res.ok) {
-                                    setCastingMatches(prev =>
-                                      prev.map(m => m.id === match.id ? { ...m, response: "accept" } : m)
-                                    );
-                                  }
-                                }}
-                                className="flex-1 py-2 text-[11px] font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-80 transition-opacity cursor-pointer"
-                              >
-                                수락
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  const res = await fetch(
-                                    `${API_URL}/api/v1/casting/respond/${match.id}?response=decline&user_id=${localStorage.getItem("sigak_user_id")}`,
-                                    { method: "POST" }
-                                  );
-                                  if (res.ok) {
-                                    setCastingMatches(prev =>
-                                      prev.map(m => m.id === match.id ? { ...m, response: "decline" } : m)
-                                    );
-                                  }
-                                }}
-                                className="flex-1 py-2 text-[11px] font-medium border border-[var(--color-border)] hover:border-[var(--color-fg)] transition-colors cursor-pointer"
-                              >
-                                거절
-                              </button>
-                            </div>
+                            <p className="text-[10px] text-[var(--color-muted)] mt-2">탭하여 상세 보기 →</p>
                           )}
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>

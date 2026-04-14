@@ -399,7 +399,7 @@ export default function HomePage() {
             <a href="mailto:partner@sigak.asia" className="hover:opacity-70 transition-opacity">partner@sigak.asia</a>
           </div>
           <p className="text-[10px] leading-[1.8] opacity-25">
-            주식회사 파이컴퓨터 | 대표: 최진규 | partner@sigak.asia<br />
+            주식회사 시각 | 대표: 조찬형 | partner@sigak.asia<br />
             &copy; 2026 SIGAK. All rights reserved.
           </p>
         </div>

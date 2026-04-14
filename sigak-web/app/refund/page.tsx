@@ -17,7 +17,7 @@ export default function RefundPage() {
 
       <article className="max-w-2xl mx-auto px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-12">
         <h1 className="font-[family-name:var(--font-serif)] text-2xl font-bold mb-2">환불규정 및 서비스 이용안내</h1>
-        <p className="text-xs text-[var(--color-muted)] mb-10">시행일: 2026년 4월 14일 | 주식회사 파이컴퓨터</p>
+        <p className="text-xs text-[var(--color-muted)] mb-10">시행일: 2026년 4월 14일 | 주식회사 시각</p>
 
         {/* ── 1. 서비스 안내 ── */}
         <Section title="1. 서비스 안내" />
@@ -27,10 +27,10 @@ export default function RefundPage() {
 
         <H3>서비스 제공자</H3>
         <Table headers={["항목", "내용"]} rows={[
-          ["상호", "주식회사 파이컴퓨터"],
-          ["대표", "최진규"],
+          ["상호", "주식회사 시각"],
+          ["대표", "조찬형"],
           ["이메일", "partner@sigak.asia"],
-          ["개인정보보호 책임자", "최진규 (대표)"],
+          ["개인정보보호 책임자", "조찬형 (대표)"],
         ]} />
 
         <H3>서비스 내용</H3>
@@ -139,7 +139,7 @@ export default function RefundPage() {
             <a href="mailto:partner@sigak.asia" className="hover:opacity-70">partner@sigak.asia</a>
           </div>
           <p className="text-[10px] leading-[1.8] opacity-30">
-            주식회사 파이컴퓨터 | 대표: 최진규 | partner@sigak.asia<br />
+            주식회사 시각 | 대표: 조찬형 | partner@sigak.asia<br />
             &copy; 2026 SIGAK. All rights reserved.
           </p>
         </div>

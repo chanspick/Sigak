@@ -17,7 +17,7 @@ export default function TermsPage() {
 
       <article className="max-w-2xl mx-auto px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-12 legal-content">
         <h1 className="font-[family-name:var(--font-serif)] text-2xl font-bold mb-2">개인정보처리방침 및 이용약관</h1>
-        <p className="text-xs text-[var(--color-muted)] mb-10">시행일: 2026년 4월 14일 | 주식회사 파이컴퓨터</p>
+        <p className="text-xs text-[var(--color-muted)] mb-10">시행일: 2026년 4월 14일 | 주식회사 시각</p>
 
         {/* ── 개인정보처리방침 ── */}
         <Section title="1. 개인정보처리방침" />
@@ -86,7 +86,7 @@ export default function TermsPage() {
 
         <H3>제10조 (개인정보보호 책임자)</H3>
         <Table headers={["항목", "내용"]} rows={[
-          ["성명", "최진규"],
+          ["성명", "조찬형"],
           ["직위", "대표"],
           ["연락처", "partner@sigak.asia"],
         ]} />
@@ -190,7 +190,7 @@ function SiteFooter() {
           <a href="mailto:partner@sigak.asia" className="hover:opacity-70">partner@sigak.asia</a>
         </div>
         <p className="text-[10px] leading-[1.8] opacity-30">
-          주식회사 파이컴퓨터 | 대표: 최진규 | partner@sigak.asia<br />
+          주식회사 시각 | 대표: 조찬형 | partner@sigak.asia<br />
           &copy; 2026 SIGAK. All rights reserved.
         </p>
       </div>

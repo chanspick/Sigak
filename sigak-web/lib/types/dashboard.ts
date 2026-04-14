@@ -29,4 +29,8 @@ export interface InterviewQuestion {
   maxSelect?: number;
   /** 필수 여부 (기본: true) */
   required?: boolean;
+  /** 최소 글자 수 (text 타입) */
+  minLength?: number;
+  /** 최대 글자 수 (text 타입) */
+  maxLength?: number;
 }

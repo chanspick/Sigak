@@ -341,6 +341,8 @@ class SubmitRequest(BaseModel):
     gender: str = "female"
     tier: str = "standard"  # 항상 standard(₩5,000)로 시작
     # Step 1: 얼굴 & 체형
+    height: Optional[str] = None
+    weight: Optional[str] = None
     face_concerns: Optional[str] = None
     neck_length: Optional[str] = None
     shoulder_width: Optional[str] = None
@@ -840,6 +842,8 @@ def _run_analysis_pipeline(
         "aspiration_summary": aspiration_result.get("interpretation", ""),
         "primary_gap_direction_kr": gap.get("primary_shift_kr", ""),
         "personal_color": personal_color_label,
+        "height": interview.get("height", ""),
+        "weight": interview.get("weight", ""),
     })
     report_content = parse_or_fallback(raw_report, action_spec)
     report_content = sanitize_report_json(report_content)  # LLM 출력 후처리 (금지 표현, 오탈자, 톤)

@@ -116,6 +116,9 @@ def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
 [얼굴 고민 영역]
 {interview_data.get('face_concerns', '없음')}
 
+[체형]
+키: {interview_data.get('height', '미입력')} / 체중: {interview_data.get('weight', '미입력')} / 어깨: {interview_data.get('shoulder_width', '미입력')} / 목: {interview_data.get('neck_length', '미입력')}
+
 [메이크업 레벨]
 {interview_data.get('makeup_level', '없음')}
 
@@ -251,6 +254,7 @@ def generate_report(action_spec, user_context: dict) -> str:
 [핵심 액션 목표] {', '.join(top_goals)}
 [얼굴형] {prompt_payload['face_shape']}
 [성별] {user_context.get('gender', 'female')}
+[체형] {user_context.get('height', '')} / {user_context.get('weight', '')}
 [퍼스널컬러] {personal_color or '미판정'}
 
 [추천 액션]

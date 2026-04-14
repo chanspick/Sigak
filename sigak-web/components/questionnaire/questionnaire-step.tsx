@@ -43,13 +43,26 @@ export function QuestionnaireStep({
 
             {/* 입력 컴포넌트 */}
             {type === "text" && (
-              <textarea
-                className="w-full px-3.5 py-3 text-sm bg-transparent border border-black/[0.12] outline-none transition-[border-color] duration-200 placeholder:opacity-25 focus:border-[var(--color-fg)] resize-none"
-                rows={q.rows ?? 2}
-                placeholder={q.placeholder}
-                value={value}
-                onChange={(e) => onChange(q.key, e.target.value)}
-              />
+              <div>
+                <textarea
+                  className="w-full px-3.5 py-3 text-sm bg-transparent border border-black/[0.12] outline-none transition-[border-color] duration-200 placeholder:opacity-25 focus:border-[var(--color-fg)] resize-none"
+                  rows={q.rows ?? 2}
+                  placeholder={q.placeholder}
+                  value={value}
+                  maxLength={q.maxLength}
+                  onChange={(e) => onChange(q.key, e.target.value)}
+                />
+                <div className="flex justify-between mt-1">
+                  {q.minLength && value.length > 0 && value.length < q.minLength ? (
+                    <span className="text-[10px] text-[var(--color-danger)]">{q.minLength}자 이상 입력해주세요</span>
+                  ) : <span />}
+                  {q.maxLength && (
+                    <span className={`text-[10px] ${value.length > (q.maxLength * 0.9) ? "text-[var(--color-danger)]" : "opacity-30"}`}>
+                      {value.length}/{q.maxLength}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
 
             {type === "single_select" && q.options && (

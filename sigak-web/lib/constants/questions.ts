@@ -6,6 +6,36 @@ import type { InterviewQuestion } from "@/lib/types/dashboard";
 
 export const FACE_BODY_QUESTIONS: InterviewQuestion[] = [
   {
+    key: "height",
+    type: "single_select",
+    label: "키",
+    description: "체형 비율 분석에 활용돼요",
+    options: [
+      { value: "under_155", label: "155cm 이하" },
+      { value: "155_160", label: "155~160cm" },
+      { value: "160_165", label: "160~165cm" },
+      { value: "165_170", label: "165~170cm" },
+      { value: "170_175", label: "170~175cm" },
+      { value: "over_175", label: "175cm 이상" },
+    ],
+  },
+  {
+    key: "weight",
+    type: "single_select",
+    label: "체중",
+    description: "어깨/목 비율 맥락 파악에 사용돼요",
+    options: [
+      { value: "under_45", label: "45kg 이하" },
+      { value: "45_50", label: "45~50kg" },
+      { value: "50_55", label: "50~55kg" },
+      { value: "55_60", label: "55~60kg" },
+      { value: "60_65", label: "60~65kg" },
+      { value: "65_70", label: "65~70kg" },
+      { value: "70_80", label: "70~80kg" },
+      { value: "over_80", label: "80kg 이상" },
+    ],
+  },
+  {
     key: "face_concerns",
     type: "multi_select",
     label: "얼굴 고민 영역",
@@ -135,15 +165,20 @@ export const STYLE_QUESTIONS: InterviewQuestion[] = [
     key: "self_perception",
     type: "text",
     label: "주변의 평가",
-    placeholder: "주변에서 어떤 이미지라는 말을 자주 들으세요?",
+    placeholder: "주변에서 어떤 이미지라는 말을 자주 들으세요? (5자 이상)",
     rows: 2,
+    minLength: 5,
+    maxLength: 300,
   },
   {
     key: "desired_image",
     type: "text",
     label: "추구미",
-    placeholder: "되고 싶은 이미지를 자유롭게 적어주세요",
+    placeholder: "되고 싶은 이미지를 자유롭게 적어주세요 (10자 이상)",
+    description: "이 답변이 리포트의 핵심 방향을 결정해요",
     rows: 2,
+    minLength: 10,
+    maxLength: 300,
   },
   {
     key: "reference_celebs",
@@ -152,6 +187,7 @@ export const STYLE_QUESTIONS: InterviewQuestion[] = [
     placeholder: "닮았다는 말을 듣거나 닮고 싶은 셀럽",
     rows: 2,
     required: false,
+    maxLength: 200,
   },
   {
     key: "style_image_keywords",
@@ -187,8 +223,10 @@ export const STYLE_QUESTIONS: InterviewQuestion[] = [
     type: "text",
     label: "추가 고민",
     placeholder: "스타일링 관련 고민이 있다면 자유롭게 적어주세요",
+    description: "구체적으로 적을수록 결과지에 직접 반영돼요!",
     rows: 2,
     required: false,
+    maxLength: 500,
   },
 ];
 

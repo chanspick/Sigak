@@ -678,9 +678,17 @@ def _build_skin_analysis(face_features: dict) -> dict:
                 "tone": palette["label_kr"],
                 "tone_description": palette["description"],
                 "hex_sample": hex_sample,
-                "recommended": palette["recommended"],
-                "avoid": palette["avoid"],
-                "avoid_reason": palette["avoid_reason"],
+                # 3단계 팔레트 (best / okay / avoid)
+                "best_colors": palette.get("best_colors", []),
+                "okay_colors": palette.get("okay_colors", []),
+                "avoid_colors": palette.get("avoid_colors", []),
+                # 하위호환: 기존 recommended/avoid 키 유지
+                "recommended": palette.get("best_colors", palette.get("recommended", [])),
+                "avoid": palette.get("avoid_colors", palette.get("avoid", [])),
+                "avoid_reason": palette.get("avoid_reason", ""),
+                # 헤어컬러 추천
+                "hair_colors": palette.get("hair_colors", []),
+                # 활용 가이드
                 "season": season,
                 "subtype": subtype,
                 "lip_direction": palette.get("lip_direction", ""),
@@ -707,6 +715,11 @@ def _build_skin_analysis(face_features: dict) -> dict:
             "tone": skin_type["label"],
             "tone_description": skin_type["description"],
             "hex_sample": hex_sample,
+            # 6타입 폴백은 best/okay 구분 없음 — recommended를 best로 매핑
+            "best_colors": skin_type["recommended"],
+            "okay_colors": [],
+            "avoid_colors": skin_type["avoid"],
+            "hair_colors": [],
             "recommended": skin_type["recommended"],
             "avoid": skin_type["avoid"],
             "avoid_reason": skin_type["avoid_reason"],

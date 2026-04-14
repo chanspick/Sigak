@@ -1653,7 +1653,17 @@ async def kakao_token(data: KakaoTokenRequest):
 
     if token_resp.status_code != 200:
         print(f"[KAKAO] token error: {token_resp.status_code} {token_resp.text}")
-        raise HTTPException(400, f"카카오 인증 실패: {token_resp.json().get('error_description', token_resp.text[:100])}")
+        try:
+            err_data = token_resp.json()
+            err_code = err_data.get("error", "")
+            err_desc = err_data.get("error_description", "")
+        except Exception:
+            err_code = "unknown"
+            err_desc = token_resp.text[:100]
+        # 이미 사용된 코드 — 유저에게 재시도 안내
+        if err_code == "KOE320":
+            raise HTTPException(400, "카카오 인증 코드가 만료되었습니다. 다시 로그인해주세요.")
+        raise HTTPException(400, f"카카오 인증 실패: {err_desc or err_code}")
 
     token_data = token_resp.json()
     access_token = token_data.get("access_token")

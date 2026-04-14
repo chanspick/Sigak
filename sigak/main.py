@@ -258,6 +258,7 @@ from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
 from pipeline.report_formatter import format_report_for_frontend, _sanitize
 from pipeline.hair_overlay import render_hair_simulation
+from pipeline.text_postprocess import sanitize_report_json
 from pipeline.overlay_renderer import render_overlay
 
 settings = get_settings()
@@ -781,6 +782,7 @@ def _run_analysis_pipeline(
 
     # Step 2: 얼굴 구조 해석 (LLM)
     face_interpretation = interpret_face_structure(features) if features else {}
+    face_interpretation = sanitize_report_json(face_interpretation)
 
     # Step 3: 유형 매칭
     similar_types = find_similar_types(user_embedding=None, user_coords=current_coords, gender=gender, top_k=3)
@@ -840,6 +842,7 @@ def _run_analysis_pipeline(
         "personal_color": personal_color_label,
     })
     report_content = parse_or_fallback(raw_report, action_spec)
+    report_content = sanitize_report_json(report_content)  # LLM 출력 후처리 (금지 표현, 오탈자, 톤)
 
     # Step 9.3: 헤어 스펙
     hair_spec = build_hair_spec(face_features=features, interview=interview, gap=gap, gender=gender)

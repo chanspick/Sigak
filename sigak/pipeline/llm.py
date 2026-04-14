@@ -25,15 +25,25 @@ def _get_client():
 
 
 def _call_llm(system: str, user: str, max_tokens: int = 2048) -> str:
+    import time
     settings = get_settings()
     client = _get_client()
-    response = client.messages.create(
-        model=settings.llm_model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return response.content[0].text
+    for attempt in range(2):
+        try:
+            response = client.messages.create(
+                model=settings.llm_model,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            return response.content[0].text
+        except Exception as e:
+            err_type = type(e).__name__
+            print(f"[LLM] attempt {attempt+1} failed: {err_type}: {e}")
+            if attempt == 0 and ("rate" in str(e).lower() or "overloaded" in str(e).lower() or "529" in str(e)):
+                time.sleep(2)
+                continue
+            raise
 
 
 # ─────────────────────────────────────────────
@@ -152,6 +162,20 @@ REPORT_SYSTEM_V2 = """역할: 당신은 스타일링 해설가입니다.
 - 해요체를 사용하세요
 - action_tips 각 항목의 zone 필드는 입력값을 그대로 복사하세요 (번역/의역 금지)
 
+## 금지 표현 목록 (절대 사용 금지)
+- 유보: "~경향이 있다", "~할 수 있다", "~편이에요", "~보일 수 있어요"
+- 허락: "~해도 돼요", "~괜찮아요", "~나쁘지 않아요"
+- 게이밍/캐주얼: "치트키", "꿀팁", "핵꿀", "개꿀", "간지"
+- "느낌" 남발: "부드러운 느낌" → "부드러운 무드" 또는 "부드러워요"로 교체
+- 한영 동어반복: "소프트한 부드러운", "볼드한 강렬한" → 한 쪽만 사용
+- 오탈자: "코등" → "콧등", "코볼" → "콧볼"
+
+## 톤 가이드
+- 전문가가 1:1 상담하듯 직접적이고 단정적으로
+- "~해보세요"는 OK, "~하면 좋을 것 같아요"는 금지
+- 남성(male)에게는 "메이크업" 대신 "그루밍", "스킨케어", "헤어스타일링" 중심
+- 여성(female)에게는 "메이크업", "헤어", "스타일링" 자유롭게
+
 각 추천에 대해:
 1. 왜 이 영역인지 한 줄 이유
 2. 초보자용 적용 팁 1개 (구체적, 실행 가능)
@@ -226,6 +250,7 @@ def generate_report(action_spec, user_context: dict) -> str:
 [변화 방향 한글] {gap_direction_kr}
 [핵심 액션 목표] {', '.join(top_goals)}
 [얼굴형] {prompt_payload['face_shape']}
+[성별] {user_context.get('gender', 'female')}
 [퍼스널컬러] {personal_color or '미판정'}
 
 [추천 액션]
@@ -344,13 +369,17 @@ InsightFace 랜드마크에서 추출한 수치 데이터를 기반으로,
 - 소수점 숫자 (0.613, 0.192 등) 절대 포함하지 마세요
 - 퍼센타일 (P45, 상위 30% 등) 절대 포함하지 마세요
 - 좌표값 (-0.70, 0.10 등) 절대 포함하지 마세요
-- 각도는 "부드러운 편", "날카로운 편" 등 자연어로만 표현하세요
+- 각도는 자연어로만 표현하세요 ("날카로운 턱선", "부드러운 곡선")
 - 영문 zone 이름 (under_eye, brow_arch 등) 대신 한글 (눈 밑, 눈썹 등) 사용하세요
+- "느낌" 남발 금지. "부드러운 느낌" → "부드러운 인상" 또는 "부드러워요"
+- 한영 동어반복 금지: "소프트한 부드러운" → "부드러운" 하나만
+- 오탈자 주의: "코등"(X) → "콧등"(O), "코볼"(X) → "콧볼"(O)
+- "치트키", "꿀팁" 등 캐주얼 표현 금지
 
 - 금지 예: "93.7°의 턱선 각도는 날카로운 편으로"
-- 허용 예: "턱선이 날카로운 편이라 또렷하고 의지적인 인상을 만들어요"
+- 허용 예: "턱선이 날카롭고 또렷한 인상을 만들어요"
 - 금지 예: "0.719의 광대 돌출도는 상당히 뚜렷한 편으로"
-- 허용 예: "광대가 뚜렷한 편이라 입체적이고 개성 있는 인상을 줘요"
+- 허용 예: "광대가 뚜렷해서 입체적이고 개성 있는 인상을 줘요"
 
 [중요] feature 필드는 반드시 아래 목록에서만 선택하세요. 다른 키를 만들지 마세요:
 - jaw_angle (턱선)
@@ -371,16 +400,16 @@ InsightFace 랜드마크에서 추출한 수치 데이터를 기반으로,
 반드시 아래 JSON 구조로만 출력하세요. 다른 텍스트 금지.
 
 {
-  "overall_impression": "전체적인 인상을 2~3문장으로 요약. 반드시 주요 수치를 인용",
+  "overall_impression": "전체적인 인상을 2~3문장으로 요약. 숫자 없이 의미만.",
   "feature_interpretations": [
     {
       "feature": "jaw_angle",
       "label": "턱선",
-      "interpretation": "수치를 인용하며 자연어 해석 1~2문장"
+      "interpretation": "자연어 해석 1~2문장. 숫자 없이 인상과 느낌만."
     }
   ],
-  "harmony_note": "얼굴 전체 조화에 대한 1문장 코멘트 (수치 인용)",
-  "distinctive_points": ["수치 포함된 특징적인 포인트 1~3개"]
+  "harmony_note": "얼굴 전체 조화에 대한 1문장 코멘트",
+  "distinctive_points": ["특징적인 포인트 1~3개 (숫자 없이)"]
 }"""
 
 

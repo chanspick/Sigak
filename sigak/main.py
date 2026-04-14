@@ -257,6 +257,7 @@ from pipeline.similarity import find_similar_types, select_teaser_type
 from pipeline.face_comparison import compare_with_top_anchors
 from pipeline.cluster import classify_user, discover_clusters, load_cluster_labels
 from pipeline.report_formatter import format_report_for_frontend, _sanitize
+from pipeline.hair_overlay import render_hair_simulation
 from pipeline.overlay_renderer import render_overlay
 
 settings = get_settings()
@@ -863,6 +864,39 @@ def _run_analysis_pipeline(
         formatted_report["overlay"] = {
             "before_url": f"/api/v1/uploads/{user_id}/{original_photos[0].name}" if original_photos else None,
             "after_url": overlay_image_url,
+        }
+
+    # Step 10.5: 헤어컬러 시뮬레이션 (퍼스널컬러 → 1순위 추천색 적용)
+    hair_sim_url = None
+    try:
+        # skin_analysis 섹션에서 hair_colors 추출
+        skin_section = next(
+            (s for s in formatted_report.get("sections", []) if s.get("id") == "skin_analysis"),
+            None,
+        )
+        hair_colors = (skin_section or {}).get("content", {}).get("hair_colors", [])
+        if hair_colors and photo_files:
+            target_hex = hair_colors[0].get("hex", "")
+            if target_hex:
+                photo_img_for_hair = cv2.imdecode(
+                    np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR
+                )
+                if photo_img_for_hair is not None:
+                    sim_img = render_hair_simulation(photo_img_for_hair, target_hex)
+                    if sim_img is not None:
+                        sim_path = photo_dir / "hair_simulation.png"
+                        cv2.imwrite(str(sim_path), sim_img)
+                        hair_sim_url = f"/api/v1/uploads/{user_id}/hair_simulation.png"
+                        print(f"[HAIR_SIM] 생성 완료: {hair_sim_url}")
+    except Exception as e:
+        print(f"[HAIR_SIM] 실패 (무시): {e}")
+
+    if hair_sim_url:
+        formatted_report["hair_simulation"] = {
+            "before_url": f"/api/v1/uploads/{user_id}/{photo_files[0].name}" if photo_files else None,
+            "after_url": hair_sim_url,
+            "color_name": hair_colors[0].get("name", "") if hair_colors else "",
+            "color_hex": hair_colors[0].get("hex", "") if hair_colors else "",
         }
 
     # 저장

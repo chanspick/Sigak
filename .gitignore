@@ -182,3 +182,6 @@ dist-ssr/
 .netlify/
 .firebase/
 .claude/plans/
+
+# ONNX 모델 바이너리
+sigak/models/*.onnx

@@ -20,6 +20,13 @@ interface OverlayData {
   after_url: string;
 }
 
+interface HairSimulationData {
+  before_url: string;
+  after_url: string;
+  color_name: string;
+  color_hex: string;
+}
+
 interface ActionPlanContent {
   items: ActionItem[];
 }
@@ -28,6 +35,7 @@ interface ActionPlanProps {
   content: ActionPlanContent;
   locked: boolean;
   overlay?: OverlayData | null;
+  hairSimulation?: HairSimulationData | null;
 }
 
 // 존 이름 영문 → 한국어 매핑 (Fix #16)
@@ -83,7 +91,7 @@ function localizeCategory(category: string): string {
 import { OverlayCompare } from "@/components/report/sections/overlay-compare";
 
 // 실행 가이드 — 우선순위 배지 + 액션 + 팁
-export function ActionPlan({ content, locked, overlay }: ActionPlanProps) {
+export function ActionPlan({ content, locked, overlay, hairSimulation }: ActionPlanProps) {
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
       {/* 섹션 헤더 */}
@@ -91,18 +99,51 @@ export function ActionPlan({ content, locked, overlay }: ActionPlanProps) {
         ACTION PLAN
       </h2>
 
-      {/* Before/After 오버레이 비교 */}
-      {overlay?.before_url && overlay?.after_url && (
-        <div className="mb-8">
-          <OverlayCompare
-            beforeUrl={overlay.before_url}
-            afterUrl={overlay.after_url}
-            actionTags={content.items.map((item) => ({
-              label: localizeCategory(item.category),
-              priority: item.priority,
-            }))}
-            locked={locked}
-          />
+      {/* Before/After 오버레이 비교 — 메이크업 + 헤어 */}
+      {(overlay?.before_url || hairSimulation?.before_url) && (
+        <div className="mb-8 space-y-8">
+          {/* 메이크업 오버레이 */}
+          {overlay?.before_url && overlay?.after_url && (
+            <div>
+              <p className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
+                MAKEUP OVERLAY
+              </p>
+              <OverlayCompare
+                beforeUrl={overlay.before_url}
+                afterUrl={overlay.after_url}
+                actionTags={content.items.map((item) => ({
+                  label: localizeCategory(item.category),
+                  priority: item.priority,
+                }))}
+                locked={locked}
+              />
+            </div>
+          )}
+
+          {/* 헤어컬러 시뮬레이션 */}
+          {hairSimulation?.before_url && hairSimulation?.after_url && (
+            <div>
+              <p className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
+                HAIR COLOR SIMULATION
+                {hairSimulation.color_name && (
+                  <span className="ml-2 normal-case tracking-normal font-normal">
+                    — {hairSimulation.color_name}
+                    {hairSimulation.color_hex && (
+                      <span
+                        className="inline-block w-3 h-3 rounded-full ml-1.5 align-middle border border-black/10"
+                        style={{ backgroundColor: hairSimulation.color_hex }}
+                      />
+                    )}
+                  </span>
+                )}
+              </p>
+              <OverlayCompare
+                beforeUrl={hairSimulation.before_url}
+                afterUrl={hairSimulation.after_url}
+                locked={locked}
+              />
+            </div>
+          )}
         </div>
       )}
 

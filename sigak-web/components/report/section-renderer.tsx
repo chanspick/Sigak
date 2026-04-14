@@ -20,14 +20,22 @@ interface OverlayData {
   after_url: string;
 }
 
+interface HairSimulationData {
+  before_url: string;
+  after_url: string;
+  color_name: string;
+  color_hex: string;
+}
+
 interface SectionRendererProps {
   section: ReportSection;
   accessLevel: AccessLevel;
   overlay?: OverlayData | null;
+  hairSimulation?: HairSimulationData | null;
 }
 
 // 섹션 타입별 분기 렌더링 - 각 section의 locked 상태 계산 후 해당 컴포넌트로 전달
-export function SectionRenderer({ section, accessLevel, overlay }: SectionRendererProps) {
+export function SectionRenderer({ section, accessLevel, overlay, hairSimulation }: SectionRendererProps) {
   // 현재 access_level 기준으로 잠금 상태 계산
   const locked = isSectionLocked(section, accessLevel);
   // 섹션 콘텐츠 (unknown으로 중간 캐스팅하여 타입 안전하게 전달)
@@ -91,6 +99,7 @@ export function SectionRenderer({ section, accessLevel, overlay }: SectionRender
           content={content as Parameters<typeof ActionPlan>[0]["content"]}
           locked={locked}
           overlay={overlay}
+          hairSimulation={hairSimulation}
         />
       );
     case "type_reference":

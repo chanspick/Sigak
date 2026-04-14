@@ -206,20 +206,22 @@ def apply_color_shift(
 def render_hair_simulation(
     image: np.ndarray,
     target_hair_hex: str,
-    eyebrow_darken: float = 0.15,
+    eyebrow_darken: float = 0.20,
+    eyebrow_opacity: float = 0.4,
 ) -> Optional[np.ndarray]:
     """
     헤어컬러 시뮬레이션 전체 파이프라인.
 
     1. BiSeNet face parsing → hair/eyebrow 마스크 분리
     2. hair 영역: target 색으로 HSV shift (V 보존)
-    3. eyebrow 영역: 동일 색 + 15% 어둡게 (자연스러움)
+    3. eyebrow 영역: 같은 색 + 20% 어둡게 + opacity 40% (원본 60% 보존)
     4. 원본과 블렌딩 → 최종 이미지
 
     Args:
         image: BGR 원본 사진
         target_hair_hex: 목표 헤어 컬러 (#RRGGBB)
-        eyebrow_darken: 눈썹 추가 어둡게 비율 (기본 15%)
+        eyebrow_darken: 눈썹 V(밝기) 추가 감소 비율 (기본 20%)
+        eyebrow_opacity: 눈썹 색 교체 강도 (기본 0.4 = 40%, 나머지 60%는 원본 유지)
 
     Returns:
         합성된 BGR 이미지 또는 None (모델 미사용)
@@ -241,10 +243,11 @@ def render_hair_simulation(
     # 1. hair 영역 색 변환
     result = apply_color_shift(image, hair_mask, target_hair_hex)
 
-    # 2. eyebrow 영역 색 변환 (헤어보다 살짝 어둡게)
+    # 2. eyebrow: opacity 낮춰서 은은하게 (100% 교체하면 부자연스러움)
     if brow_mask.sum() > 0:
+        brow_mask_soft = brow_mask * eyebrow_opacity
         result = apply_color_shift(
-            result, brow_mask, target_hair_hex,
+            result, brow_mask_soft, target_hair_hex,
             value_darken=eyebrow_darken,
         )
 

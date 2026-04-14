@@ -271,8 +271,8 @@ export const MOCK_REPORT: ReportData = {
         direction_items: [
           {
             axis: "shape",
-            label: "외형",
-            name_kr: "외형",
+            label: "골격",
+            name_kr: "골격",
             label_low: "부드러운",
             label_high: "또렷한",
             axis_description:
@@ -284,7 +284,7 @@ export const MOCK_REPORT: ReportData = {
             to_label: "또렷한 방향으로",
             difficulty: "큰 변화",
             recommendation:
-              "외형에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+              "골격에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
           },
           {
             axis: "age",
@@ -325,7 +325,7 @@ export const MOCK_REPORT: ReportData = {
           current: { x: -0.07, y: 0.15, size: 0.27 },
           aspiration: { x: 0.6, y: 0.3, size: 0.4 },
           x_axis: {
-            name_kr: "외형",
+            name_kr: "골격",
             low: "부드러운",
             high: "또렷한",
             low_en: "Soft",
@@ -481,7 +481,7 @@ export const MOCK_REPORT: ReportData = {
               {
                 action:
                   "부드러운 얼굴형에 또렷한 윤곽선을 만들어 카리스마를 더해줍니다. 턱선을 따라 자연스럽게 음영을 넣어 정돈된 인상을 연출하세요.",
-                expected_effect: "더 또렷한 외형으로",
+                expected_effect: "더 또렷한 골격으로",
               },
             ],
           },
@@ -503,7 +503,7 @@ export const MOCK_REPORT: ReportData = {
               {
                 action:
                   "부드러운 인상에 선명함을 더해주는 포인트입니다. 눈썹 끝을 또렷하게 그려 강렬한 눈빛을 연출하세요.",
-                expected_effect: "더 또렷한 외형으로",
+                expected_effect: "더 또렷한 골격으로",
               },
             ],
           },
@@ -532,7 +532,7 @@ export const MOCK_REPORT: ReportData = {
         similarity: 65,
         reasons: [
           "얼굴 구조의 주요 특징이 '부드러운 카리스마' 유형 경향과 맞아요.",
-          "외형 축에서 또렷한 쪽 경향이 뚜렷해요.",
+          "골격 축에서 또렷한 쪽 경향이 뚜렷해요.",
           "현재 이미지의 비율, 각도, 인상이 이 유형의 전형적 특징과 잘 연결돼요.",
         ],
         styling_tips: [

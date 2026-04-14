@@ -261,8 +261,8 @@ FACE_SHAPE_KR = {
 # gap recommendation 템플릿
 GAP_RECOMMENDATION_TEMPLATES = {
     "shape": {
-        "increase": "외형에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
-        "decrease": "외형에서는 윤곽을 둥글고 부드럽게 풀어주는 방향이 핵심이에요.",
+        "increase": "골격에서는 좀 더 선명하고 또렷한 윤곽을 만드는 방향이 핵심이에요.",
+        "decrease": "골격에서는 윤곽을 둥글고 부드럽게 풀어주는 방향이 핵심이에요.",
     },
     "volume": {
         "increase": "존재감에서는 이목구비를 임팩트 있고 또렷하게 강조하는 게 포인트예요.",
@@ -326,7 +326,7 @@ from pipeline.coordinate import get_axis_labels as _get_raw_axis_labels, get_all
 # 소비자용 오버라이드: coordinate.py의 라벨 + UI 표시용 name_kr/description
 _AXIS_DISPLAY_OVERRIDES = {
     "shape": {
-        "name_kr": "외형",
+        "name_kr": "골격",
         "description": "턱선, 광대, 눈매 기울기가 만드는 전체적인 골격의 형태",
     },
     "volume": {

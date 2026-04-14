@@ -6,7 +6,7 @@ version: "3axis_v1"
 
 axes:
   shape:
-    name_kr: "외형"
+    name_kr: "골격"
     low: "Soft"
     high: "Sharp"
     low_kr: "부드러운"

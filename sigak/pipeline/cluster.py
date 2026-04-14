@@ -86,7 +86,7 @@ LABEL_CANDIDATES = [
         "label_kr": "소프트 볼드",
         "label_en": "Soft Bold",
         "signature": {"shape": "soft", "volume": "bold", "age": "any"},
-        "description": "부드러운 외형에 강렬한 매력이 공존하는 반전 미감",
+        "description": "부드러운 골격에 강렬한 매력이 공존하는 반전 미감",
         "keywords": ["반전매력", "글래머러스", "자유분방", "화려하지만 부드러운"],
     },
     {

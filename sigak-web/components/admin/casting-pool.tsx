@@ -43,7 +43,7 @@ interface PoolResponse {
 // --- 좌표축 라벨 ---
 
 const AXIS_LABELS: Record<keyof Coordinates, string> = {
-  shape: "외형",
+  shape: "골격",
   volume: "존재감",
   age: "무드",
 };

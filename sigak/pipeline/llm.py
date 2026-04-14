@@ -160,6 +160,7 @@ REPORT_SYSTEM_V2 = """역할: 당신은 스타일링 해설가입니다.
 ## summary 규칙 (필수)
 - 반드시 현재 인상과 추구 방향의 차이를 1문장 이상 포함하세요
 - 핵심 action 방향을 1문장 이상 포함하세요
+- 유저의 퍼스널컬러 타입이 주어지면, "이 방향으로 가려면 컬러는 ___계열을 잡으세요" 식의 톤 가이드를 1문장 포함하세요
 - 최소 2문장, 최대 4문장
 - 금지: "스타일링을 추천해요" 수준의 일반론만으로 끝내기
 - 필수 포함: 매칭 유형명, 추구 방향, 구체적 포인트 1개 이상
@@ -215,6 +216,8 @@ def generate_report(action_spec, user_context: dict) -> str:
     gap_direction_kr = user_context.get("primary_gap_direction_kr", "")
     top_goals = [a.goal for a in action_spec.recommended_actions[:2]]
 
+    personal_color = user_context.get("personal_color", "")
+
     user_prompt = f"""{user_context.get('name', '')}님의 스타일링 추천을 설명해주세요.
 
 [매칭 유형] {prompt_payload['matched_type']}
@@ -223,6 +226,7 @@ def generate_report(action_spec, user_context: dict) -> str:
 [변화 방향 한글] {gap_direction_kr}
 [핵심 액션 목표] {', '.join(top_goals)}
 [얼굴형] {prompt_payload['face_shape']}
+[퍼스널컬러] {personal_color or '미판정'}
 
 [추천 액션]
 {json.dumps(prompt_payload['recommended_actions'], ensure_ascii=False, indent=2)}

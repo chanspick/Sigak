@@ -827,12 +827,17 @@ def _run_analysis_pipeline(
                     cv2.imwrite(str(photo_dir / "overlay.png"), overlay_img)
                     overlay_image_url = f"/api/v1/uploads/{user_id}/overlay.png"
 
-    # Step 9: LLM 리포트
+    # Step 9: LLM 리포트 (퍼스널컬러 정보 포함)
+    personal_color_label = ""
+    pc = features.get("personal_color")
+    if pc:
+        personal_color_label = pc.get("label_kr", "")
     raw_report = generate_report(action_spec, {
         "name": user["name"], "face_shape": features.get("face_shape", ""),
         "tier": user["tier"], "gender": gender,
         "aspiration_summary": aspiration_result.get("interpretation", ""),
         "primary_gap_direction_kr": gap.get("primary_shift_kr", ""),
+        "personal_color": personal_color_label,
     })
     report_content = parse_or_fallback(raw_report, action_spec)
 

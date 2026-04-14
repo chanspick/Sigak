@@ -19,11 +19,13 @@ RUN mkdir -p /root/.insightface/models && \
     unzip -q /tmp/buffalo_l.zip -d /root/.insightface/models/ && \
     rm /tmp/buffalo_l.zip
 
-# BiSeNet face parsing 모델 다운로드 (헤어컬러 시뮬레이션용)
+# BiSeNet face parsing 모델 다운로드 (헤어컬러 시뮬레이션용, ~53MB)
 RUN mkdir -p /app/models && \
-    wget -q https://github.com/yakhyo/face-parsing/releases/download/v0.0.1/bisenet_resnet18.onnx \
-    -O /app/models/bisenet_face_parsing.onnx || \
-    echo "[WARN] BiSeNet 모델 다운로드 실패 — 헤어 시뮬레이션 비활성"
+    wget -q -L https://github.com/yakhyo/face-parsing/releases/download/weights/resnet18.onnx \
+    -O /app/models/bisenet_face_parsing.onnx && \
+    test -s /app/models/bisenet_face_parsing.onnx && \
+    echo "[OK] BiSeNet model downloaded ($(du -h /app/models/bisenet_face_parsing.onnx | cut -f1))" || \
+    (rm -f /app/models/bisenet_face_parsing.onnx && echo "[WARN] BiSeNet 다운로드 실패 — 헤어 시뮬레이션 비활성")
 
 COPY sigak/ ./
 

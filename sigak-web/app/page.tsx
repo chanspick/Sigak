@@ -36,23 +36,31 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg text-fg antialiased">
-      <nav className="sticky top-0 z-[100] relative flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[60px] bg-fg text-bg">
-        <div className="hidden md:flex items-center gap-7">
-          {["About", "Method", "Team", "Casting"].map((t) => (
-            <a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">{t}</a>
+      <nav className="sticky top-0 z-[100] flex items-center justify-between px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] h-[56px] md:h-[60px] bg-fg text-bg">
+        {/* 좌: 로고 (모바일+데스크탑) */}
+        <Link href="/" className="text-[12px] md:text-[13px] font-semibold tracking-[5px] md:tracking-[6px] uppercase no-underline text-[var(--color-bg)] shrink-0">SIGAK</Link>
+
+        {/* 중: 데스크탑 네비게이션 */}
+        <div className="hidden md:flex items-center gap-7 absolute left-1/2 -translate-x-1/2">
+          {["About", "Method", "Team"].map((t) => (
+            <a key={t} href={`#${t.toLowerCase()}`} className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-50 transition-opacity duration-200 hover:opacity-100">{t}</a>
           ))}
         </div>
-        <span className="absolute left-1/2 -translate-x-1/2 text-[13px] font-semibold tracking-[6px] uppercase pointer-events-none">SIGAK</span>
-        <div className="flex items-center gap-5">
+
+        {/* 우: 액션 */}
+        <div className="flex items-center gap-3 md:gap-5">
           {isLoggedIn ? (
             <>
-              <Link href="/my" className="text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100 no-underline text-[var(--color-bg)]">내 리포트</Link>
+              <Link href="/my" className="hidden md:block text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 hover:opacity-100 transition-opacity no-underline text-[var(--color-bg)]">내 리포트</Link>
+              <Link href="/my" className="md:hidden" aria-label="내 리포트">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="9" cy="6" r="3.5" /><path d="M2.5 16.5c0-3.5 2.9-5.5 6.5-5.5s6.5 2 6.5 5.5" /></svg>
+              </Link>
               <NotificationBell />
             </>
           ) : (
-            <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">로그인</Link>
+            <Link href="/start" className="text-[10px] md:text-[11px] font-medium tracking-[1.5px] uppercase opacity-70 hover:opacity-100 transition-opacity no-underline text-[var(--color-bg)]">로그인</Link>
           )}
-          <Link href="/start" className="text-[11px] font-medium tracking-[2.5px] uppercase opacity-70 transition-opacity duration-200 hover:opacity-100">진단 시작</Link>
+          <Link href="/start" className="text-[10px] md:text-[11px] font-medium tracking-[1.5px] md:tracking-[2.5px] px-3 py-1.5 border border-white/30 hover:border-white/60 transition-colors no-underline text-[var(--color-bg)]">진단 시작</Link>
         </div>
       </nav>
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] pt-10 pb-8 md:pt-[60px] md:pb-12"><Reveal><div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16 items-end"><div>

@@ -57,7 +57,22 @@ export function StartOverlay() {
     }
   }, []);
 
-  const isValid = tier && gender && name.trim().length > 0 && phone.trim().length > 0;
+  // 전화번호 자동 포맷: 숫자만 추출 → 010-0000-0000
+  const formatPhone = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  };
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhone(e.target.value));
+  };
+
+  // 유효성 검증
+  const phoneDigits = phone.replace(/\D/g, "");
+  const nameValid = name.trim().length >= 2;
+  const phoneValid = phoneDigits.length >= 10 && phoneDigits.length <= 11 && phoneDigits.startsWith("01");
+  const isValid = tier && gender && nameValid && phoneValid;
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -246,8 +261,26 @@ export function StartOverlay() {
             <p className="text-[11px] font-semibold tracking-[1.5px] uppercase opacity-40 mb-1">
               기본 정보
             </p>
-            <Input label="이름" required value={name} onChange={(e) => setName(e.target.value)} placeholder="홍길동" />
-            <Input label="연락처" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" />
+            <Input
+              label="이름"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="홍길동"
+              minLength={2}
+              maxLength={20}
+              error={name.length > 0 && !nameValid ? "이름을 2자 이상 입력해주세요" : undefined}
+            />
+            <Input
+              label="연락처"
+              required
+              value={phone}
+              onChange={handlePhoneChange}
+              placeholder="010-0000-0000"
+              type="tel"
+              inputMode="numeric"
+              error={phone.length > 0 && !phoneValid ? "휴대폰 번호 형식을 확인해주세요" : undefined}
+            />
           </div>
         )}
 

@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "sigak-web.vercel.app" }],
+        destination: "https://www.sigak.asia/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

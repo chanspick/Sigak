@@ -30,6 +30,16 @@ function CallbackContent() {
         if (result.profile_image) localStorage.setItem("sigak_profile_image", result.profile_image);
         localStorage.setItem("sigak_kakao_id", result.kakao_id);
 
+        // 애널리틱스
+        import("@/lib/analytics").then(({ identifyUser, trackKakaoLogin }) => {
+          identifyUser(result.user_id, {
+            name: result.name,
+            email: result.email,
+            kakao_id: result.kakao_id,
+          });
+          trackKakaoLogin(result.reports.length === 0);
+        });
+
         // 리포트가 있으면 최신 리포트로 이동, 없으면 시작 페이지로
         if (result.reports.length > 0) {
           const latest = result.reports[result.reports.length - 1];

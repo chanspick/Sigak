@@ -34,7 +34,11 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
     if (report.user_id) {
       localStorage.setItem("sigak_user_id", report.user_id);
     }
-  }, [report.user_id]);
+    // 애널리틱스: 리포트 조회
+    import("@/lib/analytics").then(({ trackReportViewed }) => {
+      trackReportViewed(report.id, report.access_level);
+    });
+  }, [report.user_id, report.id, report.access_level]);
 
   // 페이월 게이트를 표시할 레벨 목록
   const gateLevels = getPaywallGateLevels(report.access_level);

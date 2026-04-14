@@ -138,6 +138,12 @@ export function QuestionnaireForm({
         }
       }
 
+      // 애널리틱스: 주문 생성
+      import("@/lib/analytics").then(({ trackOrderCreated, identifyUser }) => {
+        identifyUser(result.user_id);
+        trackOrderCreated(result.order_id, tier, result.payment_info.amount);
+      });
+
       // 송금 안내 페이지로 이동 (order_id 전달)
       const params = new URLSearchParams({
         order_id: result.order_id,

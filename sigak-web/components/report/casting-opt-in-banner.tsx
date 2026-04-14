@@ -35,6 +35,7 @@ export function CastingOptInBanner({ userId }: CastingOptInBannerProps) {
       );
       if (res.ok) {
         setStatus("opted_in");
+        import("@/lib/analytics").then(({ trackCastingOptIn }) => trackCastingOptIn());
       }
     } catch {
       console.error("[casting opt-in] failed");

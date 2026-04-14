@@ -378,10 +378,19 @@ export default function HomePage() {
           <p className="mt-3 text-[11px] opacity-30"><span className="line-through mr-1">₩5,000</span>₩2,900부터</p>
         </Link>
       </Reveal>
-      <footer className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-6 md:py-8 text-center border-t border-black/10">
-        <span className="text-[11px] tracking-[1.5px] opacity-30">
-          &copy; 2026 시각(SIGAK). ALL RIGHTS RESERVED
-        </span>
+      <footer className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8 md:py-10 border-t border-black/10">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] opacity-40 mb-4">
+            <Link href="/terms" className="hover:opacity-70 transition-opacity">이용약관</Link>
+            <Link href="/terms" className="hover:opacity-70 transition-opacity">개인정보처리방침</Link>
+            <Link href="/refund" className="hover:opacity-70 transition-opacity">환불규정</Link>
+            <a href="mailto:partner@sigak.asia" className="hover:opacity-70 transition-opacity">partner@sigak.asia</a>
+          </div>
+          <p className="text-[10px] leading-[1.8] opacity-25">
+            주식회사 파이컴퓨터 | 대표: 최진규 | partner@sigak.asia<br />
+            &copy; 2026 SIGAK. All rights reserved.
+          </p>
+        </div>
       </footer>
     </div>
   );

@@ -110,7 +110,7 @@ SKIN_TONE_THRESHOLDS = {
 SKIN_PALETTES = {
     "warm_clear": {
         "label": "웜 클리어",
-        "description": "따뜻하고 선명한 톤이에요. 생기 있는 색이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "따뜻하고 선명한 톤이에요. 생기 있는 색이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "코랄 레드", "hex": "#FF6B5B", "usage": "립"},
             {"name": "오렌지 피치", "hex": "#FF8C42", "usage": "블러셔"},
@@ -122,11 +122,11 @@ SKIN_PALETTES = {
             {"name": "라벤더", "hex": "#B57EDC"},
             {"name": "애쉬 그레이", "hex": "#B2BEB5"},
         ],
-        "avoid_reason": "차가운 계열이 얼굴에서 동떨어져 보일 수 있어요.",
+        "avoid_reason": "차가운 계열이 얼굴에서 동떨어져 보여요.",
     },
     "warm_soft": {
         "label": "웜 소프트",
-        "description": "따뜻하고 부드러운 톤이에요. 차분한 색이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "따뜻하고 부드러운 톤이에요. 차분한 색이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "살몬 핑크", "hex": "#FA8072", "usage": "립"},
             {"name": "피치", "hex": "#FFCBA4", "usage": "블러셔"},
@@ -138,11 +138,11 @@ SKIN_PALETTES = {
             {"name": "쿨 그레이", "hex": "#8C92AC"},
             {"name": "네온 계열", "hex": "#39FF14"},
         ],
-        "avoid_reason": "선명하거나 차가운 색이 피부를 칙칙하게 만들 수 있어요.",
+        "avoid_reason": "선명하거나 차가운 색이 피부를 칙칙하게 만들어요.",
     },
     "neutral_clear": {
         "label": "뉴트럴 클리어",
-        "description": "중성적이고 선명한 톤이에요. 웜/쿨 양쪽 포인트 컬러가 다 어울리는 경향이 있어요.",
+        "description": "중성적이고 선명한 톤이에요. 웜/쿨 양쪽 포인트 컬러가 다 어울려요.",
         "recommended": [
             {"name": "로즈", "hex": "#E75480", "usage": "립"},
             {"name": "소프트 레드", "hex": "#C74375", "usage": "블러셔"},
@@ -154,11 +154,11 @@ SKIN_PALETTES = {
             {"name": "올리브", "hex": "#808000"},
             {"name": "카키", "hex": "#BDB76B"},
         ],
-        "avoid_reason": "탁한 중간톤이 피부의 선명함을 가릴 수 있어요.",
+        "avoid_reason": "탁한 중간톤이 피부의 선명함을 가려요.",
     },
     "neutral_soft": {
         "label": "뉴트럴 소프트",
-        "description": "중성적이고 부드러운 톤이에요. 저채도 색이 편안하게 어울리는 경향이 있어요.",
+        "description": "중성적이고 부드러운 톤이에요. 저채도 색이 편안하게 어울려요.",
         "recommended": [
             {"name": "모브 핑크", "hex": "#D4A0A0", "usage": "립"},
             {"name": "더스티 로즈", "hex": "#DCAE96", "usage": "블러셔"},
@@ -170,11 +170,11 @@ SKIN_PALETTES = {
             {"name": "네온 핑크", "hex": "#FF6EC7"},
             {"name": "퓨어 블랙", "hex": "#000000"},
         ],
-        "avoid_reason": "강한 색이 피부와 충돌해서 부담스러워 보일 수 있어요.",
+        "avoid_reason": "강한 색이 피부와 충돌해서 부담스러워 보여요.",
     },
     "cool_clear": {
         "label": "쿨 클리어",
-        "description": "차갑고 선명한 톤이에요. 고대비 컬러가 얼굴을 살려주는 경향이 있어요.",
+        "description": "차갑고 선명한 톤이에요. 고대비 컬러가 얼굴을 살려줘요.",
         "recommended": [
             {"name": "버건디", "hex": "#800020", "usage": "립"},
             {"name": "로즈 핑크", "hex": "#FF007F", "usage": "블러셔"},
@@ -186,11 +186,11 @@ SKIN_PALETTES = {
             {"name": "골드", "hex": "#FFD700"},
             {"name": "테라코타", "hex": "#E2725B"},
         ],
-        "avoid_reason": "따뜻한 계열이 피부에서 누렇게 떠 보일 수 있어요.",
+        "avoid_reason": "따뜻한 계열이 피부에서 누렇게 떠 보여요.",
     },
     "cool_soft": {
         "label": "쿨 소프트",
-        "description": "차갑고 부드러운 톤이에요. 은은한 쿨톤 색이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "차갑고 부드러운 톤이에요. 은은한 쿨톤 색이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "라벤더 핑크", "hex": "#C4AEAD", "usage": "립"},
             {"name": "소프트 블루", "hex": "#87CEEB", "usage": "포인트"},
@@ -202,7 +202,7 @@ SKIN_PALETTES = {
             {"name": "옐로 골드", "hex": "#FFD700"},
             {"name": "웜 브라운", "hex": "#964B00"},
         ],
-        "avoid_reason": "웜톤 계열이 피부톤과 분리되어 보일 수 있어요.",
+        "avoid_reason": "웜톤 계열이 피부톤과 분리되어 보여요.",
     },
 }
 
@@ -304,7 +304,7 @@ def build_gap_recommendation(axis: str, delta: float) -> str:
     direction = "decrease" if delta < 0 else "increase"
     return GAP_RECOMMENDATION_TEMPLATES.get(axis, {}).get(
         direction,
-        "이 방향으로 스타일링을 조정하면 원하는 이미지에 가까워질 수 있어요."
+        "이 방향으로 스타일링을 조정하면 원하는 이미지에 가까워져요."
     )
 
 

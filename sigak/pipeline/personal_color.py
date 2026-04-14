@@ -39,7 +39,7 @@ class PersonalColorResult:
 SEASON_PALETTES: dict[str, dict] = {
     "spring_light": {
         "label_kr": "봄 라이트",
-        "description": "밝고 따뜻한 톤이에요. 파스텔과 화사한 색이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "밝고 따뜻한 톤이에요. 파스텔과 화사한 색이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "코랄 핑크", "hex": "#F88379", "usage": "립"},
             {"name": "피치", "hex": "#FFCBA4", "usage": "블러셔"},
@@ -52,7 +52,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "딥 레드", "hex": "#8B0000"},
             {"name": "와인", "hex": "#722F37"},
         ],
-        "avoid_reason": "어둡고 무거운 색이 얼굴을 칙칙하게 가릴 수 있어요.",
+        "avoid_reason": "어둡고 무거운 색이 얼굴을 칙칙하게 가려요.",
         "lip_direction": "밝고 따뜻한 색조. 피부보다 약간 선명한 정도.",
         "cheek_direction": "살구빛 혈색. 자연스러운 화사함.",
         "eye_direction": "따뜻한 명색 계열. 펄은 골드 펄.",
@@ -60,7 +60,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "spring_bright": {
         "label_kr": "봄 브라이트",
-        "description": "선명하고 화사한 웜톤이에요. 비비드한 따뜻한 색이 생기를 더해주는 경향이 있어요.",
+        "description": "선명하고 화사한 웜톤이에요. 비비드한 따뜻한 색이 생기를 더해줘요.",
         "recommended": [
             {"name": "비비드 코랄", "hex": "#FF6F61", "usage": "립"},
             {"name": "브라이트 오렌지", "hex": "#FF8C00", "usage": "립"},
@@ -73,7 +73,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "다크 브라운", "hex": "#5C4033"},
             {"name": "뮤트 톤", "hex": "#A89F91"},
         ],
-        "avoid_reason": "탁하거나 어두운 색이 화사함을 가릴 수 있어요.",
+        "avoid_reason": "탁하거나 어두운 색이 화사함을 가려요.",
         "lip_direction": "선명하고 밝은 웜 계열. 화사한 생기.",
         "cheek_direction": "선명한 웜 혈색. 건강하고 화사하게.",
         "eye_direction": "밝고 선명한 웜. 글리터는 골드.",
@@ -81,7 +81,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "summer_light": {
         "label_kr": "여름 라이트",
-        "description": "밝고 청량한 쿨톤이에요. 부드러운 파스텔 핑크 계열이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "밝고 청량한 쿨톤이에요. 부드러운 파스텔 핑크 계열이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "로즈 핑크", "hex": "#FF66B2", "usage": "립"},
             {"name": "베이비 핑크", "hex": "#F4C2C2", "usage": "립"},
@@ -94,7 +94,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "브릭", "hex": "#CB4154"},
             {"name": "테라코타", "hex": "#E2725B"},
         ],
-        "avoid_reason": "따뜻하고 탁한 색이 피부에서 뜨거나 칙칙해 보일 수 있어요.",
+        "avoid_reason": "따뜻하고 탁한 색이 피부에서 뜨거나 칙칙해 보여요.",
         "lip_direction": "차갑고 밝은 핑크 계열. 부드러운 발색.",
         "cheek_direction": "청량한 핑크빛 혈색.",
         "eye_direction": "시원한 톤의 명색. 펄은 실버/핑크 펄.",
@@ -102,7 +102,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "summer_mute": {
         "label_kr": "여름 뮤트",
-        "description": "부드럽고 차분한 쿨톤이에요. 탁하고 은은한 색이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "부드럽고 차분한 쿨톤이에요. 탁하고 은은한 색이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "모브", "hex": "#C8A2C8", "usage": "립"},
             {"name": "더스티 로즈", "hex": "#DCAE96", "usage": "립"},
@@ -115,7 +115,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "비비드 레드", "hex": "#FF0000"},
             {"name": "테라코타", "hex": "#E2725B"},
         ],
-        "avoid_reason": "선명하거나 따뜻한 색이 피부와 충돌해서 부담스러워 보일 수 있어요.",
+        "avoid_reason": "선명하거나 따뜻한 색이 피부와 충돌해서 부담스러워 보여요.",
         "lip_direction": "탁하고 부드러운 쿨 계열. 과하지 않은 발색.",
         "cheek_direction": "안개 낀 듯 은은한 쿨 혈색.",
         "eye_direction": "뮤트 톤 전체. 펄은 핑크/라벤더.",
@@ -123,7 +123,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "autumn_mute": {
         "label_kr": "가을 뮤트",
-        "description": "차분하고 부드러운 웜톤이에요. 탁하고 깊은 어스톤이 자연스럽게 어울리는 경향이 있어요.",
+        "description": "차분하고 부드러운 웜톤이에요. 탁하고 깊은 어스톤이 자연스럽게 어울려요.",
         "recommended": [
             {"name": "테라코타", "hex": "#E2725B", "usage": "립"},
             {"name": "브릭 레드", "hex": "#CB4154", "usage": "립"},
@@ -136,7 +136,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "네온", "hex": "#39FF14"},
             {"name": "쿨 레드", "hex": "#DC143C"},
         ],
-        "avoid_reason": "선명하고 차가운 색이 피부에서 동떨어져 보일 수 있어요.",
+        "avoid_reason": "선명하고 차가운 색이 피부에서 동떨어져 보여요.",
         "lip_direction": "탁하고 깊은 웜 계열. 차분한 발색.",
         "cheek_direction": "은은한 흙빛 혈색. 자연스럽게.",
         "eye_direction": "내추럴 어스톤. 펄은 골드/브론즈.",
@@ -144,7 +144,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "autumn_deep": {
         "label_kr": "가을 딥",
-        "description": "깊고 풍부한 웜톤이에요. 진하고 무게감 있는 색이 잘 소화되는 경향이 있어요.",
+        "description": "깊고 풍부한 웜톤이에요. 진하고 무게감 있는 색이 잘 소화돼요.",
         "recommended": [
             {"name": "버건디", "hex": "#800020", "usage": "립"},
             {"name": "딥 브라운 레드", "hex": "#6B3A2A", "usage": "립"},
@@ -157,7 +157,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "라벤더", "hex": "#B57EDC"},
             {"name": "네온", "hex": "#39FF14"},
         ],
-        "avoid_reason": "가볍고 밝은 파스텔이 피부톤과 분리되어 보일 수 있어요.",
+        "avoid_reason": "가볍고 밝은 파스텔이 피부톤과 분리되어 보여요.",
         "lip_direction": "깊고 진한 웜 계열. 무게감 있는 발색.",
         "cheek_direction": "깊은 혈색. 피부와 대비 살리기.",
         "eye_direction": "깊은 어스톤. 스모키에 강함.",
@@ -165,7 +165,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "winter_bright": {
         "label_kr": "겨울 브라이트",
-        "description": "선명하고 강렬한 쿨톤이에요. 쨍한 고채도 색이 대비감을 살려주는 경향이 있어요.",
+        "description": "선명하고 강렬한 쿨톤이에요. 쨍한 고채도 색이 대비감을 살려줘요.",
         "recommended": [
             {"name": "체리 레드", "hex": "#DE3163", "usage": "립"},
             {"name": "핫 핑크", "hex": "#FF69B4", "usage": "립"},
@@ -178,7 +178,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "살몬", "hex": "#FA8072"},
             {"name": "코랄", "hex": "#FF7F50"},
         ],
-        "avoid_reason": "따뜻하고 연한 색이 피부의 선명함을 가릴 수 있어요.",
+        "avoid_reason": "따뜻하고 연한 색이 피부의 선명함을 가려요.",
         "lip_direction": "선명하고 쨍한 쿨 계열. 대비감 극대화.",
         "cheek_direction": "선명한 대비. 피부 밝기와 대비 강조.",
         "eye_direction": "쨍한 쿨 계열. 글리터는 실버.",
@@ -186,7 +186,7 @@ SEASON_PALETTES: dict[str, dict] = {
     },
     "winter_deep": {
         "label_kr": "겨울 딥",
-        "description": "어둡고 강렬한 쿨톤이에요. 깊고 무게감 있는 쿨 계열이 강한 존재감을 주는 경향이 있어요.",
+        "description": "어둡고 강렬한 쿨톤이에요. 깊고 무게감 있는 쿨 계열이 강한 존재감을 줘요.",
         "recommended": [
             {"name": "와인", "hex": "#722F37", "usage": "립"},
             {"name": "딥 퍼플", "hex": "#301934", "usage": "립"},
@@ -199,7 +199,7 @@ SEASON_PALETTES: dict[str, dict] = {
             {"name": "코랄", "hex": "#FF7F50"},
             {"name": "피치", "hex": "#FFCBA4"},
         ],
-        "avoid_reason": "가볍고 따뜻한 색이 대비감 없이 떠 보일 수 있어요.",
+        "avoid_reason": "가볍고 따뜻한 색이 대비감 없이 떠 보여요.",
         "lip_direction": "어둡고 강렬한 쿨 계열.",
         "cheek_direction": "깊은 쿨빛 혈색.",
         "eye_direction": "강렬한 대비감. 스모키 최적.",

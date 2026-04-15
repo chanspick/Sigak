@@ -11,7 +11,7 @@ axes:
     high: "Sharp"
     low_kr: "부드러운"
     high_kr: "또렷한"
-    description_kr: "골격과 이목구비가 만드는 전체적인 형태"
+    description_kr: "턱선, 광대, 눈매가 만드는 골격의 형태"
     features:
       jaw_angle:
         weight: 0.25
@@ -35,7 +35,7 @@ axes:
     high: "Bold"
     low_kr: "은은한"
     high_kr: "강렬한"
-    description_kr: "이목구비의 크기와 볼륨이 만드는 존재감"
+    description_kr: "이목구비의 선명도"
     features:
       eye_width_ratio:
         weight: 0.30
@@ -55,9 +55,9 @@ axes:
     name_kr: "무드"
     low: "Fresh"
     high: "Mature"
-    low_kr: "생기있는"
+    low_kr: "발랄한"
     high_kr: "성숙한"
-    description_kr: "얼굴 비율이 주는 나이 인상과 분위기"
+    description_kr: "전체적인 분위기의 방향"
     features:
       forehead_ratio:
         weight: 0.35

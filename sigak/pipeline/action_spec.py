@@ -222,7 +222,7 @@ def _derive_type_modifier(coords: dict) -> dict:
     tones: list[str] = []
     tones.append("부드러운" if shape_val < 0 else "또렷한")
     tones.append("강렬한" if volume_val > 0 else "은은한")
-    tones.append("성숙한" if age_val > 0 else "생기있는")
+    tones.append("성숙한" if age_val > 0 else "발랄한")
     style_tone = " · ".join(tones[:2])
 
     return {

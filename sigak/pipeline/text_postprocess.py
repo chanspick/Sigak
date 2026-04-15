@@ -105,7 +105,7 @@ REDUNDANT_PAIRS = [
     (re.compile(r"자연스러운\s*내추럴한"), "자연스러운"),
     (re.compile(r"매튜어한\s*성숙한"), "성숙한"),
     (re.compile(r"성숙한\s*매튜어한"), "성숙한"),
-    (re.compile(r"프레시한\s*생기있는"), "생기있는"),
+    (re.compile(r"프레시한\s*발랄한"), "발랄한"),
     (re.compile(r"클린한\s*깨끗한"), "깨끗한"),
     (re.compile(r"깨끗한\s*클린한"), "깨끗한"),
 ]

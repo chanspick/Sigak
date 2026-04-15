@@ -327,15 +327,15 @@ from pipeline.coordinate import get_axis_labels as _get_raw_axis_labels, get_all
 _AXIS_DISPLAY_OVERRIDES = {
     "shape": {
         "name_kr": "골격",
-        "description": "턱선, 광대, 눈매 기울기가 만드는 전체적인 골격의 형태",
+        "description": "턱선, 광대, 눈매가 만드는 골격의 형태",
     },
     "volume": {
         "name_kr": "존재감",
-        "description": "눈 크기, 입술 볼륨, 코 높이가 만드는 이목구비의 존재감",
+        "description": "이목구비의 선명도",
     },
     "age": {
         "name_kr": "무드",
-        "description": "이마 비율, 인중 길이, 얼굴 종횡비가 주는 나이 인상과 분위기",
+        "description": "전체적인 분위기의 방향",
     },
 }
 
@@ -873,7 +873,7 @@ def _build_gap_analysis(
 ) -> dict:
     """gap_analysis 섹션 -- standard 잠금."""
     magnitude = gap.get("magnitude", 0)
-    difficulty = _gap_difficulty(magnitude)
+    gap_diff = _gap_difficulty(magnitude)
     gap_vector = gap.get("vector", {})
 
     # 현재 유형: 가장 유사한 유형에서 가져오기
@@ -929,16 +929,17 @@ def _build_gap_analysis(
         to_score = max(-1.0, min(1.0, float(aspiration_coords.get(axis_name, 0) or 0)))
         from_label = get_position_label(axis_name, from_score)
 
-        # delta 작으면 "현재 유지", 아니면 목표 방향 명시
+        # delta 작으면 "거의 일치", 아니면 목표 방향 명시
         if abs(delta_val) < 0.15:
-            to_label = "현재 유지"
-            difficulty = "유지"
-            recommendation = f"{ax_labels.get('name_kr', axis_name)}은 현재와 추구미가 가까워 큰 변화 없이 유지하면 돼요."
+            to_label = "거의 일치"
+            axis_diff = "거의 일치"
+            name_kr = ax_labels.get('name_kr', axis_name)
+            recommendation = f"{name_kr}{_postposition(name_kr, '은', '는')} 현재와 추구미가 거의 같아요. 지금 방향 그대로 좋아요."
         else:
             # "중간" 대신 이동 방향으로 표시 (예: "프레시 방향으로")
             target_direction = ax_labels.get("high", "") if delta_val > 0 else ax_labels.get("low", "")
             to_label = f"{target_direction} 방향으로"
-            difficulty = _axis_difficulty(delta_val)
+            axis_diff = _axis_difficulty(delta_val)
             recommendation = build_gap_recommendation(axis_name, delta_val)
 
         direction_items.append({
@@ -953,7 +954,7 @@ def _build_gap_analysis(
             "delta": round(abs(delta_val), 2),
             "from_label": from_label,
             "to_label": to_label,
-            "difficulty": difficulty,
+            "difficulty": axis_diff,
             "recommendation": recommendation,
         })
 
@@ -972,7 +973,7 @@ def _build_gap_analysis(
             "current_coordinates": {k: round(v, 2) for k, v in current_coords.items()},
             "aspiration_coordinates": {k: round(v, 2) for k, v in aspiration_coords.items()},
             "gap_magnitude": round(magnitude, 2),
-            "gap_difficulty": difficulty,
+            "gap_difficulty": gap_diff,
             "gap_summary": gap_summary,
             "direction_items": direction_items,
             # aesthetic_map -- 2D 시각화용 고정 좌표계
@@ -996,7 +997,7 @@ def _build_gap_analysis(
                     "bottom_left": "Soft Fresh",
                     "bottom_right": "Sharp Fresh",
                 },
-                "description": "가로축은 골격과 이목구비의 형태, 세로축은 비율이 주는 무드예요. 점이 클수록 이목구비 존재감이 강해요.",
+                "description": "가로축은 골격의 형태, 세로축은 분위기의 방향이에요. 점이 클수록 이목구비 선명도가 높아요.",
             },
             # z축 필드 예약 (다음 스프린트)
             "trend_coordinates": None,

@@ -15,7 +15,7 @@ function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; 
 
 const GALLERY = [
   { id: "owl", src: "/images/sculptures/owl.png", alt: "부엉이 조각상", axis: "또렷한 · 강렬한", desc: "강렬한 인상과 선명한 윤곽. 도시적 세련미와 대담한 구조가 만들어내는 압도적 아우라." },
-  { id: "cat", src: "/images/sculptures/cat.png", alt: "고양이 조각상", axis: "부드러운 · 생기있는", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
+  { id: "cat", src: "/images/sculptures/cat.png", alt: "고양이 조각상", axis: "부드러운 · 발랄한", desc: "경쾌한 톤과 자연스러운 곡선. 가볍지만 또렷한 인상이 전하는 편안한 호감." },
   { id: "fox", src: "/images/sculptures/fox.png", alt: "여우 조각상", axis: "성숙한 · 강렬한", desc: "깊은 인상과 강렬한 구조. 시간이 쌓아올린 무게감과 세련된 존재감." },
 ] as const;
 const PROCESS = [

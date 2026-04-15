@@ -2,6 +2,12 @@
 // 블러 시: 축 이름/격자 선명, 점/수치/화살표 블러
 // 공개 시: axes, position, target 전체 표시
 
+const AXIS_DESCRIPTIONS: Record<string, string> = {
+  "골격": "턱선, 광대, 눈매가 만드는 골격의 형태",
+  "존재감": "이목구비의 선명도",
+  "무드": "전체적인 분위기의 방향",
+};
+
 interface CoordinateMapContent {
   axes: string[];
   position: number[];
@@ -44,10 +50,15 @@ export function CoordinateMap({ content, locked }: CoordinateMapProps) {
                 key={axis}
                 className="p-4 border border-[var(--color-border)] rounded-lg"
               >
-                {/* 축 라벨 */}
-                <p className="text-xs text-[var(--color-muted)] mb-2">
+                {/* 축 라벨 + 설명 */}
+                <p className="text-xs text-[var(--color-muted)] mb-0.5">
                   {axis}
                 </p>
+                {AXIS_DESCRIPTIONS[axis] && (
+                  <p className="text-[11px] text-[var(--color-muted)] opacity-40 mb-2">
+                    {AXIS_DESCRIPTIONS[axis]}
+                  </p>
+                )}
                 {/* 현재 위치 바 */}
                 <div className="h-2 bg-[var(--color-border)] rounded-full mb-2 overflow-hidden">
                   <div

@@ -74,21 +74,27 @@ const STEPS = [
   },
 ] as const;
 
-/* ── 캐스팅 카드 목업 데이터 ── */
-const INVITATIONS = [
-  {
-    from: "Alpha Agency",
-    purpose: "화보 촬영",
-    fee: "₩500,000",
-    date: "2026. 4. 20",
-  },
-  {
-    from: "Scene Studio",
-    purpose: "브랜드 광고 모델",
-    fee: "₩800,000",
-    date: "2026. 5. 3",
-  },
-] as const;
+/* ── 종이 텍스처 SVG (data URI) ── */
+const PAPER_TEXTURE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`;
+
+/* ── Redacted block (가림 처리) ── */
+function Redacted({ w, h = 14 }: { w: number; h?: number }) {
+  return (
+    <span
+      className="inline-block bg-black/[0.08] align-middle"
+      style={{ width: w, height: h }}
+    />
+  );
+}
+
+function RedactedInline({ w }: { w: number }) {
+  return (
+    <span
+      className="inline-block bg-black/[0.06] align-middle ml-1.5"
+      style={{ width: w, height: 12 }}
+    />
+  );
+}
 
 /* ── 티어 데이터 (캐스팅 랜딩 전용) ── */
 const CASTING_TIERS = [
@@ -281,89 +287,143 @@ export default function CastingLandingPage() {
 
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 
-      {/* ── 02. INVITATION ── */}
+      {/* ── 02. INVITATION — 초대장 오브제 ── */}
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
         <Reveal>
-          <Row
-            c1={
-              <>
-                <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                  02
-                </h2>
-                <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
-                  INVITATION
+          {/* 섹션 헤더 — 1:1:2 그리드 */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10 md:mb-12">
+            <div>
+              <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
+                02
+              </h2>
+              <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
+                INVITATION
+              </span>
+            </div>
+            <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
+              이런 초대장이
+              <br />
+              도착합니다.
+            </p>
+            <div />
+          </div>
+
+          {/* 초대장 스테이지 — 중앙 배치 */}
+          <div className="relative flex justify-center py-5 md:pb-8">
+            {/* 두 번째 카드 (뒤에 깔리는 깊이감) */}
+            <div
+              className="absolute top-7 w-[min(420px,90%)] h-full border border-black/[0.08] overflow-hidden"
+              style={{ background: "#FDFBF7", transform: "rotate(1.2deg)", zIndex: 0 }}
+            >
+              <div
+                className="absolute inset-0 opacity-30 pointer-events-none"
+                style={{ backgroundImage: PAPER_TEXTURE, backgroundSize: "128px 128px" }}
+              />
+            </div>
+
+            {/* 메인 초대장 카드 */}
+            <Link
+              href="/start"
+              className="relative z-[1] w-[min(420px,90%)] border border-black/[0.08] px-6 py-8 md:px-9 md:py-10 no-underline text-[var(--color-fg)] overflow-hidden transition-transform duration-400 hover:-translate-y-[3px]"
+              style={{ background: "#FDFBF7" }}
+            >
+              {/* 종이 텍스처 오버레이 */}
+              <div
+                className="absolute inset-0 opacity-30 pointer-events-none"
+                style={{ backgroundImage: PAPER_TEXTURE, backgroundSize: "128px 128px" }}
+              />
+
+              {/* 상단: SIGAK 엠보싱 */}
+              <div className="relative flex justify-between items-baseline mb-2">
+                <span className="text-[11px] font-bold tracking-[6px] opacity-20">
+                  SIGAK
                 </span>
-              </>
-            }
-            c2={
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
-                이런 제안이
-                <br />
-                도착합니다.
-              </p>
-            }
-            c3={
-              <div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  {INVITATIONS.map((inv) => (
-                    <div
-                      key={inv.from}
-                      className="flex-1 min-w-[260px] p-6 border border-black/[0.12]"
-                    >
-                      <p className="text-[10px] font-bold tracking-[2px] opacity-25 mb-5">
-                        CASTING INVITATION
-                      </p>
-                      <div className="flex flex-col gap-2.5">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] opacity-35 tracking-[1px]">
-                            From
-                          </span>
-                          <span className="text-[14px] font-medium">
-                            {inv.from}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] opacity-35 tracking-[1px]">
-                            Purpose
-                          </span>
-                          <span className="text-[14px] font-medium">
-                            {inv.purpose}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] opacity-35 tracking-[1px]">
-                            Fee
-                          </span>
-                          <span className="text-[14px] font-extrabold">
-                            {inv.fee}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] opacity-35 tracking-[1px]">
-                            Date
-                          </span>
-                          <span className="text-[14px] font-medium">
-                            {inv.date}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-5">
-                        <span className="flex-1 py-2.5 text-center text-[12px] font-semibold bg-fg text-bg select-none">
-                          수락하기
-                        </span>
-                        <span className="flex-1 py-2.5 text-center text-[12px] font-semibold border border-black/[0.12] select-none">
-                          괜찮습니다
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-4 text-[12px] opacity-25 italic">
-                  * 실제 제안 예시를 기반으로 구성된 목업입니다
-                </p>
+                <span className="text-[9px] font-semibold tracking-[2.5px] opacity-20">
+                  CASTING INVITATION
+                </span>
               </div>
-            }
-          />
+
+              {/* 구분선 */}
+              <div className="relative h-px bg-black/10 my-5" />
+
+              {/* 수신자 */}
+              <div className="relative flex items-baseline gap-2 mb-7">
+                <span className="font-[family-name:var(--font-serif)] text-[14px] font-light opacity-30">
+                  To.
+                </span>
+                <span className="font-[family-name:var(--font-serif)] text-[22px] font-normal flex items-center">
+                  <Redacted w={64} />
+                  <span className="ml-0.5"> 님</span>
+                </span>
+              </div>
+
+              {/* 본문 — 핵심 정보 가림 */}
+              <div className="relative flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-semibold tracking-[1.5px] opacity-25">
+                    브랜드
+                  </span>
+                  <span className="text-[15px] font-medium flex items-center gap-0.5">
+                    <Redacted w={48} />
+                    <span className="ml-0.5">코스메틱</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-semibold tracking-[1.5px] opacity-25">
+                    캠페인
+                  </span>
+                  <span className="text-[15px] font-medium flex items-center gap-0.5">
+                    2026 S/S
+                    <RedactedInline w={44} />
+                    <span className="ml-0.5">화보</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-semibold tracking-[1.5px] opacity-25">
+                    보수
+                  </span>
+                  <span className="font-[family-name:var(--font-serif)] text-[20px] font-semibold flex items-center gap-0.5">
+                    ₩ <Redacted w={52} h={18} />,000
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-semibold tracking-[1.5px] opacity-25">
+                    일정
+                  </span>
+                  <span className="text-[15px] font-medium flex items-center gap-0.5">
+                    6월
+                    <Redacted w={18} />일, 서울
+                    <RedactedInline w={52} />
+                    <span className="ml-0.5">스튜디오</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 하단 안내 */}
+              <div className="relative h-px bg-black/10 mt-7 mb-4" />
+
+              <p className="relative text-[12px] leading-[1.8] opacity-30 text-center">
+                AI 매력 분석을 완료하면
+                <br />
+                캐스팅 풀에 등록되고, 이 초대장이 열립니다.
+              </p>
+
+              {/* CTA */}
+              <span className="relative block mt-5 py-3.5 text-center bg-[var(--color-fg)] text-[var(--color-bg)] text-[13px] font-semibold tracking-[0.5px] transition-opacity duration-200 hover:opacity-85">
+                내 초대장 열기
+              </span>
+            </Link>
+          </div>
+
+          {/* 하단 안내 텍스트 */}
+          <div className="text-center mt-10">
+            <p className="text-[13px] opacity-40 leading-[1.7]">
+              제안은 목적, 일정, 출연료를 포함하여 도착합니다.
+            </p>
+            <p className="text-[12px] opacity-25 mt-1">
+              수락 전까지 개인정보는 공유되지 않습니다.
+            </p>
+          </div>
         </Reveal>
       </section>
 

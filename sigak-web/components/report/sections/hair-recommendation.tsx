@@ -41,7 +41,9 @@ export function HairRecommendation({ content, locked }: HairRecommendationProps)
                 <div key={combo.rank} className="flex flex-col gap-3">
                   {/* 랭크 + 스코어 */}
                   <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold">#{combo.rank}</span>
+                    <span className="inline-flex items-center justify-center w-[24px] h-[24px] bg-[var(--color-fg)] text-[var(--color-bg)] text-[13px] font-semibold shrink-0">
+                      {combo.rank}
+                    </span>
                     <span className="text-sm font-medium">
                       {combo.front?.name_kr ?? ""} × {combo.back?.name_kr ?? ""}
                     </span>

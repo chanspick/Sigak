@@ -60,7 +60,7 @@ def _build_interview_system(gender: str = "female") -> str:
 3축 좌표계:
 - shape [-1, +1]: Soft(둥글고 부드러운 골격) ↔ Sharp(날카롭고 선명한 골격)
 - volume [-1, +1]: Subtle(작고 섬세한 이목구비) ↔ Bold(크고 존재감 있는 이목구비)
-- age [-1, +1]: Fresh(어리고 생기있는 비율) ↔ Mature(성숙하고 정돈된 비율)
+- age [-1, +1]: Fresh(어리고 발랄한 비율) ↔ Mature(성숙하고 정돈된 비율)
 
 SIGAK 인상 유형 레퍼런스:
 {type_ref}

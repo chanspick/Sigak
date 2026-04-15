@@ -265,7 +265,7 @@ export const MOCK_REPORT: ReportData = {
         current_coordinates: { shape: -0.07, volume: 0.27, age: 0.15 },
         aspiration_coordinates: { shape: 0.6, volume: 0.4, age: 0.3 },
         gap_magnitude: 0.7,
-        gap_difficulty: "유지",
+        gap_difficulty: "작은 변화",
         gap_summary:
           "가장 큰 변화는 더 또렷한 방향으로 가는 거예요. 그리고 전체적으로 더 성숙한 느낌으로요.",
         direction_items: [
@@ -276,7 +276,7 @@ export const MOCK_REPORT: ReportData = {
             label_low: "부드러운",
             label_high: "또렷한",
             axis_description:
-              "턱선, 광대, 눈매 기울기가 만드는 전체적인 골격의 형태",
+              "턱선, 광대, 눈매가 만드는 골격의 형태",
             from_score: -0.07,
             to_score: 0.6,
             delta: 0.67,
@@ -290,10 +290,10 @@ export const MOCK_REPORT: ReportData = {
             axis: "age",
             label: "무드",
             name_kr: "무드",
-            label_low: "생기있는",
+            label_low: "발랄한",
             label_high: "성숙한",
             axis_description:
-              "이마 비율, 인중 길이, 얼굴 종횡비가 주는 나이 인상과 분위기",
+              "전체적인 분위기의 방향",
             from_score: 0.15,
             to_score: 0.3,
             delta: 0.15,
@@ -310,15 +310,15 @@ export const MOCK_REPORT: ReportData = {
             label_low: "은은한",
             label_high: "강렬한",
             axis_description:
-              "눈 크기, 입술 볼륨, 코 높이가 만드는 이목구비의 존재감",
+              "이목구비의 선명도",
             from_score: 0.27,
             to_score: 0.4,
             delta: 0.13,
             from_label: "약간 강렬한",
-            to_label: "현재 유지",
-            difficulty: "유지",
+            to_label: "거의 일치",
+            difficulty: "거의 일치",
             recommendation:
-              "존재감은 현재와 추구미가 가까워 큰 변화 없이 유지하면 돼요.",
+              "존재감은 현재와 추구미가 거의 같아요. 지금 방향 그대로 좋아요.",
           },
         ],
         aesthetic_map: {
@@ -330,15 +330,15 @@ export const MOCK_REPORT: ReportData = {
             high: "또렷한",
             low_en: "Soft",
             high_en: "Sharp",
-            description: "골격과 이목구비가 만드는 전체적인 형태",
+            description: "턱선, 광대, 눈매가 만드는 골격의 형태",
           },
           y_axis: {
             name_kr: "무드",
-            low: "생기있는",
+            low: "발랄한",
             high: "성숙한",
             low_en: "Fresh",
             high_en: "Mature",
-            description: "얼굴 비율이 주는 나이 인상과 분위기",
+            description: "전체적인 분위기의 방향",
           },
           size_axis: {
             name_kr: "존재감",
@@ -346,7 +346,7 @@ export const MOCK_REPORT: ReportData = {
             high: "강렬한",
             low_en: "Subtle",
             high_en: "Bold",
-            description: "이목구비의 크기와 볼륨이 만드는 존재감",
+            description: "이목구비의 선명도",
           },
           quadrants: {
             top_left: "Soft Mature",
@@ -355,7 +355,7 @@ export const MOCK_REPORT: ReportData = {
             bottom_right: "Sharp Fresh",
           },
           description:
-            "가로축은 골격과 이목구비의 형태, 세로축은 비율이 주는 무드예요. 점이 클수록 이목구비 존재감이 강해요.",
+            "가로축은 골격의 형태, 세로축은 분위기의 방향이에요. 점이 클수록 이목구비 선명도가 높아요.",
         },
         trend_coordinates: null,
         gap_to_trend: null,

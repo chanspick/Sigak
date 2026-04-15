@@ -77,6 +77,7 @@ function MiniAxisRow({
   aspirationScore,
   labelLow,
   labelHigh,
+  description,
 }: {
   axisKey: string;
   label: string;
@@ -84,6 +85,7 @@ function MiniAxisRow({
   aspirationScore: number;
   labelLow?: string;
   labelHigh?: string;
+  description?: string;
 }) {
   const currentPos = scoreToPercent(currentScore);
   const aspirationPos = scoreToPercent(aspirationScore);
@@ -91,10 +93,17 @@ function MiniAxisRow({
 
   return (
     <div className="flex items-center gap-2">
-      {/* 축 라벨 — 고정 폭 */}
-      <span className="text-[11px] text-[var(--color-muted)] w-[42px] shrink-0 text-right tracking-[0.5px]">
-        {label}
-      </span>
+      {/* 축 라벨 + 설명 — 고정 폭 */}
+      <div className="w-[56px] shrink-0 text-right">
+        <span className="text-[11px] text-[var(--color-muted)] tracking-[0.5px] block">
+          {label}
+        </span>
+        {description && (
+          <span className="text-[8px] text-[var(--color-muted)] opacity-40 block leading-tight">
+            {description}
+          </span>
+        )}
+      </div>
 
       {/* 좌 라벨 */}
       {labelLow && (
@@ -344,6 +353,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
                   aspirationScore={content.aspiration_coordinates[item.axis as keyof Coordinates] ?? 0}
                   labelLow={item.label_low}
                   labelHigh={item.label_high}
+                  description={item.axis_description}
                 />
               ))}
             </div>

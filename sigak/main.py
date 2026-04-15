@@ -896,7 +896,12 @@ def _run_analysis_pipeline(
     import cv2
     overlay_image_url = None
     photo_dir = DATA_DIR / user_id
-    photo_files = sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
+    # 파이프라인 생성 파일 제외, 유저 원본 사진만
+    _generated_names = {"overlay.png", "hair_simulation.png"}
+    photo_files = [
+        p for p in sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
+        if p.name not in _generated_names
+    ]
     if photo_files and analysis:
         photo_img = cv2.imdecode(np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR)
         if photo_img is not None:
@@ -950,7 +955,7 @@ def _run_analysis_pipeline(
 
     # 오버레이 URL 삽입
     if overlay_image_url:
-        original_photos = [p for p in photo_files if p.name != "overlay.png"]
+        original_photos = photo_files
         formatted_report["overlay"] = {
             "before_url": f"/api/v1/uploads/{user_id}/{original_photos[0].name}" if original_photos else None,
             "after_url": overlay_image_url,

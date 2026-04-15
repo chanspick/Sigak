@@ -9,7 +9,7 @@ import Link from "next/link";
 import { NotificationBell } from "@/components/notification/notification-bell";
 
 // SiteHeader를 숨길 경로 (자체 nav가 있거나 전용 UI인 페이지)
-const HIDDEN_ROUTES = ["/", "/start", "/questionnaire", "/auth", "/report", "/admin", "/terms", "/refund", "/my"];
+const HIDDEN_ROUTES = ["/", "/start", "/questionnaire", "/auth", "/report", "/admin", "/terms", "/refund", "/my", "/casting"];
 
 function shouldHide(pathname: string): boolean {
   return HIDDEN_ROUTES.some(

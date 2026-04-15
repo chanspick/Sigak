@@ -192,26 +192,26 @@ export function StartOverlay() {
             {kakaoLoading ? "연결 중..." : "카카오로 시작하기"}
           </button>
 
-          {/* 심사용 이메일 로그인 — 배경과 동일한 색으로 거의 보이지 않게 */}
-          <form onSubmit={handleEmailLogin} className="mt-16 flex flex-col gap-2">
+          {/* 이메일 로그인 — 심사용 */}
+          <form onSubmit={handleEmailLogin} className="mt-12 flex flex-col gap-2">
             <input
               type="email"
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
               placeholder="email"
-              className="w-full px-3 py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] placeholder:text-[var(--color-bg)] focus:border-black/10 focus:text-[var(--color-fg)] focus:placeholder:text-[var(--color-muted)] outline-none transition-all"
+              className="w-full px-3 py-2 text-[11px] bg-transparent border border-black/[0.08] text-[var(--color-fg)] placeholder:text-black/20 focus:border-black/20 outline-none transition-all rounded"
             />
             <input
               type="password"
               value={testPassword}
               onChange={(e) => setTestPassword(e.target.value)}
               placeholder="password"
-              className="w-full px-3 py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] placeholder:text-[var(--color-bg)] focus:border-black/10 focus:text-[var(--color-fg)] focus:placeholder:text-[var(--color-muted)] outline-none transition-all"
+              className="w-full px-3 py-2 text-[11px] bg-transparent border border-black/[0.08] text-[var(--color-fg)] placeholder:text-black/20 focus:border-black/20 outline-none transition-all rounded"
             />
             <button
               type="submit"
               disabled={emailLoading || !testEmail || !testPassword}
-              className="w-full py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] hover:text-[var(--color-muted)] transition-all disabled:opacity-0"
+              className="w-full py-2 text-[11px] bg-transparent text-black/20 hover:text-black/40 transition-all disabled:opacity-30"
             >
               {emailLoading ? "..." : "sign in"}
             </button>

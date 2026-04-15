@@ -301,7 +301,7 @@ export default function CastingLandingPage() {
               </span>
             </div>
             <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
-              이런 초대장이
+              초대장이
               <br />
               도착합니다.
             </p>

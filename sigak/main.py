@@ -319,7 +319,7 @@ UPGRADE_PRICE = 26100
 PAYMENT_INFO = {
     "bank": "카카오뱅크",
     "account": "3333-19-3591206",
-    "holder": "조찬형",
+    "holder": "최진규",
     "toss_deeplink": "supertoss://send?amount={amount}&bank=kakaobank&account=3333193591206",
     "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=kakaobank&account=3333193591206",
 }

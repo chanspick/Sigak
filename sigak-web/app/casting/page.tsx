@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { NotificationBell } from "@/components/notification/notification-bell";
+import { EarlyBirdTimer } from "@/components/early-bird-timer";
 
 /* ── Reveal on scroll ── */
 function Reveal({
@@ -349,6 +350,13 @@ export default function CastingLandingPage() {
           </div>
         </Reveal>
       </section>
+
+      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
+
+      {/* ── EARLY BIRD TIMER ── */}
+      <div className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
+        <EarlyBirdTimer />
+      </div>
 
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 

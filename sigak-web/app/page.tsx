@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { NotificationBell } from "@/components/notification/notification-bell";
 import { MOCK_REPORT } from "@/lib/constants/mock-report";
+import { EarlyBirdTimer } from "@/components/early-bird-timer";
 
 function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -244,6 +245,13 @@ export default function HomePage() {
           );
         })()}
       </section>
+
+      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
+
+      {/* ── EARLY BIRD TIMER ── */}
+      <div className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
+        <EarlyBirdTimer />
+      </div>
 
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 

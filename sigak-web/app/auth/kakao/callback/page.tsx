@@ -56,10 +56,10 @@ function CallbackContent() {
           trackKakaoLogin(result.reports.length === 0);
         });
 
-        // 리포트가 있으면 최신 리포트로 이동, 없으면 시작 페이지로
+        // 신규 유저: 바로 요금제 선택 → 구매 플로우
+        // 기존 유저(리포트 있음): 홈으로
         if (result.reports.length > 0) {
-          const latest = result.reports[result.reports.length - 1];
-          router.replace(`/report/${latest.id}`);
+          router.replace("/");
         } else {
           router.replace("/start");
         }

@@ -351,7 +351,17 @@ export default function CastingLandingPage() {
         </Reveal>
       </section>
 
-      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
+      {/* ── 데모 리포트 링크 ── */}
+      <div className="mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)] py-6 flex items-center gap-4">
+        <div className="flex-1 h-px bg-black/[0.08]" />
+        <Link
+          href="/demo"
+          className="text-[12px] md:text-[13px] opacity-40 hover:opacity-70 transition-opacity no-underline whitespace-nowrap"
+        >
+          실제 리포트를 먼저 확인해보세요 →
+        </Link>
+        <div className="flex-1 h-px bg-black/[0.08]" />
+      </div>
 
       {/* ── EARLY BIRD TIMER ── */}
       <div className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">

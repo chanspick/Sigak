@@ -244,6 +244,19 @@ export default function HomePage() {
             </div>
           );
         })()}
+
+        {/* 데모 리포트 링크 */}
+        <Reveal delay={0.25}>
+          <div className="mt-8 text-center">
+            <Link
+              href="/demo"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium opacity-40 hover:opacity-70 transition-opacity no-underline"
+            >
+              전체 리포트 샘플 보기
+              <span className="text-[15px]">&rarr;</span>
+            </Link>
+          </div>
+        </Reveal>
       </section>
 
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />

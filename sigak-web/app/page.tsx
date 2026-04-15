@@ -306,18 +306,6 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
-
-      {/* ── FINAL CTA ── */}
-      <Reveal>
-        <Link href="/start" className="block px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 md:py-14 text-center group">
-          <p className="text-[clamp(24px,4vw,40px)] font-bold tracking-[1px] transition-opacity duration-200 group-hover:opacity-50">
-            → 진단 시작하기
-          </p>
-          <p className="mt-3 text-[11px] opacity-30"><span className="line-through mr-1">₩5,000</span>₩2,900부터</p>
-        </Link>
-      </Reveal>
-
       {/* ════════════════════════════════════════════
           보조 구간 (더 스크롤하면)
           ════════════════════════════════════════════ */}

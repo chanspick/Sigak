@@ -58,7 +58,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
   if (!isV2 && content.trends) {
     return (
       <section className="py-10 border-b border-[var(--color-border)]">
-        <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
+        <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
           TREND CONTEXT
         </h2>
         <div className="flex flex-col gap-6">
@@ -67,7 +67,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
               <h3 className="text-lg font-bold font-serif mb-3">{trend.title}</h3>
               <div className={locked ? "select-none" : ""}>
                 <div className="relative">
-                  <p className="text-sm leading-relaxed text-[var(--color-muted)]">{trend.description}</p>
+                  <p className="text-[15px] leading-relaxed text-[var(--color-muted)]">{trend.description}</p>
                   {locked && <div className="absolute inset-0 blur-overlay blur-fade-out" />}
                 </div>
               </div>
@@ -88,7 +88,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
         <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)]">
           TREND CONTEXT
         </h2>
-        <span className="text-[10px] tracking-[1.5px] text-[var(--color-muted)] opacity-50">
+        <span className="text-[11px] tracking-[1.5px] text-[var(--color-muted)] opacity-50">
           {content.season?.replace("_", " ")}
         </span>
       </div>
@@ -104,14 +104,11 @@ export function TrendContext({ content, locked }: TrendContextProps) {
 
           {/* 무드 매칭 + 정합도 */}
           {mood && (
-            <div className="p-5 border border-[var(--color-border)] rounded-lg mb-6">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-4 border border-[var(--color-border)] rounded-lg mb-6">
+              <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)]">
                     YOUR MOOD
-                  </span>
-                  <span className="text-[14px] font-bold">
-                    {mood.label_kr}
                   </span>
                 </div>
                 {content.alignment && (
@@ -120,7 +117,10 @@ export function TrendContext({ content, locked }: TrendContextProps) {
                   </span>
                 )}
               </div>
-              <p className="text-[13px] leading-relaxed text-[var(--color-muted)] mb-3">
+              <p className="text-[15px] font-bold mb-2">
+                {mood.label_kr}
+              </p>
+              <p className="text-[13px] leading-relaxed mb-3">
                 {mood.description}
               </p>
               {/* 키워드 태그 */}
@@ -128,7 +128,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
                 {mood.keywords.map((kw) => (
                   <span
                     key={kw}
-                    className="px-2 py-0.5 text-[10px] border border-[var(--color-border)] text-[var(--color-muted)] rounded-full"
+                    className="px-2 py-0.5 text-[11px] border border-[var(--color-border)] text-[var(--color-muted)] rounded-full"
                   >
                     {kw}
                   </span>
@@ -139,7 +139,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
 
           {/* 정합도 설명 */}
           {content.alignment_description && (
-            <p className="text-[13px] leading-relaxed text-[var(--color-muted)] mb-8">
+            <p className="text-[13px] leading-relaxed mb-8">
               {content.alignment_description}
             </p>
           )}
@@ -150,20 +150,20 @@ export function TrendContext({ content, locked }: TrendContextProps) {
               <p className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)] mb-3">
                 RECOMMENDATION × TREND
               </p>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {content.action_trend_tags.map((tag) => (
-                  <div key={tag.zone} className="flex items-start gap-3 text-[13px]">
-                    <span className="text-[var(--color-muted)] w-12 shrink-0 text-right">
+                  <div key={tag.zone} className="flex items-start gap-3">
+                    <span className="text-[13px] text-[var(--color-muted)] w-12 shrink-0 text-right">
                       {tag.zone_kr}
                     </span>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {tag.rising_top.map((r, i) => (
-                        <span key={i} className="text-[11px] px-1.5 py-0.5 bg-[var(--color-fg)]/[0.05] rounded">
+                        <span key={i} className="text-[12px] px-2 py-0.5 bg-[var(--color-fg)]/[0.05] rounded">
                           {r}
                         </span>
                       ))}
                       {tag.declining_top.map((d, i) => (
-                        <span key={i} className="text-[11px] px-1.5 py-0.5 text-[var(--color-muted)] opacity-50 line-through">
+                        <span key={i} className="text-[12px] px-2 py-0.5 text-[var(--color-muted)] opacity-50 line-through">
                           {d}
                         </span>
                       ))}
@@ -177,21 +177,21 @@ export function TrendContext({ content, locked }: TrendContextProps) {
           {/* 존별 메이크업 트렌드 요약 */}
           {makeupTrends.length > 0 && (
             <div>
-              <p className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)] mb-3">
+              <p className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)] mb-4">
                 MAKEUP TRENDS
               </p>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {makeupTrends.map((mt) => (
-                  <div key={mt.zone} className="pb-3 border-b border-[var(--color-border)] last:border-0">
-                    <span className="text-[12px] font-semibold">{mt.zone_kr}</span>
-                    <div className="flex flex-wrap gap-1 mt-1.5">
+                  <div key={mt.zone} className="pb-4 border-b border-[var(--color-border)] last:border-0 last:pb-0">
+                    <span className="text-[13px] font-semibold">{mt.zone_kr}</span>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
                       {mt.rising.map((r, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 border border-[var(--color-border)] rounded-full">
+                        <span key={i} className="text-[12px] px-2 py-0.5 border border-[var(--color-border)] rounded-full">
                           {r}
                         </span>
                       ))}
                       {mt.declining.map((d, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.5 text-[var(--color-muted)] opacity-40 line-through">
+                        <span key={i} className="text-[12px] px-2 py-0.5 text-[var(--color-muted)] opacity-40 line-through">
                           {d}
                         </span>
                       ))}

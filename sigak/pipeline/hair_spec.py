@@ -20,6 +20,31 @@ from pipeline.hair_rules import (
     match_image_preference,
 )
 
+# 트렌드 태그 — trend_data.py 기반
+try:
+    from pipeline.trend_data import HAIR_FRONT_TRENDS, HAIR_BACK_TRENDS
+except ImportError:
+    HAIR_FRONT_TRENDS, HAIR_BACK_TRENDS = {}, {}
+
+
+def _get_trend_tag(front_id: str, back_id: str) -> str | None:
+    """앞머리+뒷머리 평균 trend score → 태그 문자열."""
+    scores = []
+    if front_id in HAIR_FRONT_TRENDS:
+        scores.append(HAIR_FRONT_TRENDS[front_id]["score"])
+    if back_id in HAIR_BACK_TRENDS:
+        scores.append(HAIR_BACK_TRENDS[back_id]["score"])
+    if not scores:
+        return None
+    avg = sum(scores) / len(scores)
+    if avg >= 0.7:
+        return "🔥 트렌드"
+    elif avg >= 0.3:
+        return "▲ 상승"
+    elif avg <= -0.5:
+        return "↘ 하락"
+    return None
+
 
 # ============================================================
 # 0. Face Features Bridge
@@ -331,6 +356,9 @@ def generate_combos(front_scores: list, back_scores: list,
                     salon_parts.append(gc["salon_instruction"])
             salon_text = ". ".join(salon_parts) + "." if salon_parts else ""
 
+            # 트렌드 태그 (trend_data.py 기반)
+            trend_tag = _get_trend_tag(fs["style_id"], bs["style_id"])
+
             combos.append({
                 "front_id": fs["style_id"],
                 "front_name": fs["name_kr"],
@@ -343,6 +371,7 @@ def generate_combos(front_scores: list, back_scores: list,
                 "combined_score": round(combined, 3),
                 "why": why_text,
                 "salon_instruction": salon_text,
+                "trend": trend_tag,
             })
 
     combos.sort(key=lambda x: x["combined_score"], reverse=True)

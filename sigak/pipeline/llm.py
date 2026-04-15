@@ -209,6 +209,19 @@ REPORT_SYSTEM_V2 = """역할: 당신은 스타일링 해설가입니다.
 }"""
 
 
+def _get_trend_framing() -> str:
+    """트렌드 프레이밍 한 문단. trend_data.py 없으면 빈 문자열."""
+    try:
+        from pipeline.trend_data import TREND_SEASON, TREND_DIRECTION
+        return (
+            f"현재 시즌: {TREND_SEASON}. "
+            f"{TREND_DIRECTION.get('summary_kr', '')} "
+            "트렌드는 참고 맥락이지 절대 기준이 아닙니다. 얼굴 구조 적합성이 항상 우선합니다."
+        )
+    except ImportError:
+        return "트렌드 데이터 없음"
+
+
 def generate_report(action_spec, user_context: dict) -> str:
     """
     Action Spec 기반 리포트 생성 (v2).
@@ -265,6 +278,9 @@ def generate_report(action_spec, user_context: dict) -> str:
 
 [기대 효과]
 {chr(10).join('- ' + e for e in prompt_payload['expected_effects'])}
+
+[시즌 트렌드 참고]
+{_get_trend_framing()}
 
 JSON으로만 응답해주세요."""
 

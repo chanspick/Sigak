@@ -862,6 +862,19 @@ def _build_face_interpretation_data(
     }
 
 
+def _get_trend_point() -> dict | None:
+    """트렌드 방향 좌표를 산점도용 {x, y, size}로 변환."""
+    try:
+        from pipeline.trend_data import TREND_DIRECTION
+        return {
+            "x": TREND_DIRECTION.get("shape", 0),
+            "y": TREND_DIRECTION.get("age", 0),
+            "size": TREND_DIRECTION.get("volume", 0),
+        }
+    except ImportError:
+        return None
+
+
 def _build_gap_analysis(
     current_coords: dict,
     aspiration_coords: dict,
@@ -999,10 +1012,8 @@ def _build_gap_analysis(
                 },
                 "description": "가로축은 골격의 형태, 세로축은 분위기의 방향이에요. 점이 클수록 이목구비 선명도가 높아요.",
             },
-            # z축 필드 예약 (다음 스프린트)
-            "trend_coordinates": None,
-            "gap_to_trend": None,
-            "blend_weights": None,
+            # 트렌드 방향 좌표 (산점도 3번째 점)
+            "trend": _get_trend_point(),
         },
     }
 
@@ -1334,35 +1345,113 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
     }
 
 
-def _build_trend_context(report_content: dict, user_name: str = "", action_spec=None) -> dict:
-    """trend_context 섹션 -- full 잠금. LLM 출력 무시, 항상 deterministic."""
-    top_zones = []
-    if action_spec and hasattr(action_spec, 'recommended_actions'):
-        top_zones = [ZONE_NAME_KR.get(a.zone, a.zone) for a in action_spec.recommended_actions[:2]]
-    # fallback: action_spec 없으면 report_content에서 추출
-    if not top_zones:
-        action_items = _safe_get(report_content, "action_items", [])
-        if isinstance(action_items, list):
-            top_zones = [ZONE_NAME_KR.get(item.get("category", ""), item.get("category", "")) for item in action_items[:2]]
-    zone_str = ", ".join(top_zones) if top_zones else "주요 포인트"
+def _build_trend_context(
+    report_content: dict,
+    user_name: str = "",
+    aspiration_coords: dict | None = None,
+    action_spec=None,
+) -> dict:
+    """trend_context 섹션 -- full 잠금. trend_data.py 기반 deterministic."""
+    from pipeline.trend_data import (
+        TREND_SEASON, TREND_DIRECTION, TREND_MOODS,
+        MAKEUP_TRENDS, COLOR_PARADIGM,
+    )
+    import math
+
     name = user_name or "고객"
-    trends = [{
-        "title": "적용 가이드",
-        "description": (
-            f"{name}님의 리포트에서 가장 변화가 큰 포인트는 "
-            f"{zone_str} 부분이에요. "
-            f"하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. "
-            f"처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요."
-        ),
-    }]
+    aspiration = aspiration_coords or {}
+
+    # 1) 유저 추구미 ↔ 트렌드 방향 거리 → 정합도
+    trend_vec = TREND_DIRECTION
+    dist = math.sqrt(sum(
+        (aspiration.get(ax, 0) - trend_vec.get(ax, 0)) ** 2
+        for ax in ["shape", "volume", "age"]
+    )) if aspiration else 999
+
+    if dist < 0.3:
+        alignment = "aligned"
+        alignment_kr = "트렌드와 잘 맞아요"
+        alignment_desc = f"{name}님의 추구미는 이번 시즌 트렌드와 방향이 비슷해요. 자연스럽게 트렌드를 타면서 나다운 스타일을 만들 수 있어요."
+    elif dist < 0.7:
+        alignment = "neutral"
+        alignment_kr = "트렌드와 일부 겹쳐요"
+        alignment_desc = f"{name}님의 추구미는 트렌드와 일부 방향이 같아요. 맞는 부분은 살리고, 다른 부분은 그대로 유지하는 게 자연스러워요."
+    else:
+        alignment = "divergent"
+        alignment_kr = "트렌드와 다른 방향이에요"
+        alignment_desc = f"{name}님의 추구미는 이번 시즌 주류 트렌드와 다른 방향이에요. 그게 오히려 개성이고, 얼굴형에 맞는 게 트렌드보다 항상 우선이에요."
+
+    # 2) 가장 가까운 TREND_MOOD 매칭 (유클리드)
+    best_mood_id, best_mood = "", {}
+    best_dist = 999
+    for mood_id, mood in TREND_MOODS.items():
+        mc = mood.get("coordinates", {})
+        d = math.sqrt(sum(
+            (aspiration.get(ax, 0) - mc.get(ax, 0)) ** 2
+            for ax in ["shape", "volume", "age"]
+        )) if aspiration else 999
+        if d < best_dist:
+            best_dist = d
+            best_mood_id = mood_id
+            best_mood = mood
+
+    # 3) action_spec 추천 vs 트렌드 사후 태깅
+    action_tags = []
+    if action_spec and hasattr(action_spec, "recommended_actions"):
+        for action in action_spec.recommended_actions[:4]:
+            zone = action.zone
+            zone_kr = ZONE_NAME_KR.get(zone, zone)
+            makeup_zone = MAKEUP_TRENDS.get(zone, {})
+            rising = makeup_zone.get("rising", [])
+            declining = makeup_zone.get("declining", [])
+            # 존에 트렌드 데이터가 있으면 태깅
+            if rising or declining:
+                action_tags.append({
+                    "zone": zone,
+                    "zone_kr": zone_kr,
+                    "rising_top": rising[:2] if rising else [],
+                    "declining_top": declining[:1] if declining else [],
+                })
+
+    # 4) 메이크업 트렌드 존별 요약
+    makeup_summary = []
+    for zone_key in ["eyebrow", "eye", "lip", "base"]:
+        zone_data = MAKEUP_TRENDS.get(zone_key, {})
+        if zone_data.get("summary"):
+            zone_names = {"eyebrow": "눈썹", "eye": "아이", "lip": "립", "base": "베이스"}
+            makeup_summary.append({
+                "zone": zone_key,
+                "zone_kr": zone_names.get(zone_key, zone_key),
+                "rising": zone_data.get("rising", [])[:2],
+                "declining": zone_data.get("declining", [])[:1],
+                "summary": zone_data["summary"],
+            })
 
     return {
         "id": "trend_context",
         "locked": True,
         "unlock_level": "full",
-        "teaser": None,
+        "teaser": {"headline": f"2026 S/S · {alignment_kr}"},
         "content": {
-            "trends": trends,
+            "season": TREND_SEASON,
+            "season_summary": trend_vec.get("summary_kr", ""),
+            "trend_direction": {
+                "shape": trend_vec.get("shape", 0),
+                "volume": trend_vec.get("volume", 0),
+                "age": trend_vec.get("age", 0),
+            },
+            "alignment": alignment,
+            "alignment_kr": alignment_kr,
+            "alignment_description": alignment_desc,
+            "matched_mood": {
+                "id": best_mood_id,
+                "label_kr": best_mood.get("label_kr", ""),
+                "description": best_mood.get("description", ""),
+                "keywords": best_mood.get("keywords", []),
+                "trend_score": best_mood.get("trend_score", 0),
+            } if best_mood else None,
+            "action_trend_tags": action_tags,
+            "makeup_trends": makeup_summary,
         },
     }
 
@@ -1441,7 +1530,7 @@ def format_report_for_frontend(
         _build_hair_recommendation(gap, report_content, gender=gender),
         _build_action_plan(gap, face_features, report_content, gender=gender),
         _build_type_reference(similar_types, report_content, gap=gap),
-        _build_trend_context(report_content, user_name=user_name),
+        _build_trend_context(report_content, user_name=user_name, aspiration_coords=aspiration_coords),
     ]
 
     result = {

@@ -324,6 +324,7 @@ export const MOCK_REPORT: ReportData = {
         aesthetic_map: {
           current: { x: -0.07, y: 0.15, size: 0.27 },
           aspiration: { x: 0.6, y: 0.3, size: 0.4 },
+          trend: { x: 0.09, y: -0.13, size: 0.07 },
           x_axis: {
             name_kr: "골격",
             low: "부드러운",
@@ -550,13 +551,60 @@ export const MOCK_REPORT: ReportData = {
       id: "trend_context",
       locked: false,
       unlock_level: "full",
-      teaser: null,
+      teaser: { headline: "2026 S/S · 트렌드와 잘 맞아요" },
       content: {
-        trends: [
+        season: "2026_SS",
+        season_summary:
+          "2026 S/S는 '도도한 동안'과 '이지 시크'가 투톱. 피부는 맑고 얇게, 눈매는 짧지만 선명하게, 베이스는 속광 중심. 과한 커버·매트·컨투어는 확실히 빠지고, 건강한 혈색·자연스러운 텍스처가 새 기준.",
+        trend_direction: { shape: 0.09, volume: 0.07, age: -0.13 },
+        alignment: "aligned",
+        alignment_kr: "트렌드와 잘 맞아요",
+        alignment_description:
+          "회원님의 추구미는 이번 시즌 트렌드와 방향이 비슷해요. 자연스럽게 트렌드를 타면서 나다운 스타일을 만들 수 있어요.",
+        matched_mood: {
+          id: "dodo_dongan",
+          label_kr: "도도한 동안",
+          description:
+            "밝고 깨끗한 피부 + 짧고 또렷한 눈매 + 맑은 로즈/핑크 립. 어려 보이면서 선명한 인상.",
+          keywords: ["동안", "선명", "맑은 컬러", "짧은 라인", "글로시 립"],
+          trend_score: 0.9,
+        },
+        action_trend_tags: [
           {
-            title: "적용 가이드",
-            description:
-              "리포트에서 가장 변화가 큰 포인트는 턱선, 콧대 부분이에요. 하나씩 순서대로 적용해보면서 자신에게 맞는 강도를 찾아보세요. 처음엔 가볍게 시작하고, 익숙해지면 점차 강도를 올리는 게 자연스러워요.",
+            zone: "eyebrow",
+            zone_kr: "눈썹",
+            rising_top: [
+              "자연눈썹/결살/플러피",
+              "소프트 일자",
+            ],
+            declining_top: ["진한 블록 일자"],
+          },
+          {
+            zone: "eye",
+            zone_kr: "아이",
+            rising_top: [
+              "무라인/섀도 음영만",
+              "노/라이트 마스카라",
+            ],
+            declining_top: ["두꺼운 젤 라이너"],
+          },
+        ],
+        makeup_trends: [
+          {
+            zone: "eyebrow",
+            zone_kr: "눈썹",
+            rising: ["자연눈썹/결살/플러피", "소프트 일자"],
+            declining: ["진한 블록 일자"],
+            summary:
+              "2026 눈썹은 연한 톤 + 자연 결 + 소프트 곡선이 공통분모.",
+          },
+          {
+            zone: "lip",
+            zone_kr: "립",
+            rising: ["틴티드 립밤/시럽", "블러 그라데이션"],
+            declining: ["퍽퍽한 풀매트"],
+            summary:
+              "얇은 베이스 위에 더한 투명한 글로시 광. 쫀쫀한 광이 핵심.",
           },
         ],
       },

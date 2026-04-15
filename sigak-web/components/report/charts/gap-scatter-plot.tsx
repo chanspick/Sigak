@@ -4,6 +4,7 @@
 interface AestheticMap {
   current: { x: number; y: number; size: number };
   aspiration: { x: number; y: number; size: number };
+  trend?: { x: number; y: number; size: number } | null;
   x_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
   y_axis: { name_kr: string; low: string; high: string; low_en: string; high_en: string };
   size_axis: { name_kr: string; low: string; high: string };
@@ -41,7 +42,7 @@ export function GapScatterPlot({
   aestheticMap,
   gapMagnitude,
 }: GapScatterPlotProps) {
-  const { current, aspiration, x_axis, y_axis, size_axis, quadrants } = aestheticMap;
+  const { current, aspiration, trend, x_axis, y_axis, size_axis, quadrants } = aestheticMap;
 
   const W = 340;
   const H = 370;
@@ -177,6 +178,24 @@ export function GapScatterPlot({
         {/* ─── 추구 위치 — 채운 원 + 글로우 ─── */}
         <circle cx={ax} cy={ay} r={aspirationRadius} fill="var(--color-fg)" filter="url(#aspiration-glow)" />
         <circle cx={ax} cy={ay} r={aspirationRadius} fill="var(--color-fg)" />
+
+        {/* ─── 트렌드 방향 — 삼각형 (옵션) ─── */}
+        {trend && (() => {
+          const tx = toSvg(trend.x, W, padL, padR);
+          const ty = toSvg(trend.y, H, padT, padB, true);
+          const s = 6;
+          const points = `${tx},${ty - s} ${tx - s * 0.87},${ty + s * 0.5} ${tx + s * 0.87},${ty + s * 0.5}`;
+          return (
+            <polygon
+              points={points}
+              fill="none"
+              stroke="var(--color-fg)"
+              strokeWidth="1.2"
+              opacity="0.4"
+              strokeDasharray="2,1.5"
+            />
+          );
+        })()}
       </svg>
 
       {/* 범례 */}
@@ -189,6 +208,12 @@ export function GapScatterPlot({
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-[var(--color-fg)]" />
           <span className="font-medium">추구</span>
         </div>
+        {trend && (
+          <div className="flex items-center gap-1.5 text-[var(--color-muted)]">
+            <span className="text-[9px]">&#9651;</span>
+            <span>트렌드</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5 text-[var(--color-muted)]">
           <span className="text-[9px]">&#9679;</span>
           <span>점 크기 = {size_axis.name_kr}</span>

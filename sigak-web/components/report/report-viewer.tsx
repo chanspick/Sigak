@@ -55,13 +55,25 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
 
   const router = useRouter();
 
-  // 업그레이드 결제 — 주문 생성 + 웹훅 + 결제 페이지 이동
+  // 토스 위젯용 주문 ID 상태
+  const [tossOrderId, setTossOrderId] = useState<string | null>(null);
+
+  // 업그레이드 결제 — 주문 생성 + 결제 플로우 분기
   const handlePaymentComplete = useCallback(async (level: UnlockLevel) => {
     if (level === "full") {
       try {
         const res = await requestUpgrade(report.id);
         if (res.payment_info) {
           const p = res.payment_info;
+          const paywall = report.paywall?.full;
+
+          // 토스 위젯 결제 모드: 주문 ID만 저장 → PaywallGate가 위젯 표시
+          if (paywall?.method === "auto" && res.order_id) {
+            setTossOrderId(res.order_id);
+            return;
+          }
+
+          // 수동 결제 모드: 결제 안내 페이지로 이동
           const params = new URLSearchParams({
             order_id: res.order_id || "",
             amount: String(p.amount),
@@ -91,7 +103,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
       access_level: level === "standard" ? "standard_pending" : "full_pending",
       pending_level: level,
     }));
-  }, [report.id, router]);
+  }, [report.id, report.paywall, router]);
 
   // access_level 변경 감지 → 스크롤 위치 유지
   useEffect(() => {
@@ -156,6 +168,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
               paywall={report.paywall[lastSectionMap[section.id]]!}
               paymentAccount={report.payment_account}
               pendingAt={pendingAt}
+              orderId={tossOrderId || undefined}
               onPaymentComplete={() =>
                 handlePaymentComplete(lastSectionMap[section.id])
               }

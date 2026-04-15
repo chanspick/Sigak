@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { createBooking, getKakaoLoginUrl, ApiError } from "@/lib/api/client";
 import type { Tier } from "@/lib/types/tier";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 type Gender = "female" | "male";
 
 export function StartOverlay() {
@@ -25,6 +27,11 @@ export function StartOverlay() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
   const [kakaoLoading, setKakaoLoading] = useState(false);
+
+  // 이메일 로그인 상태 (심사용)
+  const [testEmail, setTestEmail] = useState("");
+  const [testPassword, setTestPassword] = useState("");
+  const [emailLoading, setEmailLoading] = useState(false);
 
   // localStorage에서 로그인 상태 확인
   useEffect(() => {
@@ -56,6 +63,39 @@ export function StartOverlay() {
       }
     }
   }, []);
+
+  // 이메일 로그인 핸들러 (심사용)
+  const handleEmailLogin = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmail || !testPassword) return;
+    setEmailLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch(`${API_URL}/api/v1/auth/email-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.detail || "로그인 실패");
+      }
+      const result = await resp.json();
+      localStorage.setItem("sigak_user_id", result.user_id);
+      localStorage.setItem("sigak_user_name", result.name);
+      if (result.email) localStorage.setItem("sigak_user_email", result.email);
+      localStorage.setItem("sigak_kakao_id", result.kakao_id);
+      if (result.reports && result.reports.length > 0) {
+        const latest = result.reports[result.reports.length - 1];
+        router.replace(`/report/${latest.id}`);
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "로그인 실패");
+      setEmailLoading(false);
+    }
+  }, [testEmail, testPassword, router]);
 
   // 전화번호 자동 포맷: 숫자만 추출 → 010-0000-0000
   const formatPhone = (raw: string) => {
@@ -151,6 +191,31 @@ export function StartOverlay() {
             )}
             {kakaoLoading ? "연결 중..." : "카카오로 시작하기"}
           </button>
+
+          {/* 심사용 이메일 로그인 — 배경과 동일한 색으로 거의 보이지 않게 */}
+          <form onSubmit={handleEmailLogin} className="mt-16 flex flex-col gap-2">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="email"
+              className="w-full px-3 py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] placeholder:text-[var(--color-bg)] focus:border-black/10 focus:text-[var(--color-fg)] focus:placeholder:text-[var(--color-muted)] outline-none transition-all"
+            />
+            <input
+              type="password"
+              value={testPassword}
+              onChange={(e) => setTestPassword(e.target.value)}
+              placeholder="password"
+              className="w-full px-3 py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] placeholder:text-[var(--color-bg)] focus:border-black/10 focus:text-[var(--color-fg)] focus:placeholder:text-[var(--color-muted)] outline-none transition-all"
+            />
+            <button
+              type="submit"
+              disabled={emailLoading || !testEmail || !testPassword}
+              className="w-full py-2 text-[11px] bg-transparent border border-transparent text-[var(--color-bg)] hover:text-[var(--color-muted)] transition-all disabled:opacity-0"
+            >
+              {emailLoading ? "..." : "sign in"}
+            </button>
+          </form>
         </div>
       </div>
     );

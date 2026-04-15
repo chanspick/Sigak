@@ -12,6 +12,7 @@ import type { ReportData, ReportSection } from "@/lib/types/report";
 import { requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "@/components/report/section-renderer";
 import { ShareButtons } from "@/components/report/share-buttons";
+import { TossPaymentFlow } from "@/components/report/toss-payment-flow";
 
 interface OverviewContentProps {
   report: ReportData;
@@ -42,6 +43,7 @@ function getTeaserText(section: ReportSection): string | null {
 export function OverviewContent({ report, reportId }: OverviewContentProps) {
   const router = useRouter();
   const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [tossOrderId, setTossOrderId] = useState<string | null>(null);
 
   // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
   useEffect(() => {
@@ -53,13 +55,23 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
     }
   }, [report.user_id, report.user_name]);
 
-  // 풀 업그레이드 — 주문 생성 + 웹훅 + 결제 페이지 이동
+  // 풀 업그레이드 — 주문 생성 + 결제 플로우 분기
   const handleUpgrade = useCallback(async () => {
     setUpgradeLoading(true);
     try {
       const res = await requestUpgrade(reportId);
       if (res.payment_info) {
         const p = res.payment_info;
+        const paywall = report.paywall?.full;
+
+        // 토스 위젯 결제: 주문 ID 저장 → 위젯 표시
+        if (paywall?.method === "auto" && res.order_id) {
+          setTossOrderId(res.order_id);
+          setUpgradeLoading(false);
+          return;
+        }
+
+        // 수동 결제: 결제 안내 페이지 이동
         const params = new URLSearchParams({
           order_id: res.order_id || "",
           amount: String(p.amount),
@@ -80,7 +92,7 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
       alert("주문 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
       setUpgradeLoading(false);
     }
-  }, [reportId, router]);
+  }, [reportId, report.paywall, router]);
 
   // 이미 풀 결제 완료된 경우
   const isFullPaid = ["full_pending", "full"].includes(report.access_level);
@@ -173,6 +185,18 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
             >
               풀 리포트 보기
             </button>
+          </div>
+        ) : tossOrderId ? (
+          /* 토스 위젯 결제 모드 — 주문 생성 완료 후 위젯 표시 */
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-2xl font-serif font-bold text-center leading-snug">
+              결제 수단을 선택해주세요
+            </p>
+            <TossPaymentFlow
+              orderId={tossOrderId}
+              orderName="시각 풀 리포트"
+              amount={report.paywall?.full?.price || 0}
+            />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4">

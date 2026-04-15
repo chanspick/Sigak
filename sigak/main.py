@@ -6,6 +6,7 @@ Flow:
   /confirm → 관리자 결제확인 → AI 파이프라인 실행 → 리포트 생성
   /report  → 리포트 조회 (status 기반)
 """
+import base64
 import json
 import os
 import uuid
@@ -300,6 +301,7 @@ ORDERS = {}  # order_id → order dict
 ZAPIER_WEBHOOK_NEW_ORDER = os.getenv("ZAPIER_WEBHOOK_NEW_ORDER", "")
 ZAPIER_WEBHOOK_REPORT_READY = os.getenv("ZAPIER_WEBHOOK_REPORT_READY", "")
 ADMIN_KEY = os.getenv("ADMIN_KEY", "sigak-admin-2026")
+TOSS_SECRET_KEY = os.getenv("TOSS_SECRET_KEY", "test_gsk_AQ92ymxN34LGgD1yDA5j3ajRKXvd")
 
 # 가격표 (세일가)
 PRICE_MAP = {
@@ -571,6 +573,82 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
             "kakao_deeplink": PAYMENT_INFO["kakao_deeplink"].format(amount=amount),
         },
     }
+
+
+# ─────────────────────────────────────────────
+#  토스페이먼츠 결제 승인
+# ─────────────────────────────────────────────
+
+class TossConfirmRequest(BaseModel):
+    payment_key: str  # paymentKey from Toss
+    order_id: str     # orderId
+    amount: int       # amount in KRW
+
+
+@app.post("/api/v1/payments/confirm")
+async def toss_confirm(data: TossConfirmRequest):
+    """토스페이먼츠 결제 승인 — 위젯 결제 완료 후 서버사이드 확인."""
+    if not TOSS_SECRET_KEY:
+        raise HTTPException(500, "토스페이먼츠 시크릿 키가 설정되지 않았습니다")
+
+    # 1. 주문 조회 및 금액 검증
+    order = None
+    if _use_db():
+        db = get_db()
+        try:
+            db_order = db.query(DBOrder).filter(DBOrder.id == data.order_id).first()
+            if db_order:
+                order = {
+                    "order_id": db_order.id,
+                    "user_id": db_order.user_id,
+                    "tier": db_order.tier,
+                    "amount": db_order.amount,
+                    "status": db_order.status,
+                }
+        except Exception as e:
+            print(f"[TOSS] DB read error: {e}")
+        finally:
+            db.close()
+
+    if not order:
+        order = ORDERS.get(data.order_id)
+    if not order:
+        raise HTTPException(404, "주문을 찾을 수 없습니다")
+
+    # 금액 위변조 검증
+    if order["amount"] != data.amount:
+        raise HTTPException(400, f"결제 금액 불일치: 요청={data.amount}, 주문={order['amount']}")
+
+    if order["status"] == "completed":
+        return {"status": "already_completed", "order_id": data.order_id}
+
+    # 2. 토스페이먼츠 승인 API 호출
+    auth_header = base64.b64encode(f"{TOSS_SECRET_KEY}:".encode()).decode()
+
+    async with httpx.AsyncClient() as client:
+        toss_resp = await client.post(
+            "https://api.tosspayments.com/v1/payments/confirm",
+            json={
+                "paymentKey": data.payment_key,
+                "orderId": data.order_id,
+                "amount": data.amount,
+            },
+            headers={
+                "Authorization": f"Basic {auth_header}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if toss_resp.status_code != 200:
+        error_data = toss_resp.json() if toss_resp.headers.get("content-type", "").startswith("application/json") else {}
+        error_msg = error_data.get("message", "토스페이먼츠 승인 실패")
+        print(f"[TOSS] confirm failed: {toss_resp.status_code} {toss_resp.text}")
+        raise HTTPException(400, error_msg)
+
+    # 3. 승인 성공 → 기존 confirm_order 로직 재사용
+    # admin confirm과 동일하게 처리 (AI 파이프라인 실행)
+    confirm_data = ConfirmRequest(admin_key=ADMIN_KEY)
+    return await confirm_order(data.order_id, confirm_data)
 
 
 # ─────────────────────────────────────────────
@@ -1608,6 +1686,81 @@ async def serve_upload(user_id: str, filename: str):
         raise HTTPException(404, "File not found")
     media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
     return FileResponse(str(file_path), media_type=media_types.get(file_path.suffix.lower(), "application/octet-stream"))
+
+
+# ─────────────────────────────────────────────
+#  심사용 테스트 로그인
+# ─────────────────────────────────────────────
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# 심사용 테스트 계정 (토스페이먼츠 심사 전용)
+TEST_ACCOUNTS = {
+    "test@naver.com": "test1234",
+}
+
+
+@app.post("/api/v1/auth/email-login")
+async def email_login(data: EmailLoginRequest):
+    """이메일/비밀번호 로그인 (토스페이먼츠 심사용)."""
+    expected_pw = TEST_ACCOUNTS.get(data.email)
+    if not expected_pw or data.password != expected_pw:
+        raise HTTPException(401, "이메일 또는 비밀번호가 올바르지 않습니다")
+
+    test_user_id = f"test_{data.email.split('@')[0]}"
+    test_user = {
+        "user_id": test_user_id,
+        "kakao_id": f"test_{data.email.split('@')[0]}",
+        "name": "심사담당자",
+        "nickname": "심사담당자",
+        "email": data.email,
+        "profile_image": "",
+        "reports": [],
+    }
+
+    # DB or in-memory에 테스트 유저 생성/업데이트
+    if _use_db():
+        db = get_db()
+        try:
+            existing = db.query(DBUser).filter(DBUser.id == test_user_id).first()
+            if not existing:
+                new_user = DBUser(
+                    id=test_user_id,
+                    kakao_id=f"test_{data.email.split('@')[0]}",
+                    name="심사담당자",
+                    email=data.email,
+                    gender="female",
+                    tier="standard",
+                    status="authenticated",
+                )
+                db.add(new_user)
+                db.commit()
+            # 기존 리포트 조회
+            reports = db.query(DBReport).filter(DBReport.user_id == test_user_id).all()
+            test_user["reports"] = [
+                {"id": r.id, "access_level": r.access_level, "created_at": r.created_at.isoformat() + "Z" if r.created_at else ""}
+                for r in reports
+            ]
+        except Exception as e:
+            db.rollback()
+            print(f"[EMAIL-LOGIN] DB error: {e}")
+        finally:
+            db.close()
+    else:
+        if test_user_id not in USERS:
+            USERS[test_user_id] = {
+                "id": test_user_id,
+                "name": "심사담당자",
+                "phone": "010-0000-0000",
+                "gender": "female",
+                "tier": "standard",
+                "status": "authenticated",
+            }
+
+    return test_user
 
 
 # ─────────────────────────────────────────────

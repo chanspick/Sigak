@@ -306,6 +306,24 @@ export async function castingOptOut(userId: string): Promise<{ status: string }>
   return handleResponse(response);
 }
 
+/** 토스페이먼츠 결제 승인 요청 */
+export async function confirmTossPayment(params: {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+}): Promise<{ status: string; order_id: string; report_id?: string; report_url?: string }> {
+  const response = await fetch(`${API_URL}/api/v1/payments/confirm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
+    body: JSON.stringify({
+      payment_key: params.paymentKey,
+      order_id: params.orderId,
+      amount: params.amount,
+    }),
+  });
+  return handleResponse(response);
+}
+
 /**
  * 리포트 조회 (서버 사이드용)
  * 서버 컴포넌트에서는 브라우저 API를 사용하지 않으므로 fetch 직접 사용

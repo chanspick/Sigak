@@ -67,14 +67,19 @@ function PaymentContent() {
               토스로 송금하기
             </a>
           )}
-          {kakaoLink && (
-            <a
-              href={kakaoLink}
-              className="flex items-center justify-center w-full py-3 text-sm font-semibold bg-[#FEE500] text-[#191919] hover:brightness-95 transition-all"
-            >
-              카카오페이로 송금하기
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(account.replace(/-/g, ""));
+              window.location.href = "kakaobank://";
+              setTimeout(() => {
+                alert("카카오뱅크 앱에서 붙여넣기로 계좌번호를 입력해주세요");
+              }, 1500);
+            }}
+            className="flex items-center justify-center w-full py-3 text-sm font-semibold bg-[#FEE500] text-[#191919] hover:brightness-95 transition-all"
+          >
+            카카오뱅크로 송금하기
+          </button>
         </div>
 
         {/* 안내 */}

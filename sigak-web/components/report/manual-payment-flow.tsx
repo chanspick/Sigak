@@ -65,13 +65,20 @@ export function ManualPaymentFlow({
         </div>
       </div>
 
-      {/* 카카오톡 송금 딥링크 버튼 */}
-      <a
-        href={paymentAccount.kakao_link}
+      {/* 카카오뱅크 앱 열기 + 계좌 복사 */}
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(paymentAccount.number.replace(/-/g, ""));
+          window.location.href = "kakaobank://";
+          setTimeout(() => {
+            alert("카카오뱅크 앱에서 붙여넣기로 계좌번호를 입력해주세요");
+          }, 1500);
+        }}
         className="flex items-center justify-center w-full py-3 mb-3 text-sm font-semibold rounded-lg bg-[#FEE500] text-[#191919] hover:brightness-95 transition-all"
       >
-        카카오톡으로 송금하기
-      </a>
+        카카오뱅크로 송금하기
+      </button>
 
       {/* 송금 완료 버튼 */}
       <Button

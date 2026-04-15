@@ -1409,11 +1409,16 @@ def _build_trend_context(
                 action_tags.append({
                     "zone": zone,
                     "zone_kr": zone_kr,
-                    "rising_top": rising[:2] if rising else [],
-                    "declining_top": declining[:1] if declining else [],
+                    "rising_top": [r.split(" (")[0].split("（")[0].strip() for r in rising[:2]] if rising else [],
+                    "declining_top": [d.split(" (")[0].split("（")[0].strip() for d in declining[:1]] if declining else [],
                 })
 
     # 4) 메이크업 트렌드 존별 요약
+    def _short_label(s: str) -> str:
+        """괄호 설명 제거: '자연눈썹/결살/플러피 (설명...)' → '자연눈썹/결살/플러피'"""
+        import re
+        return re.sub(r"\s*[\(（].*?[\)）]", "", s).strip()
+
     makeup_summary = []
     for zone_key in ["eyebrow", "eye", "lip", "base"]:
         zone_data = MAKEUP_TRENDS.get(zone_key, {})
@@ -1422,8 +1427,8 @@ def _build_trend_context(
             makeup_summary.append({
                 "zone": zone_key,
                 "zone_kr": zone_names.get(zone_key, zone_key),
-                "rising": zone_data.get("rising", [])[:2],
-                "declining": zone_data.get("declining", [])[:1],
+                "rising": [_short_label(r) for r in zone_data.get("rising", [])[:2]],
+                "declining": [_short_label(d) for d in zone_data.get("declining", [])[:1]],
                 "summary": zone_data["summary"],
             })
 

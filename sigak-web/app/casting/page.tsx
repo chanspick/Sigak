@@ -50,30 +50,6 @@ function Reveal({
   );
 }
 
-/* ── 프로세스 스텝 데이터 ── */
-const STEPS = [
-  {
-    num: "01",
-    title: "셀카 업로드",
-    desc: "정면 사진 한 장과 5분 설문. 추구하는 이미지와 매력 포인트를 알려주세요.",
-  },
-  {
-    num: "02",
-    title: "AI 매력 분석",
-    desc: "얼굴 구조, 피부톤, 이미지 유형을 다차원 좌표로 매핑합니다. 당신만의 매력이 데이터가 됩니다.",
-  },
-  {
-    num: "03",
-    title: "캐스팅 풀 등록",
-    desc: "풀 리포트를 받은 후, 캐스팅 풀 참여를 선택할 수 있어요. 개인정보는 수락 전까지 보호됩니다.",
-  },
-  {
-    num: "04",
-    title: "제안이 도착",
-    desc: "에이전시와 브랜드가 좌표 기반으로 탐색 후, 출연료를 포함한 구체적 제안을 보냅니다.",
-  },
-] as const;
-
 /* ── 종이 텍스처 SVG (data URI) ── */
 const PAPER_TEXTURE = `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`;
 
@@ -238,65 +214,13 @@ export default function CastingLandingPage() {
       {/* 구분선 */}
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 
-      {/* ── 01. PROCESS ── */}
-      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
-        <Reveal>
-          <Row
-            c1={
-              <>
-                <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                  01
-                </h2>
-                <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
-                  PROCESS
-                </span>
-              </>
-            }
-            c2={
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
-                셀카에서
-                <br />
-                캐스팅 제안까지.
-              </p>
-            }
-            c3={
-              <div>
-                {STEPS.map((step, i) => (
-                  <div
-                    key={step.num}
-                    className={`flex gap-5 py-4 ${i < STEPS.length - 1 ? "border-b border-black/[0.06]" : ""}`}
-                  >
-                    <span className="font-[family-name:var(--font-serif)] text-[18px] font-light opacity-25 shrink-0 w-7">
-                      {step.num}
-                    </span>
-                    <div>
-                      <p className="text-[15px] font-bold mb-1">
-                        {step.title}
-                      </p>
-                      <p className="text-[14px] opacity-50 leading-[1.7]">
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            }
-          />
-        </Reveal>
-      </section>
-
-      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
-
-      {/* ── 02. INVITATION — 초대장 오브제 ── */}
+      {/* ── INVITATION — 초대장 오브제 ── */}
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
         <Reveal>
           {/* 섹션 헤더 — 1:1:2 그리드 */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 md:gap-6 items-start mb-10 md:mb-12">
             <div>
-              <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                02
-              </h2>
-              <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
+              <span className="block text-[11px] font-semibold tracking-[1.5px] opacity-35">
                 INVITATION
               </span>
             </div>
@@ -429,59 +353,14 @@ export default function CastingLandingPage() {
 
       <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
 
-      {/* ── 03. WHY ── */}
+      {/* ── PRICING ── */}
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
         <Reveal>
           <Row
             c1={
-              <>
-                <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                  03
-                </h2>
-                <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
-                  WHY
-                </span>
-              </>
-            }
-            c2={
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
-                캐스팅의 시작은
-                <br />
-                매력 분석입니다.
-              </p>
-            }
-            c3={
-              <div>
-                <p className="text-[15px] leading-[1.7] opacity-70">
-                  에이전시가 당신을 찾으려면, 먼저 당신의 매력이 데이터로
-                  존재해야 합니다. AI가 얼굴 구조, 피부톤, 이미지 유형을
-                  분석하고 — 그 결과가 캐스팅 풀의 기반이 됩니다.
-                </p>
-                <p className="mt-4 text-[15px] leading-[1.7] opacity-40">
-                  분석 리포트 자체도 헤어, 메이크업, 스타일링 가이드를 포함하고
-                  있어 캐스팅 여부와 관계없이 가치가 있어요.
-                </p>
-              </div>
-            }
-          />
-        </Reveal>
-      </section>
-
-      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
-
-      {/* ── 04. PRICING ── */}
-      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
-        <Reveal>
-          <Row
-            c1={
-              <>
-                <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                  04
-                </h2>
-                <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
-                  PRICING
-                </span>
-              </>
+              <span className="block text-[11px] font-semibold tracking-[1.5px] opacity-35">
+                PRICING
+              </span>
             }
             c2={
               <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
@@ -535,46 +414,16 @@ export default function CastingLandingPage() {
                     </Link>
                   </div>
                 ))}
-              </div>
-            }
-          />
-        </Reveal>
-      </section>
 
-      <div className="h-px bg-black/[0.15] mx-[var(--spacing-page-x-mobile)] md:mx-[var(--spacing-page-x)]" />
-
-      {/* ── 05. FAQ ── */}
-      <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-7 md:py-10">
-        <Reveal>
-          <Row
-            c1={
-              <>
-                <h2 className="text-[clamp(18px,2.5vw,28px)] font-extrabold tracking-[1px] leading-[1.3]">
-                  05
-                </h2>
-                <span className="block mt-2 text-[11px] font-semibold tracking-[1.5px] opacity-35">
-                  FAQ
-                </span>
-              </>
-            }
-            c2={
-              <p className="font-[family-name:var(--font-serif)] text-[clamp(16px,2vw,24px)] font-normal leading-[1.4]">
-                자주 묻는 질문.
-              </p>
-            }
-            c3={
-              <div>
-                {FAQS.map((faq, i) => (
-                  <div
-                    key={faq.q}
-                    className={`py-4 ${i < FAQS.length - 1 ? "border-b border-black/[0.06]" : ""}`}
-                  >
-                    <p className="text-[15px] font-bold mb-1.5">{faq.q}</p>
-                    <p className="text-[14px] opacity-50 leading-[1.7]">
-                      {faq.a}
-                    </p>
-                  </div>
-                ))}
+                {/* FAQ 인라인 */}
+                <div className="mt-8 pt-6 border-t border-black/[0.06]">
+                  {FAQS.map((faq, i) => (
+                    <div key={faq.q} className={`py-3 ${i < FAQS.length - 1 ? "border-b border-black/[0.04]" : ""}`}>
+                      <p className="text-[13px] font-semibold opacity-50">{faq.q}</p>
+                      <p className="text-[12px] opacity-30 leading-[1.7] mt-1">{faq.a}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             }
           />

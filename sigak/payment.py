@@ -13,10 +13,10 @@ from pydantic import BaseModel
 
 
 PAYMENT_ACCOUNT = {
-    "bank": "기업은행",
+    "bank": "우체국",
     "number": "120-0001-11506",
     "holder": "주식회사시각",
-    "kakao_link": "kakaotalk://send?amount={amount}&bank=ibk&account=120000111506",
+    "kakao_link": "kakaotalk://send?amount={amount}&bank=epost&account=120000111506",
 }
 
 PRICE_MAP = {

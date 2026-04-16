@@ -317,11 +317,11 @@ ORIGINAL_PRICE_MAP = {
 UPGRADE_PRICE = 26100
 
 PAYMENT_INFO = {
-    "bank": "기업은행",
+    "bank": "우체국",
     "account": "120-0001-11506",
     "holder": "주식회사시각",
-    "toss_deeplink": "supertoss://send?amount={amount}&bank=ibk&account=120000111506",
-    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=ibk&account=120000111506",
+    "toss_deeplink": "supertoss://send?amount={amount}&bank=epost&account=120000111506",
+    "kakao_deeplink": "kakaotalk://send?amount={amount}&bank=epost&account=120000111506",
 }
 
 # ── 클러스터 부트스트랩 ──

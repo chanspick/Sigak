@@ -119,13 +119,31 @@ def create_hair_mask(image: np.ndarray) -> Optional[dict]:
     h, w = image.shape[:2]
 
     # 바이너리 마스크 추출
-    hair_raw = (class_map == CLASS_HAIR).astype(np.float32)
+    hair_raw = (class_map == CLASS_HAIR).astype(np.uint8)
     brow_raw = ((class_map == CLASS_LEFT_BROW) | (class_map == CLASS_RIGHT_BROW)).astype(np.float32)
 
-    # feathering (경계 자연스럽게)
+    # ── 헤어 마스크 정제 (배경 false positive 제거) ──
+
+    # 1. Opening: 배경에 찍힌 작은 노이즈 제거
+    kernel_open = np.ones((5, 5), np.uint8)
+    hair_clean = cv2.morphologyEx(hair_raw, cv2.MORPH_OPEN, kernel_open)
+
+    # 2. 가장 큰 연결 컴포넌트만 유지 (머리카락 본체)
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
+        hair_clean, connectivity=8
+    )
+    if num_labels > 1:
+        largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        hair_clean = (labels == largest_label).astype(np.uint8)
+
+    # 3. 경계 erode로 안쪽으로 깎기 (배경 침범 방지)
+    kernel_erode = np.ones((3, 3), np.uint8)
+    hair_clean = cv2.erode(hair_clean, kernel_erode, iterations=1)
+
+    # 4. 최종 feathering (경계 자연스럽게)
     feather_sigma = max(3, int(min(h, w) * 0.005))
     ksize = feather_sigma * 4 + 1
-    hair_mask = cv2.GaussianBlur(hair_raw, (ksize, ksize), feather_sigma)
+    hair_mask = cv2.GaussianBlur(hair_clean.astype(np.float32), (ksize, ksize), feather_sigma)
     brow_mask = cv2.GaussianBlur(brow_raw, (ksize, ksize), feather_sigma)
 
     # normalize

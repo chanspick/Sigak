@@ -56,9 +56,13 @@ function CallbackContent() {
           trackKakaoLogin(result.reports.length === 0);
         });
 
-        // 신규 유저: 바로 요금제 선택 → 구매 플로우
-        // 기존 유저(리포트 있음): 홈으로
-        if (result.reports.length > 0) {
+        // 로그인 전에 보던 페이지가 있으면 복귀, 없으면 기본 흐름
+        const redirect = sessionStorage.getItem("sigak_redirect");
+        if (redirect) {
+          sessionStorage.removeItem("sigak_redirect");
+          router.replace(redirect);
+        } else if (result.reports.length > 0) {
+          // 기존 유저(리포트 있음): 홈으로
           router.replace("/");
         } else {
           router.replace("/start");

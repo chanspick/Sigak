@@ -9,7 +9,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { ReportData, ReportSection } from "@/lib/types/report";
-import { requestUpgrade } from "@/lib/api/client";
+import { requestUpgrade, getKakaoLoginUrl } from "@/lib/api/client";
 import { SectionRenderer } from "@/components/report/section-renderer";
 import { ShareButtons } from "@/components/report/share-buttons";
 import { TossPaymentFlow } from "@/components/report/toss-payment-flow";
@@ -56,8 +56,28 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
     }
   }, [report.user_id, report.user_name]);
 
+  // 소유권 확인: 비로그인 → 로그인, 타인 → 차단
+  const isOwner = useCallback(() => {
+    const currentUserId = localStorage.getItem("sigak_user_id");
+    if (!currentUserId) return "not_logged_in" as const;
+    if (report.user_id && currentUserId !== report.user_id) return "not_owner" as const;
+    return "ok" as const;
+  }, [report.user_id]);
+
+  const redirectToLogin = useCallback(async () => {
+    sessionStorage.setItem("sigak_redirect", `/report/${reportId}`);
+    const { auth_url } = await getKakaoLoginUrl();
+    window.location.href = auth_url;
+  }, [reportId]);
+
   // 풀 업그레이드 — 주문 생성 + 결제 플로우 분기
   const handleUpgrade = useCallback(async () => {
+    const ownership = isOwner();
+    if (ownership === "not_logged_in") { redirectToLogin(); return; }
+    if (ownership === "not_owner") {
+      alert("본인의 리포트만 업그레이드할 수 있습니다.");
+      return;
+    }
     setUpgradeLoading(true);
     try {
       const res = await requestUpgrade(reportId);
@@ -93,7 +113,7 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
       alert("주문 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
       setUpgradeLoading(false);
     }
-  }, [reportId, report.paywall, router]);
+  }, [reportId, report.paywall, router, isOwner, redirectToLogin]);
 
   // 이미 풀 결제 완료된 경우
   const isFullPaid = ["full_pending", "full"].includes(report.access_level);
@@ -181,7 +201,15 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
               풀 리포트가 열려 있습니다
             </p>
             <button
-              onClick={() => router.push(`/report/${reportId}/full`)}
+              onClick={() => {
+                const ownership = isOwner();
+                if (ownership === "not_logged_in") { redirectToLogin(); return; }
+                if (ownership === "not_owner") {
+                  alert("본인의 리포트만 열람할 수 있습니다.");
+                  return;
+                }
+                router.push(`/report/${reportId}/full`);
+              }}
               className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-colors"
             >
               풀 리포트 보기
@@ -202,11 +230,11 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
         ) : (
           <div className="flex flex-col items-center gap-4">
             <p className="text-2xl font-serif font-bold text-center leading-snug">
-              맞춤 헤어 · 액션 플랜까지
+              맞춤 헤어 · 액션 플랜 · 캐스팅까지
             </p>
             <p className="text-sm text-[var(--color-muted)] text-center max-w-xs">
-              헤어 추천, 메이크업 액션 플랜, 유형 레퍼런스까지
-              나만의 스타일 가이드를 완성하세요
+              헤어 추천, 메이크업 액션 플랜, 유형 레퍼런스에
+              캐스팅 풀 등록 기회까지 — 나만의 스타일 가이드를 완성하세요
             </p>
             {report.paywall?.full?.original_price && (
               <p className="text-sm text-[var(--color-muted)] line-through">

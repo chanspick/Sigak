@@ -7,6 +7,7 @@ import Link from "next/link";
 import { getReportServerSide } from "@/lib/api/client";
 import { ReportViewer } from "@/components/report/report-viewer";
 import { ReportNav } from "@/components/report/report-nav";
+import { AuthGate } from "@/components/report/auth-gate";
 
 interface FullReportPageProps {
   params: Promise<{ id: string }>;
@@ -45,6 +46,9 @@ export default async function FullReportPage({ params }: FullReportPageProps) {
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)]">
+      {/* 비로그인 또는 타인 → 오버뷰로 리다이렉트 */}
+      <AuthGate reportUserId={report.user_id || ""} fallbackUrl={`/report/${id}`} />
+
       {/* 네비게이션 */}
       <ReportNav rightLink={{ href: `/report/${id}`, label: "OVERVIEW" }} />
 

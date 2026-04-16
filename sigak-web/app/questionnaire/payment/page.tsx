@@ -71,14 +71,11 @@ function PaymentContent() {
             type="button"
             onClick={() => {
               navigator.clipboard.writeText(account.replace(/-/g, ""));
-              window.location.href = "kakaobank://";
-              setTimeout(() => {
-                alert("카카오뱅크 앱에서 붙여넣기로 계좌번호를 입력해주세요");
-              }, 1500);
+              alert("계좌번호가 복사되었습니다. 은행 앱에서 붙여넣기로 입력해주세요.");
             }}
-            className="flex items-center justify-center w-full py-3 text-sm font-semibold bg-[#FEE500] text-[#191919] hover:brightness-95 transition-all"
+            className="flex items-center justify-center w-full py-3 text-sm font-semibold border border-[var(--color-border)] hover:bg-[var(--color-surface)] transition-all"
           >
-            카카오뱅크로 송금하기
+            계좌번호 복사하기
           </button>
         </div>
 

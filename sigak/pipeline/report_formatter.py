@@ -1540,6 +1540,7 @@ def format_report_for_frontend(
 
     result = {
         "id": report_id,
+        "user_id": user_id,
         "user_name": user_name,
         "access_level": "free",
         "pending_level": None,

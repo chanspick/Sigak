@@ -45,10 +45,11 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [tossOrderId, setTossOrderId] = useState<string | null>(null);
 
-  // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
+  // 소유권 검증: 이미 로그인된 본인 리포트일 때만 컨텍스트 보존
+  // 미로그인 or 타인 리포트 → localStorage 건드리지 않음 (공유 링크 보안)
   useEffect(() => {
-    if (report.user_id) {
-      localStorage.setItem("sigak_user_id", report.user_id);
+    const currentUserId = localStorage.getItem("sigak_user_id");
+    if (currentUserId && currentUserId === report.user_id) {
       if (report.user_name && report.user_name !== "회원") {
         localStorage.setItem("sigak_user_name", report.user_name);
       }

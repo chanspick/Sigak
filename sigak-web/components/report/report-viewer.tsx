@@ -29,16 +29,14 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
   // 이전 access_level 추적 (fade-out 트리거용)
   const prevAccessLevelRef = useRef(report.access_level);
 
-  // 리포트 링크로 직접 진입 시 유저 컨텍스트 보존
+  // 소유권 검증: 이미 로그인된 본인 리포트일 때만 컨텍스트 보존
+  // 미로그인 or 타인 리포트 → localStorage 건드리지 않음 (공유 링크 보안)
   useEffect(() => {
-    if (report.user_id) {
-      localStorage.setItem("sigak_user_id", report.user_id);
-    }
     // 애널리틱스: 리포트 조회
     import("@/lib/analytics").then(({ trackReportViewed }) => {
       trackReportViewed(report.id, report.access_level);
     });
-  }, [report.user_id, report.id, report.access_level]);
+  }, [report.id, report.access_level]);
 
   // 페이월 게이트를 표시할 레벨 목록
   const gateLevels = getPaywallGateLevels(report.access_level);

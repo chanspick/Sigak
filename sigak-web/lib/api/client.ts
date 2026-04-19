@@ -112,6 +112,8 @@ export interface KakaoTokenResponse {
   email: string;
   profile_image: string;
   reports: Array<{ id: string; access_level: string; created_at: string }>;
+  /** MVP v1.1 phase B — HS256 JWT, 7일 만료. 빈 문자열이면 서버가 JWT_SECRET 미설정 */
+  jwt: string;
 }
 
 export interface MeResponse {

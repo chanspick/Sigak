@@ -39,12 +39,18 @@ function CallbackContent() {
       try {
         const result = await exchangeKakaoToken(code);
 
-        // localStorage에 유저 정보 저장
-        localStorage.setItem("sigak_user_id", result.user_id);
-        localStorage.setItem("sigak_user_name", result.name);
-        if (result.email) localStorage.setItem("sigak_user_email", result.email);
-        if (result.profile_image) localStorage.setItem("sigak_profile_image", result.profile_image);
-        localStorage.setItem("sigak_kakao_id", result.kakao_id);
+        // MVP v1.1 phase B: JWT + 레거시 필드를 한 번에 저장.
+        // result.jwt가 빈 문자열이면 서버 JWT_SECRET 미설정 — Bearer auth는
+        // 작동하지 않지만 레거시 경로(user_id query param)는 계속 동작.
+        const { setAuthData } = await import("@/lib/auth");
+        setAuthData({
+          jwt: result.jwt,
+          userId: result.user_id,
+          kakaoId: result.kakao_id,
+          name: result.name,
+          email: result.email,
+          profileImage: result.profile_image,
+        });
 
         // 애널리틱스
         import("@/lib/analytics").then(({ identifyUser, trackKakaoLogin }) => {

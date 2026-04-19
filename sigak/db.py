@@ -41,6 +41,9 @@ class User(Base):
     # MVP v1.2 onboarding persistence (flat JSONB matching SubmitRequest keys)
     onboarding_completed = Column(Boolean, default=False, server_default="false", nullable=False)
     onboarding_data = Column(JSONB, nullable=True)
+    # MVP v1.2 Phase C: LLM #2 (interpret_interview) cache — hash invalidates when onboarding_data changes
+    interview_interpretation = Column(JSONB, nullable=True)
+    interview_interpretation_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     orders = relationship("Order", back_populates="user")
     reports = relationship("Report", back_populates="user")

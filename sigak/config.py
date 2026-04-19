@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-20250514"
     llm_max_tokens: int = 4096
 
+    # ── Auth (MVP v1.1 JWT) ──
+    jwt_secret: str = ""                         # HS256 signing key. Must be 32+ random bytes in prod.
+    jwt_expiry_days: int = 7                     # No refresh token for MVP. Rotating secret invalidates all sessions.
+
+    # ── Payment (MVP v1.1 Toss Payments) ──
+    toss_secret_key: str = ""                    # Server-side key. Test keys start with "test_gsk_", live with "live_gsk_".
+    toss_base_url: str = "https://api.tosspayments.com"  # Same host for test and live; keys determine environment.
+
     # ── CV Pipeline ──
     clip_model: str = "ViT-L-14"                 # CLIP model variant
     clip_pretrained: str = "openai"

@@ -290,6 +290,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── MVP v1.1 routers (tokens + payments) ──
+# Separate files under routes/ so main.py doesn't grow further. Webhook router
+# is at root (no /api/v1 prefix) because that's the URL registered with Toss.
+from routes.tokens import router as tokens_router
+from routes.payments import confirm_router as payments_confirm_router
+from routes.payments import webhook_router as payments_webhook_router
+
+app.include_router(tokens_router)
+app.include_router(payments_confirm_router)
+app.include_router(payments_webhook_router)
+
 # ── In-memory stores ──
 USERS = {}
 INTERVIEWS = {}

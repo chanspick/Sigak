@@ -6,6 +6,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 import uuid
 import re
+from sqlalchemy.dialects.postgresql import JSONB
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 # 모든 변형을 psycopg2용 postgresql:// 로 정규화
@@ -37,6 +38,9 @@ class User(Base):
     casting_opted_in = Column(Boolean, default=False)
     casting_opted_at = Column(DateTime, nullable=True)
     casting_opted_out_at = Column(DateTime, nullable=True)
+    # MVP v1.2 onboarding persistence (flat JSONB matching SubmitRequest keys)
+    onboarding_completed = Column(Boolean, default=False, server_default="false", nullable=False)
+    onboarding_data = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     orders = relationship("Order", back_populates="user")
     reports = relationship("Report", back_populates="user")

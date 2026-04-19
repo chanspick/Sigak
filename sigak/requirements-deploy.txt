@@ -18,6 +18,9 @@ scipy==1.14.0
 # LLM
 anthropic==0.39.0
 
+# Auth (MVP v1.1: JWT)
+python-jose[cryptography]>=3.3.0
+
 # Config
 pydantic==2.9.0
 pydantic-settings==2.5.0

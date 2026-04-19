@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from deps import db_session, get_current_user_mock
+from deps import db_session, get_current_user
 from services import payments as payments_service
 from services import tokens as tokens_service
 
@@ -47,7 +47,7 @@ class ConfirmResponse(BaseModel):
 async def confirm_payment(
     order_id: str,
     body: ConfirmRequest,
-    user: dict = Depends(get_current_user_mock),
+    user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
     """Approve a payment after the frontend Toss SDK redirects with success.

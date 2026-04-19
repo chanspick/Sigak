@@ -2,48 +2,59 @@
 
 ## 전제
 
-- 백엔드가 Railway에 떠 있고, `TOSS_SECRET_KEY` 환경변수가 설정되어 있음
-- 테스트할 유저가 DB에 존재 (카카오 로그인 완료 상태). 유저 ID 필요
-- `X-User-Id` 헤더로 mock 인증 사용 (JWT 배선 전까지 임시)
+- 백엔드가 Railway에 떠 있고 env 설정: `TOSS_SECRET_KEY`, `JWT_SECRET`, `ADMIN_KEY`
+- 테스트할 유저가 DB에 존재 (카카오 로그인으로 생성된 UUID)
+- 모든 보호 라우트는 `Authorization: Bearer <JWT>` 필수
 
-**환경변수** (테스트 쉘에서):
+## Step 0 — 환경변수 + JWT 발급
 
 ```bash
 export API=https://sigak-production.up.railway.app
 export USER_ID=<기존 DB의 유저 UUID>
+export ADMIN_KEY=<Railway의 ADMIN_KEY 값>
 ```
 
-Windows cmd면:
+**개발용 JWT 발급** (카카오 OAuth 건너뛰고 바로 JWT 받기):
 
+```bash
+JWT=$(curl -s -X POST "$API/api/v1/auth/dev-issue-jwt" \
+  -H "X-Admin-Key: $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"user_id\": \"$USER_ID\"}" | python -c "import sys, json; print(json.load(sys.stdin)['jwt'])")
+echo $JWT
+```
+
+Windows cmd:
 ```cmd
-set API=https://sigak-production.up.railway.app
-set USER_ID=<기존 DB의 유저 UUID>
+curl -X POST "%API%/api/v1/auth/dev-issue-jwt" -H "X-Admin-Key: %ADMIN_KEY%" -H "Content-Type: application/json" -d "{\"user_id\": \"%USER_ID%\"}"
+REM 응답의 jwt 값 복사해서:
+set JWT=eyJ...
 ```
+
+**운영 경로**: 실제 카카오 로그인 후 `/auth/kakao/token` 응답의 `jwt` 필드 사용.
 
 ## 시나리오 1 — 정상 플로우 (purchase-intent → Toss SDK → confirm → 토큰 적립)
 
-### 1-A. 잔액 확인 (0이어야 정상)
+### 1-A. 본인 확인 + 잔액
 
 ```bash
-curl -s "$API/api/v1/tokens/balance" \
-  -H "X-User-Id: $USER_ID"
-```
+curl -s "$API/api/v1/auth/me" -H "Authorization: Bearer $JWT"
+# → {id, kakao_id, email, name, tier}
 
-예상 응답:
-```json
-{"balance": 0, "updated_at": null}
+curl -s "$API/api/v1/tokens/balance" -H "Authorization: Bearer $JWT"
+# → {"balance": 0, "updated_at": null}
 ```
 
 ### 1-B. 구매 의도 생성
 
 ```bash
 curl -s -X POST "$API/api/v1/tokens/purchase-intent" \
-  -H "X-User-Id: $USER_ID" \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{"pack_code": "starter"}'
 ```
 
-예상 응답:
+예상:
 ```json
 {
   "order_id": "pay_a1b2c3d4e5f6",
@@ -55,37 +66,20 @@ curl -s -X POST "$API/api/v1/tokens/purchase-intent" \
 }
 ```
 
-`order_id` / `pg_order_id`를 기록해둠.
+`order_id` / `pg_order_id` 기록.
 
-### 1-C. Toss SDK 결제 (수동 단계)
+### 1-C. Toss SDK 결제 (수동)
 
-프론트 Toss SDK에서:
-```js
-await tossPayments.requestPayment('카드', {
-  amount: 10000,
-  orderId: '<1-B에서 받은 pg_order_id>',
-  orderName: 'SIGAK Token Pack — Starter',
-  successUrl: '...',
-  failUrl: '...',
-});
-```
-
-테스트 카드: Toss 공식 문서의 [테스트 카드 번호](https://docs.tosspayments.com/resources/test) 사용.
-
-성공 시 `successUrl`에 `paymentKey`, `orderId`, `amount` 쿼리파라미터로 리다이렉트됨.
-
-**프론트 없이 테스트하려면**: Toss 공식 [테스트 위젯](https://developers.tosspayments.com/sandbox)에서 우리 `pg_order_id`를 입력해 `paymentKey`를 뽑아낼 수 있음. 또는 시나리오 3(웹훅만) 경로로 DB 측면 검증 우선.
+프론트 Toss SDK 또는 Toss [샌드박스](https://developers.tosspayments.com/sandbox)에서 `pg_order_id` + amount 사용해 결제. 성공 시 리다이렉트 URL에 `paymentKey` 포함됨.
 
 ### 1-D. 결제 승인 (백엔드)
 
-`paymentKey`가 확보됐다고 가정:
-
 ```bash
 export ORDER_ID=pay_a1b2c3d4e5f6
-export PAYMENT_KEY=<Toss success redirect에서 받은 paymentKey>
+export PAYMENT_KEY=<Toss success에서 받은 paymentKey>
 
 curl -s -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
-  -H "X-User-Id: $USER_ID" \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d "{\"payment_key\": \"$PAYMENT_KEY\", \"amount\": 10000}"
 ```
@@ -95,49 +89,37 @@ curl -s -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
 {"order_id": "pay_a1b2c3d4e5f6", "status": "paid", "balance_after": 100}
 ```
 
-예상 Toss 에러 (예: 잘못된 payment_key):
-- HTTP 402
-- `{"detail": "결제 승인 실패: UNAUTHORIZED_KEY"}` 형태
-
 ### 1-E. 잔액 재확인
 
 ```bash
-curl -s "$API/api/v1/tokens/balance" -H "X-User-Id: $USER_ID"
+curl -s "$API/api/v1/tokens/balance" -H "Authorization: Bearer $JWT"
+# → {"balance": 100, "updated_at": "..."}
 ```
 
-예상:
-```json
-{"balance": 100, "updated_at": "2026-04-19T..."}
-```
+### 1-F. 멱등성 확인
 
-### 1-F. 멱등성 확인 (같은 confirm 재호출)
-
-1-D를 다시 실행 → **토큰 중복 적립 없음**, `balance_after: 100` 유지. 주문 상태가 이미 `paid`라서 short-circuit 탐.
+1-D를 다시 실행 → `balance_after: 100` 유지. 주문이 이미 `paid`라 short-circuit.
 
 ---
 
-## 시나리오 2 — 웹훅만 도착한 경우 (confirm 건너뛰기)
+## 시나리오 2 — 웹훅만 도착 (confirm 건너뛰기)
 
-사용자가 결제 성공 페이지에 도달하기 전에 닫아버렸거나 네트워크 끊긴 상황. Toss는 계속 웹훅 쏴서 우리 서버가 자체적으로 처리해야 함.
+유저가 결제 성공 페이지 도달 전에 앱을 닫은 상황.
 
-### 2-A. 구매 의도 생성 (시나리오 1과 동일)
+### 2-A. 구매 의도 생성
 
 ```bash
 curl -s -X POST "$API/api/v1/tokens/purchase-intent" \
-  -H "X-User-Id: $USER_ID" \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{"pack_code": "regular"}'
 ```
 
-새 `order_id`, `pg_order_id` 기록.
+### 2-B. Toss 결제 (수동)
 
-### 2-B. Toss 결제 실행 (수동)
+`paymentKey` 확보.
 
-시나리오 1-C와 동일. `paymentKey` 확보.
-
-### 2-C. confirm 호출 생략 — 웹훅 시뮬레이션
-
-실제 운영에서는 Toss가 자동으로 웹훅 POST 보냄. 수동으로 시뮬레이션:
+### 2-C. 웹훅 시뮬레이션
 
 ```bash
 curl -s -X POST "$API/payments/webhook" \
@@ -145,51 +127,92 @@ curl -s -X POST "$API/payments/webhook" \
   -d "{\"eventType\": \"PAYMENT_STATUS_CHANGED\", \"data\": {\"paymentKey\": \"$PAYMENT_KEY\"}}"
 ```
 
-예상 응답: `{"ok": true}` (HTTP 200)
+(웹훅은 JWT 불필요 — Toss 재조회가 인증 역할)
 
 내부 동작:
 1. `paymentKey` 추출
-2. `services.payments.get_payment($PAYMENT_KEY)` 호출 (우리 secret key로 Toss 재조회)
-3. Toss 응답의 `orderId`로 우리 `payment_orders` 레코드 lookup
-4. Toss `status=DONE` 확인 → 주문 paid 처리 + `credit:{order_id}` 키로 토큰 적립
+2. `get_payment($PAYMENT_KEY)` — 우리 secret key로 Toss 재조회
+3. Toss 응답의 `orderId`로 `payment_orders` lookup
+4. `status=DONE` → 주문 paid + `credit:{order_id}` 키로 토큰 적립
 
 ### 2-D. 잔액 확인
 
 ```bash
-curl -s "$API/api/v1/tokens/balance" -H "X-User-Id: $USER_ID"
+curl -s "$API/api/v1/tokens/balance" -H "Authorization: Bearer $JWT"
+# → {"balance": 280}  (시나리오 1 돌렸으면 380)
 ```
 
-예상: 시나리오 1에서 받은 100 + 시나리오 2의 280 = `280` (시나리오 1 실행 안 했다면 280만).
-
-### 2-E. confirm 후발 호출 (경쟁 상태 검증)
-
-같은 주문에 대해 이미 웹훅이 처리했는데, 뒤늦게 유저가 success 페이지에 도달해서 confirm 호출:
+### 2-E. 뒤늦은 confirm (경쟁 상태 검증)
 
 ```bash
 curl -s -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
-  -H "X-User-Id: $USER_ID" \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d "{\"payment_key\": \"$PAYMENT_KEY\", \"amount\": 25000}"
 ```
 
-예상: HTTP 200, `{"order_id": ..., "status": "paid", "balance_after": 280}` — 주문이 이미 paid라서 `credit_tokens`의 idempotency 체크가 기존 트랜잭션을 발견하고 기존 `balance_after` 그대로 반환. **중복 적립 없음**.
-
-### 2-F. 역 순서 검증 (confirm 먼저, 웹훅 나중)
-
-시나리오 1-D로 confirm 성공 후, 2-C처럼 웹훅 쏴도 동일 idempotency_key `credit:{order_id}`로 short-circuit. 상태 변화 없음.
+주문이 이미 paid → idempotency 단축 → `balance_after: 280` 그대로. **중복 없음**.
 
 ---
 
-## 데이터베이스 직접 검증
+## 보안 검증 케이스
 
-결제 없이도 테이블 구조가 맞는지, 락/제약이 걸리는지 확인할 수 있음.
+### JWT 없이 호출
+```bash
+curl -i "$API/api/v1/tokens/balance"
+```
+예상: `401 {"detail":"인증이 필요합니다"}`
+
+### 유효하지 않은 JWT
+```bash
+curl -i "$API/api/v1/tokens/balance" -H "Authorization: Bearer invalid.jwt.here"
+```
+예상: `401 {"detail":"유효하지 않은 토큰입니다"}`
+
+### 타 유저 주문 접근
+user_A의 JWT로 user_B의 order_id에 confirm:
+```bash
+curl -i -X POST "$API/api/v1/payments/confirm/$USER_B_ORDER_ID" \
+  -H "Authorization: Bearer $USER_A_JWT" \
+  -H "Content-Type: application/json" \
+  -d "{\"payment_key\": \"...\", \"amount\": 10000}"
+```
+예상: `403 {"detail":"본인 주문이 아닙니다"}`
+
+### 금액 변조 방어
+```bash
+curl -i -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"payment_key": "fake", "amount": 5000}'
+```
+예상: `400 {"detail":"결제 금액이 일치하지 않습니다"}` — Toss 호출 전 차단.
+
+### fake 웹훅 (시그니처 없는 웹훅 방어 증명)
+```bash
+curl -i -X POST "$API/payments/webhook" \
+  -H "Content-Type: application/json" \
+  -d '{"data": {"paymentKey": "fake_key_xxx"}}'
+```
+예상: `200 {"ok": true}` — DB 변화 **없음**. get_payment가 Toss에서 NOT_FOUND로 막음.
+
+### ADMIN_KEY 없이 dev-issue-jwt
+```bash
+curl -i -X POST "$API/api/v1/auth/dev-issue-jwt" \
+  -H "Content-Type: application/json" \
+  -d "{\"user_id\": \"$USER_ID\"}"
+```
+예상: `403 {"detail":"invalid admin key"}`
+
+---
+
+## DB 정합성 검증
 
 ```bash
 python -c "
 import os, sqlalchemy as sa
 e = sa.create_engine(os.environ['DATABASE_URL'])
 with e.connect() as c:
-    # 주문 + 트랜잭션 + 잔액 한번에
     for row in c.execute(sa.text('''
         SELECT po.id, po.status, po.tokens_granted, po.pg_payment_key,
                tb.balance, tt.kind, tt.amount, tt.idempotency_key
@@ -203,53 +226,7 @@ with e.connect() as c:
 "
 ```
 
-**예상되는 정합성 규칙**:
-- `payment_orders.status = 'paid'` 인 row마다 정확히 1개의 `token_transactions` row (`kind='purchase'`, `idempotency_key='credit:{order_id}'`)
-- `token_balances.balance` = 해당 유저의 모든 `token_transactions.amount` 합
-- `pending` 주문은 `token_transactions` row 없음
-- `failed` 주문도 `token_transactions` row 없음
-
----
-
-## 실패 케이스 의도적 테스트
-
-### 금액 변조 방어
-
-1-B에서 `amount_krw: 10000` 받았는데, 1-D에서 `amount: 5000`으로 보냄:
-
-```bash
-curl -s -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
-  -H "X-User-Id: $USER_ID" \
-  -H "Content-Type: application/json" \
-  -d "{\"payment_key\": \"fake\", \"amount\": 5000}"
-```
-
-예상: HTTP 400, `{"detail": "결제 금액이 일치하지 않습니다"}` — Toss 호출 전에 차단.
-
-### 타 유저 주문 접근 방어
-
-다른 user_id로 남의 order_id에 confirm 시도:
-
-```bash
-curl -s -X POST "$API/api/v1/payments/confirm/$ORDER_ID" \
-  -H "X-User-Id: OTHER_USER" \
-  ...
-```
-
-예상: HTTP 403, `{"detail": "본인 주문이 아닙니다"}`.
-
-### fake 웹훅 방어
-
-실제 Toss paymentKey 아닌 임의 문자열로 웹훅:
-
-```bash
-curl -s -X POST "$API/payments/webhook" \
-  -H "Content-Type: application/json" \
-  -d '{"data": {"paymentKey": "fake_key_xxx"}}'
-```
-
-예상:
-- `get_payment` 호출 → Toss가 `NOT_FOUND_PAYMENT` 또는 `INVALID_REQUEST`로 거부
-- 우리 서버: HTTP 200 `{"ok": true}` 리턴하되 DB는 변화 없음 (로그에만 WARNING)
-
-이 동작이 **시그니처 없는 웹훅의 인증 메커니즘**을 증명함 — fake 이벤트는 Toss API 재조회 단계에서 필터링됨.
+**정합성 규칙**:
+- `payment_orders.status='paid'` 각 row마다 정확히 1개의 `token_transactions` (`kind='purchase'`, `idempotency_key='credit:{order_id}'`)
+- `token_balances.balance` = 유저의 모든 `token_transactions.amount` 합
+- `pending`/`failed` 주문은 `token_transactions` row 없음

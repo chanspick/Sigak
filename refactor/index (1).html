@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SIGAK — Screens</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Serif+KR:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #1f1f1e;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 56px 40px 80px;
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: auto;
+  }
+  #app-meta {
+    position: fixed;
+    left: 28px; top: 20px;
+    font-family: 'Inter', system-ui;
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    z-index: 100;
+  }
+  #app-meta b {
+    color: rgba(255,255,255,0.85); font-weight: 500;
+    display: block; letter-spacing: 0.22em; margin-bottom: 4px;
+  }
+  #app-meta .sage { color: #8B9D7D; }
+  .stage { display: flex; gap: 56px; align-items: flex-start; }
+  .slot { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+  .slot .label {
+    font-family: 'Inter', system-ui; font-size: 10px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    padding-left: 6px;
+  }
+  .slot .sub {
+    color: rgba(255,255,255,0.45); letter-spacing: 0.14em; font-weight: 400;
+    margin-left: 8px;
+  }
+  .slot .sage { color: #8B9D7D; }
+</style>
+</head>
+<body>
+
+<div id="app-meta">
+  <b>SIGAK · v1.0 EDITORIAL WARM</b>
+  <span>HOME → RESULT</span> · <span class="sage">F·G PENDING REDESIGN</span>
+</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="result-screen.jsx"></script>
+<script type="text/babel" src="upload-screen.jsx"></script>
+<script type="text/babel" src="analyzing-screen.jsx"></script>
+<script type="text/babel" src="counterfactual-screen.jsx"></script>
+<script type="text/babel" src="archive-screen.jsx"></script>
+<script type="text/babel" src="home-screen.jsx"></script>
+
+<script type="text/babel">
+  function Slot({ n, title, sub, children }) {
+    return (
+      <div className="slot">
+        <div className="label">
+          <span className="sage">{n}</span>&nbsp;&nbsp;{title}
+          {sub && <span className="sub">· {sub}</span>}
+        </div>
+        {children}
+      </div>
+    );
+  }
+
+  function App() {
+    // Re-mount analyzing screen occasionally so the progress loops for demo
+    const [loopKey, setLoopKey] = React.useState(0);
+    React.useEffect(() => {
+      const t = setInterval(() => setLoopKey(k => k + 1), 6500);
+      return () => clearInterval(t);
+    }, []);
+
+    return (
+      <div className="stage">
+        <Slot n="B·0" title="Home" sub="empty">
+          <IOSDevice width={402} height={874}>
+            <HomeScreen startEmpty />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="B·1" title="Home" sub="3 added">
+          <IOSDevice width={402} height={874}>
+            <HomeScreen startEmpty={false} />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="C·0" title="Upload" sub="empty state">
+          <IOSDevice width={402} height={874}>
+            <UploadScreen empty />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="C·1" title="Upload" sub="3 added">
+          <IOSDevice width={402} height={874}>
+            <UploadScreen />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="D" title="Analyzing" sub="4-step pipeline">
+          <IOSDevice width={402} height={874}>
+            <AnalyzingScreen key={loopKey} />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="E" title="Result" sub="오늘의 최적 1장">
+          <IOSDevice width={402} height={874}>
+            <ResultScreen />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="F" title="Counterfactual" sub="PRO · 만약 그랬다면">
+          <IOSDevice width={402} height={874}>
+            <CounterfactualScreen />
+          </IOSDevice>
+        </Slot>
+
+        <Slot n="G" title="Archive" sub="지난 기록">
+          <IOSDevice width={402} height={874}>
+            <ArchiveScreen />
+          </IOSDevice>
+        </Slot>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

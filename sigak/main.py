@@ -296,10 +296,12 @@ app.add_middleware(
 from routes.tokens import router as tokens_router
 from routes.payments import confirm_router as payments_confirm_router
 from routes.payments import webhook_router as payments_webhook_router
+from routes.auth import router as auth_jwt_router
 
 app.include_router(tokens_router)
 app.include_router(payments_confirm_router)
 app.include_router(payments_webhook_router)
+app.include_router(auth_jwt_router)
 
 # ── In-memory stores ──
 USERS = {}
@@ -1964,6 +1966,16 @@ async def kakao_token(data: KakaoTokenRequest):
     # 응답: 본명이 있으면 본명, 없으면 카카오 닉네임
     display_name = merged_name if (merged_name and merged_name != "익명") else nickname
 
+    # MVP v1.1 phase B: issue JWT alongside legacy fields.
+    # Frontend stores this in SecureStorage (native) / httpOnly cookie (web).
+    # Missing JWT_SECRET falls back to empty string so legacy clients can still log in.
+    try:
+        from services.auth import issue_jwt as _issue_jwt
+        jwt_token = _issue_jwt(user_id, kakao_id)
+    except Exception as e:
+        print(f"[AUTH] JWT issuance failed (JWT_SECRET not set?): {e}")
+        jwt_token = ""
+
     return {
         "user_id": user_id,
         "kakao_id": kakao_id,
@@ -1972,6 +1984,7 @@ async def kakao_token(data: KakaoTokenRequest):
         "email": email,
         "profile_image": profile_image,
         "reports": reports,
+        "jwt": jwt_token,
     }
 
 

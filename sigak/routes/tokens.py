@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from deps import db_session, get_current_user_mock
+from deps import db_session, get_current_user
 from services import tokens as tokens_service
 
 
@@ -37,7 +37,7 @@ class PurchaseIntentResponse(BaseModel):
 
 @router.get("/balance", response_model=BalanceResponse)
 def get_balance(
-    user: dict = Depends(get_current_user_mock),
+    user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
     if db is None:
@@ -51,7 +51,7 @@ def get_balance(
 @router.post("/purchase-intent", response_model=PurchaseIntentResponse)
 def create_purchase_intent(
     body: PurchaseIntentRequest,
-    user: dict = Depends(get_current_user_mock),
+    user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
     """Create a pending ``payment_orders`` row and return the identifiers

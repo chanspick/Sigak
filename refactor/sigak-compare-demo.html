@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SIGAK — Compare v1.1 + Lightbox</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #1f1f1e;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font-family: inherit; }
+  #label {
+    color: rgba(255,255,255,0.55);
+    font-family: 'Inter', system-ui;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  #sublabel {
+    color: rgba(255,255,255,0.35);
+    font-family: 'Inter', system-ui;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    margin-bottom: 24px;
+  }
+  #sublabel .sage { color: #8B9D7D; }
+  .ctrl-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  .ctrl-row button {
+    padding: 8px 14px;
+    background: transparent;
+    border: 0.5px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.85);
+    border-radius: 6px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+  .ctrl-row button.active {
+    background: rgba(139,157,125,0.12);
+    border-color: #8B9D7D;
+    color: #8B9D7D;
+  }
+  .ctrl-row button:hover:not(.active) {
+    border-color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,1);
+  }
+  .stage {
+    display: flex;
+    justify-content: center;
+  }
+  .mobile-frame {
+    width: 402px;
+    height: 874px;
+    background: #FAFAF7;
+    border-radius: 48px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.12);
+  }
+  .mobile-inner {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+  }
+  .mobile-inner::-webkit-scrollbar { width: 0; }
+</style>
+</head>
+<body>
+
+<div id="label">SIGAK · Compare v1.1 + Lightbox</div>
+<div id="sublabel"><span class="sage">TONE GUIDE v1.2</span> · Editorial Warm</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+
+<script type="text/babel">
+
+// ──────────────────────────────────────────────────────────
+// Color tokens
+// ──────────────────────────────────────────────────────────
+const SAGE        = '#8B9D7D';
+const SAGE_SOFT   = '#E8ECE2';
+const INK         = '#0F0F0E';
+const PAPER       = '#FAFAF7';
+const LINE        = 'rgba(15,15,14,0.12)';
+const LINE_STRONG = 'rgba(15,15,14,0.22)';
+const MUTE        = 'rgba(15,15,14,0.55)';
+const MUTE_2      = 'rgba(15,15,14,0.38)';
+
+const GOLD_STROKE   = '#B8A05E';
+const GOLD_FILL     = '#E8DCC0';
+const SILVER_STROKE = '#9A9A96';
+const SILVER_FILL   = '#E8E8E4';
+const BRONZE_STROKE = '#8B6F47';
+const BRONZE_FILL   = '#D4B896';
+
+const TIER_COLORS = {
+  gold:   { stroke: GOLD_STROKE,   fill: GOLD_FILL },
+  silver: { stroke: SILVER_STROKE, fill: SILVER_FILL },
+  bronze: { stroke: BRONZE_STROKE, fill: BRONZE_FILL },
+};
+
+// ──────────────────────────────────────────────────────────
+// PhotoPlaceholder — deterministic stripe pattern
+// ──────────────────────────────────────────────────────────
+function PhotoPlaceholder({ seed = 0, ratio = '1/1', style }) {
+  const tones = [
+    { bg: '#E6E2D6', stripe: 'rgba(15,15,14,0.06)' },
+    { bg: '#D8DDD0', stripe: 'rgba(15,15,14,0.07)' },
+    { bg: '#E2DCD0', stripe: 'rgba(15,15,14,0.05)' },
+    { bg: '#D0D6CB', stripe: 'rgba(15,15,14,0.06)' },
+    { bg: '#E8E3D5', stripe: 'rgba(15,15,14,0.05)' },
+    { bg: '#DCD7C8', stripe: 'rgba(15,15,14,0.06)' },
+    { bg: '#D5DBCC', stripe: 'rgba(15,15,14,0.06)' },
+    { bg: '#E0DBCD', stripe: 'rgba(15,15,14,0.07)' },
+  ];
+  const t = tones[((seed % tones.length) + tones.length) % tones.length];
+  const angle = 28 + ((seed * 13) % 24);
+  return (
+    <div style={{
+      width: '100%',
+      aspectRatio: ratio,
+      background: `repeating-linear-gradient(${angle}deg, ${t.bg} 0 14px, ${t.stripe} 14px 15px)`,
+      overflow: 'hidden',
+      ...style,
+    }} />
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// SageFrame — corner ticks around content
+// ──────────────────────────────────────────────────────────
+function SageFrame({ children, inset = 8, tick = 14, weight = 1 }) {
+  const corners = [
+    { key: 'tl', pos: { left: 0, top: 0 },
+      bars: [
+        { left: 0, top: 0, width: tick, height: weight },
+        { left: 0, top: 0, width: weight, height: tick },
+      ]},
+    { key: 'tr', pos: { right: 0, top: 0 },
+      bars: [
+        { right: 0, top: 0, width: tick, height: weight },
+        { right: 0, top: 0, width: weight, height: tick },
+      ]},
+    { key: 'bl', pos: { left: 0, bottom: 0 },
+      bars: [
+        { left: 0, bottom: 0, width: tick, height: weight },
+        { left: 0, bottom: 0, width: weight, height: tick },
+      ]},
+    { key: 'br', pos: { right: 0, bottom: 0 },
+      bars: [
+        { right: 0, bottom: 0, width: tick, height: weight },
+        { right: 0, bottom: 0, width: weight, height: tick },
+      ]},
+  ];
+  return (
+    <div style={{ position: 'relative', padding: inset }}>
+      {corners.map(c => (
+        <div key={c.key} style={{ position: 'absolute', width: tick, height: tick, ...c.pos }}>
+          {c.bars.map((b, i) => (
+            <div key={i} style={{ position: 'absolute', background: SAGE, ...b }} />
+          ))}
+        </div>
+      ))}
+      <div style={{ position: 'relative' }}>{children}</div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Medal SVG
+// ──────────────────────────────────────────────────────────
+function Medal({ tier, size = 14 }) {
+  const c = TIER_COLORS[tier];
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" style={{ display: 'block' }}>
+      <circle cx={7} cy={7} r={6} stroke={c.stroke} fill={c.fill} strokeWidth={1} />
+    </svg>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Status bar (iOS style, minimal)
+// ──────────────────────────────────────────────────────────
+function StatusBar({ dark = false }) {
+  const c = dark ? '#fff' : '#000';
+  return (
+    <div style={{
+      position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '18px 30px 0',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        fontFamily: '-apple-system, SF Pro, system-ui',
+        fontSize: 15, fontWeight: 590, color: c,
+      }}>9:41</div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <svg width="17" height="11" viewBox="0 0 17 11">
+          <rect x="0"  y="7" width="2.8" height="4" rx="0.5" fill={c}/>
+          <rect x="4.2" y="5" width="2.8" height="6" rx="0.5" fill={c}/>
+          <rect x="8.4" y="3" width="2.8" height="8" rx="0.5" fill={c}/>
+          <rect x="12.6" y="0" width="2.8" height="11" rx="0.5" fill={c}/>
+        </svg>
+        <svg width="16" height="11" viewBox="0 0 16 11">
+          <path d="M8 2.5a8 8 0 0 1 5.6 2.3l1-1a9.5 9.5 0 0 0-13.2 0l1 1A8 8 0 0 1 8 2.5zm0 3.3a4.5 4.5 0 0 1 3.2 1.3l1-1a6 6 0 0 0-8.4 0l1 1A4.5 4.5 0 0 1 8 5.8z" fill={c}/>
+          <circle cx="8" cy="9.5" r="1.3" fill={c}/>
+        </svg>
+        <svg width="25" height="12" viewBox="0 0 25 12">
+          <rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke={c} strokeOpacity="0.4" fill="none"/>
+          <rect x="1.8" y="1.8" width="18" height="8.4" rx="1.8" fill={c}/>
+          <path d="M23 3.8v4.4c.7-.3 1.2-1 1.2-2.2s-.5-1.9-1.2-2.2z" fill={c} fillOpacity="0.4"/>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Dynamic island
+// ──────────────────────────────────────────────────────────
+function DynamicIsland() {
+  return (
+    <div style={{
+      position: 'absolute', top: 11, left: '50%',
+      transform: 'translateX(-50%)',
+      width: 120, height: 34, borderRadius: 22,
+      background: '#000', zIndex: 50, pointerEvents: 'none',
+    }} />
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Home indicator
+// ──────────────────────────────────────────────────────────
+function HomeIndicator({ dark = false }) {
+  return (
+    <div style={{
+      position: 'absolute', bottom: 8, left: '50%',
+      transform: 'translateX(-50%)',
+      width: 135, height: 5, borderRadius: 100,
+      background: dark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.25)',
+      zIndex: 60, pointerEvents: 'none',
+    }} />
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Top bar (Result/Compare shared)
+// ──────────────────────────────────────────────────────────
+function ScreenTopBar({ tokens, onBack }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '62px 20px 0',
+    }}>
+      <button onClick={onBack} style={{
+        width: 28, height: 28, padding: 0, background: 'transparent',
+        border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+      }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M9 2L4 7l5 5" stroke={INK} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ position: 'relative', width: 10, height: 10 }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `1px solid ${INK}` }} />
+          <div style={{ position: 'absolute', left: 2.5, top: 2.5, width: 5, height: 5, borderRadius: '50%', background: SAGE }} />
+        </div>
+        <div style={{
+          fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 400,
+          color: INK, letterSpacing: '0.02em',
+          fontVariantNumeric: 'tabular-nums',
+        }}>{tokens}</div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — PhotoSlot (66×66 + medal + tier label)
+// ──────────────────────────────────────────────────────────
+function PhotoSlot({ data, onTap }) {
+  return (
+    <div onClick={onTap} style={{
+      cursor: 'pointer',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', gap: 4,
+    }}>
+      <Medal tier={data.tier} size={14} />
+      <div style={{ width: 66, height: 66, marginTop: 4 }}>
+        <PhotoPlaceholder seed={data.seed} ratio="1/1" />
+      </div>
+      <div style={{
+        marginTop: 6,
+        fontFamily: 'Inter, system-ui', fontSize: 9, fontWeight: 500,
+        letterSpacing: '0.14em', color: MUTE, textTransform: 'uppercase',
+      }}>{data.tier}</div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — PhotoPair (A ↔ B)
+// ──────────────────────────────────────────────────────────
+function PhotoPair({ a, b, onSlotTap }) {
+  return (
+    <div style={{
+      display: 'flex', gap: 48,
+      justifyContent: 'center', alignItems: 'center',
+      padding: '36px 20px 0',
+    }}>
+      <PhotoSlot data={a} onTap={() => onSlotTap('A')} />
+      <div style={{
+        fontFamily: 'Inter, system-ui', fontSize: 16, fontWeight: 400,
+        color: MUTE, lineHeight: 1, paddingTop: 14,
+      }}>↔</div>
+      <PhotoSlot data={b} onTap={() => onSlotTap('B')} />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Bar row
+// ──────────────────────────────────────────────────────────
+function BarRow({ letter, value, color, suffix = '' }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '20px 1fr 38px',
+      gap: 10, alignItems: 'center',
+      marginTop: letter === 'A' ? 0 : 5,
+    }}>
+      <span style={{
+        fontFamily: 'Inter, system-ui', fontSize: 9, fontWeight: 500,
+        color: letter === 'A' ? SAGE : INK, letterSpacing: '0.1em',
+      }}>{letter}</span>
+      <div style={{ height: 3, background: 'rgba(15,15,14,0.06)', position: 'relative' }}>
+        <div style={{
+          position: 'absolute', left: 0, top: 0, bottom: 0,
+          width: `${value}%`, background: color,
+          transition: 'width 400ms ease-out',
+        }} />
+      </div>
+      <div style={{
+        fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 400,
+        color: INK, textAlign: 'right',
+        fontVariantNumeric: 'tabular-nums',
+      }}>{value}{suffix}</div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Axis row (3축)
+// ──────────────────────────────────────────────────────────
+function AxisRow({ label, krLabel, a, b }) {
+  const delta = a - b;
+  const absD  = Math.abs(delta);
+  const sign  = delta === 0 ? '' : delta > 0 ? '+' : '−';
+  const deltaColor = absD >= 5 ? INK : MUTE_2;
+
+  return (
+    <div style={{ padding: '11px 0' }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'baseline', marginBottom: 8,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{
+            fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 500,
+            color: INK, letterSpacing: '0.08em', textTransform: 'uppercase',
+          }}>{label}</span>
+          <span style={{
+            fontFamily: 'Pretendard, system-ui', fontSize: 12, fontWeight: 400,
+            color: MUTE_2, letterSpacing: '-0.01em',
+          }}>{krLabel}</span>
+        </div>
+        <div style={{
+          fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 400,
+          color: deltaColor, fontVariantNumeric: 'tabular-nums',
+          letterSpacing: '0.04em',
+        }}>Δ {sign}{absD}</div>
+      </div>
+      <BarRow letter="A" value={a} color={SAGE} />
+      <BarRow letter="B" value={b} color={INK} />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Aim row (추구미 %)
+// ──────────────────────────────────────────────────────────
+function AimRow({ label, a, b }) {
+  const delta = a - b;
+  const absD  = Math.abs(delta);
+  const sign  = delta === 0 ? '' : delta > 0 ? '+' : '−';
+  const deltaColor = absD >= 5 ? INK : MUTE_2;
+
+  const winner = absD < 3 ? 'similar' : (delta > 0 ? 'A' : 'B');
+  const winnerText  = winner === 'similar' ? '비슷' : `${winner} 우위`;
+  const winnerColor = winner === 'similar' ? MUTE_2 : SAGE;
+
+  return (
+    <div style={{ padding: '11px 0' }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'baseline', marginBottom: 8,
+      }}>
+        <span style={{
+          fontFamily: 'Pretendard, system-ui', fontSize: 12, fontWeight: 500,
+          color: INK, letterSpacing: '-0.005em',
+        }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+          <span style={{
+            fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 400,
+            color: deltaColor, fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.04em',
+          }}>Δ {sign}{absD}</span>
+          <span style={{ fontSize: 9, color: MUTE_2 }}>·</span>
+          <span style={{
+            fontFamily: 'Inter, system-ui', fontSize: 10, fontWeight: 500,
+            color: winnerColor, letterSpacing: '0.08em',
+          }}>{winnerText}</span>
+        </div>
+      </div>
+      <BarRow letter="A" value={a} color={SAGE} suffix="%" />
+      <BarRow letter="B" value={b} color={INK} suffix="%" />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Insight
+// ──────────────────────────────────────────────────────────
+function Insight({ topAxis, topKr, delta }) {
+  const absD = Math.abs(delta);
+  return (
+    <div style={{ padding: '14px 0' }}>
+      <div style={{
+        fontFamily: 'Pretendard, system-ui', fontSize: 13, fontWeight: 500,
+        color: INK, letterSpacing: '-0.005em',
+      }}>
+        가장 큰 차이 ·{' '}
+        <span style={{
+          fontFamily: 'Inter, system-ui', fontWeight: 500, color: SAGE,
+        }}>{topAxis}</span>
+        {' '}
+        <span style={{
+          fontFamily: 'Inter, system-ui', fontWeight: 400, color: INK,
+          fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em',
+        }}>Δ {absD}</span>
+      </div>
+      <div style={{
+        marginTop: 6,
+        fontFamily: 'Pretendard, system-ui', fontSize: 13, fontWeight: 400,
+        color: MUTE, lineHeight: 1.6, maxWidth: 320,
+        letterSpacing: '-0.005em',
+      }}>
+        두 사진은 {topKr}에서 가장 차이나요.
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Slot picker (비교 대상 변경 overlay)
+// ──────────────────────────────────────────────────────────
+function SlotPicker({ photos, currentIndex, onSelect, onClose }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 200,
+      background: 'rgba(250,250,247,0.92)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{
+        padding: '62px 20px 0',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      }}>
+        <div style={{
+          fontFamily: 'Inter, system-ui', fontSize: 10, fontWeight: 500,
+          letterSpacing: '0.14em', color: MUTE, textTransform: 'uppercase',
+        }}>사진 선택</div>
+        <button onClick={onClose} style={{
+          width: 28, height: 28, padding: 0, background: 'transparent',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 1l12 12M13 1L1 13" stroke={INK} strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div style={{
+        flex: 1, padding: '40px 20px',
+        display: 'flex', flexDirection: 'column', gap: 16,
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 14, width: '100%', maxWidth: 300,
+        }}>
+          {photos.map((p, i) => {
+            const isCurrent = i === currentIndex;
+            return (
+              <div key={p.id} onClick={() => onSelect(i)} style={{
+                cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                gap: 4,
+              }}>
+                <Medal tier={p.tier} size={12} />
+                <div style={{ position: 'relative', width: '100%', marginTop: 2 }}>
+                  {isCurrent ? (
+                    <SageFrame inset={6} tick={10}>
+                      <PhotoPlaceholder seed={p.seed} ratio="1/1" />
+                    </SageFrame>
+                  ) : (
+                    <PhotoPlaceholder seed={p.seed} ratio="1/1" />
+                  )}
+                </div>
+                <div style={{
+                  marginTop: 4,
+                  fontFamily: 'Inter, system-ui', fontSize: 8, fontWeight: 500,
+                  letterSpacing: '0.14em', color: isCurrent ? SAGE : MUTE_2,
+                  textTransform: 'uppercase',
+                }}>{p.tier}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare — Footer actions
+// ──────────────────────────────────────────────────────────
+function FooterActions() {
+  const items = ['완료', '공유', '저장'];
+  return (
+    <div style={{
+      padding: '40px 20px 48px',
+      display: 'flex', gap: 22,
+    }}>
+      {items.map(t => (
+        <div key={t} style={{
+          fontFamily: 'Pretendard, system-ui', fontSize: 13, fontWeight: 400,
+          color: MUTE, letterSpacing: '-0.005em', cursor: 'pointer',
+        }}>{t}</div>
+      ))}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Compare screen
+// ──────────────────────────────────────────────────────────
+function CompareScreen({ mockPhotos, initialA = 0, initialB = 1, onBack }) {
+  const [indexA, setIndexA] = React.useState(initialA);
+  const [indexB, setIndexB] = React.useState(initialB);
+  const [selectingSlot, setSelectingSlot] = React.useState(null);
+
+  const a = mockPhotos[indexA];
+  const b = mockPhotos[indexB];
+
+  const axes = [
+    { label: 'SHAPE',  kr: '형태',   a: a.shape,  b: b.shape  },
+    { label: 'VOLUME', kr: '부피',   a: a.volume, b: b.volume },
+    { label: 'AGE',    kr: '나이감', a: a.age,    b: b.age    },
+  ];
+  const top = axes.reduce((m, x) =>
+    Math.abs(x.a - x.b) > Math.abs(m.a - m.b) ? x : m
+  );
+
+  const aims = [
+    { label: '내추럴', a: a.natural, b: b.natural },
+    { label: '모던',   a: a.modern,  b: b.modern  },
+    { label: '큐트',   a: a.cute,    b: b.cute    },
+  ];
+
+  const handleSlotTap = (slot) => setSelectingSlot(slot);
+  const handlePick = (i) => {
+    if (selectingSlot === 'A') {
+      if (i === indexB) setIndexB(indexA);
+      setIndexA(i);
+    } else {
+      if (i === indexA) setIndexA(indexB);
+      setIndexB(i);
+    }
+    setSelectingSlot(null);
+  };
+
+  const currentPickerIndex = selectingSlot === 'A' ? indexA : indexB;
+
+  return (
+    <div style={{
+      background: PAPER, minHeight: '100%',
+      fontFamily: 'Pretendard, -apple-system, system-ui, sans-serif',
+      color: INK, position: 'relative',
+    }}>
+      <ScreenTopBar tokens={9} onBack={onBack} />
+
+      <PhotoPair a={a} b={b} onSlotTap={handleSlotTap} />
+
+      {/* Block 1 — 3-axis */}
+      <div style={{ padding: '56px 20px 0' }}>
+        <div style={{ height: 0.5, background: LINE, marginBottom: 6 }} />
+        {axes.map(x => (
+          <AxisRow key={x.label}
+            label={x.label} krLabel={x.kr}
+            a={x.a} b={x.b} />
+        ))}
+      </div>
+
+      {/* Block 2 — AIM */}
+      <div style={{ padding: '24px 20px 0' }}>
+        <div style={{ height: 0.5, background: LINE, marginBottom: 16 }} />
+        <div style={{
+          fontFamily: 'Inter, system-ui', fontSize: 10, fontWeight: 500,
+          color: INK, letterSpacing: '0.12em', textTransform: 'uppercase',
+          marginBottom: 4,
+        }}>AIM · <span style={{
+          fontFamily: 'Pretendard, system-ui', fontSize: 11,
+          fontWeight: 500, letterSpacing: '-0.005em', textTransform: 'none',
+        }}>추구미 적합도</span></div>
+        <div style={{ marginTop: 10 }}>
+          {aims.map(x => (
+            <AimRow key={x.label} label={x.label} a={x.a} b={x.b} />
+          ))}
+        </div>
+      </div>
+
+      {/* Block 3 — Insight */}
+      <div style={{ padding: '24px 20px 0' }}>
+        <div style={{ height: 0.5, background: LINE, marginBottom: 6 }} />
+        <Insight topAxis={top.label} topKr={top.kr} delta={top.a - top.b} />
+      </div>
+
+      {/* Nav — change pair */}
+      <div style={{ padding: '52px 20px 0' }}>
+        <div onClick={() => setSelectingSlot('A')} style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          cursor: 'pointer',
+          fontFamily: 'Pretendard, system-ui', fontSize: 13, fontWeight: 400,
+          color: INK, letterSpacing: '-0.005em',
+        }}>
+          <span>다른 조합으로 비교</span>
+          <span style={{ fontFamily: 'Inter, system-ui', fontSize: 14, color: SAGE }}>→</span>
+        </div>
+      </div>
+
+      <FooterActions />
+
+      {selectingSlot && (
+        <SlotPicker
+          photos={mockPhotos}
+          currentIndex={currentPickerIndex}
+          onSelect={handlePick}
+          onClose={() => setSelectingSlot(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Lightbox button
+// ──────────────────────────────────────────────────────────
+function LightboxButton({ locked, label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: 1, height: 48,
+      background: 'rgba(250,250,247,0.08)',
+      border: '0.5px solid rgba(250,250,247,0.22)',
+      borderRadius: 10,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      gap: 10, cursor: 'pointer', padding: '0 16px',
+      fontFamily: 'Pretendard, system-ui', fontSize: 13, fontWeight: 400,
+      color: PAPER, letterSpacing: '-0.005em',
+    }}>
+      <span>{label}</span>
+      {locked ? (
+        <svg width="12" height="13" viewBox="0 0 12 13" fill="none" style={{ opacity: 0.5 }}>
+          <rect x="2" y="6" width="8" height="6" rx="0.8" stroke={PAPER} strokeWidth="1" />
+          <path d="M4 6V4a2 2 0 014 0v2" stroke={PAPER} strokeWidth="1" strokeLinecap="round"/>
+        </svg>
+      ) : (
+        <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+          <path d="M1.5 6h10M8 1.5l4 4.5-4 4.5" stroke={SAGE} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Lightbox (확대 뷰)
+// ──────────────────────────────────────────────────────────
+function Lightbox({ photo, isPro, onClose, onCompare, onDeep, onPaywall }) {
+  const isGold = photo.tier === 'gold';
+  const showBlur = !isPro && !isGold;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 999,
+      background: 'rgba(15,15,14,0.92)',
+      display: 'flex', flexDirection: 'column',
+      animation: 'lightbox-fade 220ms ease-out',
+    }}>
+      <style>{`
+        @keyframes lightbox-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+
+      {/* Close */}
+      <div style={{
+        padding: '60px 20px 0',
+        display: 'flex', justifyContent: 'flex-end',
+      }}>
+        <button onClick={onClose} style={{
+          width: 32, height: 32, padding: 0, background: 'transparent',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 1l12 12M13 1L1 13" stroke={PAPER} strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Photo + buttons */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', padding: '0 30px 60px',
+      }}>
+        <div style={{ position: 'relative', width: '100%' }}>
+          {isGold ? (
+            <SageFrame inset={8} tick={14}>
+              <div style={{
+                filter: showBlur ? 'blur(10px)' : 'none',
+                overflow: 'hidden',
+              }}>
+                <PhotoPlaceholder seed={photo.seed} ratio="4/5" />
+              </div>
+            </SageFrame>
+          ) : (
+            <div style={{
+              filter: showBlur ? 'blur(10px)' : 'none',
+              overflow: 'hidden',
+            }}>
+              <PhotoPlaceholder seed={photo.seed} ratio="4/5" />
+            </div>
+          )}
+
+          {/* Medal + tier label overlay */}
+          <div style={{
+            position: 'absolute', left: 16, top: 16,
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '5px 10px',
+            background: 'rgba(250,250,247,0.9)',
+            borderRadius: 999,
+          }}>
+            <Medal tier={photo.tier} size={14} />
+            <span style={{
+              fontFamily: 'Inter, system-ui', fontSize: 10, fontWeight: 500,
+              color: INK, letterSpacing: '0.14em', textTransform: 'uppercase',
+            }}>{photo.tier}</span>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{
+          marginTop: 32, display: 'flex', gap: 8,
+        }}>
+          <LightboxButton
+            locked={!isPro}
+            label="비교하기"
+            onClick={isPro ? onCompare : onPaywall} />
+          <LightboxButton
+            locked={!isPro}
+            label="전체 진단"
+            onClick={isPro ? onDeep : onPaywall} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Result background (for lightbox demos)
+// ──────────────────────────────────────────────────────────
+function ResultBackdrop() {
+  return (
+    <div style={{
+      background: PAPER, minHeight: '100%',
+      padding: '62px 20px 40px',
+      color: INK,
+    }}>
+      <div style={{
+        fontFamily: 'Inter, system-ui', fontSize: 11, fontWeight: 500,
+        letterSpacing: '0.24em', color: INK, marginBottom: 26,
+      }}>SIGAK</div>
+      <div style={{
+        fontFamily: 'Pretendard, system-ui', fontSize: 12, fontWeight: 400,
+        color: MUTE, marginBottom: 12,
+      }}>4월 19일</div>
+      <div style={{
+        fontFamily: 'Pretendard, system-ui', fontSize: 28, fontWeight: 500,
+        color: INK, lineHeight: 1.3, letterSpacing: '-0.02em',
+      }}>
+        이 중에서는,<br/>이 한 장.
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Mobile frame
+// ──────────────────────────────────────────────────────────
+function MobileFrame({ children, dark = false }) {
+  return (
+    <div className="mobile-frame">
+      <DynamicIsland />
+      <StatusBar dark={dark} />
+      <div className="mobile-inner">{children}</div>
+      <HomeIndicator dark={dark} />
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Demo controls
+// ──────────────────────────────────────────────────────────
+function DemoControls({ view, setView }) {
+  const btns = [
+    { id: 'compare',       label: 'Compare (Pro)' },
+    { id: 'lightbox-pro',  label: 'Lightbox · Pro' },
+    { id: 'lightbox-free', label: 'Lightbox · Free' },
+  ];
+  return (
+    <div className="ctrl-row">
+      {btns.map(b => (
+        <button key={b.id}
+          className={view === b.id ? 'active' : ''}
+          onClick={() => setView(b.id)}>{b.label}</button>
+      ))}
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────
+// Mock data
+// ──────────────────────────────────────────────────────────
+const MOCK_PHOTOS = [
+  { id: 1, seed: 0, tier: 'gold',   shape: 82, volume: 79, age: 84, natural: 91, modern: 76, cute: 68 },
+  { id: 2, seed: 3, tier: 'silver', shape: 71, volume: 68, age: 74, natural: 72, modern: 84, cute: 55 },
+  { id: 3, seed: 5, tier: 'silver', shape: 68, volume: 65, age: 78, natural: 80, modern: 72, cute: 62 },
+  { id: 4, seed: 2, tier: 'silver', shape: 66, volume: 72, age: 70, natural: 76, modern: 70, cute: 64 },
+  { id: 5, seed: 4, tier: 'bronze', shape: 64, volume: 58, age: 69, natural: 65, modern: 68, cute: 58 },
+  { id: 6, seed: 6, tier: 'bronze', shape: 61, volume: 55, age: 72, natural: 70, modern: 62, cute: 48 },
+  { id: 7, seed: 7, tier: 'bronze', shape: 59, volume: 62, age: 66, natural: 62, modern: 60, cute: 52 },
+  { id: 8, seed: 1, tier: 'bronze', shape: 56, volume: 60, age: 64, natural: 58, modern: 55, cute: 60 },
+];
+
+// ──────────────────────────────────────────────────────────
+// App
+// ──────────────────────────────────────────────────────────
+function App() {
+  const [view, setView] = React.useState('compare');
+
+  const handlePaywall = () => {
+    alert('[Demo] 무료 상태 → Pro 결제로 유도\n실제 앱: Result 화면의 ProUnlockBlock으로 smooth scroll + pulse');
+  };
+  const handleCompare = () => {
+    setView('compare');
+  };
+  const handleDeep = () => {
+    alert('[Demo] Deep Analysis 화면 진입\n(CTO 영역, 이 mock up 범위 밖)');
+  };
+  const handleClose = () => {
+    alert('[Demo] Lightbox 닫기\n실제 앱: Result 화면으로 복귀');
+  };
+  const handleBack = () => {
+    setView('lightbox-pro');
+  };
+
+  return (
+    <div>
+      <DemoControls view={view} setView={setView} />
+      <div className="stage">
+        <MobileFrame dark={view !== 'compare'}>
+          {view === 'compare' && (
+            <CompareScreen
+              mockPhotos={MOCK_PHOTOS}
+              initialA={0} initialB={1}
+              onBack={handleBack} />
+          )}
+          {(view === 'lightbox-pro' || view === 'lightbox-free') && (
+            <React.Fragment>
+              <ResultBackdrop />
+              <Lightbox
+                photo={view === 'lightbox-pro' ? MOCK_PHOTOS[1] : MOCK_PHOTOS[1]}
+                isPro={view === 'lightbox-pro'}
+                onClose={handleClose}
+                onCompare={handleCompare}
+                onDeep={handleDeep}
+                onPaywall={handlePaywall} />
+            </React.Fragment>
+          )}
+        </MobileFrame>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

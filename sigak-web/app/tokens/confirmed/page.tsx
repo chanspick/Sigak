@@ -133,7 +133,7 @@ function ConfirmedContent() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/" />
 
       <main
         style={{

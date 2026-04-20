@@ -90,7 +90,7 @@ export default function ProfilePage() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      <FeedTopBar />
+      <FeedTopBar backTarget="/" />
 
       {/* 프로필 정보 */}
       <section style={{ padding: "36px 28px 28px" }}>

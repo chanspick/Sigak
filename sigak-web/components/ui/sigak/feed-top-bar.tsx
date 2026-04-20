@@ -1,28 +1,39 @@
 // SIGAK MVP v1.2 — FeedTopBar
 //
-// 홈/프로필 전용. 검정 바 52px + 좌우 분할:
-//   좌: letterspaced SIGAK
-//   우: [토큰잔액] [프로필아이콘] [+ 버튼 → /verdict/new]
-//
-// 온보딩/로그인/결제/verdict/terms 같은 서브 화면은 기존 TopBar(centered SIGAK) 사용.
+// 검정 바 52px.
+//   - backTarget/onBack 없으면 (/feed 루트): 좌 SIGAK, 우 [balance / profile / +]
+//   - backTarget/onBack 있으면 (/profile 등 서브): 좌 back chevron, 중앙 SIGAK,
+//     우 [balance / profile / +]
 "use client";
 
-import Image from "next/image";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 import { useTokenBalance } from "@/hooks/use-token-balance";
 import { getCurrentUser } from "@/lib/auth";
 
-export function FeedTopBar() {
+interface FeedTopBarProps {
+  /** 왼쪽 back chevron 활성화 (이 경로로 push). */
+  backTarget?: string;
+  /** 왼쪽 back chevron 활성화 (커스텀 콜백). backTarget보다 우선. */
+  onBack?: () => void;
+}
+
+export function FeedTopBar({ backTarget, onBack }: FeedTopBarProps = {}) {
   const router = useRouter();
   const { balance } = useTokenBalance();
+  const showBack = onBack != null || backTarget != null;
 
   const profileImage = useMemo(() => {
     if (typeof window === "undefined") return "";
     const u = getCurrentUser();
     return u?.profileImage || "";
   }, []);
+
+  function handleBack() {
+    if (onBack) onBack();
+    else if (backTarget) router.push(backTarget);
+  }
 
   return (
     <nav
@@ -35,27 +46,88 @@ export function FeedTopBar() {
         color: "var(--color-paper)",
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 20px",
         flexShrink: 0,
+        padding: "0 20px",
       }}
     >
-      {/* Left: SIGAK */}
-      <span
-        className="font-sans"
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: "6px",
-          color: "var(--color-paper)",
-        }}
-      >
-        SIGAK
-      </span>
+      {/* Left — back chevron 또는 SIGAK 워드마크 */}
+      {showBack ? (
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label="뒤로"
+          style={{
+            width: 32,
+            height: 32,
+            padding: 0,
+            marginLeft: -8,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-start",
+          }}
+        >
+          <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
+            <path
+              d="M8 1L1 8l7 7"
+              stroke="var(--color-paper)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              opacity="0.85"
+            />
+          </svg>
+        </button>
+      ) : (
+        <span
+          className="font-sans"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "6px",
+            color: "var(--color-paper)",
+          }}
+        >
+          SIGAK
+        </span>
+      )}
 
-      {/* Right: balance + profile + plus */}
+      {/* Center — back 있을 때만 SIGAK 중앙 */}
+      {showBack && (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            height: "100%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <span
+            className="font-sans"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "6px",
+              color: "var(--color-paper)",
+            }}
+          >
+            SIGAK
+          </span>
+        </div>
+      )}
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Right — balance + profile + plus */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        {/* Token balance */}
         <span
           className="font-sans tabular-nums"
           style={{
@@ -71,7 +143,6 @@ export function FeedTopBar() {
           {balance ?? 0}
         </span>
 
-        {/* Profile icon → /profile */}
         <button
           type="button"
           onClick={() => router.push("/profile")}
@@ -108,7 +179,6 @@ export function FeedTopBar() {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                letterSpacing: "1px",
                 color: "var(--color-paper)",
                 opacity: 0.7,
               }}
@@ -118,7 +188,6 @@ export function FeedTopBar() {
           )}
         </button>
 
-        {/* Plus icon → /verdict/new */}
         <button
           type="button"
           onClick={() => router.push("/verdict/new")}

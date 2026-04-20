@@ -50,7 +50,7 @@ export default function OnboardingCompletePage() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/" />
 
       {/* 본문 */}
       <section

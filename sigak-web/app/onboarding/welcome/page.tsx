@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { getToken } from "@/lib/auth";
+import { getToken, logout } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe, saveConsent } from "@/lib/api/onboarding";
 import { ONBOARDING_STEPS } from "@/lib/constants/onboarding-steps";
@@ -147,7 +147,19 @@ export default function OnboardingWelcomePage() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar
+        onBack={() => {
+          // 뒤로 가기 = 로그아웃. 이 화면에서 consent 미완이라 / 로 돌려보내도
+          // 가드가 welcome으로 튕김 → 순환 방지 차원에서 logout().
+          if (
+            typeof window !== "undefined" &&
+            !window.confirm("뒤로 가면 로그아웃됩니다. 진행할까요?")
+          ) {
+            return;
+          }
+          logout();
+        }}
+      />
 
       <main style={{ padding: "48px 28px 24px", flex: 1 }}>
         {/* 헤드라인 */}

@@ -20,7 +20,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 interface ProfileState {
   name: string;
-  email: string;
+  kakaoId: string;
   profileImage: string;
 }
 
@@ -29,7 +29,7 @@ export function FeedView() {
   const [tab, setTab] = useState<TabKey>("feed");
   const [profile, setProfile] = useState<ProfileState>({
     name: "",
-    email: "",
+    kakaoId: "",
     profileImage: "",
   });
 
@@ -38,7 +38,7 @@ export function FeedView() {
     if (u) {
       setProfile({
         name: u.name || "익명",
-        email: u.email || "",
+        kakaoId: u.kakaoId || "",
         profileImage: u.profileImage || "",
       });
     }
@@ -48,7 +48,7 @@ export function FeedView() {
     <>
       <ProfileSection
         name={profile.name}
-        email={profile.email}
+        kakaoId={profile.kakaoId}
         profileImage={profile.profileImage}
         verdictCount={total}
       />
@@ -70,14 +70,14 @@ function labelFor(tab: TabKey): string {
 
 interface ProfileSectionProps {
   name: string;
-  email: string;
+  kakaoId: string;
   profileImage: string;
   verdictCount: number | null;
 }
 
 function ProfileSection({
   name,
-  email,
+  kakaoId,
   profileImage,
   verdictCount,
 }: ProfileSectionProps) {
@@ -132,7 +132,7 @@ function ProfileSection({
         >
           {name || "익명"}
         </div>
-        {email && (
+        {kakaoId && (
           <div
             className="font-sans"
             style={{
@@ -146,7 +146,7 @@ function ProfileSection({
               whiteSpace: "nowrap",
             }}
           >
-            {email}
+            @{kakaoId}
           </div>
         )}
       </div>

@@ -68,21 +68,28 @@ function PurchaseContent() {
         { method: "POST", json: req },
       );
 
-      // Toss SDK 동적 로드 (SSR 회피)
-      const { loadTossPayments } = await import("@tosspayments/payment-sdk");
+      // Toss SDK V2 동적 로드 (SSR 회피). gck_ prefix 키 사용.
+      const { loadTossPayments, ANONYMOUS } = await import(
+        "@tosspayments/tosspayments-sdk"
+      );
       const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+
+      // Non-subscription 일회성 카드 결제 → ANONYMOUS customerKey OK.
+      // (정기결제/자동결제로 확장 시 실제 user_id로 교체)
+      const payment = tossPayments.payment({ customerKey: ANONYMOUS });
 
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
 
-      await tossPayments.requestPayment("카드", {
-        amount: order.pg_amount,
+      await payment.requestPayment({
+        method: "CARD",
+        amount: { currency: "KRW", value: order.pg_amount },
         orderId: order.pg_order_id,
         orderName: order.pg_order_name,
         successUrl: `${origin}${successPath}`,
         failUrl: `${origin}/tokens/fail`,
       });
-      // tossPayments.requestPayment는 새 창/페이지 이동이므로 여기 도달 시 취소된 것.
+      // requestPayment는 페이지 이동이므로 여기 도달 시 취소된 것.
     } catch (e) {
       setSubmitting(false);
       if (e instanceof ApiError && e.status === 401) {

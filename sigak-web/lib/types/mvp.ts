@@ -203,6 +203,52 @@ export interface ChugumiCoords {
   age: number;
 }
 
+// ─────────────────────────────────────────────
+//  PI 리포트 (v2 BM — 유저 1회 50토큰 영속 해제)
+// ─────────────────────────────────────────────
+
+/** 최초 해제 시 placeholder. 실제 생성 로직 붙으면 필드 채워짐. */
+export interface PIReportData {
+  status?: "generating" | "ready" | "migrated_from_sigak_report" | string;
+  face_analysis?: unknown | null;
+  skin_tone?: unknown | null;
+  gap_analysis?: unknown | null;
+  hair_recommendations?: unknown | null;
+  makeup_guide?: unknown | null;
+  [key: string]: unknown;
+}
+
+export interface PIStatusResponse {
+  unlocked: boolean;
+  cost: number;
+  unlocked_at?: string | null;
+  report_data?: PIReportData | null;
+}
+
+export interface PIUnlockResponse {
+  unlocked: true;
+  unlocked_at: string;
+  report_data: PIReportData;
+  token_balance: number;
+}
+
+// ─────────────────────────────────────────────
+//  변화 탭 (v2 BM — 무료)
+// ─────────────────────────────────────────────
+
+export interface ChangeEntry {
+  verdict_id: string;
+  created_at: string;
+  winner_coords: ChugumiCoords | null;
+  target_coords: ChugumiCoords | null;
+  diagnosis_unlocked: boolean;
+}
+
+export interface ChangeResponse {
+  entries: ChangeEntry[];
+  count: number;
+}
+
 export interface SigakReportResponse {
   released: boolean;
   cost: number;

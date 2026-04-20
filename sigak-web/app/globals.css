@@ -52,6 +52,25 @@ body {
   color: var(--color-ink);
 }
 
+/* ──────────────────────────────────────────────
+ * 데스크톱 모바일 프레임 (A1)
+ *
+ * 441px 이상 화면에서는 body를 440px max-width 센터 정렬로 묶어
+ * 폰 프레임 느낌 유지. 주변 배경은 어두운 톤으로 대비.
+ * 441px 미만(실제 모바일)은 기본 full-width.
+ * ────────────────────────────────────────────── */
+@media (min-width: 441px) {
+  html {
+    background: #1a1a1a;
+  }
+  body {
+    max-width: 440px;
+    margin: 0 auto;
+    min-height: 100vh;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.12);
+  }
+}
+
 ::selection {
   background-color: var(--color-ink);
   color: var(--color-paper);

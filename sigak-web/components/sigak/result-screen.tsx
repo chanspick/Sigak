@@ -190,7 +190,7 @@ export function ResultScreen({
 
       <Rule />
 
-      {/* Footer — 공유만 */}
+      {/* Footer — 공유 */}
       <section
         style={{
           padding: "32px 28px 24px",
@@ -198,7 +198,7 @@ export function ResultScreen({
           justifyContent: "center",
         }}
       >
-        <FooterLink>공유</FooterLink>
+        <ShareButton verdictId={verdict.verdict_id} />
       </section>
 
       {/* 사업자 정보 (PG 심사 필수) */}
@@ -338,6 +338,71 @@ function FooterLink({ children }: { children: React.ReactNode }) {
     >
       {children}
     </span>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  ShareButton — Web Share API + clipboard fallback
+// ─────────────────────────────────────────────
+
+function ShareButton({ verdictId }: { verdictId: string }) {
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  async function handleShare() {
+    if (typeof window === "undefined") return;
+    const url = `${window.location.origin}/verdict/${verdictId}`;
+    const shareData = {
+      title: "SIGAK — 시각이 본 당신",
+      text: "오늘 한 장.",
+      url,
+    };
+
+    const nav = navigator as Navigator & {
+      share?: (data: ShareData) => Promise<void>;
+      canShare?: (data: ShareData) => boolean;
+    };
+
+    // 1) Native share (모바일)
+    if (nav.share) {
+      try {
+        await nav.share(shareData);
+        return;
+      } catch (e) {
+        // AbortError = 사용자가 공유 취소, 무시
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        // 그 외 → clipboard fallback으로 진행
+      }
+    }
+
+    // 2) Clipboard fallback (데스크톱)
+    try {
+      await navigator.clipboard.writeText(url);
+      setFeedback("링크 복사됨");
+      setTimeout(() => setFeedback(null), 2000);
+    } catch {
+      setFeedback("공유 실패");
+      setTimeout(() => setFeedback(null), 2000);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      className="font-sans"
+      style={{
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        fontSize: 13,
+        opacity: 0.55,
+        letterSpacing: "-0.005em",
+        cursor: "pointer",
+        color: "var(--color-ink)",
+      }}
+    >
+      {feedback ?? "공유"}
+    </button>
   );
 }
 

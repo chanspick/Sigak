@@ -1,20 +1,14 @@
-// SIGAK MVP v1.2 (Rebrand) — ResultScreen
+// SIGAK MVP v1.2 (D-6 Batch 3) — ResultScreen
 //
-// 브랜딩 리팩토링:
-//   - Medal/SageFrame 전면 제거. "GOLD/SILVER/BRONZE" 라벨 문구 삭제
-//   - 날짜 라벨 "2026 · 04 · 19" (sans 11px/2px letterSpacing/opacity 0.4)
-//   - 헤드라인 "이 한 장." serif 40px weight 400
-//   - GOLD 이미지 4/5 프레임 없이 직접 렌더
-//   - Reading: Noto Serif 18px lineHeight 1.7
-//   - SILVER/BRONZE: 메달 라벨 제거, "나머지 N장" 단일 행으로 통합
+// 나머지 N장 섹션을 페이지에서 제거하고 모달로 분리.
+// GOLD 이미지 아래에 "진단 보기" 버튼 — 클릭 시 DiagnosisModal open.
+//   - blur_released=false: 모달 안에서 silver/bronze 블러 + PRO CTA (50 토큰)
+//   - blur_released=true:  모달 안에서 이미지 복구 + readings + full_analysis
 //
-// 기능은 그대로 유지:
-//   - 3-tier 구조(gold[0] + silver + bronze) 응답 그대로 사용
-//   - blur_released 분기 (false면 remaining 이미지 블러, true면 전체 공개 + pro_data)
-//   - PRO CTA: 잔액 ≥50 → 인라인 releaseBlur / <50 → /tokens/purchase intent
+// Footer는 "공유"만 (Batch 1에서 반영).
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { TopBar } from "@/components/ui/sigak";
@@ -40,19 +34,16 @@ export function ResultScreen({
 
   const [verdict, setVerdict] = useState<VerdictResponse>(initialVerdict);
   const [lightbox, setLightbox] = useState(false);
-  const [pulseKey, setPulseKey] = useState(0);
+  const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
-  const proRef = useRef<HTMLDivElement>(null);
 
   const gold = verdict.tiers.gold[0] ?? null;
-  const silver = verdict.tiers.silver;
-  const bronze = verdict.tiers.bronze;
-  const remaining: TierPhoto[] = [...silver, ...bronze];
+  const remaining: TierPhoto[] = [...verdict.tiers.silver, ...verdict.tiers.bronze];
   const reading = verdict.gold_reading || goldReadingOverride || "";
   const released = verdict.blur_released;
-  const tokens = balance ?? 0;
 
+  // lightbox ESC
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => {
@@ -62,11 +53,25 @@ export function ResultScreen({
     return () => window.removeEventListener("keydown", onKey);
   }, [lightbox]);
 
-  function scrollToProAndPulse() {
-    if (!proRef.current) return;
-    proRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    setPulseKey((k) => k + 1);
-  }
+  // 모달 ESC
+  useEffect(() => {
+    if (!showDiagnosis) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowDiagnosis(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showDiagnosis]);
+
+  // body scroll lock — lightbox 또는 모달
+  useEffect(() => {
+    if (!showDiagnosis && !lightbox) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [showDiagnosis, lightbox]);
 
   async function handleProCta() {
     if (releasing) return;
@@ -101,7 +106,7 @@ export function ResultScreen({
         return;
       }
       if (e instanceof ApiError && e.status === 401) {
-        router.replace("/auth/login");
+        router.replace("/");
         return;
       }
       setReleaseError(
@@ -143,7 +148,7 @@ export function ResultScreen({
         </h1>
       </section>
 
-      {/* 선택된 사진 — 풀 너비, 프레임 없음 */}
+      {/* GOLD 이미지 */}
       {gold && (
         <div
           style={{ padding: "0 28px", cursor: "pointer" }}
@@ -153,7 +158,16 @@ export function ResultScreen({
         </div>
       )}
 
-      {/* Reading */}
+      {/* 진단 보기 버튼 — GOLD 바로 아래 */}
+      <div style={{ padding: "20px 28px 0" }}>
+        <DiagnosisButton
+          locked={!released}
+          remainingCount={remaining.length}
+          onClick={() => setShowDiagnosis(true)}
+        />
+      </div>
+
+      {/* Reading (무료) */}
       {reading && (
         <section style={{ padding: "28px 28px 36px" }}>
           <p
@@ -175,59 +189,6 @@ export function ResultScreen({
 
       <Rule />
 
-      {/* 나머지 후보 */}
-      {remaining.length > 0 && (
-        <section style={{ padding: "28px 28px 32px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-            }}
-          >
-            <Label>나머지</Label>
-            <LabelRight>{remaining.length}장</LabelRight>
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: 4,
-            }}
-          >
-            {remaining.map((photo, i) => {
-              if (released && photo.url) {
-                return (
-                  <div key={photo.photo_id} style={{ opacity: 0.5 }}>
-                    <PhotoTile url={resolvePhotoUrl(photo.url)} aspectRatio="1/1" />
-                  </div>
-                );
-              }
-              return (
-                <BlurredTile key={photo.photo_id || i} onTap={scrollToProAndPulse} />
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <Rule />
-
-      {/* PRO 블록 (blur_released=false 에서만) */}
-      {!released ? (
-        <ProUnlockBlock
-          refEl={proRef}
-          pulseKey={pulseKey}
-          onClick={handleProCta}
-          balance={balance}
-          busy={releasing}
-          error={releaseError}
-        />
-      ) : (
-        <ProRevealedBlock verdict={verdict} />
-      )}
-
       {/* Footer — 공유만 */}
       <section
         style={{
@@ -239,8 +200,23 @@ export function ResultScreen({
         <FooterLink>공유</FooterLink>
       </section>
 
+      {/* Lightbox — GOLD 확대 */}
       {lightbox && gold && (
         <Lightbox url={resolvePhotoUrl(gold.url)} onClose={() => setLightbox(false)} />
+      )}
+
+      {/* Diagnosis Modal */}
+      {showDiagnosis && (
+        <DiagnosisModal
+          verdict={verdict}
+          remaining={remaining}
+          released={released}
+          balance={balance}
+          busy={releasing}
+          error={releaseError}
+          onClose={() => setShowDiagnosis(false)}
+          onProCta={handleProCta}
+        />
       )}
     </div>
   );
@@ -276,13 +252,7 @@ function DateLabel() {
   );
 }
 
-function PhotoTile({
-  url,
-  aspectRatio,
-}: {
-  url: string;
-  aspectRatio: string;
-}) {
+function PhotoTile({ url, aspectRatio }: { url: string; aspectRatio: string }) {
   return (
     <div
       style={{
@@ -306,40 +276,6 @@ function PhotoTile({
         />
       )}
     </div>
-  );
-}
-
-function BlurredTile({ onTap }: { onTap: () => void }) {
-  const [hot, setHot] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      onPointerEnter={() => setHot(true)}
-      onPointerLeave={() => setHot(false)}
-      aria-label="가려진 사진 — PRO 해제"
-      style={{
-        cursor: "pointer",
-        overflow: "hidden",
-        aspectRatio: "1/1",
-        border: "none",
-        padding: 0,
-        background: "rgba(0, 0, 0, 0.06)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          filter: hot ? "blur(6px)" : "blur(10px)",
-          transform: "scale(1.15)",
-          transformOrigin: "center",
-          transition: "filter 200ms ease-out",
-          background:
-            "repeating-linear-gradient(32deg, rgba(0,0,0,0.08) 0 14px, rgba(0,0,0,0.02) 14px 15px)",
-        }}
-      />
-    </button>
   );
 }
 
@@ -377,11 +313,7 @@ function LabelRight({ children }: { children: React.ReactNode }) {
   return (
     <span
       className="font-serif tabular-nums"
-      style={{
-        fontSize: 14,
-        fontWeight: 400,
-        color: "var(--color-ink)",
-      }}
+      style={{ fontSize: 14, fontWeight: 400, color: "var(--color-ink)" }}
     >
       {children}
     </span>
@@ -406,53 +338,304 @@ function FooterLink({ children }: { children: React.ReactNode }) {
 }
 
 // ─────────────────────────────────────────────
-//  PRO unlock block — 50 토큰
+//  DiagnosisButton — GOLD 아래 CTA
 // ─────────────────────────────────────────────
 
-function ProUnlockBlock({
-  refEl,
-  pulseKey,
+function DiagnosisButton({
+  locked,
+  remainingCount,
   onClick,
+}: {
+  locked: boolean;
+  remainingCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="font-sans"
+      style={{
+        width: "100%",
+        height: 48,
+        background: "transparent",
+        color: "var(--color-ink)",
+        border: "1px solid rgba(0, 0, 0, 0.25)",
+        borderRadius: 0,
+        fontSize: 13,
+        fontWeight: 600,
+        letterSpacing: "0.3px",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        padding: "0 18px",
+      }}
+    >
+      <span>진단 보기</span>
+      {locked && (
+        <>
+          <svg width="11" height="12" viewBox="0 0 11 12" aria-hidden style={{ opacity: 0.5 }}>
+            <rect
+              x="1.5"
+              y="5.5"
+              width="8"
+              height="6"
+              rx="0.8"
+              stroke="var(--color-ink)"
+              strokeWidth="1"
+              fill="none"
+            />
+            <path
+              d="M3.5 5.5V3.5a2 2 0 014 0v2"
+              stroke="var(--color-ink)"
+              strokeWidth="1"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </svg>
+          <span
+            className="font-serif tabular-nums"
+            style={{ fontSize: 13, fontWeight: 400 }}
+          >
+            {BLUR_RELEASE_COST} 토큰
+          </span>
+        </>
+      )}
+      {!locked && remainingCount > 0 && (
+        <span
+          className="font-serif tabular-nums"
+          style={{ fontSize: 13, fontWeight: 400, opacity: 0.5 }}
+        >
+          · 나머지 {remainingCount}장
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  DiagnosisModal
+// ─────────────────────────────────────────────
+
+function DiagnosisModal({
+  verdict,
+  remaining,
+  released,
   balance,
   busy,
   error,
+  onClose,
+  onProCta,
 }: {
-  refEl: React.RefObject<HTMLDivElement | null>;
-  pulseKey: number;
-  onClick: () => void;
+  verdict: VerdictResponse;
+  remaining: TierPhoto[];
+  released: boolean;
   balance: number | null;
   busy: boolean;
   error: string | null;
+  onClose: () => void;
+  onProCta: () => void;
 }) {
-  const innerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!pulseKey || !innerRef.current) return;
-    innerRef.current.animate(
-      [
-        { opacity: 1 },
-        { opacity: 0.65 },
-        { opacity: 1 },
-      ],
-      { duration: 900, easing: "ease-out" },
-    );
-  }, [pulseKey]);
-
-  const insufficient = balance != null && balance < BLUR_RELEASE_COST;
-
   return (
-    <div ref={refEl} style={{ padding: "28px 28px 0" }}>
-      <div
-        ref={innerRef}
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onClick();
+    <div
+      className="animate-fade-in"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: "var(--color-paper)",
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="진단"
+    >
+      {/* 상단: Close + 타이틀 */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          height: 52,
+          background: "var(--color-ink)",
+          color: "var(--color-paper)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 20px",
+          flexShrink: 0,
         }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫기"
+          style={{
+            width: 32,
+            height: 32,
+            padding: 0,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+            <path
+              d="M1 1l12 12M13 1L1 13"
+              stroke="var(--color-paper)"
+              strokeWidth="1"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </svg>
+        </button>
+        <span
+          className="font-sans"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "4px",
+            color: "var(--color-paper)",
+          }}
+        >
+          진단
+        </span>
+        <span style={{ width: 32 }} aria-hidden />
+      </header>
+
+      {/* 나머지 이미지 그리드 */}
+      {remaining.length > 0 && (
+        <section style={{ padding: "28px 28px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 12,
+            }}
+          >
+            <Label>나머지</Label>
+            <LabelRight>{remaining.length}장</LabelRight>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 4,
+            }}
+          >
+            {remaining.map((photo) => (
+              <ModalTile
+                key={photo.photo_id}
+                photo={photo}
+                locked={!released}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* PRO unlock or pro_data */}
+      {!released ? (
+        <ProUnlockSection
+          balance={balance}
+          busy={busy}
+          error={error}
+          onClick={onProCta}
+        />
+      ) : (
+        <ProRevealedSection verdict={verdict} />
+      )}
+
+      <div style={{ height: 48 }} />
+    </div>
+  );
+}
+
+function ModalTile({
+  photo,
+  locked,
+}: {
+  photo: TierPhoto;
+  locked: boolean;
+}) {
+  if (locked || !photo.url) {
+    return (
+      <div
+        style={{
+          aspectRatio: "1/1",
+          overflow: "hidden",
+          background: "rgba(0, 0, 0, 0.06)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            filter: "blur(10px)",
+            transform: "scale(1.15)",
+            background:
+              "repeating-linear-gradient(32deg, rgba(0,0,0,0.08) 0 14px, rgba(0,0,0,0.02) 14px 15px)",
+          }}
+        />
+      </div>
+    );
+  }
+  const src = resolvePhotoUrl(photo.url);
+  return (
+    <div
+      style={{
+        aspectRatio: "1/1",
+        overflow: "hidden",
+        background: "rgba(0, 0, 0, 0.04)",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+        }}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Pro Unlock Section (inside modal)
+// ─────────────────────────────────────────────
+
+function ProUnlockSection({
+  balance,
+  busy,
+  error,
+  onClick,
+}: {
+  balance: number | null;
+  busy: boolean;
+  error: string | null;
+  onClick: () => void;
+}) {
+  const insufficient = balance != null && balance < BLUR_RELEASE_COST;
+  return (
+    <section style={{ padding: "32px 28px 0" }}>
+      <div
         style={{
           border: "1px solid rgba(0, 0, 0, 0.15)",
           padding: "24px 22px",
-          cursor: "pointer",
+          background: "transparent",
         }}
       >
         <div
@@ -482,10 +665,11 @@ function ProUnlockBlock({
           가려진 것들
         </div>
 
-        <div
+        <p
           className="font-sans"
           style={{
             marginTop: 8,
+            marginBottom: 0,
             fontSize: 13,
             opacity: 0.55,
             lineHeight: 1.55,
@@ -494,45 +678,39 @@ function ProUnlockBlock({
           }}
         >
           나머지 사진과 전체 진단까지.
-        </div>
+        </p>
 
-        <div
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={busy}
+          className="font-sans"
           style={{
             marginTop: 20,
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
+            width: "100%",
+            height: 50,
+            background: busy ? "transparent" : "var(--color-ink)",
+            color: busy ? "var(--color-ink)" : "var(--color-paper)",
+            border: busy ? "1px solid rgba(0, 0, 0, 0.15)" : "none",
+            borderRadius: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: "0.5px",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.5 : 1,
           }}
         >
-          <span
-            className="font-sans uppercase"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "1.5px",
-              opacity: 0.4,
-              color: "var(--color-ink)",
-            }}
-          >
-            해제
-          </span>
-          <span
-            className="font-serif tabular-nums"
-            style={{
-              fontSize: 18,
-              fontWeight: 400,
-              color: "var(--color-ink)",
-            }}
-          >
-            {BLUR_RELEASE_COST} 토큰
-          </span>
-        </div>
+          {busy
+            ? "해제 중..."
+            : `해제 · ${BLUR_RELEASE_COST} 토큰`}
+        </button>
 
         {insufficient && !busy && (
-          <div
+          <p
             className="font-sans"
             style={{
               marginTop: 10,
+              marginBottom: 0,
               fontSize: 11,
               opacity: 0.5,
               letterSpacing: "-0.005em",
@@ -541,28 +719,14 @@ function ProUnlockBlock({
             }}
           >
             현재 잔액 {balance}토큰 — 충전 페이지로 안내
-          </div>
-        )}
-        {busy && (
-          <div
-            className="font-sans"
-            style={{
-              marginTop: 10,
-              fontSize: 11,
-              opacity: 0.5,
-              letterSpacing: "-0.005em",
-              textAlign: "right",
-              color: "var(--color-ink)",
-            }}
-          >
-            해제 중...
-          </div>
+          </p>
         )}
         {error && (
-          <div
+          <p
             className="font-sans"
             style={{
               marginTop: 10,
+              marginBottom: 0,
               fontSize: 11,
               letterSpacing: "-0.005em",
               textAlign: "right",
@@ -571,23 +735,23 @@ function ProUnlockBlock({
             role="alert"
           >
             {error}
-          </div>
+          </p>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
 // ─────────────────────────────────────────────
-//  PRO revealed block
+//  Pro Revealed Section (inside modal)
 // ─────────────────────────────────────────────
 
-function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
+function ProRevealedSection({ verdict }: { verdict: VerdictResponse }) {
   const data = verdict.pro_data;
   if (!data) return null;
   const all = [...data.silver_readings, ...data.bronze_readings];
   return (
-    <div style={{ padding: "28px 28px 0" }}>
+    <section style={{ padding: "32px 28px 0" }}>
       <div
         style={{
           display: "flex",
@@ -619,8 +783,10 @@ function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
                 color: "var(--color-ink)",
               }}
             >
-              #{String(i + 2).padStart(2, "0")} · Δ shape {formatDelta(r.axis_delta.shape)},
-              volume {formatDelta(r.axis_delta.volume)}, age {formatDelta(r.axis_delta.age)}
+              #{String(i + 2).padStart(2, "0")} · Δ shape{" "}
+              {formatDelta(r.axis_delta.shape)}, volume{" "}
+              {formatDelta(r.axis_delta.volume)}, age{" "}
+              {formatDelta(r.axis_delta.age)}
             </div>
             <p
               className="font-serif"
@@ -657,7 +823,7 @@ function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
           </p>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -668,7 +834,7 @@ function formatDelta(n: number): string {
 }
 
 // ─────────────────────────────────────────────
-//  Lightbox
+//  Lightbox (GOLD 확대)
 // ─────────────────────────────────────────────
 
 function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
@@ -684,7 +850,7 @@ function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
         alignItems: "center",
         justifyContent: "center",
         padding: "40px 24px",
-        zIndex: 50,
+        zIndex: 200,
       }}
     >
       <button

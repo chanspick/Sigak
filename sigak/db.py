@@ -45,6 +45,9 @@ class User(Base):
     # consent_data에 {timestamp, ip, terms_version, terms, privacy, sensitive, overseas_transfer, age_confirmed, marketing} 저장.
     consent_completed = Column(Boolean, default=False, server_default="false", nullable=False)
     consent_data = Column(JSONB, nullable=True)
+    # MVP v1.2 시각 리포트 해제 플래그. 30토큰 소비 시 TRUE.
+    # 시각 재설정 시 FALSE로 되돌아가지만, release는 idempotent라 재해제 시 추가 차감 없음.
+    sigak_report_released = Column(Boolean, default=False, server_default="false", nullable=False)
     # MVP v1.2 Phase C: LLM #2 (interpret_interview) cache — hash invalidates when onboarding_data changes
     interview_interpretation = Column(JSONB, nullable=True)
     interview_interpretation_hash = Column(String, nullable=True)
@@ -117,6 +120,8 @@ def _migrate_columns(eng):
         # MVP v2.0 consent (ad-hoc 안전망, Alembic이 먼저 돌면 중복이지만 IF NOT EXISTS로 통과)
         ("users", "consent_completed", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("users", "consent_data", "JSONB"),
+        # MVP v1.2 시각 리포트 해제 플래그
+        ("users", "sigak_report_released", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ]
     with eng.connect() as conn:
         for table, column, col_type in migrations:

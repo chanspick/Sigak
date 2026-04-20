@@ -24,14 +24,17 @@ import { getToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { api } from "@/lib/api/fetch";
 import { releaseBlur } from "@/lib/api/verdicts";
+import { releaseSigakReport } from "@/lib/api/sigak-report";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 
 type Phase =
-  | "confirming"       // payment confirm 호출 중
-  | "released"         // intent=blur_release + release-blur 성공
-  | "release_failed"   // intent=blur_release + release-blur 실패 (토큰은 적립됨)
-  | "charged"          // 일반 충전 완료
-  | "failed";          // payment confirm 자체 실패
+  | "confirming"            // payment confirm 호출 중
+  | "released"              // intent=blur_release + release-blur 성공
+  | "release_failed"        // intent=blur_release + release-blur 실패 (토큰 적립됨)
+  | "sigak_released"        // intent=sigak_report + release-sigak 성공
+  | "sigak_release_failed"  // intent=sigak_report + release-sigak 실패 (토큰 적립됨)
+  | "charged"               // 일반 충전 완료
+  | "failed";               // payment confirm 자체 실패
 
 function ConfirmedContent() {
   const router = useRouter();
@@ -99,19 +102,35 @@ function ConfirmedContent() {
         return;
       }
 
-      // 2. intent=blur_release 면 자동 release-blur
+      // 2-a. intent=blur_release 면 자동 release-blur
       if (intent === "blur_release" && verdictId) {
         try {
           const rel = await releaseBlur(verdictId);
           setBalance(rel.balance_after);
           setPhase("released");
         } catch (e) {
-          // 토큰은 이미 적립됐음. 수동 가이드.
           setPhase("release_failed");
           setErrorMessage(
             e instanceof Error
               ? e.message
               : "블러 해제에 실패했습니다. 판정 페이지에서 다시 시도해 주세요.",
+          );
+        }
+        return;
+      }
+
+      // 2-b. intent=sigak_report 면 자동 release sigak report
+      if (intent === "sigak_report") {
+        try {
+          const rel = await releaseSigakReport();
+          setBalance(rel.balance_after);
+          setPhase("sigak_released");
+        } catch (e) {
+          setPhase("sigak_release_failed");
+          setErrorMessage(
+            e instanceof Error
+              ? e.message
+              : "시각 리포트 해제에 실패했습니다. 시각 탭에서 다시 시도해 주세요.",
           );
         }
         return;
@@ -217,6 +236,58 @@ function ConfirmedContent() {
           </>
         )}
 
+        {phase === "sigak_released" && (
+          <>
+            <h1
+              className="font-serif"
+              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+            >
+              해제되었습니다.
+            </h1>
+            <p
+              className="font-sans"
+              style={{ marginTop: 16, fontSize: 13, opacity: 0.5, lineHeight: 1.6 }}
+            >
+              결제 완료 · 시각 리포트 해제 완료.
+            </p>
+            <BalanceRow balance={balance} />
+          </>
+        )}
+
+        {phase === "sigak_release_failed" && (
+          <>
+            <h1
+              className="font-serif"
+              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+            >
+              결제는 완료됐어요.
+            </h1>
+            <p
+              className="font-sans"
+              style={{ marginTop: 16, fontSize: 13, opacity: 0.55, lineHeight: 1.7, letterSpacing: "-0.005em" }}
+            >
+              토큰은 적립됐지만 시각 리포트 해제 중 오류가 있었어요.
+              <br />
+              시각 탭에서 다시 시도해 주세요.
+            </p>
+            <BalanceRow balance={balance} />
+            {errorMessage && (
+              <p
+                className="font-sans"
+                role="alert"
+                style={{
+                  marginTop: 20,
+                  fontSize: 12,
+                  color: "var(--color-danger)",
+                  letterSpacing: "-0.005em",
+                }}
+              >
+                {errorMessage}
+              </p>
+            )}
+          </>
+        )}
+
         {phase === "charged" && (
           <>
             <h1
@@ -278,6 +349,16 @@ function ConfirmedContent() {
         {phase === "release_failed" && verdictId && (
           <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
             판정 페이지로
+          </PrimaryButton>
+        )}
+        {phase === "sigak_released" && (
+          <PrimaryButton onClick={() => router.replace("/")}>
+            시각 리포트 보러 가기
+          </PrimaryButton>
+        )}
+        {phase === "sigak_release_failed" && (
+          <PrimaryButton onClick={() => router.replace("/")}>
+            홈으로
           </PrimaryButton>
         )}
         {phase === "charged" && (

@@ -144,7 +144,7 @@ export function ResultScreen({
             color: "var(--color-ink)",
           }}
         >
-          이 한 장.
+          시각이 본 당신.
         </h1>
       </section>
 

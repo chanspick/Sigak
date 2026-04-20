@@ -8,13 +8,13 @@ import { useEffect, useState } from "react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { VerdictGrid } from "./verdict-grid";
+import { SigakReportView } from "./sigak-report-view";
 
-type TabKey = "feed" | "dx" | "aim" | "change";
+type TabKey = "feed" | "sigak" | "change";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "feed", label: "피드" },
-  { key: "dx", label: "진단" },
-  { key: "aim", label: "추구미" },
+  { key: "sigak", label: "시각" },
   { key: "change", label: "변화" },
 ];
 
@@ -55,13 +55,10 @@ export function FeedView() {
       <TabBar active={tab} onChange={setTab} />
 
       {tab === "feed" && <VerdictGrid onTotalChange={setTotal} />}
-      {tab !== "feed" && <TabPlaceholder label={labelFor(tab)} />}
+      {tab === "sigak" && <SigakReportView />}
+      {tab === "change" && <TabPlaceholder label="변화" />}
     </>
   );
-}
-
-function labelFor(tab: TabKey): string {
-  return TABS.find((t) => t.key === tab)?.label ?? "";
 }
 
 // ─────────────────────────────────────────────

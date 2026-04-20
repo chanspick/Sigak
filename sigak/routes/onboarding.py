@@ -173,8 +173,14 @@ def reset(
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
+    # 시각 재설정 시 리포트도 다시 잠기게 (release는 idempotent라 재해제 시 추가 차감 없음)
     db.execute(
-        text("UPDATE users SET onboarding_completed = FALSE WHERE id = :uid"),
+        text(
+            "UPDATE users SET "
+            "  onboarding_completed = FALSE, "
+            "  sigak_report_released = FALSE "
+            "WHERE id = :uid"
+        ),
         {"uid": user["id"]},
     )
     db.commit()

@@ -185,6 +185,22 @@ export interface ReleaseBlurResponse {
 }
 
 // ─────────────────────────────────────────────
+//  Sigak Report (시각 리포트 — 온보딩 기반 유저 분석 요약)
+// ─────────────────────────────────────────────
+
+export interface SigakReportResponse {
+  released: boolean;
+  cost: number;
+  onboarding_data: OnboardingData | null;
+}
+
+export interface ReleaseSigakReportResponse {
+  released: true;
+  onboarding_data: OnboardingData;
+  balance_after: number;
+}
+
+// ─────────────────────────────────────────────
 //  Verdict List (피드 그리드용)
 // ─────────────────────────────────────────────
 

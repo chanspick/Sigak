@@ -311,6 +311,7 @@ from routes.payments import webhook_router as payments_webhook_router
 from routes.auth import router as auth_jwt_router
 from routes.onboarding import router as onboarding_router
 from routes.verdicts import router as verdicts_router
+from routes.sigak_report import router as sigak_report_router
 
 app.include_router(tokens_router)
 app.include_router(payments_confirm_router)
@@ -318,6 +319,7 @@ app.include_router(payments_webhook_router)
 app.include_router(auth_jwt_router)
 app.include_router(onboarding_router)
 app.include_router(verdicts_router)
+app.include_router(sigak_report_router)
 
 # ── In-memory stores ──
 USERS = {}

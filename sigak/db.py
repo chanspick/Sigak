@@ -89,6 +89,21 @@ class Report(Base):
     user = relationship("User", back_populates="reports")
 
 
+class PIReport(Base):
+    """v2 BM: PI 리포트 (유저 1회 50토큰 해제, 영속).
+
+    unlocked_at IS NULL = 잠김. NOT NULL = 해제됨.
+    report_data 는 생성 완료된 리포트 페이로드. 최초 해제 직후엔
+    {status: 'generating'} stub일 수 있음.
+    """
+    __tablename__ = "pi_reports"
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    unlocked_at = Column(DateTime, nullable=True)
+    report_data = Column(JSONB, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -120,8 +135,10 @@ def _migrate_columns(eng):
         # MVP v2.0 consent (ad-hoc 안전망, Alembic이 먼저 돌면 중복이지만 IF NOT EXISTS로 통과)
         ("users", "consent_completed", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("users", "consent_data", "JSONB"),
-        # MVP v1.2 시각 리포트 해제 플래그
+        # MVP v1.2 시각 리포트 해제 플래그 (deprecated — pi_reports로 이관, legacy 조회용 유지)
         ("users", "sigak_report_released", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        # v2 BM: 피드 진단 해제 (verdict 단위, 10토큰)
+        ("verdicts", "diagnosis_unlocked", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ]
     with eng.connect() as conn:
         for table, column, col_type in migrations:

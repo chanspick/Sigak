@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getToken } from "@/lib/auth";
 import { authFetch, ApiError } from "@/lib/api/fetch";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 import {
   TOKEN_PACKS,
   type PackCode,
@@ -221,7 +222,7 @@ function PurchaseContent() {
       </main>
 
       {/* CTA */}
-      <div style={{ padding: "20px 28px 32px" }}>
+      <div style={{ padding: "20px 28px 24px" }}>
         <PrimaryButton
           onClick={handlePurchase}
           disabled={!canSubmit}
@@ -236,6 +237,9 @@ function PurchaseContent() {
           결제하기
         </PrimaryButton>
       </div>
+
+      {/* 사업자 정보 (PG 심사 필수 — 결제 페이지는 핵심) */}
+      <SiteFooter />
     </div>
   );
 }

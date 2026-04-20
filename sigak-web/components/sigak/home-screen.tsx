@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 import { createVerdict, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import { AnalyzingScreen } from "./analyzing-screen";
@@ -190,7 +191,7 @@ export function HomeScreen() {
       <div style={{ flex: 1 }} />
 
       {/* CTA */}
-      <div style={{ padding: "20px 28px 32px" }}>
+      <div style={{ padding: "20px 28px 24px" }}>
         <PrimaryButton
           onClick={handleStart}
           disabled={!canStart}
@@ -199,6 +200,9 @@ export function HomeScreen() {
           시작
         </PrimaryButton>
       </div>
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
 
       {/* hidden file input */}
       <input

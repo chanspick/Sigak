@@ -11,6 +11,7 @@ import { getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
 import { FeedTopBar, TopBar } from "@/components/ui/sigak";
 import { FeedView } from "@/components/sigak/feed-view";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
 
@@ -54,6 +55,7 @@ function LoggedInFeed() {
     >
       <FeedTopBar />
       <FeedView />
+      <SiteFooter />
     </div>
   );
 }
@@ -215,6 +217,8 @@ function LoggedOutLanding() {
           에 동의하는 것으로 간주됩니다.
         </p>
       </div>
+
+      <SiteFooter />
     </div>
   );
 }

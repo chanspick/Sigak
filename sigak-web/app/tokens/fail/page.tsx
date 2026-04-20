@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 function FailContent() {
   const router = useRouter();
@@ -121,6 +122,9 @@ function FailContent() {
           홈으로
         </Link>
       </div>
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
     </div>
   );
 }

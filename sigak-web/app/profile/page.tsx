@@ -14,6 +14,7 @@ import { getCurrentUser, getToken, logout } from "@/lib/auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 import { FeedTopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -239,7 +240,10 @@ export default function ProfilePage() {
         </p>
       )}
 
-      <div style={{ height: 40 }} />
+      <div style={{ height: 20 }} />
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
     </div>
   );
 }

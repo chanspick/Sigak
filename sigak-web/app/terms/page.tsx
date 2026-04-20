@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { TermsTopNav } from "./terms-top-nav";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 // SIGAK MVP v2.0 (2026-04-20) 약관/개인정보처리방침.
 // 토큰 기반 BM + verdict + 블러 해제 구조 반영. 레거시 TIER(Standard/Full/Celebrity) 전면 제거.
@@ -505,24 +506,3 @@ function Hr() {
   return <hr className="my-10" style={{ borderColor: "var(--color-border)" }} />;
 }
 
-function SiteFooter() {
-  return (
-    <footer
-      className="border-t px-5 py-8 md:px-[var(--spacing-page-x)]"
-      style={{ borderColor: "var(--color-border)" }}
-    >
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-mute" style={{ fontSize: 11 }}>
-          <Link href="/terms" className="hover:opacity-70">이용약관</Link>
-          <Link href="/refund" className="hover:opacity-70">환불규정</Link>
-          <a href="mailto:partner@sigak.asia" className="hover:opacity-70">partner@sigak.asia</a>
-        </div>
-        <p className="text-mute" style={{ fontSize: 10, lineHeight: 1.8, opacity: 0.5 }}>
-          주식회사 시각 | 대표: 조찬형 | partner@sigak.asia
-          <br />
-          &copy; 2026 SIGAK. All rights reserved.
-        </p>
-      </div>
-    </footer>
-  );
-}

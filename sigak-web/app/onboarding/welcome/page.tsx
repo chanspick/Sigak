@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api/fetch";
 import { getMe, saveConsent } from "@/lib/api/onboarding";
 import { ONBOARDING_STEPS } from "@/lib/constants/onboarding-steps";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 type ConsentKey =
   | "age_confirmed"
@@ -282,7 +283,7 @@ export default function OnboardingWelcomePage() {
         )}
       </main>
 
-      <div style={{ padding: "20px 28px 32px" }}>
+      <div style={{ padding: "20px 28px 24px" }}>
         <PrimaryButton
           onClick={handleSubmit}
           disabled={!allRequiredChecked || submitting}
@@ -293,6 +294,9 @@ export default function OnboardingWelcomePage() {
           시작하기
         </PrimaryButton>
       </div>
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
     </div>
   );
 }

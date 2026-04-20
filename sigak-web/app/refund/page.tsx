@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SiteFooter } from "@/components/sigak/site-footer";
+
 export const metadata: Metadata = {
   title: "환불규정 및 서비스 이용안내 — SIGAK",
   description: "SIGAK 환불규정, 결제 안내, 서비스 이용 제한 사항",
@@ -130,20 +132,8 @@ export default function RefundPage() {
         ]} />
       </article>
 
-      {/* 푸터 */}
-      <footer className="border-t border-[var(--color-border)] px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] opacity-40 mb-4">
-            <Link href="/terms" className="hover:opacity-70">이용약관</Link>
-            <Link href="/refund" className="hover:opacity-70">환불규정</Link>
-            <a href="mailto:partner@sigak.asia" className="hover:opacity-70">partner@sigak.asia</a>
-          </div>
-          <p className="text-[10px] leading-[1.8] opacity-30">
-            주식회사 시각 | 대표: 조찬형 | partner@sigak.asia<br />
-            &copy; 2026 SIGAK. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
     </div>
   );
 }

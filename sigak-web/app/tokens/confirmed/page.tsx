@@ -26,6 +26,7 @@ import { api } from "@/lib/api/fetch";
 import { releaseBlur } from "@/lib/api/verdicts";
 import { releaseSigakReport } from "@/lib/api/sigak-report";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 
 type Phase =
   | "confirming"            // payment confirm 호출 중
@@ -386,6 +387,9 @@ function ConfirmedContent() {
           </div>
         )}
       </div>
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
     </div>
   );
 }

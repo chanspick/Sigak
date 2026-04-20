@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { TopBar } from "@/components/ui/sigak";
+import { SiteFooter } from "@/components/sigak/site-footer";
 import { releaseBlur, resolvePhotoUrl } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import type { TierPhoto, VerdictResponse } from "@/lib/types/mvp";
@@ -192,13 +193,16 @@ export function ResultScreen({
       {/* Footer — 공유만 */}
       <section
         style={{
-          padding: "32px 28px 40px",
+          padding: "32px 28px 24px",
           display: "flex",
           justifyContent: "center",
         }}
       >
         <FooterLink>공유</FooterLink>
       </section>
+
+      {/* 사업자 정보 (PG 심사 필수) */}
+      <SiteFooter />
 
       {/* Lightbox — GOLD 확대 */}
       {lightbox && gold && (

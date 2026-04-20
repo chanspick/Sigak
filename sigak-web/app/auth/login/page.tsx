@@ -10,7 +10,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { getToken } from "@/lib/auth";
@@ -28,7 +28,9 @@ function getRedirectUri(): string {
   return "https://www.sigak.asia/auth/kakao/callback";
 }
 
-export default function LoginPage() {
+// Next.js 16은 useSearchParams()를 쓰는 컴포넌트가 prerender 시점에
+// <Suspense>로 감싸져야 한다. LoginContent(실제 UI) + 기본 export(Suspense 래퍼) 분리.
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
@@ -173,5 +175,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-paper" />}>
+      <LoginContent />
+    </Suspense>
   );
 }

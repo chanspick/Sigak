@@ -169,8 +169,16 @@ export interface VerdictResponse {
   candidate_count: number;
   tiers: VerdictTiers;
   gold_reading: string; // GET 재조회 시 빈 문자열 (ephemeral on create)
-  blur_released: boolean;
+  blur_released: boolean;        // deprecated (legacy 50토큰 해제)
+  diagnosis_unlocked?: boolean;  // v2 BM — 10토큰 진단 해제
   pro_data: VerdictProData | null;
+}
+
+// v2 BM — POST /verdicts/{id}/unlock-diagnosis
+export interface UnlockDiagnosisResponse {
+  verdict_id: string;
+  diagnosis_unlocked: true;
+  token_balance: number;
 }
 
 export interface ReleaseBlurRequest {

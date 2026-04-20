@@ -2,8 +2,8 @@
 //
 // 나머지 N장 섹션을 페이지에서 제거하고 모달로 분리.
 // GOLD 이미지 아래에 "진단 보기" 버튼 — 클릭 시 DiagnosisModal open.
-//   - blur_released=false: 모달 안에서 silver/bronze 블러 + PRO CTA (50 토큰)
-//   - blur_released=true:  모달 안에서 이미지 복구 + readings + full_analysis
+//   - diagnosis_unlocked=false: 모달 안에서 silver/bronze 블러 + PRO CTA (10 토큰)
+//   - diagnosis_unlocked=true:  모달 안에서 이미지 복구 + readings + full_analysis
 //
 // Footer는 "공유"만 (Batch 1에서 반영).
 "use client";
@@ -13,12 +13,13 @@ import { useRouter } from "next/navigation";
 
 import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
-import { releaseBlur, resolvePhotoUrl } from "@/lib/api/verdicts";
+import { resolvePhotoUrl, unlockDiagnosis } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import type { TierPhoto, VerdictResponse } from "@/lib/types/mvp";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 
-const BLUR_RELEASE_COST = 50;
+// v2 BM: 10 토큰. (기존 50토큰 BLUR_RELEASE는 deprecated)
+const DIAGNOSIS_COST = 10;
 
 interface ResultScreenProps {
   verdict: VerdictResponse;
@@ -42,7 +43,10 @@ export function ResultScreen({
   const gold = verdict.tiers.gold[0] ?? null;
   const remaining: TierPhoto[] = [...verdict.tiers.silver, ...verdict.tiers.bronze];
   const reading = verdict.gold_reading || goldReadingOverride || "";
-  const released = verdict.blur_released;
+  // v2 BM: diagnosis_unlocked가 primary. blur_released는 legacy 데이터 폴백.
+  const released = Boolean(
+    verdict.diagnosis_unlocked ?? verdict.blur_released,
+  );
 
   // lightbox ESC
   useEffect(() => {
@@ -76,34 +80,42 @@ export function ResultScreen({
 
   async function handleProCta() {
     if (releasing) return;
-    if (balance != null && balance < BLUR_RELEASE_COST) {
+    if (balance != null && balance < DIAGNOSIS_COST) {
       router.push(
-        `/tokens/purchase?intent=blur_release&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
+        `/tokens/purchase?intent=unlock_diagnosis&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
       );
       return;
     }
     setReleasing(true);
     setReleaseError(null);
     try {
-      const res = await releaseBlur(verdict.verdict_id);
-      setVerdict((prev) => ({
-        ...prev,
-        blur_released: true,
-        pro_data: res.pro_data,
-      }));
+      await unlockDiagnosis(verdict.verdict_id);
+      // 재조회로 전체 응답 갱신 (pro_data, tiers url 등)
       try {
         const { getVerdict } = await import("@/lib/api/verdicts");
         const full = await getVerdict(verdict.verdict_id);
         setVerdict(full);
       } catch {
-        // ignore
+        // 재조회 실패해도 diagnosis_unlocked 최소 반영
+        setVerdict((prev) => ({ ...prev, diagnosis_unlocked: true }));
       }
       await refetchBalance();
     } catch (e) {
       if (e instanceof ApiError && e.status === 402) {
         router.push(
-          `/tokens/purchase?intent=blur_release&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
+          `/tokens/purchase?intent=unlock_diagnosis&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
         );
+        return;
+      }
+      if (e instanceof ApiError && e.status === 409) {
+        // 이미 해제된 경우 — 재조회로 상태 동기화
+        try {
+          const { getVerdict } = await import("@/lib/api/verdicts");
+          const full = await getVerdict(verdict.verdict_id);
+          setVerdict(full);
+        } catch {
+          setVerdict((prev) => ({ ...prev, diagnosis_unlocked: true }));
+        }
         return;
       }
       if (e instanceof ApiError && e.status === 401) {
@@ -468,7 +480,7 @@ function DiagnosisButton({
             className="font-serif tabular-nums"
             style={{ fontSize: 13, fontWeight: 400 }}
           >
-            {BLUR_RELEASE_COST} 토큰
+            {DIAGNOSIS_COST} 토큰
           </span>
         </>
       )}
@@ -697,7 +709,7 @@ function ProUnlockSection({
   error: string | null;
   onClick: () => void;
 }) {
-  const insufficient = balance != null && balance < BLUR_RELEASE_COST;
+  const insufficient = balance != null && balance < DIAGNOSIS_COST;
   return (
     <section style={{ padding: "32px 28px 0" }}>
       <div
@@ -731,7 +743,7 @@ function ProUnlockSection({
             color: "var(--color-ink)",
           }}
         >
-          가려진 것들
+          왜 이 한 장인가
         </div>
 
         <p
@@ -746,7 +758,7 @@ function ProUnlockSection({
             letterSpacing: "-0.005em",
           }}
         >
-          나머지 사진과 전체 진단까지.
+          왜 이 사진이 최적인지, 나머지 사진들.
         </p>
 
         <button
@@ -771,7 +783,7 @@ function ProUnlockSection({
         >
           {busy
             ? "해제 중..."
-            : `해제 · ${BLUR_RELEASE_COST} 토큰`}
+            : `해제 · ${DIAGNOSIS_COST} 토큰`}
         </button>
 
         {insufficient && !busy && (

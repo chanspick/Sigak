@@ -5,6 +5,7 @@ import { authFetch } from "@/lib/api/fetch";
 import type {
   ReleaseBlurRequest,
   ReleaseBlurResponse,
+  UnlockDiagnosisResponse,
   VerdictListResponse,
   VerdictResponse,
 } from "@/lib/types/mvp";
@@ -50,6 +51,17 @@ export function listVerdicts(
 export function getVerdict(verdictId: string): Promise<VerdictResponse> {
   return authFetch<VerdictResponse>(
     `/api/v1/verdicts/${encodeURIComponent(verdictId)}`,
+  );
+}
+
+/** v2 BM — 10 토큰 소비해서 verdict 진단 해제 (silver/bronze + pro_data).
+ * 409 already_unlocked, 402 insufficient_balance 가능. */
+export function unlockDiagnosis(
+  verdictId: string,
+): Promise<UnlockDiagnosisResponse> {
+  return authFetch<UnlockDiagnosisResponse>(
+    `/api/v1/verdicts/${encodeURIComponent(verdictId)}/unlock-diagnosis`,
+    { method: "POST" },
   );
 }
 

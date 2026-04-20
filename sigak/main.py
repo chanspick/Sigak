@@ -282,9 +282,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SIGAK PI API", version="2.0.0", lifespan=lifespan)
 
+# CORS: ``allow_origins=["*"]`` + ``allow_credentials=True`` 조합은 CORS 스펙상
+# 무효(브라우저가 wildcard origin + credentials 응답을 거부)이므로 explicit 목록
+# + vercel preview regex로 대체. Preflight 실패 → "No 'Access-Control-Allow-Origin'
+# header" 에러의 근본 원인이었음.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://sigak.asia",
+        "https://www.sigak.asia",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+    ],
+    # Vercel preview deployments 허용 (sigak-web-*.vercel.app)
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

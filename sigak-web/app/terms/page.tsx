@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { TermsTopNav } from "./terms-top-nav";
+
 // SIGAK MVP v2.0 (2026-04-20) 약관/개인정보처리방침.
 // 토큰 기반 BM + verdict + 블러 해제 구조 반영. 레거시 TIER(Standard/Full/Celebrity) 전면 제거.
 
@@ -369,87 +371,6 @@ export default function TermsPage() {
 
       <SiteFooter />
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  Terms-specific TopNav (back + anchors)
-// ─────────────────────────────────────────────
-
-function TermsTopNav() {
-  return (
-    <nav
-      className="sticky top-0 z-[100]"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        height: 52,
-        background: "var(--color-ink)",
-        color: "var(--color-paper)",
-      }}
-    >
-      {/* Back chevron — uses window.history.back */}
-      <button
-        type="button"
-        onClick={() => {
-          if (typeof window !== "undefined") {
-            if (window.history.length > 1) window.history.back();
-            else window.location.href = "/";
-          }
-        }}
-        aria-label="뒤로"
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 52,
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-        }}
-      >
-        <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
-          <path
-            d="M8 1L1 8l7 7"
-            stroke="var(--color-paper)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-            opacity="0.85"
-          />
-        </svg>
-      </button>
-
-      <div
-        style={{
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Link
-          href="/"
-          className="font-sans"
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: "6px",
-            color: "var(--color-paper)",
-            textDecoration: "none",
-          }}
-        >
-          SIGAK
-        </Link>
-      </div>
-    </nav>
   );
 }
 

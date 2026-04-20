@@ -74,6 +74,19 @@ class VerdictResponse(BaseModel):
     pro_data: Optional[dict] = None
 
 
+class VerdictListItem(BaseModel):
+    verdict_id: str
+    gold_photo_url: Optional[str] = None
+    blur_released: bool
+    created_at: str  # ISO
+
+
+class VerdictListResponse(BaseModel):
+    verdicts: list[VerdictListItem]
+    total: int
+    has_more: bool
+
+
 class ReleaseBlurRequest(BaseModel):
     idempotency_key: Optional[str] = Field(
         default=None,
@@ -157,6 +170,70 @@ def _build_pro_data(verdict_row, user: DBUser, db) -> dict:
         "bronze_readings": bronze_readings,
         "full_analysis": full_analysis,
     }
+
+
+# ─────────────────────────────────────────────
+#  GET /api/v1/verdicts  (list, user-scoped)
+# ─────────────────────────────────────────────
+
+@router.get("", response_model=VerdictListResponse)
+def list_verdicts(
+    limit: int = 30,
+    offset: int = 0,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """유저 본인의 verdict 리스트. 피드 그리드용.
+
+    created_at DESC 정렬. ranked_photo_ids[0]이 gold — 거기서 filename 추출해
+    URL 재생성 (S3 signed URL 전환 시 매 호출마다 refresh되도록 설계).
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    # Clamp limit/offset
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+
+    # Total count
+    total_row = db.execute(
+        text("SELECT COUNT(*) AS c FROM verdicts WHERE user_id = :uid"),
+        {"uid": user["id"]},
+    ).first()
+    total = int(total_row.c) if total_row else 0
+
+    rows = db.execute(
+        text(
+            "SELECT id, ranked_photo_ids, blur_released, created_at "
+            "FROM verdicts "
+            "WHERE user_id = :uid "
+            "ORDER BY created_at DESC "
+            "LIMIT :lim OFFSET :off"
+        ),
+        {"uid": user["id"], "lim": limit, "off": offset},
+    ).fetchall()
+
+    items: list[VerdictListItem] = []
+    for row in rows:
+        ranked = row.ranked_photo_ids or []
+        gold_filename = (
+            ranked[0].get("filename") if isinstance(ranked, list) and ranked else None
+        )
+        gold_url = _photo_url(user["id"], gold_filename) if gold_filename else None
+        created_at_iso = (
+            row.created_at.isoformat() if row.created_at else ""
+        )
+        items.append(
+            VerdictListItem(
+                verdict_id=row.id,
+                gold_photo_url=gold_url,
+                blur_released=bool(row.blur_released),
+                created_at=created_at_iso,
+            )
+        )
+
+    has_more = (offset + len(items)) < total
+    return VerdictListResponse(verdicts=items, total=total, has_more=has_more)
 
 
 # ─────────────────────────────────────────────

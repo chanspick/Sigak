@@ -5,6 +5,7 @@ import { authFetch } from "@/lib/api/fetch";
 import type {
   ReleaseBlurRequest,
   ReleaseBlurResponse,
+  VerdictListResponse,
   VerdictResponse,
 } from "@/lib/types/mvp";
 
@@ -32,6 +33,17 @@ export async function createVerdict(files: File[]): Promise<VerdictResponse> {
     method: "POST",
     rawBody: form,
   });
+}
+
+/** 유저의 verdict 리스트. 피드 그리드용. created_at DESC. */
+export function listVerdicts(
+  limit = 30,
+  offset = 0,
+): Promise<VerdictListResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+  return authFetch<VerdictListResponse>(`/api/v1/verdicts?${params.toString()}`);
 }
 
 /** 기존 verdict 재조회. gold_reading은 재조회 시 빈 문자열(ephemeral on create). */

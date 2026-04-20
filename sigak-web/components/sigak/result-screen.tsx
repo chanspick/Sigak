@@ -230,7 +230,7 @@ export function ResultScreen({
 
       {/* Footer actions */}
       <section style={{ padding: "32px 28px 40px" }}>
-        <PrimaryButton onClick={() => router.push("/")}>다시 읽기</PrimaryButton>
+        <PrimaryButton onClick={() => router.push("/verdict/new")}>다시 읽기</PrimaryButton>
         <div
           style={{
             marginTop: 18,

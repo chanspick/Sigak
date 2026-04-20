@@ -125,7 +125,7 @@ export function HomeScreen() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/" />
 
       {/* Serif 헤드라인 */}
       <section style={{ padding: "48px 28px 40px" }}>

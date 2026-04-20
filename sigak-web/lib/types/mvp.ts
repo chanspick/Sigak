@@ -185,6 +185,23 @@ export interface ReleaseBlurResponse {
 }
 
 // ─────────────────────────────────────────────
+//  Verdict List (피드 그리드용)
+// ─────────────────────────────────────────────
+
+export interface VerdictListItem {
+  verdict_id: string;
+  gold_photo_url: string | null;
+  blur_released: boolean;
+  created_at: string; // ISO
+}
+
+export interface VerdictListResponse {
+  verdicts: VerdictListItem[];
+  total: number;
+  has_more: boolean;
+}
+
+// ─────────────────────────────────────────────
 //  Tokens (/api/v1/tokens/*)
 // ─────────────────────────────────────────────
 

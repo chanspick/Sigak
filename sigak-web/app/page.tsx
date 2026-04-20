@@ -1,9 +1,9 @@
-// SIGAK MVP v1.2 (Rebrand) — / (루트 랜딩)
+// SIGAK MVP v1.2 (D-6) — / (피드)
 //
-// 로그인 + 온보딩 완료 유저 → HomeScreen (upload)
-// 비로그인 유저 → 신 브랜딩 랜딩 (serif 헤드라인 + Kakao CTA)
+// 로그인 + 가드 통과 유저 → FeedTopBar + VerdictGrid
+// 비로그인 → LoggedOutLanding (카카오 CTA)
 //
-// 가드는 로그인 유저에게만 적용.
+// 업로드는 더 이상 여기 없음 → /verdict/new 로 이동 (FeedTopBar의 + 아이콘).
 "use client";
 
 import Link from "next/link";
@@ -12,8 +12,8 @@ import { useRouter } from "next/navigation";
 
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
-import { HomeScreen } from "@/components/sigak/home-screen";
-import { TopBar } from "@/components/ui/sigak";
+import { FeedTopBar, TopBar } from "@/components/ui/sigak";
+import { VerdictGrid } from "@/components/sigak/verdict-grid";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
 
@@ -32,19 +32,31 @@ export default function RootPage() {
     return <LoggedOutLanding />;
   }
 
-  return <LoggedInHome />;
+  return <LoggedInFeed />;
 }
 
 // ─────────────────────────────────────────────
-//  로그인 유저: 가드 통과 후 HomeScreen
+//  로그인 + 가드 통과 시 피드
 // ─────────────────────────────────────────────
 
-function LoggedInHome() {
+function LoggedInFeed() {
   const { status } = useOnboardingGuard();
   if (status !== "ready") {
     return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
   }
-  return <HomeScreen />;
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <FeedTopBar />
+      <VerdictGrid />
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -67,7 +79,6 @@ function LoggedOutLanding() {
     >
       <TopBar />
 
-      {/* 헤드라인 */}
       <section style={{ padding: "72px 28px 0" }}>
         <h1
           className="font-serif"
@@ -98,7 +109,6 @@ function LoggedOutLanding() {
 
       <div style={{ flex: 1 }} />
 
-      {/* Rule + list */}
       <Rule />
 
       <section style={{ padding: "28px 28px 0" }}>
@@ -149,7 +159,6 @@ function LoggedOutLanding() {
         </ol>
       </section>
 
-      {/* CTA */}
       <div style={{ padding: "28px 28px 20px" }}>
         <button
           type="button"
@@ -183,7 +192,6 @@ function LoggedOutLanding() {
         </button>
       </div>
 
-      {/* Fine print */}
       <div style={{ padding: "0 28px 32px" }}>
         <p
           className="font-sans"

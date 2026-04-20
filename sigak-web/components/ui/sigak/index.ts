@@ -5,6 +5,7 @@
 export { PhotoPlaceholder } from "./photo-placeholder";
 export { SageFrame } from "./sage-frame";
 export { TopBar } from "./top-bar";
+export { FeedTopBar } from "./feed-top-bar";
 export { ProgressBar } from "./progress-bar";
 export { PillGroup, PillGroupMulti } from "./pill-group";
 export type { PillOption } from "./pill-group";

@@ -144,7 +144,7 @@ export default function OnboardingCompletePage() {
 
       {/* CTA */}
       <div style={{ padding: "20px 28px 32px" }}>
-        <PrimaryButton onClick={() => router.push("/")}>
+        <PrimaryButton onClick={() => router.push("/verdict/new")}>
           사진 올리러 가기
         </PrimaryButton>
       </div>

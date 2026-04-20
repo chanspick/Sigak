@@ -1,53 +1,88 @@
 @import "tailwindcss";
 
-/* 디자인 토큰 */
+/* ──────────────────────────────────────────────
+ * SIGAK 디자인 토큰 (MVP v1.2)
+ *
+ * 기존 --color-bg, --color-fg는 값만 브리프 토큰으로 override(#FAFAF7/#0F0F0E).
+ * 변수명 유지 → 레거시 스크린이 자동으로 새 팔레트 따라감.
+ * 새 팔레트(sage/paper/ink/medal 등)는 별도 토큰으로 추가해 Tailwind utility 사용.
+ * ────────────────────────────────────────────── */
 @theme {
-  --color-bg: #F3F0EB;
-  --color-fg: #000000;
-  --color-blur-bg: rgba(243, 240, 235, 0.7);
-  --color-accent: #000000;
-  --color-muted: #666666;
+  /* 레거시 호환 (값만 새 톤으로 교체) */
+  --color-bg: #FAFAF7;
+  --color-fg: #0F0F0E;
+  --color-accent: #0F0F0E;
+  --color-muted: rgba(15, 15, 14, 0.55);
   --color-danger: #A32D2D;
-  --color-border: #E0DCD6;
+  --color-border: rgba(15, 15, 14, 0.12);
+  --color-blur-bg: rgba(250, 250, 247, 0.7);
 
-  --font-serif: var(--font-noto-serif-kr);
-  --font-sans: var(--font-pretendard);
+  /* 신규 MVP v1.2 팔레트 — refactor/shared.jsx source of truth */
+  --color-paper: #FAFAF7;
+  --color-ink: #0F0F0E;
+  --color-sage: #8B9D7D;
+  --color-sage-soft: #E8ECE2;
+  --color-line: rgba(15, 15, 14, 0.12);
+  --color-line-strong: rgba(15, 15, 14, 0.22);
+  --color-mute: rgba(15, 15, 14, 0.55);
+  --color-mute-2: rgba(15, 15, 14, 0.38);
 
+  /* 메달 팔레트 (result screen) */
+  --color-gold-stroke: #B8A05E;
+  --color-gold-fill: #E8DCC0;
+  --color-silver-stroke: #9A9A96;
+  --color-silver-fill: #E8E8E4;
+  --color-bronze-stroke: #8B6F47;
+  --color-bronze-fill: #D4B896;
+
+  /* 폰트 */
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-serif: "Noto Serif KR", serif;
+  --font-display: Inter, "Pretendard Variable", system-ui, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+
+  /* 공용 spacing (기존 유지) */
   --spacing-page-x: 60px;
   --spacing-page-x-mobile: 24px;
   --breakpoint-mobile: 768px;
 }
 
-/* 기본 스타일 */
+/* ──────────────────────────────────────────────
+ * 기본 스타일
+ * ────────────────────────────────────────────── */
 html {
-  background-color: var(--color-bg);
-  color: var(--color-fg);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
 }
 
 body {
-  font-family: var(--font-sans), "Pretendard Variable", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
 }
 
-/* 선택 영역 반전 */
 ::selection {
-  background-color: var(--color-fg);
-  color: var(--color-bg);
+  background-color: var(--color-ink);
+  color: var(--color-paper);
 }
 
-/* 블러 오버레이 유틸리티 */
+/* ──────────────────────────────────────────────
+ * 유틸리티
+ * ────────────────────────────────────────────── */
+
+/* 블러 오버레이 (레거시 + 신규 공용) */
 .blur-overlay {
   backdrop-filter: blur(12px);
   background: var(--color-blur-bg);
 }
 
-/* 블러 해제 트랜지션 */
 .blur-fade-out {
   transition: opacity 0.6s ease;
 }
 
-/* 스크롤 reveal 기본 */
+/* 스크롤 reveal (레거시) */
 .reveal-hidden {
   opacity: 0;
   transform: translateY(20px);
@@ -59,15 +94,40 @@ body {
   transform: translateY(0);
 }
 
-/* 예약 오버레이 애니메이션 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
+/* ──────────────────────────────────────────────
+ * 애니메이션 키프레임 (CSS-only 전략)
+ * ────────────────────────────────────────────── */
+@keyframes sigak-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
+@keyframes sigak-slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
 }
+
+@keyframes sigak-slide-in-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sigak-active-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+@keyframes sigak-pulse-opacity {
+  0%, 100% { opacity: 1; }
+  25%      { opacity: 0.78; }
+  75%      { opacity: 0.85; }
+}
+
+.animate-fade-in       { animation: sigak-fade-in 220ms ease-out both; }
+.animate-slide-right   { animation: sigak-slide-in-right 260ms ease-out both; }
+.animate-slide-up      { animation: sigak-slide-in-up 240ms ease-out both; }
+.animate-active-pulse  { animation: sigak-active-pulse 1000ms ease-in-out infinite; }
+.animate-pulse-opacity { animation: sigak-pulse-opacity 900ms ease-out both; }
+
+/* Tabular numerals — 토큰 카운터, 진행률, 인덱스 스탬프 */
+.tabular-nums { font-variant-numeric: tabular-nums; }

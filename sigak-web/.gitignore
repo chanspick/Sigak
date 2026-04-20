@@ -42,3 +42,12 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 .env.local
+
+# Capacitor native platforms (재생성 가능 — 매 개발자 cap add 전제)
+# 네이티브 프로젝트 커밋 방침으로 전환 시 이 두 줄 제거.
+/ios
+/android
+
+# Capacitor generated
+.capacitor/
+

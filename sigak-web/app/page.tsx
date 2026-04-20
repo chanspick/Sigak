@@ -197,7 +197,7 @@ function LoggedOutLanding() {
       </div>
 
       {/* 약관 fine print */}
-      <div style={{ padding: "0 28px 32px" }}>
+      <div style={{ padding: "0 28px 12px" }}>
         <p
           className="font-sans"
           style={{
@@ -220,6 +220,25 @@ function LoggedOutLanding() {
           </Link>
           에 동의하는 것으로 간주됩니다.
         </p>
+      </div>
+
+      {/* Toss PG 심사용 — 승인 후 제거 */}
+      <div style={{ padding: "0 28px 32px", textAlign: "center" }}>
+        <Link
+          href="/auth/test-login"
+          className="font-sans"
+          style={{
+            fontSize: 10,
+            letterSpacing: "1.5px",
+            textTransform: "uppercase",
+            opacity: 0.3,
+            color: "var(--color-ink)",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          PG 심사 테스트 로그인
+        </Link>
       </div>
 
       <SiteFooter />

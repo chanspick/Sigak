@@ -53,6 +53,14 @@ export function getVerdict(verdictId: string): Promise<VerdictResponse> {
   );
 }
 
+/** 본인 verdict 삭제. 204. 404/403 시 authFetch가 throw. */
+export function deleteVerdict(verdictId: string): Promise<void> {
+  return authFetch<void>(
+    `/api/v1/verdicts/${encodeURIComponent(verdictId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /** 50토큰 소비해서 블러 해제.
  *
  * 409 (onboarding 미완), 402 (잔액 부족), 404, 403 가능.

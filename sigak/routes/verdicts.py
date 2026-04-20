@@ -432,6 +432,43 @@ def get_verdict(
 
 
 # ─────────────────────────────────────────────
+#  DELETE /api/v1/verdicts/{verdict_id}
+# ─────────────────────────────────────────────
+
+@router.delete("/{verdict_id}", status_code=204)
+def delete_verdict(
+    verdict_id: str,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """본인 verdict 삭제. 업로드 파일(uploads/)은 orphan으로 남음 —
+    cleanup job은 refactor backlog.
+
+    token_transactions.reference_id 는 verdict_id를 가리키지만 FK 강제는
+    없으므로 verdicts row만 삭제해도 DB integrity OK. 감사 이력 보존용으로
+    transactions는 남겨둠.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    row = db.execute(
+        text("SELECT user_id FROM verdicts WHERE id = :id"),
+        {"id": verdict_id},
+    ).first()
+    if not row:
+        raise HTTPException(404, "verdict not found")
+    if row.user_id != user["id"]:
+        raise HTTPException(403, "본인 verdict가 아닙니다")
+
+    db.execute(
+        text("DELETE FROM verdicts WHERE id = :id"),
+        {"id": verdict_id},
+    )
+    db.commit()
+    return None
+
+
+# ─────────────────────────────────────────────
 #  POST /api/v1/verdicts/{verdict_id}/release-blur
 # ─────────────────────────────────────────────
 

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
-import { listVerdicts, resolvePhotoUrl } from "@/lib/api/verdicts";
+import { deleteVerdict, listVerdicts, resolvePhotoUrl } from "@/lib/api/verdicts";
 import type { VerdictListItem } from "@/lib/types/mvp";
 
 const PAGE_SIZE = 30;
@@ -28,10 +28,37 @@ export function VerdictGrid({ onTotalChange }: VerdictGridProps = {}) {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const offsetRef = useRef(0);
   const totalRef = useRef<number>(0);
+
+  async function handleDelete(verdictId: string) {
+    if (deletingId) return;
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "이 판정을 삭제하시겠어요?\n삭제 후 복구할 수 없어요.",
+      );
+      if (!ok) return;
+    }
+    setDeletingId(verdictId);
+    try {
+      await deleteVerdict(verdictId);
+      setItems((prev) => prev.filter((v) => v.verdict_id !== verdictId));
+      totalRef.current = Math.max(0, totalRef.current - 1);
+      onTotalChange?.(totalRef.current);
+      offsetRef.current = Math.max(0, offsetRef.current - 1);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        router.replace("/");
+        return;
+      }
+      setError(e instanceof Error ? e.message : "삭제 실패");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   const loadMore = useCallback(async () => {
     if (!hasMore) return;
@@ -91,12 +118,14 @@ export function VerdictGrid({ onTotalChange }: VerdictGridProps = {}) {
         {/* 첫 셀: + 업로드 진입점 (항상 노출) */}
         <AddCell onClick={() => router.push("/verdict/new")} />
 
-        {/* Verdict 썸네일 — 블러 없음, 항상 클리어 */}
+        {/* Verdict 썸네일 — 블러 없음, 항상 클리어. long-press 삭제. */}
         {items.map((v) => (
           <ThumbCell
             key={v.verdict_id}
             url={resolvePhotoUrl(v.gold_photo_url)}
             onClick={() => router.push(`/verdict/${v.verdict_id}`)}
+            onLongPress={() => handleDelete(v.verdict_id)}
+            deleting={deletingId === v.verdict_id}
           />
         ))}
       </div>
@@ -191,28 +220,85 @@ function AddCell({ onClick }: { onClick: () => void }) {
 }
 
 // ─────────────────────────────────────────────
-//  Verdict 썸네일 — 클리어, 블러/락 없음
+//  Verdict 썸네일 — 클리어 + long-press(700ms) / right-click 삭제
 // ─────────────────────────────────────────────
+
+const LONG_PRESS_MS = 700;
 
 function ThumbCell({
   url,
   onClick,
+  onLongPress,
+  deleting,
 }: {
   url: string;
   onClick: () => void;
+  onLongPress: () => void;
+  deleting: boolean;
 }) {
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressedRef = useRef(false);
+
+  function clearPress() {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  }
+
+  function onPointerDown() {
+    longPressedRef.current = false;
+    clearPress();
+    pressTimerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      // 가벼운 햅틱 피드백 (지원 기기만)
+      try {
+        (navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }).vibrate?.(25);
+      } catch {
+        // ignore
+      }
+      onLongPress();
+    }, LONG_PRESS_MS);
+  }
+
+  function onClickGuarded() {
+    // long-press가 발동된 클릭이면 navigate 차단
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
+    onClick();
+  }
+
   return (
     <button
       type="button"
-      onClick={onClick}
-      aria-label="판정 보기"
+      onClick={onClickGuarded}
+      onPointerDown={onPointerDown}
+      onPointerUp={clearPress}
+      onPointerLeave={clearPress}
+      onPointerMove={clearPress}
+      onPointerCancel={clearPress}
+      onContextMenu={(e) => {
+        // 데스크톱 우클릭 — 컨텍스트 메뉴 대신 삭제 프롬프트
+        e.preventDefault();
+        onLongPress();
+      }}
+      aria-label="판정 — 탭: 보기 · 길게 누르기: 삭제"
       style={{
+        position: "relative",
         aspectRatio: "1/1",
         background: "rgba(0, 0, 0, 0.04)",
         border: "none",
         padding: 0,
         cursor: "pointer",
         overflow: "hidden",
+        opacity: deleting ? 0.4 : 1,
+        transition: "opacity 150ms ease",
+        // long-press 시 drag/select 방지
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        touchAction: "manipulation",
       }}
     >
       {url && (
@@ -220,13 +306,34 @@ function ThumbCell({
         <img
           src={url}
           alt=""
+          draggable={false}
           style={{
             width: "100%",
             height: "100%",
             objectFit: "cover",
             display: "block",
+            pointerEvents: "none", // 이미지가 이벤트 먹지 않도록
           }}
         />
+      )}
+      {deleting && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            color: "var(--color-paper)",
+            background: "rgba(0, 0, 0, 0.5)",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 600,
+            letterSpacing: "1px",
+          }}
+        >
+          삭제 중
+        </div>
       )}
     </button>
   );

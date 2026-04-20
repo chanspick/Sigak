@@ -1,13 +1,7 @@
-// SIGAK MVP v1.2 — /onboarding/step/[n]
+// SIGAK MVP v1.2 (Rebrand) — /onboarding/step/[n]
 //
-// 동적 라우트 하나로 step 1~4 모두 처리. 각 step 정의는
-// lib/constants/onboarding-steps.ts 의 ONBOARDING_STEPS.
-//
-// 진입 시 GET /api/v1/onboarding/state 로 기존 응답 불러와 pre-fill.
-// "다음" CTA 클릭 → POST /api/v1/onboarding/save-step → 다음 step 또는 /complete.
-//
-// 권한 게이트: JWT 없음 → /auth/login. consent 미완료 → /onboarding/welcome.
-// 최종 가드 로직은 D-5의 useOnboardingGuard가 담당하지만 여기서도 기본 방어.
+// 4스텝 질문지. 기능(save-step 호출, 필수 필드 검증)은 유지.
+// 브랜딩: TopBar + serif 헤드라인 + pill/textarea(검정 테두리, sage 제거).
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -36,7 +30,7 @@ import {
 } from "@/components/ui/sigak";
 
 // ─────────────────────────────────────────────
-//  Helpers — comma-join 처리 (backend가 string 받음)
+//  Helpers
 // ─────────────────────────────────────────────
 
 function splitCsv(v: unknown): string[] {
@@ -49,10 +43,6 @@ function splitCsv(v: unknown): string[] {
 function joinCsv(arr: string[]): string {
   return arr.join(",");
 }
-
-// ─────────────────────────────────────────────
-//  Validation — required 필드 모두 값 있음?
-// ─────────────────────────────────────────────
 
 function validateStep(step: OnboardingStep, values: OnboardingData): boolean {
   for (const q of step.questions) {
@@ -89,7 +79,6 @@ export default function OnboardingStepPage() {
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
 
-  // 1. 권한 게이트 + 기존 데이터 pre-fill
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -116,13 +105,11 @@ export default function OnboardingStepPage() {
           router.replace("/auth/login");
           return;
         }
-        // 네트워크 실패 시 빈 값으로 진행
       }
       setBooting(false);
     })();
   }, [router]);
 
-  // 2. route param이 범위 밖이면 step 1로 보냄
   useEffect(() => {
     if (!step) {
       router.replace("/onboarding/step/1");
@@ -143,7 +130,6 @@ export default function OnboardingStepPage() {
     setSubmitting(true);
     setError(null);
 
-    // 현재 step에서 변경된 필드만 추려서 전송
     const fieldsForStep: OnboardingData = {};
     for (const q of step.questions) {
       const v = values[q.key];
@@ -172,52 +158,73 @@ export default function OnboardingStepPage() {
   }
 
   if (booting || !step) {
-    return <div className="min-h-screen bg-paper" aria-hidden />;
+    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-hidden />;
   }
 
   const progressPct = Math.round(((stepN - 1) / ONBOARDING_STEPS.length) * 100);
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      <TopBar
-        variant="onboarding"
-        stepLabel={`STEP 0${stepN} / 04`}
-        hideTokens
-      />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <TopBar />
 
-      {/* Progress */}
-      <div className="mt-6 px-5">
-        <ProgressBar
-          pct={progressPct}
-          label={`STEP ${stepN}`}
-          hideValue
-        />
-      </div>
+      {/* Step label + progress */}
+      <section style={{ padding: "28px 28px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Label>Step {stepN} / 4</Label>
+          <LabelRight>{String(Math.round((stepN / 4) * 100)).padStart(3, " ")}%</LabelRight>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <ProgressBar pct={progressPct} label="진행" hideValue />
+        </div>
+      </section>
 
       {/* 제목 */}
-      <div className="mt-8 px-5">
+      <section style={{ padding: "36px 28px 0" }}>
         <h1
-          className="font-sans font-medium text-ink"
-          style={{ fontSize: 24, lineHeight: 1.3, letterSpacing: "-0.02em" }}
+          className="font-serif"
+          style={{
+            fontSize: 28,
+            fontWeight: 400,
+            lineHeight: 1.3,
+            letterSpacing: "-0.01em",
+            margin: 0,
+            color: "var(--color-ink)",
+          }}
         >
           {step.title}
         </h1>
         {step.subtitle && (
           <p
-            className="mt-2 font-sans text-mute"
-            style={{ fontSize: 13, lineHeight: 1.6, letterSpacing: "-0.005em" }}
+            className="font-sans"
+            style={{
+              marginTop: 12,
+              fontSize: 13,
+              opacity: 0.5,
+              lineHeight: 1.6,
+              color: "var(--color-ink)",
+            }}
           >
             {step.subtitle}
           </p>
         )}
-      </div>
+      </section>
 
-      {/* 질문들 */}
+      {/* 질문 */}
       <main
-        key={stepN /* step 변경 시 slide-in 애니 */}
-        className="flex-1 animate-slide-right px-5 pb-32 pt-8"
+        key={stepN}
+        className="animate-slide-right"
+        style={{ padding: "32px 28px 140px", flex: 1 }}
       >
-        <div className="space-y-10">
+        <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
           {step.questions.map((q) => (
             <FieldBlock
               key={q.key}
@@ -230,23 +237,29 @@ export default function OnboardingStepPage() {
 
         {error && (
           <p
-            className="mt-6 font-sans"
+            className="font-sans"
+            role="alert"
             style={{
+              marginTop: 20,
               fontSize: 12,
               color: "var(--color-danger)",
               letterSpacing: "-0.005em",
             }}
-            role="alert"
           >
             {error}
           </p>
         )}
       </main>
 
-      {/* 하단 CTA — fixed bottom */}
+      {/* CTA */}
       <div
-        className="sticky bottom-0 border-t bg-paper px-5 pb-8 pt-4"
-        style={{ borderColor: "var(--color-line)" }}
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "var(--color-paper)",
+          borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+          padding: "20px 28px 32px",
+        }}
       >
         <PrimaryButton
           onClick={handleNext}
@@ -261,7 +274,7 @@ export default function OnboardingStepPage() {
 }
 
 // ─────────────────────────────────────────────
-//  FieldBlock — 질문 타입별 렌더러
+//  FieldBlock
 // ─────────────────────────────────────────────
 
 interface FieldBlockProps {
@@ -274,15 +287,30 @@ function FieldBlock({ q, value, onChange }: FieldBlockProps) {
   return (
     <section>
       <h2
-        className="mb-1 font-sans font-medium text-ink"
-        style={{ fontSize: 15, letterSpacing: "-0.005em" }}
+        className="font-sans"
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          letterSpacing: "-0.005em",
+          margin: 0,
+          marginBottom: 4,
+          color: "var(--color-ink)",
+        }}
       >
         {q.label}
       </h2>
       {q.description && (
         <p
-          className="mb-3 font-sans text-mute"
-          style={{ fontSize: 12, lineHeight: 1.6, letterSpacing: "-0.005em" }}
+          className="font-sans"
+          style={{
+            margin: 0,
+            marginBottom: 12,
+            fontSize: 12,
+            lineHeight: 1.6,
+            opacity: 0.5,
+            letterSpacing: "-0.005em",
+            color: "var(--color-ink)",
+          }}
         >
           {q.description}
         </p>
@@ -294,7 +322,7 @@ function FieldBlock({ q, value, onChange }: FieldBlockProps) {
           options={q.options.map((o) => ({ value: o.value, label: o.label }))}
           value={typeof value === "string" ? value : null}
           onChange={onChange}
-          className="mt-2"
+          className="mt-1"
         />
       )}
 
@@ -305,7 +333,7 @@ function FieldBlock({ q, value, onChange }: FieldBlockProps) {
           value={splitCsv(value)}
           onChange={(arr) => onChange(joinCsv(arr))}
           max={q.maxSelect}
-          className="mt-2"
+          className="mt-1"
         />
       )}
 
@@ -342,24 +370,34 @@ function TextArea({ value, onChange, placeholder, rows, maxLength, minLength }: 
         placeholder={placeholder}
         rows={rows}
         maxLength={maxLength}
-        className="w-full resize-none font-sans text-ink"
+        className="font-sans"
         style={{
-          marginTop: 8,
+          marginTop: 4,
+          width: "100%",
           padding: "12px 14px",
           fontSize: 14,
           lineHeight: 1.6,
           letterSpacing: "-0.005em",
-          border: "0.5px solid var(--color-line-strong)",
-          borderRadius: 8,
+          border: "1px solid rgba(0, 0, 0, 0.15)",
+          borderRadius: 0,
           background: "transparent",
           color: "var(--color-ink)",
           outline: "none",
+          resize: "none",
         }}
       />
       {(minLength != null || maxLength != null) && (
         <div
-          className="mt-1 flex justify-end font-mono text-mute tabular-nums"
-          style={{ fontSize: 10, letterSpacing: "0.04em" }}
+          className="font-sans tabular-nums"
+          style={{
+            marginTop: 4,
+            display: "flex",
+            justifyContent: "flex-end",
+            fontSize: 10,
+            letterSpacing: "1.5px",
+            opacity: 0.4,
+            color: "var(--color-ink)",
+          }}
         >
           {minLength != null && count < minLength
             ? `${count} / 최소 ${minLength}`
@@ -369,5 +407,41 @@ function TextArea({ value, onChange, placeholder, rows, maxLength, minLength }: 
         </div>
       )}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Labels
+// ─────────────────────────────────────────────
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-sans uppercase"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "1.5px",
+        opacity: 0.4,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LabelRight({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-serif tabular-nums"
+      style={{
+        fontSize: 14,
+        fontWeight: 400,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
   );
 }

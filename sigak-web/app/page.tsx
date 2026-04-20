@@ -1,13 +1,9 @@
-// SIGAK MVP v1.2 — / (루트 랜딩)
+// SIGAK MVP v1.2 (Rebrand) — / (루트 랜딩)
 //
-// 로그인 + 온보딩 완료 유저 → HomeScreen (upload zone)
-// 비로그인 유저 → minimal 랜딩 (SIGAK 워드마크 + 한 줄 pitch + 카카오 CTA)
+// 로그인 + 온보딩 완료 유저 → HomeScreen (upload)
+// 비로그인 유저 → 신 브랜딩 랜딩 (serif 헤드라인 + Kakao CTA)
 //
-// useOnboardingGuard는 로그인 유저 경로에서만 호출 (비로그인에서 호출하면
-// guard가 즉시 /auth/login으로 redirect시켜 랜딩이 안 보이게 됨).
-//
-// 가드가 통과시킨(ready) 유저만 HomeScreen 렌더. consent/onboarding 미완은
-// 가드가 알아서 /onboarding/welcome 또는 /onboarding/step/{n}으로 redirect.
+// 가드는 로그인 유저에게만 적용.
 "use client";
 
 import Link from "next/link";
@@ -17,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
 import { HomeScreen } from "@/components/sigak/home-screen";
+import { TopBar } from "@/components/ui/sigak";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
 
@@ -28,7 +25,7 @@ export default function RootPage() {
   }, []);
 
   if (phase === "loading") {
-    return <div className="min-h-screen bg-paper" aria-busy />;
+    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
   }
 
   if (phase === "logged_out") {
@@ -45,101 +42,135 @@ export default function RootPage() {
 function LoggedInHome() {
   const { status } = useOnboardingGuard();
   if (status !== "ready") {
-    return <div className="min-h-screen bg-paper" aria-busy />;
+    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
   }
   return <HomeScreen />;
 }
 
 // ─────────────────────────────────────────────
-//  비로그인 랜딩 (minimal)
+//  비로그인 랜딩
 // ─────────────────────────────────────────────
 
 function LoggedOutLanding() {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      {/* Top spacer */}
-      <div className="pt-[15vh]" />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <TopBar />
 
-      {/* Wordmark + pitch */}
-      <div className="px-6 text-center">
+      {/* 헤드라인 */}
+      <section style={{ padding: "72px 28px 0" }}>
         <h1
-          className="font-display font-medium text-ink"
+          className="font-serif"
           style={{
-            fontSize: 34,
-            letterSpacing: "0.32em",
-            paddingLeft: "0.32em",
-            lineHeight: 1,
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            letterSpacing: "-0.02em",
+            margin: 0,
+            color: "var(--color-ink)",
           }}
         >
-          SIGAK
+          당신을<br />읽겠습니다.
         </h1>
         <p
-          className="mt-10 font-sans text-ink"
-          style={{ fontSize: 16, lineHeight: 1.6, letterSpacing: "-0.005em" }}
+          className="font-sans"
+          style={{
+            marginTop: 20,
+            fontSize: 13,
+            opacity: 0.5,
+            lineHeight: 1.6,
+            color: "var(--color-ink)",
+          }}
         >
-          이 중에서는,
-          <br />이 한{" "}
-          <span
-            className="font-serif"
-            style={{ fontStyle: "italic", fontWeight: 400 }}
-          >
-            장
-          </span>
-          .
+          사진 세 장. AI가 오늘의 한 장을.
         </p>
-        <p
-          className="mt-6 font-sans text-mute"
-          style={{ fontSize: 13, lineHeight: 1.7, letterSpacing: "-0.005em" }}
-        >
-          후보 사진을 올리면 AI가 오늘의 한 장을 골라드려요.
-        </p>
-      </div>
+      </section>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      <div style={{ flex: 1 }} />
 
-      {/* Proof points */}
-      <div className="px-5 pb-8">
-        <ul className="mx-auto mb-10 max-w-[320px] space-y-2">
+      {/* Rule + list */}
+      <Rule />
+
+      <section style={{ padding: "28px 28px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Label>읽기</Label>
+          <LabelRight>03</LabelRight>
+        </div>
+        <ol style={{ margin: "16px 0 0", padding: 0, listStyle: "none" }}>
           {[
-            "3~10장 업로드, 즉시 판정",
-            "GOLD 결과와 짧은 해석은 무료",
-            "상세 진단은 50토큰으로 해제",
+            "사진 세 장부터.",
+            "GOLD 한 장 · reading 무료.",
+            "나머지 · 50 토큰으로 해제.",
           ].map((t, i) => (
-            <li key={t} className="flex items-center gap-3">
+            <li
+              key={t}
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 14,
+                padding: "12px 0",
+                borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+              }}
+            >
               <span
-                className="font-mono tabular-nums text-mute"
-                style={{ fontSize: 10, letterSpacing: "0.14em" }}
+                className="font-serif tabular-nums"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 400,
+                  opacity: 0.4,
+                  color: "var(--color-ink)",
+                }}
               >
-                /00{i + 1}
+                {String(i + 1).padStart(2, "0")}
               </span>
               <span
-                className="font-sans text-ink"
-                style={{ fontSize: 13, letterSpacing: "-0.005em" }}
+                className="font-sans"
+                style={{
+                  fontSize: 14,
+                  fontWeight: 400,
+                  letterSpacing: "-0.005em",
+                  color: "var(--color-ink)",
+                }}
               >
                 {t}
               </span>
             </li>
           ))}
-        </ul>
+        </ol>
+      </section>
 
-        {/* Kakao CTA */}
+      {/* CTA */}
+      <div style={{ padding: "28px 28px 20px" }}>
         <button
           type="button"
           onClick={() => router.push("/auth/login")}
           aria-label="카카오로 시작하기"
-          className="flex w-full items-center justify-center gap-2 font-sans font-medium"
           style={{
-            height: 54,
+            width: "100%",
+            height: 56,
             background: "#FEE500",
             color: "rgba(0, 0, 0, 0.85)",
             border: "none",
-            borderRadius: 12,
-            fontSize: 15,
-            letterSpacing: "-0.005em",
+            borderRadius: 0,
+            fontFamily: "var(--font-sans)",
+            fontSize: 14,
+            fontWeight: 600,
+            letterSpacing: "0.5px",
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
           }}
         >
           <svg width="18" height="16" viewBox="0 0 18 16" aria-hidden>
@@ -150,22 +181,78 @@ function LoggedOutLanding() {
           </svg>
           <span>카카오로 시작하기</span>
         </button>
+      </div>
 
+      {/* Fine print */}
+      <div style={{ padding: "0 28px 32px" }}>
         <p
-          className="mt-4 text-center font-sans text-mute"
-          style={{ fontSize: 11, lineHeight: 1.7, letterSpacing: "-0.005em" }}
+          className="font-sans"
+          style={{
+            fontSize: 11,
+            lineHeight: 1.7,
+            opacity: 0.4,
+            textAlign: "center",
+            margin: 0,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
+          }}
         >
           계속 진행하면{" "}
-          <Link href="/terms" className="underline underline-offset-2">
+          <Link href="/terms" style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>
             이용약관
           </Link>
           {" · "}
-          <Link href="/terms#privacy" className="underline underline-offset-2">
+          <Link href="/terms#privacy" style={{ textDecoration: "underline", textUnderlineOffset: 2 }}>
             개인정보처리방침
           </Link>
           에 동의하는 것으로 간주됩니다.
         </p>
       </div>
     </div>
+  );
+}
+
+function Rule() {
+  return (
+    <div
+      style={{
+        height: 1,
+        background: "var(--color-ink)",
+        margin: "0 28px",
+        opacity: 0.15,
+      }}
+    />
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-sans uppercase"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "1.5px",
+        opacity: 0.4,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LabelRight({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-serif tabular-nums"
+      style={{
+        fontSize: 14,
+        fontWeight: 400,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
   );
 }

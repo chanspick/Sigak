@@ -1,22 +1,23 @@
-// SIGAK MVP v1.2 — ResultScreen (3-tier)
+// SIGAK MVP v1.2 (Rebrand) — ResultScreen
 //
-// refactor/result-screen.jsx v1.2 포팅 + 브리프 3개 수정 반영:
-//   1. GOLD 셀 풀 너비 hero (4/5 aspect, SageFrame tick=16)
-//   2. PRO 블록 토큰 7 → 50
-//   3. Reading 무료 유지 (blur_released=false 에서도 공개)
+// 브랜딩 리팩토링:
+//   - Medal/SageFrame 전면 제거. "GOLD/SILVER/BRONZE" 라벨 문구 삭제
+//   - 날짜 라벨 "2026 · 04 · 19" (sans 11px/2px letterSpacing/opacity 0.4)
+//   - 헤드라인 "이 한 장." serif 40px weight 400
+//   - GOLD 이미지 4/5 프레임 없이 직접 렌더
+//   - Reading: Noto Serif 18px lineHeight 1.7
+//   - SILVER/BRONZE: 메달 라벨 제거, "나머지 N장" 단일 행으로 통합
 //
-// blur_released=false: GOLD 이미지 + reading + SILVER/BRONZE 블러 + PRO CTA
-// blur_released=true:  SILVER/BRONZE URL 복구 + pro_data 렌더
+// 기능은 그대로 유지:
+//   - 3-tier 구조(gold[0] + silver + bronze) 응답 그대로 사용
+//   - blur_released 분기 (false면 remaining 이미지 블러, true면 전체 공개 + pro_data)
+//   - PRO CTA: 잔액 ≥50 → 인라인 releaseBlur / <50 → /tokens/purchase intent
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  MedalLabel,
-  SageFrame,
-  TopBar,
-} from "@/components/ui/sigak";
+import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 import { releaseBlur, resolvePhotoUrl } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import type { TierPhoto, VerdictResponse } from "@/lib/types/mvp";
@@ -26,15 +27,17 @@ const BLUR_RELEASE_COST = 50;
 
 interface ResultScreenProps {
   verdict: VerdictResponse;
-  /** create 시점의 gold_reading을 sessionStorage에서 주입 (GET 재조회 시엔 빈 문자열). */
+  /** create 시점의 gold_reading을 sessionStorage에서 주입. */
   goldReadingOverride?: string;
 }
 
-export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: ResultScreenProps) {
+export function ResultScreen({
+  verdict: initialVerdict,
+  goldReadingOverride,
+}: ResultScreenProps) {
   const router = useRouter();
   const { balance, refetch: refetchBalance } = useTokenBalance();
 
-  // verdict을 로컬 state로 관리 — releaseBlur 성공 시 inline 갱신.
   const [verdict, setVerdict] = useState<VerdictResponse>(initialVerdict);
   const [lightbox, setLightbox] = useState(false);
   const [pulseKey, setPulseKey] = useState(0);
@@ -45,11 +48,11 @@ export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: R
   const gold = verdict.tiers.gold[0] ?? null;
   const silver = verdict.tiers.silver;
   const bronze = verdict.tiers.bronze;
+  const remaining: TierPhoto[] = [...silver, ...bronze];
   const reading = verdict.gold_reading || goldReadingOverride || "";
   const released = verdict.blur_released;
   const tokens = balance ?? 0;
 
-  // keyboard esc for lightbox
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => {
@@ -67,14 +70,12 @@ export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: R
 
   async function handleProCta() {
     if (releasing) return;
-    // 잔액 < 50: purchase 페이지로 intent 전달
     if (balance != null && balance < BLUR_RELEASE_COST) {
       router.push(
         `/tokens/purchase?intent=blur_release&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
       );
       return;
     }
-    // 잔액 로딩 중 또는 충분: 직접 release-blur 시도. 실패(402) 시 purchase로 fallback.
     setReleasing(true);
     setReleaseError(null);
     try {
@@ -83,20 +84,17 @@ export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: R
         ...prev,
         blur_released: true,
         pro_data: res.pro_data,
-        // silver/bronze URL을 재조회 응답에서 채워야 완전한 반영 가능 — 간단히 getVerdict 재호출
       }));
-      // 재조회로 url 포함된 tiers 복구
       try {
         const { getVerdict } = await import("@/lib/api/verdicts");
         const full = await getVerdict(verdict.verdict_id);
         setVerdict(full);
       } catch {
-        // 무시 — 최소 pro_data는 반영됨
+        // ignore
       }
       await refetchBalance();
     } catch (e) {
       if (e instanceof ApiError && e.status === 402) {
-        // 잔액 부족 — purchase로 redirect
         router.push(
           `/tokens/purchase?intent=blur_release&verdict_id=${encodeURIComponent(verdict.verdict_id)}`,
         );
@@ -115,62 +113,108 @@ export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: R
   }
 
   return (
-    <div className="relative min-h-screen bg-paper text-ink">
-      <TopBar variant="result" tokens={tokens} />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+        overflowY: "auto",
+      }}
+    >
+      <TopBar />
 
-      {/* Date line */}
-      <DateLine />
-
-      {/* Headline */}
-      <div className="px-5 pt-3">
+      {/* 날짜 + 헤드라인 */}
+      <section style={{ padding: "40px 28px 32px" }}>
+        <DateLabel />
         <h1
-          className="m-0 font-sans"
+          className="font-serif"
           style={{
-            fontSize: 34,
-            fontWeight: 500,
-            lineHeight: 1.25,
+            fontSize: 40,
+            fontWeight: 400,
+            lineHeight: 1.2,
             letterSpacing: "-0.02em",
+            margin: 0,
+            marginTop: 16,
             color: "var(--color-ink)",
           }}
         >
-          이 중에서는,
-          <br />이 한{" "}
-          <span
-            className="font-serif"
-            style={{ fontStyle: "italic", fontWeight: 400 }}
-          >
-            장
-          </span>
-          .
+          이 한 장.
         </h1>
-      </div>
+      </section>
 
-      {/* GOLD — full-width hero (4/5 aspect) */}
+      {/* 선택된 사진 — 풀 너비, 프레임 없음 */}
       {gold && (
-        <GoldHero
-          photo={gold}
-          onTap={() => setLightbox(true)}
-          reading={reading}
-        />
+        <div
+          style={{ padding: "0 28px", cursor: "pointer" }}
+          onClick={() => setLightbox(true)}
+        >
+          <PhotoTile url={resolvePhotoUrl(gold.url)} aspectRatio="4/5" />
+        </div>
       )}
 
-      {/* SILVER / BRONZE rows */}
-      <TierRow
-        tier="silver"
-        photos={silver}
-        marginTop={36}
-        released={released}
-        onLockedTap={scrollToProAndPulse}
-      />
-      <TierRow
-        tier="bronze"
-        photos={bronze}
-        marginTop={24}
-        released={released}
-        onLockedTap={scrollToProAndPulse}
-      />
+      {/* Reading */}
+      {reading && (
+        <section style={{ padding: "28px 28px 36px" }}>
+          <p
+            className="font-serif"
+            style={{
+              fontSize: 18,
+              fontWeight: 400,
+              lineHeight: 1.7,
+              letterSpacing: "-0.01em",
+              margin: 0,
+              color: "var(--color-ink)",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {reading}
+          </p>
+        </section>
+      )}
 
-      {/* PRO unlock block (or full_analysis if released) */}
+      <Rule />
+
+      {/* 나머지 후보 */}
+      {remaining.length > 0 && (
+        <section style={{ padding: "28px 28px 32px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+            }}
+          >
+            <Label>나머지</Label>
+            <LabelRight>{remaining.length}장</LabelRight>
+          </div>
+          <div
+            style={{
+              marginTop: 16,
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: 4,
+            }}
+          >
+            {remaining.map((photo, i) => {
+              if (released && photo.url) {
+                return (
+                  <div key={photo.photo_id} style={{ opacity: 0.5 }}>
+                    <PhotoTile url={resolvePhotoUrl(photo.url)} aspectRatio="1/1" />
+                  </div>
+                );
+              }
+              return (
+                <BlurredTile key={photo.photo_id || i} onTap={scrollToProAndPulse} />
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <Rule />
+
+      {/* PRO 블록 (blur_released=false 에서만) */}
       {!released ? (
         <ProUnlockBlock
           refEl={proRef}
@@ -185,219 +229,107 @@ export function ResultScreen({ verdict: initialVerdict, goldReadingOverride }: R
       )}
 
       {/* Footer actions */}
-      <FooterActions onNewVerdict={() => router.push("/")} />
+      <section style={{ padding: "32px 28px 40px" }}>
+        <PrimaryButton onClick={() => router.push("/")}>다시 읽기</PrimaryButton>
+        <div
+          style={{
+            marginTop: 18,
+            display: "flex",
+            justifyContent: "center",
+            gap: 22,
+          }}
+        >
+          <FooterLink>공유</FooterLink>
+          <FooterLink>저장</FooterLink>
+        </div>
+      </section>
 
       {lightbox && gold && (
-        <GoldLightbox
-          url={resolvePhotoUrl(gold.url)}
-          onClose={() => setLightbox(false)}
+        <Lightbox url={resolvePhotoUrl(gold.url)} onClose={() => setLightbox(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Primitives
+// ─────────────────────────────────────────────
+
+function DateLabel() {
+  const [label, setLabel] = useState("");
+  useEffect(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    setLabel(`${y} · ${m} · ${day}`);
+  }, []);
+  return (
+    <p
+      className="font-sans uppercase"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "2px",
+        opacity: 0.4,
+        margin: 0,
+        color: "var(--color-ink)",
+      }}
+    >
+      {label}
+    </p>
+  );
+}
+
+function PhotoTile({
+  url,
+  aspectRatio,
+}: {
+  url: string;
+  aspectRatio: string;
+}) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        aspectRatio,
+        overflow: "hidden",
+        background: "rgba(0, 0, 0, 0.04)",
+      }}
+    >
+      {url && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
         />
       )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
-//  DateLine
-// ─────────────────────────────────────────────
-
-function DateLine() {
-  const [label, setLabel] = useState("");
-  useEffect(() => {
-    const d = new Date();
-    setLabel(`${d.getMonth() + 1}월 ${d.getDate()}일`);
-  }, []);
-  return (
-    <div
-      className="px-5 pt-[26px] font-sans text-mute"
-      style={{ fontSize: 12, letterSpacing: "-0.005em" }}
-    >
-      {label}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  GOLD hero — 브리프 수정 1: 풀 너비 4/5
-// ─────────────────────────────────────────────
-
-function GoldHero({
-  photo,
-  reading,
-  onTap,
-}: {
-  photo: TierPhoto;
-  reading: string;
-  onTap: () => void;
-}) {
-  const [pressed, setPressed] = useState(false);
-  const src = resolvePhotoUrl(photo.url);
-  return (
-    <div className="pt-11">
-      <div className="px-5">
-        <MedalLabel tier="gold" count={1} />
-      </div>
-      <div
-        className="mt-3 px-5"
-        onClick={onTap}
-        onPointerDown={() => setPressed(true)}
-        onPointerUp={() => setPressed(false)}
-        onPointerLeave={() => setPressed(false)}
-        style={{
-          cursor: "pointer",
-          transform: pressed ? "scale(0.99)" : "scale(1)",
-          transition: "transform 150ms ease-out",
-          transformOrigin: "center",
-        }}
-      >
-        <SageFrame inset={10} tick={16} weight={1}>
-          <div
-            style={{
-              width: "100%",
-              aspectRatio: "4/5",
-              overflow: "hidden",
-              background: "var(--color-sage-soft)",
-            }}
-          >
-            {src && (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={src}
-                alt="GOLD"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-            )}
-          </div>
-        </SageFrame>
-      </div>
-
-      {reading && (
-        <div className="px-5 pt-5">
-          <p
-            className="max-w-[320px] font-sans"
-            style={{
-              fontSize: 14,
-              fontWeight: 400,
-              lineHeight: 1.7,
-              color: "var(--color-ink)",
-              letterSpacing: "-0.005em",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {reading}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  TierRow — SILVER / BRONZE
-// ─────────────────────────────────────────────
-
-function TierRow({
-  tier,
-  photos,
-  marginTop,
-  released,
-  onLockedTap,
-}: {
-  tier: "silver" | "bronze";
-  photos: TierPhoto[];
-  marginTop: number;
-  released: boolean;
-  onLockedTap: () => void;
-}) {
-  const slots = tier === "silver" ? 3 : 5;
-  return (
-    <div style={{ paddingTop: marginTop }} className="px-5">
-      <MedalLabel tier={tier} count={photos.length} />
-      <div
-        className="mt-3"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: 8,
-        }}
-      >
-        {Array.from({ length: 5 }, (_, i) => {
-          if (i >= slots || i >= photos.length) return <div key={i} />;
-          const photo = photos[i];
-          if (released) {
-            const src = resolvePhotoUrl(photo.url);
-            return (
-              <div
-                key={photo.photo_id}
-                style={{
-                  aspectRatio: "1/1",
-                  overflow: "hidden",
-                  background: "var(--color-sage-soft)",
-                  borderRadius: 2,
-                }}
-              >
-                {src && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={src}
-                    alt={tier}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                )}
-              </div>
-            );
-          }
-          return (
-            <BlurredCell
-              key={photo.photo_id}
-              tier={tier}
-              onTap={onLockedTap}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function BlurredCell({
-  tier,
-  onTap,
-}: {
-  tier: "silver" | "bronze";
-  onTap: () => void;
-}) {
+function BlurredTile({ onTap }: { onTap: () => void }) {
   const [hot, setHot] = useState(false);
-  // tier별 살짝 다른 tonal fill — visual variation
-  const fill =
-    tier === "silver"
-      ? "var(--color-silver-fill)"
-      : "var(--color-bronze-fill)";
   return (
     <button
       type="button"
       onClick={onTap}
       onPointerEnter={() => setHot(true)}
       onPointerLeave={() => setHot(false)}
-      aria-label="블러 해제하려면 탭"
+      aria-label="가려진 사진 — PRO 해제"
       style={{
         cursor: "pointer",
         overflow: "hidden",
-        borderRadius: 2,
         aspectRatio: "1/1",
         border: "none",
         padding: 0,
-        background: fill,
+        background: "rgba(0, 0, 0, 0.06)",
       }}
     >
       <div
@@ -408,15 +340,78 @@ function BlurredCell({
           transform: "scale(1.15)",
           transformOrigin: "center",
           transition: "filter 200ms ease-out",
-          background: `repeating-linear-gradient(32deg, ${fill} 0 14px, rgba(15,15,14,0.07) 14px 15px)`,
+          background:
+            "repeating-linear-gradient(32deg, rgba(0,0,0,0.08) 0 14px, rgba(0,0,0,0.02) 14px 15px)",
         }}
       />
     </button>
   );
 }
 
+function Rule() {
+  return (
+    <div
+      style={{
+        height: 1,
+        background: "var(--color-ink)",
+        margin: "0 28px",
+        opacity: 0.15,
+      }}
+    />
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-sans uppercase"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "1.5px",
+        opacity: 0.4,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LabelRight({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-serif tabular-nums"
+      style={{
+        fontSize: 14,
+        fontWeight: 400,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function FooterLink({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-sans"
+      style={{
+        fontSize: 13,
+        opacity: 0.5,
+        letterSpacing: "-0.005em",
+        cursor: "pointer",
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 // ─────────────────────────────────────────────
-//  PRO Unlock block — 브리프 수정 2: 7 → 50
+//  PRO unlock block — 50 토큰
 // ─────────────────────────────────────────────
 
 function ProUnlockBlock({
@@ -440,9 +435,7 @@ function ProUnlockBlock({
     innerRef.current.animate(
       [
         { opacity: 1 },
-        { opacity: 0.78 },
-        { opacity: 1 },
-        { opacity: 0.85 },
+        { opacity: 0.65 },
         { opacity: 1 },
       ],
       { duration: 900, easing: "ease-out" },
@@ -452,141 +445,146 @@ function ProUnlockBlock({
   const insufficient = balance != null && balance < BLUR_RELEASE_COST;
 
   return (
-    <div ref={refEl} className="pt-[52px]">
-      <div className="px-5">
+    <div ref={refEl} style={{ padding: "28px 28px 0" }}>
+      <div
+        ref={innerRef}
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") onClick();
+        }}
+        style={{
+          border: "1px solid rgba(0, 0, 0, 0.15)",
+          padding: "24px 22px",
+          cursor: "pointer",
+        }}
+      >
         <div
-          ref={innerRef}
-          onClick={onClick}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onClick();
-          }}
+          className="font-sans uppercase"
           style={{
-            background: "var(--color-sage-soft)",
-            borderRadius: 10,
-            padding: "20px 22px",
-            cursor: "pointer",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "2px",
+            opacity: 0.4,
+            color: "var(--color-ink)",
           }}
         >
-          <div
-            className="font-display font-medium uppercase"
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.14em",
-              color: "var(--color-sage)",
-            }}
-          >
-            PRO
-          </div>
-
-          <div
-            className="mt-3 font-sans"
-            style={{
-              fontSize: 19,
-              fontWeight: 500,
-              lineHeight: 1.35,
-              letterSpacing: "-0.015em",
-              color: "var(--color-ink)",
-            }}
-          >
-            가려진 것들
-          </div>
-
-          <div
-            className="mt-1.5 font-sans"
-            style={{
-              fontSize: 13,
-              fontWeight: 400,
-              lineHeight: 1.55,
-              color: "var(--color-ink)",
-              letterSpacing: "-0.005em",
-            }}
-          >
-            silver, bronze 사진과 전체 진단까지.
-          </div>
-
-          <div className="mt-[14px] flex items-center justify-end gap-3">
-            <span
-              className="font-display"
-              style={{
-                fontSize: 16,
-                color: "var(--color-ink)",
-                lineHeight: 1,
-              }}
-            >
-              →
-            </span>
-            <span
-              className="flex items-center gap-[5px] font-display tabular-nums"
-              style={{
-                fontSize: 11,
-                fontWeight: 400,
-                color: "var(--color-ink)",
-                letterSpacing: "0.02em",
-              }}
-            >
-              <span
-                className="relative inline-block"
-                style={{ width: 9, height: 9 }}
-              >
-                <span
-                  className="absolute inset-0 rounded-full"
-                  style={{ border: "1px solid var(--color-ink)" }}
-                />
-                <span
-                  className="absolute rounded-full"
-                  style={{
-                    left: 2.25,
-                    top: 2.25,
-                    width: 4.5,
-                    height: 4.5,
-                    background: "var(--color-sage)",
-                  }}
-                />
-              </span>
-              {BLUR_RELEASE_COST}
-            </span>
-          </div>
-
-          {insufficient && !busy && (
-            <div
-              className="mt-2 font-sans text-mute"
-              style={{ fontSize: 11, letterSpacing: "-0.005em", textAlign: "right" }}
-            >
-              현재 잔액 {balance}토큰 — 충전 페이지로 안내됩니다
-            </div>
-          )}
-          {busy && (
-            <div
-              className="mt-2 font-sans text-mute"
-              style={{ fontSize: 11, letterSpacing: "-0.005em", textAlign: "right" }}
-            >
-              해제 중...
-            </div>
-          )}
-          {error && (
-            <div
-              className="mt-2 font-sans"
-              style={{
-                fontSize: 11,
-                letterSpacing: "-0.005em",
-                textAlign: "right",
-                color: "var(--color-danger)",
-              }}
-              role="alert"
-            >
-              {error}
-            </div>
-          )}
+          PRO
         </div>
+
+        <div
+          className="font-serif"
+          style={{
+            marginTop: 14,
+            fontSize: 22,
+            fontWeight: 400,
+            lineHeight: 1.3,
+            letterSpacing: "-0.01em",
+            color: "var(--color-ink)",
+          }}
+        >
+          가려진 것들
+        </div>
+
+        <div
+          className="font-sans"
+          style={{
+            marginTop: 8,
+            fontSize: 13,
+            opacity: 0.55,
+            lineHeight: 1.55,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          나머지 사진과 전체 진단까지.
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+          }}
+        >
+          <span
+            className="font-sans uppercase"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "1.5px",
+              opacity: 0.4,
+              color: "var(--color-ink)",
+            }}
+          >
+            해제
+          </span>
+          <span
+            className="font-serif tabular-nums"
+            style={{
+              fontSize: 18,
+              fontWeight: 400,
+              color: "var(--color-ink)",
+            }}
+          >
+            {BLUR_RELEASE_COST} 토큰
+          </span>
+        </div>
+
+        {insufficient && !busy && (
+          <div
+            className="font-sans"
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              opacity: 0.5,
+              letterSpacing: "-0.005em",
+              textAlign: "right",
+              color: "var(--color-ink)",
+            }}
+          >
+            현재 잔액 {balance}토큰 — 충전 페이지로 안내
+          </div>
+        )}
+        {busy && (
+          <div
+            className="font-sans"
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              opacity: 0.5,
+              letterSpacing: "-0.005em",
+              textAlign: "right",
+              color: "var(--color-ink)",
+            }}
+          >
+            해제 중...
+          </div>
+        )}
+        {error && (
+          <div
+            className="font-sans"
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              letterSpacing: "-0.005em",
+              textAlign: "right",
+              color: "var(--color-danger)",
+            }}
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────
-//  PRO Revealed block (pro_data 렌더)
+//  PRO revealed block
 // ─────────────────────────────────────────────
 
 function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
@@ -594,44 +592,49 @@ function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
   if (!data) return null;
   const all = [...data.silver_readings, ...data.bronze_readings];
   return (
-    <div className="pt-[52px]">
-      <div className="mb-3 flex items-baseline gap-2.5 px-5">
-        <span
-          className="font-mono text-mute"
-          style={{ fontSize: 10, letterSpacing: "0.14em" }}
-        >
-          § 02
-        </span>
-        <span
-          className="font-display font-medium uppercase text-ink"
-          style={{ fontSize: 10, letterSpacing: "0.22em" }}
-        >
-          — READINGS
-        </span>
+    <div style={{ padding: "28px 28px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 18,
+        }}
+      >
+        <Label>해석</Label>
+        <LabelRight>{all.length}장</LabelRight>
       </div>
 
-      <div className="space-y-4 px-5">
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {all.map((r, i) => (
           <div
             key={r.photo_id}
-            className="border-b pb-4"
-            style={{ borderColor: "var(--color-line)" }}
+            style={{
+              borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+              paddingBottom: 20,
+            }}
           >
             <div
-              className="mb-1 font-mono tabular-nums text-mute"
-              style={{ fontSize: 10, letterSpacing: "0.14em" }}
+              className="font-sans uppercase tabular-nums"
+              style={{
+                fontSize: 10,
+                letterSpacing: "1.5px",
+                opacity: 0.4,
+                marginBottom: 8,
+                color: "var(--color-ink)",
+              }}
             >
-              #{String(i + 2).padStart(2, "0")} · Δ shape{" "}
-              {formatDelta(r.axis_delta.shape)}, volume{" "}
-              {formatDelta(r.axis_delta.volume)}, age {formatDelta(r.axis_delta.age)}
+              #{String(i + 2).padStart(2, "0")} · Δ shape {formatDelta(r.axis_delta.shape)},
+              volume {formatDelta(r.axis_delta.volume)}, age {formatDelta(r.axis_delta.age)}
             </div>
             <p
-              className="font-sans"
+              className="font-serif"
               style={{
-                fontSize: 13,
+                fontSize: 15,
                 lineHeight: 1.7,
-                color: "var(--color-ink)",
                 letterSpacing: "-0.005em",
+                color: "var(--color-ink)",
+                margin: 0,
               }}
             >
               {r.reason}
@@ -640,23 +643,19 @@ function ProRevealedBlock({ verdict }: { verdict: VerdictResponse }) {
         ))}
       </div>
 
-      {/* full_analysis interpretation */}
       {data.full_analysis.interpretation && (
-        <div className="mt-8 px-5">
-          <div
-            className="mb-2 font-display font-medium uppercase text-mute"
-            style={{ fontSize: 10, letterSpacing: "0.22em" }}
-          >
-            § FULL ANALYSIS
-          </div>
+        <div style={{ marginTop: 24 }}>
+          <Label>전체 해석</Label>
           <p
-            className="font-sans"
+            className="font-serif"
             style={{
-              fontSize: 14,
+              marginTop: 12,
+              fontSize: 16,
               lineHeight: 1.8,
-              color: "var(--color-ink)",
               letterSpacing: "-0.005em",
+              color: "var(--color-ink)",
               whiteSpace: "pre-wrap",
+              margin: 0,
             }}
           >
             {data.full_analysis.interpretation}
@@ -674,58 +673,10 @@ function formatDelta(n: number): string {
 }
 
 // ─────────────────────────────────────────────
-//  Footer actions
+//  Lightbox
 // ─────────────────────────────────────────────
 
-function FooterActions({ onNewVerdict }: { onNewVerdict: () => void }) {
-  return (
-    <div className="flex gap-5 px-5 pb-8 pt-[52px]">
-      <button
-        type="button"
-        onClick={onNewVerdict}
-        className="font-sans text-mute"
-        style={{
-          fontSize: 13,
-          fontWeight: 400,
-          letterSpacing: "-0.005em",
-          cursor: "pointer",
-          border: "none",
-          background: "transparent",
-          padding: 0,
-        }}
-      >
-        다시 판정
-      </button>
-      {/* 공유/저장은 v1.2에서 비활성 — placeholder만 */}
-      <span
-        className="font-sans text-mute-2"
-        style={{
-          fontSize: 13,
-          letterSpacing: "-0.005em",
-          color: "var(--color-mute-2)",
-        }}
-      >
-        공유
-      </span>
-      <span
-        className="font-sans text-mute-2"
-        style={{
-          fontSize: 13,
-          letterSpacing: "-0.005em",
-          color: "var(--color-mute-2)",
-        }}
-      >
-        저장
-      </span>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  GOLD lightbox
-// ─────────────────────────────────────────────
-
-function GoldLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+function Lightbox({ url, onClose }: { url: string; onClose: () => void }) {
   return (
     <div
       onClick={onClose}
@@ -733,7 +684,7 @@ function GoldLightbox({ url, onClose }: { url: string; onClose: () => void }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15,15,14,0.85)",
+        background: "rgba(0, 0, 0, 0.92)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -754,9 +705,8 @@ function GoldLightbox({ url, onClose }: { url: string; onClose: () => void }) {
           right: 20,
           width: 32,
           height: 32,
-          borderRadius: 999,
           background: "transparent",
-          border: "0.5px solid rgba(250,250,247,0.5)",
+          border: "1px solid rgba(255, 255, 255, 0.4)",
           cursor: "pointer",
           padding: 0,
           display: "flex",
@@ -767,39 +717,17 @@ function GoldLightbox({ url, onClose }: { url: string; onClose: () => void }) {
         <svg width="11" height="11" viewBox="0 0 11 11">
           <path
             d="M1 1l9 9M10 1L1 10"
-            stroke="var(--color-paper)"
+            stroke="#F3F0EB"
             strokeWidth="1"
             strokeLinecap="round"
           />
         </svg>
       </button>
-
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 320 }}
+        style={{ width: "100%", maxWidth: 340 }}
       >
-        <SageFrame inset={10} tick={16} weight={1}>
-          <div
-            style={{
-              width: "100%",
-              aspectRatio: "4/5",
-              overflow: "hidden",
-              background: "var(--color-sage-soft)",
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt="GOLD"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-              }}
-            />
-          </div>
-        </SageFrame>
+        <PhotoTile url={url} aspectRatio="4/5" />
       </div>
     </div>
   );

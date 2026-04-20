@@ -1,9 +1,7 @@
-// SIGAK MVP v1.2 — /onboarding/welcome
+// SIGAK MVP v1.2 (Rebrand) — /onboarding/welcome
 //
-// 로그인 직후 첫 진입 게이트. 여기서 약관 v2.0 필수 5개 + 선택 1개 동의를 받고
-// POST /api/v1/auth/consent 로 저장한다. 성공 시 /onboarding/step/1 이동.
-//
-// 이미 consent_completed=true 라면 즉시 step으로 보냄(useEffect).
+// 로그인 후 첫 게이트. v2.0 약관 필수 5 + 선택 1 동의 수집 → POST /auth/consent.
+// 기능은 그대로, 브랜딩만 새 체계 (TopBar 검정바, serif 헤드라인, Rule 구분선).
 "use client";
 
 import Link from "next/link";
@@ -14,9 +12,8 @@ import { getToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe, saveConsent } from "@/lib/api/onboarding";
 import { ONBOARDING_STEPS } from "@/lib/constants/onboarding-steps";
-import { PrimaryButton } from "@/components/ui/sigak";
+import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 
-// 체크박스 필드 정의 (필수 5 + 선택 1)
 type ConsentKey =
   | "age_confirmed"
   | "terms"
@@ -29,15 +26,15 @@ interface ConsentItem {
   key: ConsentKey;
   required: boolean;
   label: string;
-  termsAnchor?: string; // /terms#... 앵커. 없으면 "전문 보기" 숨김
+  termsAnchor?: string;
 }
 
 const CONSENT_ITEMS: ConsentItem[] = [
   { key: "age_confirmed",     required: true, label: "만 14세 이상입니다" },
   { key: "terms",             required: true, label: "서비스 이용약관 동의", termsAnchor: "#tos" },
   { key: "privacy",           required: true, label: "개인정보 수집·이용 동의", termsAnchor: "#privacy" },
-  { key: "sensitive",         required: true, label: "민감정보(얼굴·생체 특징) 수집·이용 동의", termsAnchor: "#privacy" },
-  { key: "overseas_transfer", required: true, label: "개인정보 국외 이전 동의 (Railway·Vercel·Anthropic)", termsAnchor: "#privacy" },
+  { key: "sensitive",         required: true, label: "민감정보 수집·이용 동의", termsAnchor: "#privacy" },
+  { key: "overseas_transfer", required: true, label: "개인정보 국외 이전 동의", termsAnchor: "#privacy" },
   { key: "marketing",         required: false, label: "마케팅 정보 수신 동의" },
 ];
 
@@ -63,8 +60,6 @@ export default function OnboardingWelcomePage() {
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
 
-  // 인증 + consent 상태 확인. 로그인 안 되어 있으면 /auth/login.
-  // 이미 consent 완료면 step으로 바로 보냄.
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -75,7 +70,6 @@ export default function OnboardingWelcomePage() {
       try {
         const me = await getMe();
         if (me.consent_completed) {
-          // 다음 온보딩 스텝 또는 완료 화면 → 가드가 최종 분기 (여기선 단순히 step/1)
           router.replace(me.onboarding_completed ? "/" : "/onboarding/step/1");
           return;
         }
@@ -84,7 +78,6 @@ export default function OnboardingWelcomePage() {
           router.replace("/auth/login");
           return;
         }
-        // 네트워크 오류: 계속 진행시키되 consent 제출 시 실패하면 알림
       }
       setBooting(false);
     })();
@@ -140,101 +133,115 @@ export default function OnboardingWelcomePage() {
   }
 
   if (booting) {
-    return (
-      <div className="min-h-screen bg-paper" aria-hidden />
-    );
+    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-hidden />;
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      {/* 상단 여백 */}
-      <div className="pt-[56px]" />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <TopBar />
 
-      <main className="flex-1 px-6 pb-6">
+      <main style={{ padding: "48px 28px 24px", flex: 1 }}>
         {/* 헤드라인 */}
         <h1
-          className="font-sans font-medium text-ink"
+          className="font-serif"
           style={{
-            fontSize: 28,
+            fontSize: 34,
+            fontWeight: 400,
             lineHeight: 1.3,
-            letterSpacing: "-0.02em",
+            letterSpacing: "-0.01em",
+            margin: 0,
+            color: "var(--color-ink)",
           }}
         >
-          SIGAK 시작하기
+          시작 전에.
         </h1>
         <p
-          className="mt-3 font-sans text-mute"
-          style={{ fontSize: 13, lineHeight: 1.7, letterSpacing: "-0.005em" }}
+          className="font-sans"
+          style={{
+            marginTop: 16,
+            fontSize: 13,
+            opacity: 0.5,
+            lineHeight: 1.6,
+            color: "var(--color-ink)",
+          }}
         >
-          4단계로 당신의 추구미를 파악합니다.
-          <br />
-          한 번만 설정하면 판정이 더 정확해집니다.
+          네 걸음으로 당신을 읽습니다.
         </p>
 
         {/* 4스텝 프리뷰 */}
-        <section className="mt-10">
-          <div
-            className="mb-3 font-display font-medium uppercase text-mute"
-            style={{ fontSize: 10, letterSpacing: "0.22em" }}
-          >
-            § 4 STEPS
+        <div style={{ marginTop: 40 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+            <Label>네 걸음</Label>
+            <LabelRight>04</LabelRight>
           </div>
-          <ol className="space-y-2">
-            {ONBOARDING_STEPS.map((s) => (
+          <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
+            {ONBOARDING_STEPS.map((s, i) => (
               <li
                 key={s.step}
-                className="flex items-center gap-3 border-b py-3"
-                style={{ borderColor: "var(--color-line)" }}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 14,
+                  padding: "12px 0",
+                  borderBottom: i === ONBOARDING_STEPS.length - 1 ? "none" : "1px solid rgba(0, 0, 0, 0.1)",
+                }}
               >
                 <span
-                  className="font-mono text-mute tabular-nums"
-                  style={{ fontSize: 10, letterSpacing: "0.14em" }}
+                  className="font-serif tabular-nums"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 400,
+                    opacity: 0.4,
+                    color: "var(--color-ink)",
+                  }}
                 >
-                  /00{s.step}
-                </span>
-                <span className="font-sans text-ink" style={{ fontSize: 14, letterSpacing: "-0.01em" }}>
-                  {s.shortLabel}
+                  {String(s.step).padStart(2, "0")}
                 </span>
                 <span
-                  className="ml-auto font-sans text-mute"
-                  style={{ fontSize: 11, letterSpacing: "-0.005em" }}
+                  className="font-sans"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 400,
+                    letterSpacing: "-0.005em",
+                    color: "var(--color-ink)",
+                  }}
                 >
-                  {s.title.replace(/^SIGAK /, "")}
+                  {s.shortLabel}
                 </span>
               </li>
             ))}
           </ol>
-        </section>
+        </div>
 
-        {/* 동의 체크박스 */}
-        <section className="mt-10">
-          <div
-            className="mb-3 font-display font-medium uppercase text-mute"
-            style={{ fontSize: 10, letterSpacing: "0.22em" }}
-          >
-            § CONSENT
-          </div>
+        {/* 동의 섹션 */}
+        <div style={{ marginTop: 48 }}>
+          <Label>동의</Label>
 
-          {/* 전체 동의 토글 */}
-          <div
-            className="mb-2 border-b py-3"
-            style={{ borderColor: "var(--color-line)" }}
-          >
+          {/* 전체 동의 */}
+          <div style={{ marginTop: 16, paddingBottom: 14, borderBottom: "1px solid rgba(0, 0, 0, 0.15)" }}>
             <ConsentRow
               checked={allChecked}
               onToggle={toggleAll}
-              strong
               label="전체 동의 (선택 포함)"
+              strong
             />
           </div>
 
-          {/* 개별 체크박스 */}
-          <ul className="space-y-0">
+          {/* 개별 */}
+          <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
             {CONSENT_ITEMS.map((item) => (
               <li
                 key={item.key}
-                className="border-b py-3"
-                style={{ borderColor: "var(--color-line)" }}
+                style={{ padding: "14px 0", borderBottom: "1px solid rgba(0, 0, 0, 0.1)" }}
               >
                 <ConsentRow
                   checked={consents[item.key]}
@@ -245,33 +252,31 @@ export default function OnboardingWelcomePage() {
               </li>
             ))}
           </ul>
-        </section>
+        </div>
 
-        {/* 에러 */}
         {error && (
           <p
-            className="mt-6 font-sans"
+            className="font-sans"
+            role="alert"
             style={{
+              marginTop: 20,
               fontSize: 12,
               color: "var(--color-danger)",
               letterSpacing: "-0.005em",
             }}
-            role="alert"
           >
             {error}
           </p>
         )}
       </main>
 
-      {/* 하단 CTA */}
-      <div className="px-5 pb-8 pt-4">
+      <div style={{ padding: "20px 28px 32px" }}>
         <PrimaryButton
           onClick={handleSubmit}
           disabled={!allRequiredChecked || submitting}
           disabledLabel={
             submitting ? "저장 중..." : "필수 항목에 모두 동의해주세요"
           }
-          showArrow={allRequiredChecked && !submitting}
         >
           시작하기
         </PrimaryButton>
@@ -292,31 +297,25 @@ interface ConsentRowProps {
   termsAnchor?: string;
 }
 
-function ConsentRow({
-  checked,
-  onToggle,
-  label,
-  strong = false,
-  termsAnchor,
-}: ConsentRowProps) {
+function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: ConsentRowProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <button
         type="button"
         role="checkbox"
         aria-checked={checked}
         onClick={onToggle}
-        className="flex items-center justify-center transition-colors"
         style={{
-          width: 20,
-          height: 20,
+          width: 18,
+          height: 18,
           flexShrink: 0,
-          borderRadius: 4,
-          border: checked
-            ? "1px solid var(--color-ink)"
-            : "1px solid var(--color-line-strong)",
+          border: checked ? "1px solid var(--color-ink)" : "1px solid rgba(0, 0, 0, 0.25)",
           background: checked ? "var(--color-ink)" : "transparent",
           cursor: "pointer",
+          padding: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {checked && (
@@ -335,14 +334,15 @@ function ConsentRow({
 
       <label
         onClick={onToggle}
-        className="font-sans text-ink"
+        className="font-sans"
         style={{
           fontSize: strong ? 14 : 13,
-          fontWeight: strong ? 500 : 400,
+          fontWeight: strong ? 600 : 400,
           letterSpacing: "-0.005em",
           lineHeight: 1.5,
           cursor: "pointer",
           flex: 1,
+          color: "var(--color-ink)",
         }}
       >
         {label}
@@ -353,12 +353,51 @@ function ConsentRow({
           href={`/terms${termsAnchor}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-sans text-mute underline underline-offset-2"
-          style={{ fontSize: 11, letterSpacing: "-0.005em" }}
+          className="font-sans"
+          style={{
+            fontSize: 11,
+            letterSpacing: "-0.005em",
+            opacity: 0.5,
+            textDecoration: "underline",
+            textUnderlineOffset: 2,
+            color: "var(--color-ink)",
+          }}
         >
-          전문 보기
+          전문
         </Link>
       )}
     </div>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-sans uppercase"
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "1.5px",
+        opacity: 0.4,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LabelRight({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className="font-serif tabular-nums"
+      style={{
+        fontSize: 14,
+        fontWeight: 400,
+        color: "var(--color-ink)",
+      }}
+    >
+      {children}
+    </span>
   );
 }

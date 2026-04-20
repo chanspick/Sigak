@@ -1,7 +1,8 @@
-// SIGAK MVP v1.2 — PrimaryButton
-// Full-width INK CTA. 54px 높이, 우측 화살표(sage).
-// disabled 상태: 반투명 ink 배경 + mute_2 텍스트.
-// Source: refactor/home-screen.jsx HomeCTA.
+// SIGAK MVP v1.2 (Rebrand) — PrimaryButton
+//
+// Active: 검정 bg + 베이지 텍스트, border 없음, 높이 56, border-radius 0.
+// Inactive: 투명 bg + 검정 1px 0.15 opacity 테두리, opacity 0.3.
+// 폰트: Pretendard 14px weight 600, letterSpacing 0.5px.
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
@@ -9,19 +10,20 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 interface PrimaryButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   children: ReactNode;
-  /** 우측 sage 화살표 표시. ready 상태에서만. 기본 true. */
-  showArrow?: boolean;
-  /** 비활성 텍스트 override. disabled 상태에서 children 대신 표시. */
+  /** disabled 상태 텍스트 override. */
   disabledLabel?: ReactNode;
+  /** 하위 호환: 무시됨 (신규 디자인엔 화살표 없음). */
+  showArrow?: boolean;
 }
 
 export function PrimaryButton({
   children,
-  showArrow = true,
   disabledLabel,
   disabled,
   className,
   style,
+  // showArrow prop 소비만 (렌더에 영향 없음)
+  showArrow: _showArrow,
   ...rest
 }: PrimaryButtonProps) {
   const ready = !disabled;
@@ -32,37 +34,24 @@ export function PrimaryButton({
       className={className}
       style={{
         width: "100%",
-        height: 54,
-        background: ready ? "var(--color-ink)" : "rgba(15,15,14,0.06)",
-        color: ready ? "var(--color-paper)" : "var(--color-mute-2)",
-        border: "none",
-        borderRadius: 12,
+        height: 56,
+        background: ready ? "var(--color-ink)" : "transparent",
+        color: ready ? "var(--color-paper)" : "var(--color-ink)",
+        border: ready ? "none" : "1px solid rgba(0, 0, 0, 0.15)",
+        borderRadius: 0,
         fontFamily: "var(--font-sans)",
         fontSize: 14,
-        fontWeight: 500,
-        letterSpacing: "-0.005em",
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        opacity: ready ? 1 : 0.3,
         cursor: ready ? "pointer" : "default",
         display: "flex",
         alignItems: "center",
-        justifyContent: showArrow && ready ? "space-between" : "center",
-        padding: "0 22px",
+        justifyContent: "center",
         ...style,
       }}
     >
       <span>{ready ? children : (disabledLabel ?? children)}</span>
-      {ready && showArrow && (
-        <span
-          aria-hidden
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 18,
-            color: "var(--color-sage)",
-            lineHeight: 1,
-          }}
-        >
-          →
-        </span>
-      )}
     </button>
   );
 }

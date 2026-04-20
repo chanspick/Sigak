@@ -1,11 +1,11 @@
-// SIGAK MVP v1.2 — ProgressBar
-// 2px sage 진행바 + 좌측 라벨 + 우측 퍼센트.
-// Source: refactor/analyzing-screen.jsx ProgressBar (0..100).
+// SIGAK MVP v1.2 (Rebrand) — ProgressBar
+//
+// 단순 1px 라인. 좌측 "진행" 라벨(sans 11px/1.5px) + 우측 serif tabular percentage.
 
 interface ProgressBarProps {
-  /** 0..100 정수 권장. */
+  /** 0..100 정수. */
   pct: number;
-  /** 좌측 라벨. 기본 "PROGRESS". */
+  /** 좌측 라벨. 기본 "진행". */
   label?: string;
   /** 퍼센트 숨김. 기본 false. */
   hideValue?: boolean;
@@ -14,33 +14,54 @@ interface ProgressBarProps {
 
 export function ProgressBar({
   pct,
-  label = "PROGRESS",
+  label = "진행",
   hideValue = false,
   className,
 }: ProgressBarProps) {
   const clamped = Math.max(0, Math.min(100, Math.round(pct)));
   return (
     <div className={className}>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 12,
+        }}
+      >
         <span
-          className="font-display font-medium text-mute"
-          style={{ fontSize: 10, letterSpacing: "0.22em" }}
+          className="font-sans uppercase"
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "1.5px",
+            opacity: 0.4,
+            color: "var(--color-ink)",
+          }}
         >
           {label}
         </span>
         {!hideValue && (
           <span
-            className="font-mono text-ink tabular-nums"
-            style={{ fontSize: 11, letterSpacing: "0.04em" }}
+            className="font-serif tabular-nums"
+            style={{
+              fontSize: 14,
+              fontWeight: 400,
+              color: "var(--color-ink)",
+            }}
           >
             {String(clamped).padStart(3, " ")}%
           </span>
         )}
       </div>
-      <div className="h-[2px] w-full" style={{ background: "rgba(15,15,14,0.08)" }}>
+      <div style={{ width: "100%", height: 1, background: "rgba(0, 0, 0, 0.1)" }}>
         <div
-          className="h-full bg-sage transition-[width] duration-[260ms] ease-out"
-          style={{ width: `${clamped}%` }}
+          style={{
+            width: `${clamped}%`,
+            height: "100%",
+            background: "var(--color-ink)",
+            transition: "width 0.2s ease",
+          }}
         />
       </div>
     </div>

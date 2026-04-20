@@ -5,12 +5,13 @@ import type { ReactNode } from "react";
 import { TermsTopNav } from "./terms-top-nav";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
-// SIGAK MVP v2.0 (2026-04-20) 약관/개인정보처리방침.
-// 토큰 기반 BM + verdict + 블러 해제 구조 반영. 레거시 TIER(Standard/Full/Celebrity) 전면 제거.
+// SIGAK MVP v2.1 (2026-04-24) 약관/개인정보처리방침.
+// v2 BM 3단 구조 반영: 진단 해제(10토큰) · PI 해제(50토큰) · 변화 탭(무료).
+// 기존 "블러 해제 50토큰" 단일 해제는 deprecated.
 
 export const metadata: Metadata = {
   title: "이용약관 및 개인정보처리방침 — SIGAK",
-  description: "SIGAK 서비스 이용약관 및 개인정보처리방침 v2.0",
+  description: "SIGAK 서비스 이용약관 및 개인정보처리방침 v2.1",
 };
 
 export default function TermsPage() {
@@ -23,7 +24,7 @@ export default function TermsPage() {
           개인정보처리방침 및 이용약관
         </h1>
         <p className="mb-10 text-mute" style={{ fontSize: 12, letterSpacing: "-0.005em" }}>
-          시행일: 2026년 4월 20일 · 버전 v2.0 · 주식회사 시각
+          시행일: 2026년 4월 24일 · 버전 v2.1 · 주식회사 시각
         </p>
 
         {/* ── 1. 개인정보처리방침 ── */}
@@ -215,7 +216,9 @@ export default function TermsPage() {
             ["판정(Verdict)", "이용자가 업로드한 사진을 분석하여 가장 적합한 1장(GOLD)과 부가 순위(SILVER, BRONZE)를 반환하는 분석 결과"],
             ["토큰", "서비스 내 유료 기능 이용을 위해 이용자가 구매하는 가상의 결제 수단. 1 토큰 = 100원"],
             ["토큰 팩", "Starter (100 토큰/10,000원), Regular (280 토큰/25,000원), Pro (600 토큰/50,000원)"],
-            ["블러 해제", "50 토큰을 소비하여 판정 결과의 전체 내용(SILVER, BRONZE 사진 및 상세 분석)을 열람하는 행위"],
+            ["진단 해제", "10 토큰을 소비하여 특정 판정의 전체 내용(SILVER, BRONZE 사진 및 상세 분석)을 열람하는 행위. 판정 단위 개별 해제."],
+            ["PI 해제", "50 토큰을 소비하여 이용자 본인의 종합 이미지 리포트(얼굴·피부톤·갭·헤어·메이크업)를 열람하는 행위. 이용자당 1회, 영속."],
+            ["변화 탭", "이용자의 판정 시계열 궤적. 무료 제공."],
           ]}
         />
 
@@ -243,8 +246,10 @@ export default function TermsPage() {
         <P>회사는 이용자에게 다음 서비스를 제공합니다.</P>
         <Ol items={[
           "판정(Verdict) 기능: 이용자가 업로드한 사진(3~10장)을 분석하여 가장 적합한 1장(GOLD)과 추가 순위(SILVER, BRONZE)를 제공합니다. GOLD 결과와 짧은 해석은 무료로 제공됩니다.",
-          "블러 해제 기능(유료): 50 토큰 소비 시 SILVER·BRONZE 사진과 전체 상세 분석을 열람할 수 있습니다.",
-          "추가 분석 기능(유료, 향후 제공 예정): 판정별 상세 추론(reasoning unlock), 월간 리포트, 시즌별 심화 분석 등",
+          "진단 해제 기능(유료, 10 토큰): 특정 판정에 대해 SILVER·BRONZE 사진과 상세 분석을 열람합니다. 판정 단위 개별 해제.",
+          "PI 해제 기능(유료, 50 토큰): 이용자의 종합 이미지 리포트(얼굴·피부톤·갭·헤어·메이크업)를 열람합니다. 이용자당 1회 영속 해제.",
+          "변화 탭: 이용자 판정 시계열 궤적을 무료로 제공합니다.",
+          "추가 분석 기능(유료, 향후 제공 예정): 월간 리포트, 시즌별 심화 분석 등",
         ]} />
 
         <H3>제6조 (토큰 및 결제)</H3>
@@ -259,13 +264,14 @@ export default function TermsPage() {
         />
         <h4 className="mb-2 mt-5 font-sans" style={{ fontSize: 13, fontWeight: 500 }}>6.2 결제 수단</h4>
         <P>결제는 토스페이먼츠를 통해 처리되며, 신용카드, 카카오페이, 네이버페이 등 토스페이먼츠가 지원하는 결제 수단을 이용할 수 있습니다.</P>
-        <h4 className="mb-2 mt-5 font-sans" style={{ fontSize: 13, fontWeight: 500 }}>6.3 토큰 소비 단가 (참고)</h4>
+        <h4 className="mb-2 mt-5 font-sans" style={{ fontSize: 13, fontWeight: 500 }}>6.3 토큰 소비 단가</h4>
         <Table
           headers={["기능", "소비 토큰", "환산 금액"]}
           rows={[
-            ["블러 해제 (1회 판정당)", "50 토큰", "5,000원"],
-            ["추론 언락 (1 verdict당)", "5 토큰", "500원"],
-            ["월간 리포트", "30 토큰", "3,000원"],
+            ["진단 해제 (판정 1건당)", "10 토큰", "1,000원"],
+            ["PI 해제 (이용자 1회, 영속)", "50 토큰", "5,000원"],
+            ["변화 탭", "무료", "—"],
+            ["월간 리포트 (향후)", "30 토큰", "3,000원"],
           ]}
         />
 

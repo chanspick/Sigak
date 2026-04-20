@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { releaseBlur, resolvePhotoUrl } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import type { TierPhoto, VerdictResponse } from "@/lib/types/mvp";
@@ -228,20 +228,15 @@ export function ResultScreen({
         <ProRevealedBlock verdict={verdict} />
       )}
 
-      {/* Footer actions */}
-      <section style={{ padding: "32px 28px 40px" }}>
-        <PrimaryButton onClick={() => router.push("/verdict/new")}>다시 읽기</PrimaryButton>
-        <div
-          style={{
-            marginTop: 18,
-            display: "flex",
-            justifyContent: "center",
-            gap: 22,
-          }}
-        >
-          <FooterLink>공유</FooterLink>
-          <FooterLink>저장</FooterLink>
-        </div>
+      {/* Footer — 공유만 */}
+      <section
+        style={{
+          padding: "32px 28px 40px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <FooterLink>공유</FooterLink>
       </section>
 
       {lightbox && gold && (

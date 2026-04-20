@@ -1,21 +1,20 @@
-// SIGAK MVP v1.2 (D-6) — / (피드)
+// SIGAK MVP v1.2 (D-6 revised) — / (피드 or 비로그인 랜딩)
 //
-// 로그인 + 가드 통과 유저 → FeedTopBar + VerdictGrid
-// 비로그인 → LoggedOutLanding (카카오 CTA)
-//
-// 업로드는 더 이상 여기 없음 → /verdict/new 로 이동 (FeedTopBar의 + 아이콘).
+// 로그인 + 가드 통과 → FeedTopBar + VerdictGrid
+// 비로그인 → 심플 랜딩. /auth/login 경유 없이 직접 Kakao OAuth 트리거.
 "use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
+import { getKakaoRedirectUri } from "@/lib/kakao";
 import { FeedTopBar, TopBar } from "@/components/ui/sigak";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function RootPage() {
   const [phase, setPhase] = useState<RootPhase>("loading");
@@ -64,7 +63,28 @@ function LoggedInFeed() {
 // ─────────────────────────────────────────────
 
 function LoggedOutLanding() {
-  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function startKakaoLogin() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const redirectUri = getKakaoRedirectUri();
+      const url = `${API_URL}/api/v1/auth/kakao/login?redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const res = await fetch(url, {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
+      if (!res.ok) throw new Error(`서버 응답 오류 (${res.status})`);
+      const data = (await res.json()) as { auth_url?: string };
+      if (!data.auth_url) throw new Error("카카오 인증 URL을 받지 못했습니다");
+      window.location.href = data.auth_url;
+    } catch (e) {
+      setBusy(false);
+      setError(e instanceof Error ? e.message : "카카오 로그인 시작에 실패했습니다");
+    }
+  }
 
   return (
     <div
@@ -79,7 +99,16 @@ function LoggedOutLanding() {
     >
       <TopBar />
 
-      <section style={{ padding: "72px 28px 0" }}>
+      {/* 헤드라인 — 카피 미니멀 */}
+      <section
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "0 28px",
+        }}
+      >
         <h1
           className="font-serif"
           style={{
@@ -91,78 +120,46 @@ function LoggedOutLanding() {
             color: "var(--color-ink)",
           }}
         >
-          당신을<br />읽겠습니다.
+          오늘 한 장.
         </h1>
         <p
           className="font-sans"
           style={{
             marginTop: 20,
-            fontSize: 13,
-            opacity: 0.5,
-            lineHeight: 1.6,
+            fontSize: 14,
+            opacity: 0.55,
+            lineHeight: 1.7,
             color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
           }}
         >
-          사진 세 장. AI가 오늘의 한 장을.
+          3~10장 중 가장 나다운 한 장을.
         </p>
       </section>
 
-      <div style={{ flex: 1 }} />
+      {/* 에러 */}
+      {error && (
+        <p
+          className="font-sans"
+          role="alert"
+          style={{
+            padding: "0 28px 8px",
+            fontSize: 12,
+            color: "var(--color-danger)",
+            letterSpacing: "-0.005em",
+            textAlign: "center",
+          }}
+        >
+          {error}
+        </p>
+      )}
 
-      <Rule />
-
-      <section style={{ padding: "28px 28px 0" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label>읽기</Label>
-          <LabelRight>03</LabelRight>
-        </div>
-        <ol style={{ margin: "16px 0 0", padding: 0, listStyle: "none" }}>
-          {[
-            "사진 세 장부터.",
-            "GOLD 한 장 · reading 무료.",
-            "나머지 · 50 토큰으로 해제.",
-          ].map((t, i) => (
-            <li
-              key={t}
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 14,
-                padding: "12px 0",
-                borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
-              }}
-            >
-              <span
-                className="font-serif tabular-nums"
-                style={{
-                  fontSize: 14,
-                  fontWeight: 400,
-                  opacity: 0.4,
-                  color: "var(--color-ink)",
-                }}
-              >
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span
-                className="font-sans"
-                style={{
-                  fontSize: 14,
-                  fontWeight: 400,
-                  letterSpacing: "-0.005em",
-                  color: "var(--color-ink)",
-                }}
-              >
-                {t}
-              </span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <div style={{ padding: "28px 28px 20px" }}>
+      {/* Kakao CTA */}
+      <div style={{ padding: "0 28px 20px" }}>
         <button
           type="button"
-          onClick={() => router.push("/auth/login")}
+          onClick={startKakaoLogin}
+          disabled={busy}
           aria-label="카카오로 시작하기"
           style={{
             width: "100%",
@@ -175,7 +172,8 @@ function LoggedOutLanding() {
             fontSize: 14,
             fontWeight: 600,
             letterSpacing: "0.5px",
-            cursor: "pointer",
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.6 : 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -188,10 +186,11 @@ function LoggedOutLanding() {
               fill="currentColor"
             />
           </svg>
-          <span>카카오로 시작하기</span>
+          <span>{busy ? "이동 중..." : "카카오로 시작하기"}</span>
         </button>
       </div>
 
+      {/* 약관 fine print */}
       <div style={{ padding: "0 28px 32px" }}>
         <p
           className="font-sans"
@@ -217,50 +216,5 @@ function LoggedOutLanding() {
         </p>
       </div>
     </div>
-  );
-}
-
-function Rule() {
-  return (
-    <div
-      style={{
-        height: 1,
-        background: "var(--color-ink)",
-        margin: "0 28px",
-        opacity: 0.15,
-      }}
-    />
-  );
-}
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="font-sans uppercase"
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "1.5px",
-        opacity: 0.4,
-        color: "var(--color-ink)",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function LabelRight({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="font-serif tabular-nums"
-      style={{
-        fontSize: 14,
-        fontWeight: 400,
-        color: "var(--color-ink)",
-      }}
-    >
-      {children}
-    </span>
   );
 }

@@ -174,7 +174,7 @@ export default function OnboardingWelcomePage() {
             color: "var(--color-ink)",
           }}
         >
-          네 걸음으로 당신을 읽습니다.
+          네 걸음으로 기준을 설정합니다.
         </p>
 
         {/* 4스텝 프리뷰 */}

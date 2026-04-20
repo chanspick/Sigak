@@ -53,7 +53,7 @@ interface AnalyzingScreenProps {
 
 export function AnalyzingScreen({
   candidateCount,
-  headline = "읽고 있습니다.",
+  headline = "고르고 있어요.",
   done = false,
   onFinish,
 }: AnalyzingScreenProps) {

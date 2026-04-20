@@ -140,7 +140,7 @@ export function HomeScreen() {
             color: "var(--color-ink)",
           }}
         >
-          당신을 읽겠습니다.
+          한 장을 골라드립니다.
         </h1>
         <p
           className="font-sans"
@@ -152,7 +152,7 @@ export function HomeScreen() {
             color: "var(--color-ink)",
           }}
         >
-          사진 세 장부터.
+          3~10장 올려주세요.
         </p>
       </section>
 
@@ -194,9 +194,9 @@ export function HomeScreen() {
         <PrimaryButton
           onClick={handleStart}
           disabled={!canStart}
-          disabledLabel="세 장부터"
+          disabledLabel="3장 이상 올려주세요"
         >
-          읽기 시작
+          시작
         </PrimaryButton>
       </div>
 

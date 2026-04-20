@@ -213,7 +213,8 @@ export default function ProfilePage() {
       {/* 설정 리스트 */}
       <section style={{ padding: "8px 0 0" }}>
         <SettingRow
-          label="온보딩 재설정"
+          label="시각 재설정"
+          sublabel="체형·얼굴·추구미 답변을 다시 입력해 SIGAK의 판정 기준을 업데이트합니다."
           onClick={handleResetOnboarding}
           busy={resetting}
         />
@@ -279,11 +280,13 @@ function Label({ children }: { children: React.ReactNode }) {
 
 function SettingRow({
   label,
+  sublabel,
   onClick,
   busy = false,
   danger = false,
 }: {
   label: string;
+  sublabel?: string;
   onClick: () => void;
   busy?: boolean;
   danger?: boolean;
@@ -301,16 +304,45 @@ function SettingRow({
         background: "transparent",
         border: "none",
         borderTop: "1px solid rgba(0, 0, 0, 0.1)",
-        fontSize: 14,
         letterSpacing: "-0.005em",
         textAlign: "left",
         cursor: busy ? "default" : "pointer",
-        color: danger ? "var(--color-danger)" : "var(--color-ink)",
         opacity: busy ? 0.5 : 1,
+        alignItems: sublabel ? "flex-start" : "center",
       }}
     >
-      <span style={{ flex: 1 }}>{busy ? "처리 중..." : label}</span>
-      <span style={{ opacity: 0.3, fontSize: 14 }}>›</span>
+      <span
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: sublabel ? 4 : 0,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 14,
+            color: danger ? "var(--color-danger)" : "var(--color-ink)",
+          }}
+        >
+          {busy ? "처리 중..." : label}
+        </span>
+        {sublabel && !busy && (
+          <span
+            className="font-sans"
+            style={{
+              fontSize: 11,
+              lineHeight: 1.55,
+              opacity: 0.5,
+              color: "var(--color-ink)",
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {sublabel}
+          </span>
+        )}
+      </span>
+      <span style={{ opacity: 0.3, fontSize: 14, marginLeft: 10 }}>›</span>
     </button>
   );
 }

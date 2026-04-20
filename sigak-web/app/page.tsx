@@ -10,7 +10,7 @@ import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
 import { FeedTopBar, TopBar } from "@/components/ui/sigak";
-import { VerdictGrid } from "@/components/sigak/verdict-grid";
+import { FeedView } from "@/components/sigak/feed-view";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
 
@@ -53,7 +53,7 @@ function LoggedInFeed() {
       }}
     >
       <FeedTopBar />
-      <VerdictGrid />
+      <FeedView />
     </div>
   );
 }

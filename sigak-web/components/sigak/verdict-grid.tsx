@@ -1,7 +1,11 @@
-// SIGAK MVP v1.2 — VerdictGrid (Instagram 스타일 피드)
+// SIGAK MVP v1.2 (D-6 revised) — VerdictGrid
 //
-// 3-col grid gap 2px. blur_released=false면 blur(14px) + 자물쇠.
-// 무한 스크롤 (IntersectionObserver). 빈 상태 중앙 안내.
+// Instagram 3-col gap 2px. 본인 사진이므로 블러/자물쇠 없음, 항상 클리어.
+// 첫 셀은 항상 "+" 업로드 버튼 — 피드가 비어있어도 상시 노출.
+// 무한 스크롤 (IntersectionObserver).
+//
+// onTotalChange 콜백으로 상위(FeedView)에 총 개수 전달 — 프로필 섹션의
+// "피드 N"에 쓰임.
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,7 +17,12 @@ import type { VerdictListItem } from "@/lib/types/mvp";
 
 const PAGE_SIZE = 30;
 
-export function VerdictGrid() {
+interface VerdictGridProps {
+  /** 총 개수 상위로 전달 (프로필 섹션 "피드 N"용). */
+  onTotalChange?: (total: number) => void;
+}
+
+export function VerdictGrid({ onTotalChange }: VerdictGridProps = {}) {
   const router = useRouter();
   const [items, setItems] = useState<VerdictListItem[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -22,26 +31,30 @@ export function VerdictGrid() {
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const offsetRef = useRef(0);
+  const totalRef = useRef<number>(0);
 
   const loadMore = useCallback(async () => {
-    if (loading === false && !hasMore) return;
+    if (!hasMore) return;
     try {
       const res = await listVerdicts(PAGE_SIZE, offsetRef.current);
       setItems((prev) => [...prev, ...res.verdicts]);
       offsetRef.current += res.verdicts.length;
       setHasMore(res.has_more);
+      if (res.total !== totalRef.current) {
+        totalRef.current = res.total;
+        onTotalChange?.(res.total);
+      }
       setError(null);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        router.replace("/auth/login");
+        router.replace("/");
         return;
       }
       setError(e instanceof Error ? e.message : "피드 로드 실패");
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [hasMore, router, onTotalChange]);
 
   // 초기 로드
   useEffect(() => {
@@ -65,58 +78,6 @@ export function VerdictGrid() {
     return () => io.disconnect();
   }, [hasMore, loading, loadMore]);
 
-  // 초기 로딩
-  if (loading && items.length === 0) {
-    return (
-      <div
-        style={{
-          minHeight: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--color-ink)",
-          opacity: 0.3,
-          fontFamily: "var(--font-sans)",
-          fontSize: 12,
-        }}
-        aria-busy
-      >
-        불러오는 중...
-      </div>
-    );
-  }
-
-  // 빈 상태
-  if (!loading && items.length === 0) {
-    return (
-      <div
-        style={{
-          minHeight: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 28px",
-        }}
-      >
-        <p
-          className="font-sans"
-          style={{
-            textAlign: "center",
-            fontSize: 13,
-            opacity: 0.4,
-            lineHeight: 1.6,
-            letterSpacing: "-0.005em",
-            color: "var(--color-ink)",
-          }}
-        >
-          아직 판정이 없어요.
-          <br />
-          우상단 + 버튼을 눌러 시작하세요.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <>
       <div
@@ -127,16 +88,20 @@ export function VerdictGrid() {
           background: "var(--color-paper)",
         }}
       >
+        {/* 첫 셀: + 업로드 진입점 (항상 노출) */}
+        <AddCell onClick={() => router.push("/verdict/new")} />
+
+        {/* Verdict 썸네일 — 블러 없음, 항상 클리어 */}
         {items.map((v) => (
-          <GridCell
+          <ThumbCell
             key={v.verdict_id}
-            item={v}
+            url={resolvePhotoUrl(v.gold_photo_url)}
             onClick={() => router.push(`/verdict/${v.verdict_id}`)}
           />
         ))}
       </div>
 
-      {/* Sentinel for infinite scroll */}
+      {/* 무한 스크롤 sentinel */}
       {hasMore && (
         <div
           ref={sentinelRef}
@@ -172,33 +137,76 @@ export function VerdictGrid() {
         </p>
       )}
 
-      {/* 하단 여백 */}
       <div style={{ height: 60 }} />
     </>
   );
 }
 
 // ─────────────────────────────────────────────
-//  GridCell
+//  + 업로드 셀 (첫 셀)
 // ─────────────────────────────────────────────
 
-function GridCell({
-  item,
-  onClick,
-}: {
-  item: VerdictListItem;
-  onClick: () => void;
-}) {
-  const src = resolvePhotoUrl(item.gold_photo_url);
-  const locked = !item.blur_released;
-
+function AddCell({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={locked ? "가려진 판정" : "판정 보기"}
+      aria-label="새 판정"
       style={{
+        aspectRatio: "1/1",
+        background: "rgba(0, 0, 0, 0.04)",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         position: "relative",
+      }}
+    >
+      <span style={{ position: "relative", width: 28, height: 28 }}>
+        <span
+          style={{
+            position: "absolute",
+            top: 13.5,
+            left: 0,
+            width: 28,
+            height: 1,
+            background: "var(--color-ink)",
+          }}
+        />
+        <span
+          style={{
+            position: "absolute",
+            left: 13.5,
+            top: 0,
+            width: 1,
+            height: 28,
+            background: "var(--color-ink)",
+          }}
+        />
+      </span>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Verdict 썸네일 — 클리어, 블러/락 없음
+// ─────────────────────────────────────────────
+
+function ThumbCell({
+  url,
+  onClick,
+}: {
+  url: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="판정 보기"
+      style={{
         aspectRatio: "1/1",
         background: "rgba(0, 0, 0, 0.04)",
         border: "none",
@@ -207,83 +215,19 @@ function GridCell({
         overflow: "hidden",
       }}
     >
-      {/* Image */}
-      {src && (
+      {url && (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
-          src={src}
+          src={url}
           alt=""
           style={{
             width: "100%",
             height: "100%",
             objectFit: "cover",
             display: "block",
-            filter: locked ? "blur(14px)" : "none",
-            transform: locked ? "scale(1.1)" : "none",
-            transformOrigin: "center",
           }}
         />
       )}
-
-      {/* Locked overlay (어둡게) */}
-      {locked && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.10)",
-            pointerEvents: "none",
-          }}
-        />
-      )}
-
-      {/* Top-right icon — 자물쇠 or 체크 */}
-      <div
-        style={{
-          position: "absolute",
-          top: 6,
-          right: 6,
-          width: 16,
-          height: 16,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4))",
-        }}
-      >
-        {locked ? (
-          <svg width="12" height="13" viewBox="0 0 12 13" aria-hidden>
-            <rect
-              x="2"
-              y="6"
-              width="8"
-              height="6"
-              rx="0.8"
-              stroke="#FFFFFF"
-              strokeWidth="1"
-              fill="none"
-            />
-            <path
-              d="M4 6V4a2 2 0 014 0v2"
-              stroke="#FFFFFF"
-              strokeWidth="1"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </svg>
-        ) : (
-          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
-            <path
-              d="M2 6l3 3 5-6"
-              stroke="#FFFFFF"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
-        )}
-      </div>
     </button>
   );
 }

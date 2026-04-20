@@ -134,14 +134,21 @@ export async function getKakaoLoginUrl(): Promise<KakaoLoginUrlResponse> {
   return handleResponse<KakaoLoginUrlResponse>(response);
 }
 
-/** 카카오 인증 코드로 토큰 교환 */
+/** 카카오 인증 코드로 토큰 교환.
+ *
+ * ⚠️ redirect_uri 필수: OAuth 규약상 Step 1(/kakao/login)과 Step 3(/kakao/token)에서
+ * 보내는 redirect_uri가 완전히 일치해야 Kakao가 수락함. 도메인 변형(sigak.asia vs
+ * www.sigak.asia) 때문에 백엔드 기본값에 의존하면 mismatch 에러 발생.
+ * 프론트가 window.location.origin 기반으로 명시 전달.
+ */
 export async function exchangeKakaoToken(
   code: string,
+  redirectUri: string,
 ): Promise<KakaoTokenResponse> {
   const response = await fetch(`${API_URL}/api/v1/auth/kakao/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...COMMON_HEADERS },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, redirect_uri: redirectUri }),
   });
   return handleResponse<KakaoTokenResponse>(response);
 }

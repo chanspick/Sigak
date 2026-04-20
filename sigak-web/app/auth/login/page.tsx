@@ -14,19 +14,9 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { getToken } from "@/lib/auth";
+import { getKakaoRedirectUri } from "@/lib/kakao";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-function getRedirectUri(): string {
-  // Kakao Console 등록된 URI와 정확히 매칭되어야 함.
-  // 우선순위: 빌드타임 env → window.location.origin + /auth/kakao/callback
-  const fromEnv = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
-  if (fromEnv) return fromEnv;
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/auth/kakao/callback`;
-  }
-  return "https://www.sigak.asia/auth/kakao/callback";
-}
 
 // Next.js 16은 useSearchParams()를 쓰는 컴포넌트가 prerender 시점에
 // <Suspense>로 감싸져야 한다. LoginContent(실제 UI) + 기본 export(Suspense 래퍼) 분리.
@@ -56,7 +46,7 @@ function LoginContent() {
     setBusy(true);
     setError(null);
     try {
-      const redirectUri = getRedirectUri();
+      const redirectUri = getKakaoRedirectUri();
       const url = `${API_URL}/api/v1/auth/kakao/login?redirect_uri=${encodeURIComponent(redirectUri)}`;
       const res = await fetch(url, {
         headers: { "ngrok-skip-browser-warning": "true" },

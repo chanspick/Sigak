@@ -16,6 +16,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { exchangeKakaoToken } from "@/lib/api/client";
+import { getKakaoRedirectUri } from "@/lib/kakao";
 
 function CallbackContent() {
   const router = useRouter();
@@ -52,7 +53,10 @@ function CallbackContent() {
 
     (async () => {
       try {
-        const result = await exchangeKakaoToken(code);
+        // ⚠️ login 페이지와 동일한 redirect_uri를 보내야 Kakao가 수락함.
+        //    lib/kakao.ts의 getKakaoRedirectUri()가 양쪽에서 같은 값을 반환.
+        const redirectUri = getKakaoRedirectUri();
+        const result = await exchangeKakaoToken(code, redirectUri);
 
         // JWT + 레거시 필드 일괄 저장. 레거시 필드는 전환 기간 호환용.
         const { setAuthData } = await import("@/lib/auth");

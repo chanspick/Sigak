@@ -12,7 +12,9 @@ import { createVerdict, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import { AnalyzingScreen } from "./analyzing-screen";
 
-const ANALYSIS_MIN_MS = 3200;
+// Analyzing 진행바가 POST 응답과 동기화되므로 별도 MIN 대기 불필요.
+// 빠른 응답 → 약 2.9초(climb 2.5s + snap 0.4s)에 완료.
+// 느린 응답 → 90%에서 hold 하며 응답 대기 후 완료.
 
 interface UploadItem {
   file: File;
@@ -23,6 +25,8 @@ export function HomeScreen() {
   const router = useRouter();
   const [items, setItems] = useState<UploadItem[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisDone, setAnalysisDone] = useState(false);
+  const verdictIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,9 +66,10 @@ export function HomeScreen() {
   async function handleStart() {
     if (items.length < UX_MIN_PHOTOS || analyzing) return;
     setAnalyzing(true);
+    setAnalysisDone(false);
+    verdictIdRef.current = null;
     setError(null);
 
-    const startedAt = Date.now();
     try {
       const response = await createVerdict(items.map((it) => it.file));
       try {
@@ -75,13 +80,11 @@ export function HomeScreen() {
       } catch {
         // ignore
       }
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < ANALYSIS_MIN_MS) {
-        await new Promise((r) => setTimeout(r, ANALYSIS_MIN_MS - elapsed));
-      }
-      router.push(`/verdict/${response.verdict_id}`);
+      verdictIdRef.current = response.verdict_id;
+      setAnalysisDone(true); // AnalyzingScreen이 90→100%로 snap 후 onFinish 호출
     } catch (e) {
       setAnalyzing(false);
+      setAnalysisDone(false);
       if (e instanceof ApiError && e.status === 401) {
         router.replace("/auth/login");
         return;
@@ -94,8 +97,19 @@ export function HomeScreen() {
     }
   }
 
+  function handleAnalysisFinish() {
+    const id = verdictIdRef.current;
+    if (id) router.push(`/verdict/${id}`);
+  }
+
   if (analyzing) {
-    return <AnalyzingScreen candidateCount={items.length} />;
+    return (
+      <AnalyzingScreen
+        candidateCount={items.length}
+        done={analysisDone}
+        onFinish={handleAnalysisFinish}
+      />
+    );
   }
 
   const canStart = items.length >= UX_MIN_PHOTOS;

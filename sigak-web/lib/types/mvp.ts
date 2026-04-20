@@ -188,15 +188,31 @@ export interface ReleaseBlurResponse {
 //  Sigak Report (시각 리포트 — 온보딩 기반 유저 분석 요약)
 // ─────────────────────────────────────────────
 
+/** 추구미 3축 좌표. 각 -1.0 .. 1.0 */
+export interface ChugumiCoords {
+  shape: number;
+  volume: number;
+  age: number;
+}
+
 export interface SigakReportResponse {
   released: boolean;
   cost: number;
   onboarding_data: OnboardingData | null;
+  /** LLM #2 자연어 해석 — "시각이 본 당신" */
+  interpretation?: string | null;
+  /** 해석 참조 앵커 (e.g., "따뜻한 첫사랑") */
+  reference_base?: string | null;
+  /** 추구미 좌표 — 방향성 */
+  chugumi_coords?: ChugumiCoords | null;
 }
 
 export interface ReleaseSigakReportResponse {
   released: true;
   onboarding_data: OnboardingData;
+  interpretation?: string | null;
+  reference_base?: string | null;
+  chugumi_coords?: ChugumiCoords | null;
   balance_after: number;
 }
 

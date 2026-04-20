@@ -146,33 +146,19 @@ function PurchaseContent() {
             </p>
           </>
         ) : (
-          <>
-            <h1
-              className="font-serif"
-              style={{
-                fontSize: 32,
-                fontWeight: 400,
-                lineHeight: 1.3,
-                letterSpacing: "-0.01em",
-                margin: 0,
-                color: "var(--color-ink)",
-              }}
-            >
-              토큰 충전.
-            </h1>
-            <p
-              className="font-sans"
-              style={{
-                marginTop: 14,
-                fontSize: 13,
-                opacity: 0.5,
-                lineHeight: 1.6,
-                color: "var(--color-ink)",
-              }}
-            >
-              1 토큰 = 100원. 많이 사면 덜 냅니다.
-            </p>
-          </>
+          <h1
+            className="font-serif"
+            style={{
+              fontSize: 32,
+              fontWeight: 400,
+              lineHeight: 1.3,
+              letterSpacing: "-0.01em",
+              margin: 0,
+              color: "var(--color-ink)",
+            }}
+          >
+            토큰 충전.
+          </h1>
         )}
 
         {/* 팩 카드 */}

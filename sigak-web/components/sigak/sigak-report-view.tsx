@@ -19,7 +19,11 @@ import { useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
 import { getSigakReport, releaseSigakReport } from "@/lib/api/sigak-report";
-import type { OnboardingData, SigakReportResponse } from "@/lib/types/mvp";
+import type {
+  ChugumiCoords,
+  OnboardingData,
+  SigakReportResponse,
+} from "@/lib/types/mvp";
 import { labelFor, labelsFor } from "@/lib/utils/onboarding-labels";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 
@@ -151,7 +155,12 @@ export function SigakReportView() {
       {/* Report 카드 */}
       <div style={{ marginTop: 24, position: "relative" }}>
         {released && data.onboarding_data ? (
-          <ReportContent data={data.onboarding_data} />
+          <ReportContent
+            data={data.onboarding_data}
+            interpretation={data.interpretation ?? null}
+            referenceBase={data.reference_base ?? null}
+            chugumiCoords={data.chugumi_coords ?? null}
+          />
         ) : (
           <ReportLocked />
         )}
@@ -377,7 +386,17 @@ function LockedSection({
 //  ReportContent — 해제 상태, 실제 데이터
 // ─────────────────────────────────────────────
 
-function ReportContent({ data }: { data: OnboardingData }) {
+function ReportContent({
+  data,
+  interpretation,
+  referenceBase,
+  chugumiCoords,
+}: {
+  data: OnboardingData;
+  interpretation: string | null;
+  referenceBase: string | null;
+  chugumiCoords: ChugumiCoords | null;
+}) {
   const height = labelFor("height", asString(data.height));
   const weight = labelFor("weight", asString(data.weight));
   const shoulder = labelFor("shoulder_width", asString(data.shoulder_width));
@@ -396,6 +415,8 @@ function ReportContent({ data }: { data: OnboardingData }) {
   const selfPerception = asString(data.self_perception) ?? "";
   const currentConcerns = asString(data.current_concerns) ?? "";
 
+  const hasInterp = !!(interpretation || referenceBase || chugumiCoords);
+
   return (
     <div
       style={{
@@ -403,6 +424,43 @@ function ReportContent({ data }: { data: OnboardingData }) {
         padding: "28px 22px",
       }}
     >
+      {/* 시각의 해석 — LLM narrative */}
+      {hasInterp && (
+        <ReportSection label="시각이 본 당신" last={false}>
+          {interpretation && (
+            <p
+              className="font-serif"
+              style={{
+                margin: 0,
+                fontSize: 16,
+                lineHeight: 1.8,
+                letterSpacing: "-0.005em",
+                color: "var(--color-ink)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {interpretation}
+            </p>
+          )}
+          {referenceBase && (
+            <p
+              className="font-sans"
+              style={{
+                marginTop: 12,
+                marginBottom: 0,
+                fontSize: 12,
+                letterSpacing: "-0.005em",
+                color: "var(--color-ink)",
+                opacity: 0.5,
+              }}
+            >
+              기반 앵커 — {referenceBase}
+            </p>
+          )}
+          {chugumiCoords && <CoordsBars coords={chugumiCoords} />}
+        </ReportSection>
+      )}
+
       {/* 체형 */}
       <ReportSection label="체형" last={false}>
         <Line>키 {height || "—"} · 체중 {weight || "—"}</Line>
@@ -431,6 +489,107 @@ function ReportContent({ data }: { data: OnboardingData }) {
         {selfPerception && <Line>{selfPerception}</Line>}
         {currentConcerns && <Line muted>{currentConcerns}</Line>}
       </ReportSection>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  CoordsBars — 추구미 3축 좌표 (-1..1) 수평 막대
+// ─────────────────────────────────────────────
+
+function CoordsBars({ coords }: { coords: ChugumiCoords }) {
+  const axes = [
+    { key: "shape", label: "SHAPE", kr: "형태", value: coords.shape },
+    { key: "volume", label: "VOLUME", kr: "부피", value: coords.volume },
+    { key: "age", label: "AGE", kr: "나이감", value: coords.age },
+  ];
+  return (
+    <div style={{ marginTop: 18 }}>
+      {axes.map((a) => (
+        <AxisBar key={a.key} label={a.label} kr={a.kr} value={a.value} />
+      ))}
+    </div>
+  );
+}
+
+function AxisBar({
+  label,
+  kr,
+  value,
+}: {
+  label: string;
+  kr: string;
+  value: number;
+}) {
+  const clamped = Math.max(-1, Math.min(1, value));
+  const centerPct = 50 + clamped * 50; // -1 → 0, 0 → 50, 1 → 100
+  const sign = clamped === 0 ? "" : clamped > 0 ? "+" : "−";
+  const rounded = Math.abs(Math.round(clamped * 100) / 100);
+  return (
+    <div style={{ padding: "8px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 6,
+        }}
+      >
+        <span
+          className="font-sans uppercase"
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: "1.5px",
+            opacity: 0.55,
+            color: "var(--color-ink)",
+          }}
+        >
+          {label}
+          <span style={{ opacity: 0.5, marginLeft: 6, letterSpacing: 0 }}>
+            {kr}
+          </span>
+        </span>
+        <span
+          className="font-serif tabular-nums"
+          style={{ fontSize: 12, color: "var(--color-ink)" }}
+        >
+          {sign}
+          {rounded.toFixed(2)}
+        </span>
+      </div>
+      <div
+        style={{
+          position: "relative",
+          height: 2,
+          background: "rgba(0, 0, 0, 0.08)",
+        }}
+      >
+        {/* 중앙 0 마커 */}
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: -3,
+            bottom: -3,
+            width: 1,
+            background: "rgba(0, 0, 0, 0.2)",
+          }}
+        />
+        {/* 값 dot */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${centerPct}%`,
+            top: -3,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "var(--color-ink)",
+            transform: "translateX(-50%)",
+          }}
+        />
+      </div>
     </div>
   );
 }

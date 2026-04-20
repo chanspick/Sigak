@@ -34,10 +34,14 @@ def get_pack(pack_code: str) -> TokenPack:
     return PACKS[pack_code]
 
 
-# Consumption prices — must match brief section 6.11 "무엇에 쓰나요?"
-COST_REASONING_UNLOCK = 5       # /verdicts/{id}/unlock-reasoning
-COST_BLUR_RELEASE = 50          # /reports/{id}/release-blur
+# Consumption prices
+COST_REASONING_UNLOCK = 5       # /verdicts/{id}/unlock-reasoning (legacy)
+COST_BLUR_RELEASE = 50          # /verdicts/{id}/release-blur (deprecated — v2 BM에서 분리)
 COST_MONTHLY_REPORT = 30        # monthly re-run; endpoint TBD
+
+# v2 BM (2026-04-24): 3단 구조
+COST_DIAGNOSIS_UNLOCK = 10      # verdict 단위 진단 해제 — /verdicts/{id}/unlock-diagnosis
+COST_PI_UNLOCK = 50             # 유저 1회 영속 PI 해제 — /pi/unlock
 
 
 # ─────────────────────────────────────────────
@@ -50,6 +54,8 @@ KIND_CONSUME_REASONING = "consume_reasoning"
 KIND_CONSUME_BLUR_RELEASE = "consume_blur_release"
 KIND_CONSUME_MONTHLY_REPORT = "consume_monthly_report"
 KIND_CONSUME_OTHER = "consume_other"
+KIND_CONSUME_DIAGNOSIS = "consume_diagnosis"     # v2 BM
+KIND_CONSUME_PI = "consume_pi"                   # v2 BM
 KIND_REFUND = "refund"
 KIND_ADMIN_GRANT = "admin_grant"
 

@@ -101,6 +101,13 @@ class ReleaseBlurResponse(BaseModel):
     balance_after: int
 
 
+# v2 BM — 진단 해제 (10 토큰, verdict 단위)
+class UnlockDiagnosisResponse(BaseModel):
+    verdict_id: str
+    diagnosis_unlocked: bool
+    token_balance: int
+
+
 # ─────────────────────────────────────────────
 #  Internal helpers
 # ─────────────────────────────────────────────
@@ -428,6 +435,81 @@ def get_verdict(
         gold_reading="",
         blur_released=bool(row.blur_released),
         pro_data=row.reasoning_data if row.blur_released else None,
+    )
+
+
+# ─────────────────────────────────────────────
+#  POST /api/v1/verdicts/{verdict_id}/unlock-diagnosis  (v2 BM, 10 토큰)
+# ─────────────────────────────────────────────
+
+@router.post("/{verdict_id}/unlock-diagnosis", response_model=UnlockDiagnosisResponse)
+def unlock_diagnosis(
+    verdict_id: str,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """10 토큰 차감 + verdicts.diagnosis_unlocked=TRUE.
+
+    v2 BM에서 verdict 단위 해제. blur_released(50토큰)와 독립.
+    idempotency_key=``diagnosis:{verdict_id}`` — 재시도 시 추가 차감 없음.
+
+    상태 전환:
+      - 이미 diagnosis_unlocked=TRUE면 409 already_unlocked (중복 호출 방지)
+      - 잔액 < 10 이면 402 insufficient_balance
+        (프론트가 intent=unlock_diagnosis&verdict_id=X 로 purchase 유도)
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    row = db.execute(
+        text(
+            "SELECT user_id, diagnosis_unlocked FROM verdicts WHERE id = :id"
+        ),
+        {"id": verdict_id},
+    ).first()
+    if row is None:
+        raise HTTPException(404, "verdict not found")
+    if row.user_id != user["id"]:
+        raise HTTPException(403, "본인 verdict가 아닙니다")
+
+    if row.diagnosis_unlocked:
+        raise HTTPException(409, "already_unlocked")
+
+    current_balance = tokens_service.get_balance(db, user["id"])
+    if current_balance < tokens_service.COST_DIAGNOSIS_UNLOCK:
+        raise HTTPException(
+            402,
+            f"토큰이 부족합니다. {tokens_service.COST_DIAGNOSIS_UNLOCK}토큰 필요, 현재 {current_balance}",
+        )
+
+    idempotency_key = f"diagnosis:{verdict_id}"
+    try:
+        balance_after = tokens_service.credit_tokens(
+            db,
+            user_id=user["id"],
+            amount=-tokens_service.COST_DIAGNOSIS_UNLOCK,
+            kind=tokens_service.KIND_CONSUME_DIAGNOSIS,
+            idempotency_key=idempotency_key,
+            reference_id=verdict_id,
+            reference_type="verdict",
+        )
+    except IntegrityError:
+        db.rollback()
+        balance_after = tokens_service.get_balance(db, user["id"])
+
+    db.execute(
+        text(
+            "UPDATE verdicts SET diagnosis_unlocked = TRUE "
+            "WHERE id = :id AND diagnosis_unlocked = FALSE"
+        ),
+        {"id": verdict_id},
+    )
+    db.commit()
+
+    return UnlockDiagnosisResponse(
+        verdict_id=verdict_id,
+        diagnosis_unlocked=True,
+        token_balance=balance_after,
     )
 
 

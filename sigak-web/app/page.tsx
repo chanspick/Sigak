@@ -9,8 +9,9 @@ import { useEffect, useState } from "react";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
-import { FeedTopBar, TopBar } from "@/components/ui/sigak";
-import { FeedView } from "@/components/sigak/feed-view";
+import { TopBar } from "@/components/ui/sigak";
+import { FeedShell } from "@/components/sigak/feed-shell";
+import { VerdictGrid } from "@/components/sigak/verdict-grid";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
@@ -41,6 +42,8 @@ export default function RootPage() {
 
 function LoggedInFeed() {
   const { status } = useOnboardingGuard();
+  const [verdictCount, setVerdictCount] = useState<number | null>(null);
+
   if (status !== "ready") {
     return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
   }
@@ -53,8 +56,9 @@ function LoggedInFeed() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      <FeedTopBar />
-      <FeedView />
+      <FeedShell verdictCount={verdictCount}>
+        <VerdictGrid onTotalChange={setVerdictCount} />
+      </FeedShell>
       <SiteFooter />
     </div>
   );

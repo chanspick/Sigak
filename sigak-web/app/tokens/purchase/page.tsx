@@ -117,35 +117,22 @@ function PurchaseContent() {
       <TopBar onBack={() => router.back()} />
 
       <main style={{ flex: 1, padding: "40px 28px 24px" }}>
-        {/* 헤드라인 */}
-        {intent === "blur_release" ? (
-          <>
-            <h1
-              className="font-serif"
-              style={{
-                fontSize: 28,
-                fontWeight: 400,
-                lineHeight: 1.3,
-                letterSpacing: "-0.01em",
-                margin: 0,
-                color: "var(--color-ink)",
-              }}
-            >
-              가려진 것들을 풀려면.
-            </h1>
-            <p
-              className="font-sans"
-              style={{
-                marginTop: 14,
-                fontSize: 13,
-                opacity: 0.5,
-                lineHeight: 1.6,
-                color: "var(--color-ink)",
-              }}
-            >
-              토큰을 충전하면 바로 이어집니다.
-            </p>
-          </>
+        {/* 헤드라인 — intent에 따라 다른 카피 */}
+        {intent === "unlock_diagnosis" ? (
+          <IntentHeadline
+            title="진단을 보려면."
+            subtitle="10 토큰. 충전 후 바로 이어집니다."
+          />
+        ) : intent === "unlock_pi" ? (
+          <IntentHeadline
+            title="PI를 확인하려면."
+            subtitle="50 토큰. 충전 후 바로 이어집니다."
+          />
+        ) : intent === "blur_release" || intent === "sigak_report" ? (
+          <IntentHeadline
+            title="가려진 것들을 풀려면."
+            subtitle="토큰을 충전하면 바로 이어집니다."
+          />
         ) : (
           <h1
             className="font-serif"
@@ -241,6 +228,48 @@ function PurchaseContent() {
       {/* 사업자 정보 (PG 심사 필수 — 결제 페이지는 핵심) */}
       <SiteFooter />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  IntentHeadline — intent 별 헤드라인 + 서브
+// ─────────────────────────────────────────────
+
+function IntentHeadline({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <>
+      <h1
+        className="font-serif"
+        style={{
+          fontSize: 28,
+          fontWeight: 400,
+          lineHeight: 1.3,
+          letterSpacing: "-0.01em",
+          margin: 0,
+          color: "var(--color-ink)",
+        }}
+      >
+        {title}
+      </h1>
+      <p
+        className="font-sans"
+        style={{
+          marginTop: 14,
+          fontSize: 13,
+          opacity: 0.5,
+          lineHeight: 1.6,
+          color: "var(--color-ink)",
+        }}
+      >
+        {subtitle}
+      </p>
+    </>
   );
 }
 

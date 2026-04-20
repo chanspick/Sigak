@@ -13,32 +13,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-paper text-ink">
-      {/* 헤더 */}
-      <nav className="sticky top-0 z-[100] flex h-[60px] items-center justify-between bg-ink px-5 text-paper md:px-[var(--spacing-page-x)]">
-        <Link
-          href="/"
-          className="font-display no-underline"
-          style={{ fontSize: 13, fontWeight: 500, letterSpacing: "0.32em", color: "var(--color-paper)" }}
-        >
-          SIGAK
-        </Link>
-        <div className="flex items-center gap-5">
-          <a
-            href="#privacy"
-            className="font-sans no-underline opacity-70 transition-opacity hover:opacity-100"
-            style={{ fontSize: 11, color: "var(--color-paper)", letterSpacing: "0.1em" }}
-          >
-            개인정보
-          </a>
-          <a
-            href="#tos"
-            className="font-sans no-underline opacity-70 transition-opacity hover:opacity-100"
-            style={{ fontSize: 11, color: "var(--color-paper)", letterSpacing: "0.1em" }}
-          >
-            이용약관
-          </a>
-        </div>
-      </nav>
+      <TermsTopNav />
 
       <article className="mx-auto max-w-2xl px-5 py-12 md:px-[var(--spacing-page-x)]">
         <h1 className="font-serif mb-2" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em" }}>
@@ -394,6 +369,87 @@ export default function TermsPage() {
 
       <SiteFooter />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Terms-specific TopNav (back + anchors)
+// ─────────────────────────────────────────────
+
+function TermsTopNav() {
+  return (
+    <nav
+      className="sticky top-0 z-[100]"
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        height: 52,
+        background: "var(--color-ink)",
+        color: "var(--color-paper)",
+      }}
+    >
+      {/* Back chevron — uses window.history.back */}
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            if (window.history.length > 1) window.history.back();
+            else window.location.href = "/";
+          }
+        }}
+        aria-label="뒤로"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: 52,
+          height: 52,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+        }}
+      >
+        <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
+          <path
+            d="M8 1L1 8l7 7"
+            stroke="var(--color-paper)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            opacity="0.85"
+          />
+        </svg>
+      </button>
+
+      <div
+        style={{
+          height: 52,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Link
+          href="/"
+          className="font-sans"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "6px",
+            color: "var(--color-paper)",
+            textDecoration: "none",
+          }}
+        >
+          SIGAK
+        </Link>
+      </div>
+    </nav>
   );
 }
 

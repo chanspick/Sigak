@@ -174,7 +174,13 @@ export default function OnboardingStepPage() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar
+        backTarget={
+          stepN === 1
+            ? "/onboarding/welcome"
+            : `/onboarding/step/${stepN - 1}`
+        }
+      />
 
       {/* Step label + progress */}
       <section style={{ padding: "28px 28px 0" }}>

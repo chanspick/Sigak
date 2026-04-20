@@ -66,7 +66,7 @@ function LoginContent() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/" />
 
       <section style={{ padding: "72px 28px 0" }}>
         <h1

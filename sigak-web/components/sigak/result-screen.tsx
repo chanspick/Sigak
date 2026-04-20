@@ -122,7 +122,7 @@ export function ResultScreen({
         overflowY: "auto",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/" />
 
       {/* 날짜 + 헤드라인 */}
       <section style={{ padding: "40px 28px 32px" }}>

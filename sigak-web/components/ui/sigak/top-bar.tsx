@@ -1,50 +1,105 @@
 // SIGAK MVP v1.2 (Rebrand) — TopBar
 //
-// 단일 variant. 검정 52px 바 + 중앙 letterspaced "SIGAK" 워드마크.
-// variants/토큰 카운터/back chevron 전부 제거. 브랜딩 일관성.
+// 검정 52px 바 + 중앙 letterspaced "SIGAK" 워드마크.
+// 필요한 화면에서만 back chevron 노출:
+//   - backTarget="/" → router.push(target)
+//   - onBack={() => ...} → 커스텀 콜백
+//   - 둘 다 안 주면 chevron 안 보임 (루트/터미널 화면용)
 //
-// Props는 하위 호환을 위해 받지만 전부 무시 — 호출부 한꺼번에 수정하지 않아도 됨.
+// SIGAK 중앙 정렬은 chevron 유무와 무관하게 유지 (absolute positioning).
 "use client";
 
-type LegacyVariant = "minimal" | "home" | "result" | "onboarding";
+import { useRouter } from "next/navigation";
 
 interface TopBarProps {
-  /** 하위 호환 — 무시됨. */
-  variant?: LegacyVariant;
-  /** 하위 호환 — 무시됨. */
-  tokens?: number;
-  /** 하위 호환 — 무시됨. */
-  stepLabel?: string;
-  /** 하위 호환 — 무시됨. */
+  /** 지정 시 왼쪽에 back chevron 렌더. 클릭 → router.push. */
+  backTarget?: string;
+  /** 지정 시 왼쪽에 back chevron 렌더. 클릭 → 콜백. backTarget보다 우선. */
   onBack?: () => void;
-  /** 하위 호환 — 무시됨. */
+
+  // 하위 호환 무시 props (레거시 호출부 깨지지 않도록)
+  variant?: string;
+  tokens?: number;
+  stepLabel?: string;
   hideTokens?: boolean;
 }
 
-export function TopBar(_props: TopBarProps = {}) {
+export function TopBar({ backTarget, onBack }: TopBarProps = {}) {
+  const router = useRouter();
+  const showBack = onBack != null || backTarget != null;
+
+  function handleBack() {
+    if (onBack) onBack();
+    else if (backTarget) router.push(backTarget);
+  }
+
   return (
     <nav
       style={{
+        position: "relative",
         height: 52,
         background: "var(--color-ink)",
         color: "var(--color-paper)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         flexShrink: 0,
       }}
     >
-      <span
-        className="font-sans"
+      {/* Left: back chevron (absolute) */}
+      {showBack && (
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label="뒤로"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 52,
+            height: 52,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+          }}
+        >
+          <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
+            <path
+              d="M8 1L1 8l7 7"
+              stroke="var(--color-paper)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              opacity="0.85"
+            />
+          </svg>
+        </button>
+      )}
+
+      {/* Center: SIGAK wordmark (always centered) */}
+      <div
         style={{
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: "6px",
-          color: "var(--color-paper)",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        SIGAK
-      </span>
+        <span
+          className="font-sans"
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "6px",
+            color: "var(--color-paper)",
+          }}
+        >
+          SIGAK
+        </span>
+      </div>
     </nav>
   );
 }

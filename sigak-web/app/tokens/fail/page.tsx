@@ -30,7 +30,7 @@ function FailContent() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar backTarget="/tokens/purchase" />
 
       <main style={{ flex: 1, padding: "48px 28px 24px" }}>
         <h1

@@ -106,7 +106,7 @@ function PurchaseContent() {
         flexDirection: "column",
       }}
     >
-      <TopBar />
+      <TopBar onBack={() => router.back()} />
 
       <main style={{ flex: 1, padding: "40px 28px 24px" }}>
         {/* 헤드라인 */}
@@ -180,35 +180,8 @@ function PurchaseContent() {
           ))}
         </div>
 
-        {/* 소비 단가 안내 */}
-        <div
-          style={{
-            marginTop: 32,
-            padding: "16px 0",
-            borderTop: "1px solid rgba(0, 0, 0, 0.1)",
-            borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
-          }}
-        >
-          <div
-            className="font-sans uppercase"
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "1.5px",
-              opacity: 0.4,
-              marginBottom: 10,
-              color: "var(--color-ink)",
-            }}
-          >
-            쓰임
-          </div>
-          <ConsumptionRow label="블러 해제" tokens={50} won={5000} />
-          <ConsumptionRow label="추론 언락" tokens={5} won={500} />
-          <ConsumptionRow label="월간 리포트" tokens={30} won={3000} />
-        </div>
-
         {/* 동의 */}
-        <div style={{ marginTop: 32 }}>
+        <div style={{ marginTop: 40 }}>
           <ConsentRow
             checked={consents.refund}
             onToggle={() => setConsents((c) => ({ ...c, refund: !c.refund }))}
@@ -387,47 +360,6 @@ function PackCard({
         </div>
       </div>
     </button>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  ConsumptionRow
-// ─────────────────────────────────────────────
-
-function ConsumptionRow({
-  label,
-  tokens,
-  won,
-}: {
-  label: string;
-  tokens: number;
-  won: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "baseline",
-        padding: "8px 0",
-      }}
-    >
-      <span
-        className="font-sans"
-        style={{ fontSize: 13, letterSpacing: "-0.005em", color: "var(--color-ink)" }}
-      >
-        {label}
-      </span>
-      <span
-        className="font-serif tabular-nums"
-        style={{ fontSize: 13, color: "var(--color-ink)" }}
-      >
-        {tokens}토큰
-        <span className="font-sans" style={{ fontSize: 11, opacity: 0.4, marginLeft: 8 }}>
-          ₩{won.toLocaleString()}
-        </span>
-      </span>
-    </div>
   );
 }
 

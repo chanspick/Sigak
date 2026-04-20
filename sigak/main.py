@@ -1800,7 +1800,9 @@ async def kakao_login(redirect_uri: str = "https://www.sigak.asia/auth/kakao/cal
         f"?client_id={kakao_key}"
         f"&redirect_uri={redirect_uri}"
         "&response_type=code"
-        "&scope=profile_nickname,account_email"
+        # MVP v2.0 terms: 프로필 이미지도 수집 명시 → scope 추가 필요.
+        # Kakao Console 동의항목에 "프로필 이미지" 활성화 필수(선택 동의).
+        "&scope=profile_nickname,profile_image,account_email"
     )
     return {"auth_url": auth_url}
 

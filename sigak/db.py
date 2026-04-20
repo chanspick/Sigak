@@ -41,6 +41,10 @@ class User(Base):
     # MVP v1.2 onboarding persistence (flat JSONB matching SubmitRequest keys)
     onboarding_completed = Column(Boolean, default=False, server_default="false", nullable=False)
     onboarding_data = Column(JSONB, nullable=True)
+    # MVP v2.0 terms (2026-04-20): 약관/개인정보/민감정보/국외이전/만14세 + 선택 마케팅.
+    # consent_data에 {timestamp, ip, terms_version, terms, privacy, sensitive, overseas_transfer, age_confirmed, marketing} 저장.
+    consent_completed = Column(Boolean, default=False, server_default="false", nullable=False)
+    consent_data = Column(JSONB, nullable=True)
     # MVP v1.2 Phase C: LLM #2 (interpret_interview) cache — hash invalidates when onboarding_data changes
     interview_interpretation = Column(JSONB, nullable=True)
     interview_interpretation_hash = Column(String, nullable=True)
@@ -110,6 +114,9 @@ def _migrate_columns(eng):
         ("users", "casting_opted_in", "BOOLEAN DEFAULT FALSE"),
         ("users", "casting_opted_at", "TIMESTAMP"),
         ("users", "casting_opted_out_at", "TIMESTAMP"),
+        # MVP v2.0 consent (ad-hoc 안전망, Alembic이 먼저 돌면 중복이지만 IF NOT EXISTS로 통과)
+        ("users", "consent_completed", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("users", "consent_data", "JSONB"),
     ]
     with eng.connect() as conn:
         for table, column, col_type in migrations:

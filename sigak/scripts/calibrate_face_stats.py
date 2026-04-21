@@ -35,6 +35,7 @@ METRICS_TO_CALIBRATE = [
     "forehead_ratio",
     "philtrum_ratio",
     "skin_brightness",
+    "brow_eye_distance",
 ]
 
 

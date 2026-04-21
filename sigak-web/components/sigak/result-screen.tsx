@@ -25,11 +25,17 @@ interface ResultScreenProps {
   verdict: VerdictResponse;
   /** create 시점의 gold_reading을 sessionStorage에서 주입. */
   goldReadingOverride?: string;
+  /** kebab 메뉴의 "삭제" 선택 시 호출. 없으면 메뉴 미표시. */
+  onDelete?: () => void;
+  /** 삭제 진행 중 상태 — 메뉴 항목 비활성화 표시용. */
+  deleting?: boolean;
 }
 
 export function ResultScreen({
   verdict: initialVerdict,
   goldReadingOverride,
+  onDelete,
+  deleting = false,
 }: ResultScreenProps) {
   const router = useRouter();
   const { balance, refetch: refetchBalance } = useTokenBalance();
@@ -39,6 +45,7 @@ export function ResultScreen({
   const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const gold = verdict.tiers.gold[0] ?? null;
   const remaining: TierPhoto[] = [...verdict.tiers.silver, ...verdict.tiers.bronze];
@@ -163,11 +170,27 @@ export function ResultScreen({
 
       {/* GOLD 이미지 */}
       {gold && (
-        <div
-          style={{ padding: "0 28px", cursor: "pointer" }}
-          onClick={() => setLightbox(true)}
-        >
-          <PhotoTile url={resolvePhotoUrl(gold.url)} aspectRatio="4/5" />
+        <div style={{ padding: "0 28px" }}>
+          <div style={{ position: "relative" }}>
+            <div
+              style={{ cursor: "pointer" }}
+              onClick={() => setLightbox(true)}
+            >
+              <PhotoTile url={resolvePhotoUrl(gold.url)} aspectRatio="4/5" />
+            </div>
+            {onDelete && (
+              <PhotoKebab
+                open={menuOpen}
+                deleting={deleting}
+                onToggle={() => setMenuOpen((v) => !v)}
+                onClose={() => setMenuOpen(false)}
+                onDelete={() => {
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -290,6 +313,114 @@ function PhotoTile({ url, aspectRatio }: { url: string; aspectRatio: string }) {
             display: "block",
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function PhotoKebab({
+  open,
+  deleting,
+  onToggle,
+  onClose,
+  onDelete,
+}: {
+  open: boolean;
+  deleting: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || !t.closest("[data-sigak-kebab]")) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div
+      data-sigak-kebab
+      style={{ position: "absolute", top: 8, right: 8 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label="옵션 메뉴"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        style={{
+          width: 32,
+          height: 32,
+          padding: 0,
+          background: "rgba(0, 0, 0, 0.45)",
+          border: "none",
+          borderRadius: 999,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg width="4" height="16" viewBox="0 0 4 16" aria-hidden>
+          <circle cx="2" cy="2" r="1.6" fill="#F3F0EB" />
+          <circle cx="2" cy="8" r="1.6" fill="#F3F0EB" />
+          <circle cx="2" cy="14" r="1.6" fill="#F3F0EB" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: "absolute",
+            top: 38,
+            right: 0,
+            minWidth: 120,
+            background: "var(--color-paper)",
+            border: "1px solid rgba(0, 0, 0, 0.12)",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+            padding: "4px 0",
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!deleting) onDelete();
+            }}
+            disabled={deleting}
+            className="font-sans"
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              background: "transparent",
+              border: "none",
+              textAlign: "left",
+              fontSize: 13,
+              color: "var(--color-danger)",
+              cursor: deleting ? "default" : "pointer",
+              opacity: deleting ? 0.5 : 1,
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {deleting ? "삭제 중..." : "삭제"}
+          </button>
+        </div>
       )}
     </div>
   );

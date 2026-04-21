@@ -144,36 +144,11 @@ export default function VerdictPage() {
   }
 
   return (
-    <>
-      <ResultScreen verdict={verdict} goldReadingOverride={goldReading} />
-      <div
-        style={{
-          padding: "24px 28px 40px",
-          textAlign: "center",
-          background: "var(--color-paper)",
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          className="font-sans"
-          style={{
-            fontSize: 11,
-            opacity: deleting ? 0.2 : 0.4,
-            color: "var(--color-ink)",
-            background: "transparent",
-            border: "none",
-            padding: 4,
-            textDecoration: "underline",
-            textUnderlineOffset: 3,
-            cursor: deleting ? "default" : "pointer",
-            letterSpacing: "-0.005em",
-          }}
-        >
-          {deleting ? "삭제 중..." : "삭제"}
-        </button>
-      </div>
-    </>
+    <ResultScreen
+      verdict={verdict}
+      goldReadingOverride={goldReading}
+      onDelete={handleDelete}
+      deleting={deleting}
+    />
   );
 }

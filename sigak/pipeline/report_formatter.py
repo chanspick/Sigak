@@ -1044,10 +1044,30 @@ def _build_hair_recommendation(
 
     AI 레퍼런스 이미지 기반 헤어 추천.
     파이널폼 v5: p7 TOP 3 조합 + p8~11 심화/AVOID.
+
+    Gender-aware pool selection (2026-04-21 Phase B gap 5):
+      - female: hair_styles.json 의 front_styles (8) + back_styles (13) 조합 pool
+      - male:   hair_styles.json 의 male_styles (12) 단일 pool. build_hair_spec
+                이 생성한 mono combo (back_id=None) 를 front 슬롯에만 채우고
+                back=None 으로 반환. 프론트엔드는 back 이 None 이면 단일 style
+                렌더링으로 처리.
     """
     styles = _load_hair_styles()
-    front_styles = {s["id"]: s for s in styles.get("front_styles", [])}
-    back_styles = {s["id"]: s for s in styles.get("back_styles", [])}
+
+    # Gender 별 pool/catalog 결정 — silent female default 차단
+    if gender == "male":
+        male_list = styles.get("male_styles", [])
+        pool = {s["id"]: s for s in male_list}
+        catalog = {"male": list(pool.values())}
+    else:
+        front_styles = {s["id"]: s for s in styles.get("front_styles", [])}
+        back_styles = {s["id"]: s for s in styles.get("back_styles", [])}
+        # 통합 lookup pool (front + back id 가 유니크하므로 merge 가능)
+        pool = {**front_styles, **back_styles}
+        catalog = {
+            "front": list(front_styles.values()),
+            "back": list(back_styles.values()),
+        }
 
     # LLM report_content에서 헤어 관련 데이터 추출
     hair_data = report_content.get("hair_recommendation", {})
@@ -1066,9 +1086,10 @@ def _build_hair_recommendation(
     top_combos = []
     for combo in raw_combos[:3]:
         front_id = combo.get("front_id", "")
-        back_id = combo.get("back_id", "")
-        front = front_styles.get(front_id)
-        back = back_styles.get(back_id)
+        back_id = combo.get("back_id")  # male: None / female: 문자열
+        front = pool.get(front_id)
+        # male mono combo: back_id=None → back=None. 프론트엔드는 None 체크로 분기.
+        back = pool.get(back_id) if back_id else None
 
         # 스코어 정규화 (0.80~0.99)
         raw_s = combo.get("combined_score", 0)
@@ -1086,22 +1107,16 @@ def _build_hair_recommendation(
         }
         top_combos.append(entry)
 
-    # AVOID 스타일 빌드
+    # AVOID 스타일 빌드 — gender 에 맞는 pool 에서만 조회 (다른 성별 id 섞임 방지)
     avoid_list = []
     for av in raw_avoids:
         style_id = av.get("style_id", "")
-        style = front_styles.get(style_id) or back_styles.get(style_id)
+        style = pool.get(style_id)
         avoid_list.append({
             "style": style,
             "name_kr": av.get("name_kr", style["name_kr"] if style else ""),
             "reason": av.get("primary_reason") or av.get("reason", ""),
         })
-
-    # 전체 스타일 카탈로그 (프론트엔드에서 필요 시 사용)
-    catalog = {
-        "front": list(front_styles.values()),
-        "back": list(back_styles.values()),
-    }
 
     return {
         "id": "hair_recommendation",

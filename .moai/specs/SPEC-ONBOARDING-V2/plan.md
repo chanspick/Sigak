@@ -64,17 +64,62 @@ def restart_conversation(db, user_id) -> None  # structured_fields 초기화
 **Deliverable**: 4 모듈 + 유닛 테스트.
 **Review gate**: IG 수집 스키마 + Pydantic 스키마 확정.
 
-### D3 (2026-04-24) — Sia 대화 엔드포인트
-- `sigak/routes/sia.py` 신규:
-  - `POST /api/v1/sia/chat/start` — session 생성 + 첫 메시지
-  - `POST /api/v1/sia/chat/message` — 다음 턴 처리
-  - `POST /api/v1/sia/chat/end` — 종료 + extraction 트리거
-- Redis 세션 유틸 (`services/sia_session.py`)
-- Haiku 4.5 클라이언트 + system prompt injection
+### D3 (2026-04-24) — Sia 대화 엔드포인트 (persona 재작성 반영)
+
+**신규 파일 (4)**:
+- `sigak/services/sia_session.py` — Redis 세션 유틸 (sliding TTL 5분)
+- `sigak/services/sia_llm.py` — Haiku 4.5 클라이언트 + system prompt injection
+- `sigak/routes/sia.py`:
+  - `POST /api/v1/sia/chat/start` — Redis session 생성 + 첫 메시지 (오프닝)
+  - `POST /api/v1/sia/chat/message` — 다음 턴 처리 (유저 입력 수신 → Sia 응답)
+  - `POST /api/v1/sia/chat/end` — 명시 종료 + create_ended_conversation + extraction 큐잉
+- `sigak/tests/test_sia_samples.py` — 샘플 대화 자동 검증
+
+**Sia system prompt 완전체 (§4-1 draft 그대로 이식)**:
+- Hard Rules 5 (Verdict/판정 단어 금지, 마크다운 금지, 이모지 금지)
+- 서술형 정중체 enforcement
+- 4지선다 구조 + 주관식 예외 2개 필드
+- 구체 숫자 근거 규칙 (데이터 없으면 숫자 생략)
 - 호칭 폴백 3단 로직
 
-**Deliverable**: 3 엔드포인트 + Redis 통합.
-**Review gate**: 샘플 대화 녹화 → 톤 검수.
+**샘플 대화 녹화 (본인 검수 대상 3종)**:
+1. 오프닝 (1순위 name + IG 성공)
+2. 중간 턴 (유저 4지선다 선택 반영 + 주관식 심화)
+3. 클로징 ("시각이 본 나" CTA 자연 흡수)
+
+**`test_sia_samples.py` 검증 규칙** (REQ-SIA-002a/b/c + AC-SIA-HR*):
+```python
+# 각 샘플 응답에 대해:
+assert "verdict" not in sample.lower()          # HR1
+assert "판정" not in sample                     # HR2
+assert not re.search(r"\*\*|##|^>|```", sample) # HR3
+assert not re.search(r"^[ \t]*\*", sample, re.M) # HR4 (별표 bullet)
+assert not re.search(EMOJI_PATTERN, sample)     # HR5
+# 문장당 35자, 턴당 ≤3 문장, 서술형 어미 존재, 금지 어미 부재
+```
+
+**Mock 데이터 전략 (D3 → D4 이관)**:
+- D3 샘플 녹화 시 IG_FEED_SUMMARY / vision analysis 는 mock 고정값
+  (예: post_count=38, dominant_mood="쿨뮤트" 68%, chroma=1.4배)
+- D4 Verdict 엔진에서 실 vision analysis 파이프라인 구현
+- Sia LLM 은 주입된 숫자를 그대로 사용. Sia 가 직접 숫자 계산하지 않음.
+
+**Deliverable**: 4 신규 파일 + Redis 통합 + 샘플 대화 녹화 3종.
+**Review gate**:
+  - 샘플 대화 녹화 자동 검증 전부 통과
+  - 본인 검수 체크리스트 10 항목 통과 (아래)
+
+**본인 검수 체크리스트 (D3 샘플 대화 리뷰 시)**:
+- [ ] "verdict" / "판정" 단어 0건
+- [ ] 마크다운 0건 (`**`, `*`, `##`, `>`)
+- [ ] 이모지 0건
+- [ ] "~네요" / "~같아요" 0건
+- [ ] "~합니다" / "~습니다" 사용
+- [ ] 확인 요청 없음 ("본인도 그렇게 생각하세요?" X)
+- [ ] 4지선다 질문 구조 (주관식 예외 2개 필드 외)
+- [ ] 구체적 숫자 포함 (mock OK, 조작 감지 시 알림)
+- [ ] 유저 한 문장 정의 포함 (오프닝: "{NAME}님은 X 인 분입니다")
+- [ ] "시각이 본 나" CTA 자연 흡수 (클로징, 1 문장 이내)
 
 ### D4 (2026-04-25) — Extraction Pipeline
 - Sonnet 4.6 extraction 호출 (`services/extraction.py`)

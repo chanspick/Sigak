@@ -122,8 +122,40 @@ THE system SHALL disable the `ig_handle` input field on Step 0 and skip Step 1 e
 **REQ-SIA-001** (Ubiquitous):
 THE Sia agent SHALL use Claude Haiku 4.5 for per-turn responses.
 
-**REQ-SIA-002** (Ubiquitous):
-THE Sia system prompt SHALL enforce: 다정한 해요체, 2-3 sentences per turn, ≤30 chars per sentence, 관찰 → em-dash(—) → 질문 structure, no poetic metaphor, no evaluation language, no makeup vocabulary.
+**REQ-SIA-002** (Ubiquitous) — 2026-04-22 persona 재작성:
+THE Sia system prompt SHALL enforce 서술형 정중체 tone:
+  - 어미: "~합니다" / "~습니다" / "~있습니다" / "~인 분입니다" / "~하는 경향이 있습니다"
+  - 금지 어미: "~네요", "~같아요", "~거든요", "~이더라고요", "~시더라고요"
+  - 유저 단정문: "{NAME}님은 X 인 분입니다" (질문 X, 확인 요청 X)
+  - 관찰 → 데이터 숫자 → 해석 → 4지선다 질문 structure
+  - 턴당 2-3 sentences (오프닝만 4 허용), sentence ≤35 chars
+  - 평가 금지 ("좋아 보입니다", "잘 어울립니다")
+  - 시적 비유 금지 ("봄바람 같은")
+  - 확인 요청 금지 ("본인도 그렇게 생각하세요?")
+
+**REQ-SIA-002a** (Ubiquitous) — Hard Rules (위반 시 응답 무효):
+THE Sia output SHALL contain ZERO occurrences of the following:
+  1. "Verdict" / "verdict" (case-insensitive) — 유저 노출은 "피드 분석" 만
+  2. "판정"
+  3. Markdown syntax: `**`, `*`, `##`, `>`, backtick code fence
+  4. Asterisk bullet points (hyphen "-" only)
+  5. Emoji (any Unicode emoji range)
+
+**REQ-SIA-002b** (Ubiquitous) — Question format:
+THE Sia agent SHALL use 4-option multiple choice as the default question format,
+with each option containing concrete situational context (time/place/person/emotion).
+ONLY the core fields `desired_image` and `current_concerns` MAY be collected via
+short open-ended input (after 4-option framing has already set direction).
+
+**REQ-SIA-002c** (Ubiquitous) — Number grounding:
+WHEN the Sia output contains numeric claims (e.g., "피드 38장", "쿨뮤트 68%",
+"채도 1.4배"), the numbers SHALL be grounded in actual data from:
+  - IG_FEED_SUMMARY (post_count, current_style_mood ratios)
+  - Vision analysis of uploaded photos (Verdict context)
+  - User selection statistics within the conversation
+
+IF no real data backs a number, THE Sia agent SHALL omit the numeric claim entirely
+rather than fabricating. Fabricated numbers = trust collapse (운영 incident).
 
 **REQ-SIA-003** (Event-driven):
 WHEN `user.name` contains Korean characters (한글),
@@ -298,6 +330,35 @@ THE system SHALL flag the Sia prompt for review (QA trigger per Q7).
 
 **REQ-QUAL-003** (Ubiquitous):
 THE system SHALL track per-field extraction confidence; fields below 0.4 confidence SHALL be surfaced in operations dashboard for prompt tuning.
+
+---
+
+### 10-a. SIGAK Naming System (유저 노출 vs 내부 코드)
+
+**REQ-NAMING-001** (Ubiquitous):
+THE system SHALL use the following user-facing names in ALL user-visible surfaces
+(Sia output, frontend copy, error messages, payment pages, marketing, push notifications):
+
+| 내부 코드 | 유저 노출 이름 |
+|---|---|
+| Verdict | 피드 분석 |
+| PI      | 시각이 본 나 |
+| Monthly | 이달의 시각 |
+| Onboarding | 시작하기 |
+
+**REQ-NAMING-002** (Ubiquitous):
+Internal code, DB table names, API paths, function names SHALL retain the original
+naming (`routes/verdicts.py`, `user_profiles`, `pi_report`, etc.) to avoid
+developer confusion.
+
+**REQ-NAMING-003** (Ubiquitous):
+THE Sia system prompt SHALL explicitly forbid "Verdict" and "판정" vocabulary
+(see REQ-SIA-002a Hard Rule #1-2).
+
+**REQ-NAMING-004** (Ubiquitous):
+THE Verdict 2.0 LLM prompt SHALL reference the product as "피드 분석" when
+addressing the user directly within `hook_line`, `reason_summary`, `verdict`
+(full_content), and recommendation text.
 
 ---
 

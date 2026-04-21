@@ -7,13 +7,25 @@ Axes:
   3. Age    — Fresh(-1) <-> Mature(+1)  비율이 주는 나이 인상
 
 All axis definitions loaded from sigak/data/axis_config.yaml (SSOT).
-All observed ranges loaded from sigak/data/calibration_3axis.yaml.
+All observed ranges loaded from sigak/data/calibration_3axis.yaml, keyed by gender.
+
+Gender-aware 리팩터 (2026-04-21):
+  calibration_3axis.yaml 이 observed_ranges.{female,male} 중첩 구조.
+  compute_coordinates(features, gender) 가 gender 별로 분기.
+  해당 gender section 누락/미캘리브레이션 시 CoordinateConfigError raise.
 """
 import math
 import os
 import yaml
 from functools import lru_cache
 from typing import Optional
+
+
+class CoordinateConfigError(RuntimeError):
+    """calibration_3axis.yaml 의 gender 섹션이 없거나 feature range 가 null 일 때.
+
+    silent {0,0,0} 반환하지 않고 조기 실패시켜 왜곡된 좌표 산출을 차단.
+    """
 
 
 # ─────────────────────────────────────────────
@@ -112,20 +124,73 @@ def _weighted_fallback(components: list[tuple[float, float]]) -> float:
 #  Coordinate Computation (YAML-driven)
 # ─────────────────────────────────────────────
 
+def _resolve_obs_ranges(gender: str) -> dict:
+    """calibration_3axis.yaml 의 observed_ranges.{gender} 를 로드 + 검증.
+
+    - gender 섹션 자체가 없으면 CoordinateConfigError
+    - 섹션은 있는데 axis_config 가 참조하는 feature 중 null 인 게 있으면
+      CoordinateConfigError (미캘리브레이션 상태)
+
+    통과 시 feature_name -> [lo, hi] dict 반환.
+    """
+    axis_config = _load_axis_config()
+    cal = _load_calibration()
+    all_ranges = cal.get("observed_ranges", {})
+
+    if gender not in all_ranges:
+        raise CoordinateConfigError(
+            f"observed_ranges.{gender} not found in calibration_3axis.yaml. "
+            f"Available: {list(all_ranges.keys())}"
+        )
+    obs_ranges = all_ranges[gender] or {}
+
+    required = set()
+    for axis_def in axis_config.get("axes", {}).values():
+        for feat_name in axis_def.get("features", {}):
+            required.add(feat_name)
+
+    missing = []
+    for feat_name in required:
+        rng = obs_ranges.get(feat_name)
+        if rng is None:
+            missing.append(feat_name)
+            continue
+        if isinstance(rng, (list, tuple)) and (
+            len(rng) != 2 or rng[0] is None or rng[1] is None
+        ):
+            missing.append(feat_name)
+
+    if missing:
+        subset_hint = {"female": "AF", "male": "AM"}.get(gender, gender.upper())
+        raise CoordinateConfigError(
+            f"observed_ranges.{gender} is not calibrated. "
+            f"Missing/null features: {sorted(missing)}. "
+            f"Run: python -m scripts.calibrate_face_stats --subset {subset_hint} "
+            f"--image-dir <SCUT path> --output <json path>"
+        )
+
+    return obs_ranges
+
+
 def compute_coordinates(
     structural_features: dict,
+    gender: str = "female",
     clip_embedding=None,   # reserved for future CLIP integration
     projector=None,        # reserved for future CLIP integration
 ) -> dict[str, float]:
     """
-    12개 피처 -> 3축 좌표 계산.
-    각 피처는 calibration observed_ranges로 [-1, +1] 정규화 후 가중합.
+    12개 피처 -> 3축 좌표 계산. gender 별로 다른 observed_ranges 적용.
+
+    Args:
+        structural_features: analyze_face().to_dict() 산출물
+        gender: "female" / "male" — calibration 섹션 선택.
+            미캘리브레이션된 gender 호출 시 CoordinateConfigError raise.
+        clip_embedding, projector: 향후 CLIP projector 통합 예약 파라미터.
 
     Returns: {"shape": 0.35, "volume": -0.22, "age": 0.1}
     """
     axis_config = _load_axis_config()
-    cal = _load_calibration()
-    obs_ranges = cal.get("observed_ranges", {})
+    obs_ranges = _resolve_obs_ranges(gender)
 
     coords = {}
     for axis_name, axis_def in axis_config["axes"].items():
@@ -137,6 +202,8 @@ def compute_coordinates(
 
             feat_range = obs_ranges.get(feat_name)
             if feat_range is None:
+                # _resolve_obs_ranges 에서 이미 검증됐으므로 여기 도달 안 함.
+                # 방어적으로 skip.
                 continue
 
             normalized = _normalize(raw, feat_range)

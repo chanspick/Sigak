@@ -299,7 +299,7 @@ async def create_verdict(
             continue
 
         features = face_result.to_dict()
-        coords = compute_coordinates(features)
+        coords = compute_coordinates(features, gender=(user_row.gender or "female"))
         photo_records.append({
             "photo_id": f"p_{uuid.uuid4().hex[:8]}",
             "filename": filename,

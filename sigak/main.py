@@ -890,7 +890,7 @@ def _run_analysis_pipeline(
     # Step 1: 좌표 계산
     if analysis:
         features = analysis["primary_features"]
-        current_coords = compute_coordinates(features)
+        current_coords = compute_coordinates(features, gender=gender)
     else:
         features = {}
         current_coords = {"shape": 0, "volume": 0, "age": 0}

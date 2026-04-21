@@ -1,23 +1,54 @@
 # SIGAK 3-Axis Calibration Data
-# coordinate.py는 이 파일에서만 observed_ranges를 로드한다.
+# coordinate.py 는 이 파일에서만 observed_ranges 를 로드한다.
 # 재캘리브레이션 시 이 파일만 교체하면 전체 반영.
 #
-# 초기값: SCUT-FBP5500 AF 2000장 InsightFace p10~p90 (2026-04-08)
-# brow_eye_distance는 추정값 — 캘리브레이션 후 실측으로 교체 예정.
+# Structure (2026-04-21 gender-aware 리팩터 이후):
+#   observed_ranges.female  — SCUT-FBP5500 AF 2000 InsightFace p10-p90 (2026-04-08)
+#   observed_ranges.male    — SCUT-FBP5500 AM 2000 InsightFace p10-p90 (TBD, TODO)
+#
+# coordinate.py::compute_coordinates(features, gender) 가 gender 별로 분기.
+# gender 에 해당하는 섹션이 없거나 feature range 가 null 이면 CoordinateConfigError
+# 를 raise (silent {0,0,0} 금지 — 미캘리브레이션 상태에서 왜곡된 좌표 산출 차단).
 
 observed_ranges:
-  jaw_angle: [90.1, 117.2]
-  cheekbone_prominence: [0.522, 0.746]
-  eye_tilt: [-1.06, 5.50]
-  brow_arch: [0.026, 0.037]
-  eye_ratio: [0.284, 0.41]
-  eye_width_ratio: [0.178, 0.214]
-  lip_fullness: [0.003, 0.106]
-  nose_bridge_height: [0.472, 0.573]
-  brow_eye_distance: [0.1, 0.4]            # 추정값. 캘리브레이션 후 교체.
-  forehead_ratio: [0.354, 0.465]
-  philtrum_ratio: [0.206, 0.339]
-  face_length_ratio: [1.158, 1.293]
+  female:
+    # SCUT-FBP5500 AF 2000장 InsightFace p10-p90 (2026-04-08)
+    # brow_eye_distance 는 추정값. 재캘리브레이션 후 교체 예정.
+    jaw_angle: [90.1, 117.2]
+    cheekbone_prominence: [0.522, 0.746]
+    eye_tilt: [-1.06, 5.50]
+    brow_arch: [0.026, 0.037]
+    eye_ratio: [0.284, 0.41]
+    eye_width_ratio: [0.178, 0.214]
+    lip_fullness: [0.003, 0.106]
+    nose_bridge_height: [0.472, 0.573]
+    brow_eye_distance: [0.1, 0.4]
+    forehead_ratio: [0.354, 0.465]
+    philtrum_ratio: [0.206, 0.339]
+    face_length_ratio: [1.158, 1.293]
+
+  male:
+    # TODO(calibration): SCUT-FBP5500 AM 2000장 InsightFace p10-p90 산출 후 채움.
+    # 실행:
+    #   python -m scripts.calibrate_face_stats \
+    #     --subset AM \
+    #     --image-dir ../experiments/scut-fbp5500/SCUT-FBP5500_v2/Images \
+    #     --output ../experiments/scut-fbp5500/calibration_am_insightface.json
+    #
+    # 현재 null placeholder. compute_coordinates(gender="male") 호출 시
+    # CoordinateConfigError 로 조기 실패 — 왜곡된 male 좌표 산출 차단.
+    jaw_angle: null
+    cheekbone_prominence: null
+    eye_tilt: null
+    brow_arch: null
+    eye_ratio: null
+    eye_width_ratio: null
+    lip_fullness: null
+    nose_bridge_height: null
+    brow_eye_distance: null
+    forehead_ratio: null
+    philtrum_ratio: null
+    face_length_ratio: null
 
 # 캘리브레이션 스크립트 산출 영역 (초기: 비어 있음)
 axis_distribution: {}

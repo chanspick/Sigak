@@ -314,6 +314,8 @@ from routes.verdicts import router as verdicts_router
 from routes.sigak_report import router as sigak_report_router
 from routes.pi import router as pi_router
 from routes.change import router as change_router
+# TEMP: 파이프라인 진단용. 진단 종료 후 router 등록과 파일 모두 제거.
+from routes._debug import router as _debug_router
 
 app.include_router(tokens_router)
 app.include_router(payments_confirm_router)
@@ -324,6 +326,7 @@ app.include_router(verdicts_router)
 app.include_router(sigak_report_router)
 app.include_router(pi_router)
 app.include_router(change_router)
+app.include_router(_debug_router)
 
 # ── In-memory stores ──
 USERS = {}

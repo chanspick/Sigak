@@ -290,10 +290,10 @@ def chat_end(
     # 2. Redis session DELETE
     sia_session.delete_session(body.conversation_id)
 
-    # 3. Extraction 백그라운드 큐잉 (placeholder — D4 구현)
+    # 3. Extraction 백그라운드 큐잉 (D4 구현 완료)
     extraction_queued = True
     background_tasks.add_task(
-        _extract_conversation_placeholder,
+        _run_extraction_job,
         conversation_id=body.conversation_id,
         user_id=user["id"],
     )
@@ -307,15 +307,94 @@ def chat_end(
 
 
 # ─────────────────────────────────────────────
-#  Background: Extraction placeholder (D4 구현 예정)
+#  Background: Extraction job (D4)
 # ─────────────────────────────────────────────
 
-def _extract_conversation_placeholder(conversation_id: str, user_id: str) -> None:
-    """D4 에서 Sonnet 4.6 extraction 로 대체.
+def _run_extraction_job(conversation_id: str, user_id: str) -> None:
+    """FastAPI BackgroundTask 에서 실행되는 Sonnet 4.6 extraction.
 
-    현재는 로그만 찍고 no-op. conversations.status="ended" 인 상태로 남음.
+    Flow (contract #3):
+      1. DB 에서 conversation 로드 (status="ended")
+      2. messages → Pydantic 파싱
+      3. extraction.extract_structured_fields() 호출 (Sonnet 1회 + 재시도 1회)
+      4-a. 성공: mark_extracted (status="extracted" + structured_fields merge +
+           onboarding_completed=TRUE)
+      4-b. 실패: mark_failed (status="failed", user_profiles 변경 없음)
+
+    BackgroundTask 는 독립 DB session 필요 (request session 은 이미 close 됨).
+    session 생성/종료 명시 관리.
     """
-    logger.info(
-        "TODO(D4): Sonnet extraction for cid=%s user_id=%s",
-        conversation_id, user_id,
-    )
+    from services import conversations as conv_svc
+    from services import extraction
+    from db import get_db
+
+    db = get_db()
+    if db is None:
+        logger.error(
+            "extraction job: DB unavailable cid=%s (conversation stays status=ended)",
+            conversation_id,
+        )
+        return
+
+    try:
+        conv = conv_svc.get_conversation(db, conversation_id)
+        if conv is None:
+            logger.error(
+                "extraction job: conversation not found cid=%s", conversation_id,
+            )
+            return
+
+        raw_msgs = conv.get("messages") or []
+        try:
+            messages = [ConversationMessage.model_validate(m) for m in raw_msgs]
+        except Exception as e:
+            logger.exception(
+                "extraction job: invalid messages cid=%s — %s",
+                conversation_id, e,
+            )
+            conv_svc.mark_failed(
+                db, conversation_id=conversation_id,
+                reason=f"invalid messages in DB: {e}",
+            )
+            db.commit()
+            return
+
+        try:
+            result = extraction.extract_structured_fields(messages)
+        except extraction.ExtractionError as e:
+            logger.exception(
+                "extraction job: Sonnet failure cid=%s", conversation_id,
+            )
+            conv_svc.mark_failed(
+                db, conversation_id=conversation_id,
+                reason=f"extraction failed: {e}",
+            )
+            db.commit()
+            return
+
+        # Success path — conversations UPDATE + user_profiles merge + completed=TRUE
+        conv_svc.mark_extracted(
+            db,
+            conversation_id=conversation_id,
+            user_id=user_id,
+            result=result,
+        )
+        db.commit()
+        logger.info(
+            "extraction job: success cid=%s fallback_needed=%s",
+            conversation_id, result.fallback_needed,
+        )
+    except Exception:
+        # 안전망 — 예외 버블업으로 BackgroundTask 조용히 죽는 거 방지
+        logger.exception(
+            "extraction job: unexpected error cid=%s", conversation_id,
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass

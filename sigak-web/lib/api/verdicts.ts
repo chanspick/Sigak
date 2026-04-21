@@ -65,9 +65,12 @@ export function unlockDiagnosis(
   );
 }
 
-/** 본인 verdict 삭제. 204. 404/403 시 authFetch가 throw. */
-export function deleteVerdict(verdictId: string): Promise<void> {
-  return authFetch<void>(
+/** 본인 verdict 삭제. 연관 업로드 파일도 같이 정리됨.
+ * 404 (없음) / 403 (타유저) 시 authFetch가 throw. */
+export function deleteVerdict(
+  verdictId: string,
+): Promise<{ deleted: boolean; verdict_id: string }> {
+  return authFetch<{ deleted: boolean; verdict_id: string }>(
     `/api/v1/verdicts/${encodeURIComponent(verdictId)}`,
     { method: "DELETE" },
   );

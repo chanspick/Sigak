@@ -517,24 +517,26 @@ def unlock_diagnosis(
 #  DELETE /api/v1/verdicts/{verdict_id}
 # ─────────────────────────────────────────────
 
-@router.delete("/{verdict_id}", status_code=204)
+@router.delete("/{verdict_id}")
 def delete_verdict(
     verdict_id: str,
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
-    """본인 verdict 삭제. 업로드 파일(uploads/)은 orphan으로 남음 —
-    cleanup job은 refactor backlog.
+    """본인 verdict 삭제.
+
+    업로드 원본 + tier(GOLD/SILVER/BRONZE 뷰의 근거) 이미지가 모두 같은 파일이므로
+    ranked_photo_ids[].filename 전체를 uploads/{user_id}/ 에서 제거.
 
     token_transactions.reference_id 는 verdict_id를 가리키지만 FK 강제는
     없으므로 verdicts row만 삭제해도 DB integrity OK. 감사 이력 보존용으로
-    transactions는 남겨둠.
+    transactions는 남겨둠. diagnosis_unlocked=true였어도 환불 없음.
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
     row = db.execute(
-        text("SELECT user_id FROM verdicts WHERE id = :id"),
+        text("SELECT user_id, ranked_photo_ids FROM verdicts WHERE id = :id"),
         {"id": verdict_id},
     ).first()
     if not row:
@@ -542,12 +544,27 @@ def delete_verdict(
     if row.user_id != user["id"]:
         raise HTTPException(403, "본인 verdict가 아닙니다")
 
+    ranked = row.ranked_photo_ids or []
+    user_dir = DATA_DIR / user["id"]
+    for item in ranked:
+        filename = item.get("filename") if isinstance(item, dict) else None
+        if not filename:
+            continue
+        try:
+            target = (user_dir / filename).resolve()
+            if target.parent == user_dir.resolve() and target.is_file():
+                target.unlink()
+        except OSError as e:
+            logger.warning(
+                "[verdict %s] file unlink failed %s: %s", verdict_id, filename, e
+            )
+
     db.execute(
         text("DELETE FROM verdicts WHERE id = :id"),
         {"id": verdict_id},
     )
     db.commit()
-    return None
+    return {"deleted": True, "verdict_id": verdict_id}
 
 
 # ─────────────────────────────────────────────

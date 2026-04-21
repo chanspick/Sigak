@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
-import { getVerdict } from "@/lib/api/verdicts";
+import { deleteVerdict, getVerdict } from "@/lib/api/verdicts";
 import { ResultScreen } from "@/components/sigak/result-screen";
 import type { VerdictResponse } from "@/lib/types/mvp";
 import { getToken } from "@/lib/auth";
@@ -22,6 +22,42 @@ export default function VerdictPage() {
   const [verdict, setVerdict] = useState<VerdictResponse | null>(null);
   const [goldReading, setGoldReading] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!verdictId || deleting) return;
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(
+        "이 판정을 삭제하시겠어요?\n되돌릴 수 없습니다.",
+      );
+      if (!ok) return;
+    }
+    setDeleting(true);
+    try {
+      await deleteVerdict(verdictId);
+      try {
+        sessionStorage.removeItem(`sigak_gold_reading:${verdictId}`);
+      } catch {
+        // ignore
+      }
+      router.replace("/");
+    } catch (e) {
+      setDeleting(false);
+      if (e instanceof ApiError && e.status === 401) {
+        router.replace("/auth/login");
+        return;
+      }
+      const msg =
+        e instanceof ApiError && e.status === 403
+          ? "본인의 판정만 삭제할 수 있습니다."
+          : e instanceof ApiError && e.status === 404
+            ? "이미 삭제된 판정입니다."
+            : e instanceof Error
+              ? e.message
+              : "삭제 실패";
+      if (typeof window !== "undefined") window.alert(msg);
+    }
+  }
 
   useEffect(() => {
     const token = getToken();
@@ -107,5 +143,37 @@ export default function VerdictPage() {
     );
   }
 
-  return <ResultScreen verdict={verdict} goldReadingOverride={goldReading} />;
+  return (
+    <>
+      <ResultScreen verdict={verdict} goldReadingOverride={goldReading} />
+      <div
+        style={{
+          padding: "24px 28px 40px",
+          textAlign: "center",
+          background: "var(--color-paper)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="font-sans"
+          style={{
+            fontSize: 11,
+            opacity: deleting ? 0.2 : 0.4,
+            color: "var(--color-ink)",
+            background: "transparent",
+            border: "none",
+            padding: 4,
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+            cursor: deleting ? "default" : "pointer",
+            letterSpacing: "-0.005em",
+          }}
+        >
+          {deleting ? "삭제 중..." : "삭제"}
+        </button>
+      </div>
+    </>
+  );
 }

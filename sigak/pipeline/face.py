@@ -492,7 +492,7 @@ def _analyze_with_insightface(image: np.ndarray) -> Optional[FaceFeatures]:
         nose_width_ratio=round(nose_width_ratio, 3),
         nose_bridge_height=round(nose_bridge_height, 3),
         lip_fullness=round(lip_fullness, 4),
-        face_length_ratio=round(face_length_ratio, 3),
+        face_length_ratio=round(float(face_length_ratio), 3),
         forehead_ratio=round(forehead_ratio, 3),
         brow_arch=round(brow_arch, 4),
         brow_eye_distance=brow_eye_distance_val,

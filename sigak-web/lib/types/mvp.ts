@@ -168,10 +168,12 @@ export interface VerdictResponse {
   verdict_id: string;
   candidate_count: number;
   tiers: VerdictTiers;
-  gold_reading: string; // GET 재조회 시 빈 문자열 (ephemeral on create)
+  gold_reading: string; // 20260425 이후 영속. 그 이전 row는 ""
   blur_released: boolean;        // deprecated (legacy 50토큰 해제)
   diagnosis_unlocked?: boolean;  // v2 BM — 10토큰 진단 해제
   pro_data: VerdictProData | null;
+  /** 공유 링크로 타유저가 열었을 땐 false. 프론트는 kebab/진단 CTA 노출에 사용. */
+  is_owner: boolean;
 }
 
 // v2 BM — POST /verdicts/{id}/unlock-diagnosis

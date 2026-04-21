@@ -27,7 +27,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from db import User as DBUser
-from deps import db_session, get_current_user
+from deps import db_session, get_current_user, get_optional_user
 from pipeline.coordinate import compute_coordinates
 from pipeline.face import analyze_face
 from services import tokens as tokens_service
@@ -71,7 +71,10 @@ class VerdictResponse(BaseModel):
     tiers: dict[str, list[TierPhoto]]
     gold_reading: str
     blur_released: bool
+    diagnosis_unlocked: bool = False
     pro_data: Optional[dict] = None
+    # 공유 링크 시 타유저에게는 False. 프론트는 이 값으로 kebab/진단 CTA 노출 제어.
+    is_owner: bool = True
 
 
 class VerdictListItem(BaseModel):
@@ -346,13 +349,20 @@ async def create_verdict(
             for p in photo_records
         ],
     }
+    # 9. Gold reading — placeholder for founder (insert 전에 생성해서 영속화)
+    gold_reading = generate_gold_reading(
+        winner_photo_coords=winner["coords"],
+        chugumi_target=target_coords,
+        reference_base=(interview_interp or {}).get("reference_base"),
+    )
+
     db.execute(
         text(
             "INSERT INTO verdicts "
             "  (id, user_id, candidate_count, winner_photo_id, ranked_photo_ids, "
-            "   coordinates_snapshot, reasoning_unlocked, blur_released) "
+            "   coordinates_snapshot, reasoning_unlocked, blur_released, gold_reading) "
             "VALUES (:id, :uid, :cc, :wp, CAST(:ranked AS jsonb), "
-            "        CAST(:coords AS jsonb), FALSE, FALSE)"
+            "        CAST(:coords AS jsonb), FALSE, FALSE, :reading)"
         ),
         {
             "id": verdict_id,
@@ -361,16 +371,10 @@ async def create_verdict(
             "wp": winner["photo_id"],
             "ranked": json.dumps(ranked_for_storage, ensure_ascii=False),
             "coords": json.dumps(coords_snapshot, ensure_ascii=False),
+            "reading": gold_reading or "",
         },
     )
     db.commit()
-
-    # 9. Gold reading — placeholder for founder
-    gold_reading = generate_gold_reading(
-        winner_photo_coords=winner["coords"],
-        chugumi_target=target_coords,
-        reference_base=(interview_interp or {}).get("reference_base"),
-    )
 
     # 10. Response
     return VerdictResponse(
@@ -394,27 +398,54 @@ async def create_verdict(
 @router.get("/{verdict_id}", response_model=VerdictResponse)
 def get_verdict(
     verdict_id: str,
-    user: dict = Depends(get_current_user),
+    user: Optional[dict] = Depends(get_optional_user),
     db=Depends(db_session),
 ):
+    """verdict 재조회. 인증은 선택.
+
+    - 본인(토큰의 sub == verdict.user_id): 전체 필드 반환. kebab/진단 CTA 노출용.
+    - 타유저/비로그인: GOLD tier + gold_reading 만 공개. silver/bronze,
+      pro_data, diagnosis_unlocked 는 감춤. is_owner=False로 구분.
+    """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
     row = db.execute(
         text(
             "SELECT id, user_id, candidate_count, ranked_photo_ids, "
-            "       coordinates_snapshot, blur_released, reasoning_data "
+            "       coordinates_snapshot, blur_released, diagnosis_unlocked, "
+            "       reasoning_data, gold_reading "
             "FROM verdicts WHERE id = :id"
         ),
         {"id": verdict_id},
     ).first()
     if row is None:
         raise HTTPException(404, "verdict not found")
-    if row.user_id != user["id"]:
-        raise HTTPException(403, "본인 verdict가 아닙니다")
 
+    is_owner = bool(user and row.user_id == user["id"])
     ranked = row.ranked_photo_ids or []
     tiers = verdict_util.assign_tiers(ranked)
+    reading = row.gold_reading or ""
+
+    if not is_owner:
+        # 공유 공개 스코프: GOLD만. silver/bronze/pro_data/진단 상태 모두 비공개.
+        return VerdictResponse(
+            verdict_id=row.id,
+            candidate_count=row.candidate_count,
+            tiers={
+                "gold": [
+                    _photo_to_response(p, row.user_id, include_url=True)
+                    for p in tiers["gold"]
+                ],
+                "silver": [],
+                "bronze": [],
+            },
+            gold_reading=reading,
+            blur_released=False,
+            diagnosis_unlocked=False,
+            pro_data=None,
+            is_owner=False,
+        )
 
     return VerdictResponse(
         verdict_id=row.id,
@@ -430,11 +461,11 @@ def get_verdict(
                 for p in tiers["bronze"]
             ],
         },
-        # GET doesn't re-run gold_reading — it's ephemeral per create.
-        # TODO: persist gold_reading on create so re-fetch keeps it.
-        gold_reading="",
+        gold_reading=reading,
         blur_released=bool(row.blur_released),
+        diagnosis_unlocked=bool(row.diagnosis_unlocked),
         pro_data=row.reasoning_data if row.blur_released else None,
+        is_owner=True,
     )
 
 

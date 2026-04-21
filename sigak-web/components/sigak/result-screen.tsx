@@ -54,6 +54,7 @@ export function ResultScreen({
   const released = Boolean(
     verdict.diagnosis_unlocked ?? verdict.blur_released,
   );
+  const isOwner = verdict.is_owner;
 
   // lightbox ESC
   useEffect(() => {
@@ -194,14 +195,16 @@ export function ResultScreen({
         </div>
       )}
 
-      {/* 진단 보기 버튼 — GOLD 바로 아래 */}
-      <div style={{ padding: "20px 28px 0" }}>
-        <DiagnosisButton
-          locked={!released}
-          remainingCount={remaining.length}
-          onClick={() => setShowDiagnosis(true)}
-        />
-      </div>
+      {/* 진단 보기 버튼 — GOLD 바로 아래. 공유 링크로 본 타유저에겐 미노출. */}
+      {isOwner && (
+        <div style={{ padding: "20px 28px 0" }}>
+          <DiagnosisButton
+            locked={!released}
+            remainingCount={remaining.length}
+            onClick={() => setShowDiagnosis(true)}
+          />
+        </div>
+      )}
 
       {/* Reading (무료) */}
       {reading && (

@@ -56,6 +56,43 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
         db.close()
 
 
+def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    """Best-effort JWT 검증. 토큰 없거나 무효해도 401 없이 None 반환.
+
+    공유 링크 등 익명 접근이 허용되는 엔드포인트에서 사용. 라우트는 반환값이
+    None인지 여부로 익명/본인을 분기하고, 본인 전용 데이터를 가드해야 함.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+
+    token = authorization.removeprefix("Bearer ").strip()
+    claims = verify_jwt(token)
+    if not claims:
+        return None
+
+    user_id = claims.get("sub")
+    if not user_id:
+        return None
+
+    db = get_db()
+    if db is None:
+        return {"id": user_id, "kakao_id": claims.get("kid", "")}
+
+    try:
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "kakao_id": user.kakao_id or "",
+            "email": user.email or "",
+            "name": user.name or "",
+            "tier": user.tier or "standard",
+        }
+    finally:
+        db.close()
+
+
 def db_session():
     """FastAPI dependency that yields a DB session and closes it on teardown.
 

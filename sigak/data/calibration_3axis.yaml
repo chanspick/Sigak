@@ -2,9 +2,23 @@
 # coordinate.py 는 이 파일에서만 observed_ranges 를 로드한다.
 # 재캘리브레이션 시 이 파일만 교체하면 전체 반영.
 #
-# Structure (2026-04-21 gender-aware 리팩터 이후):
-#   observed_ranges.female  — SCUT-FBP5500 AF 2000 InsightFace p10-p90 (2026-04-08)
-#   observed_ranges.male    — SCUT-FBP5500 AM 2000 InsightFace p10-p90 (TBD, TODO)
+# Structure (2026-04-21 Phase A.1 clean rebuild):
+#   observed_ranges.female — SCUT-FBP5500 AF clean IF-only (MediaPipe 혼입 제거)
+#   observed_ranges.male   — SCUT-FBP5500 AM clean IF-only
+#
+# 이전 YAML 오염 상태:
+#   - AF (2026-04-08): MediaPipe 폴백 활성 상태에서 수집 → 791 MP 샘플 혼입.
+#     lip_fullness/eye_tilt 등 11개 metric 이 두 엔진 scale 혼합 분포였음.
+#   - AM (2026-04-21 초기): face_length_ratio np.float32 reject 로 n=0,
+#     brow_eye_distance METRICS 리스트 누락으로 수집 실패. 양쪽 모두 proxy 사용.
+#
+# 수정 내용 (2026-04-21):
+#   1. sigak/pipeline/face.py:495 — face_length_ratio 에 float() cast 추가
+#      (np.float32 → Python float 강제, isinstance 체크 통과)
+#   2. sigak/scripts/calibrate_face_stats.py — METRICS_TO_CALIBRATE 에
+#      brow_eye_distance 추가
+#   3. AF/AM 둘 다 현재 face.py (InsightFace-only, MediaPipe 폴백 비활성) 로
+#      재calibration. 모든 axis feature 가 단일 엔진 · 단일 scale 에서 수집.
 #
 # coordinate.py::compute_coordinates(features, gender) 가 gender 별로 분기.
 # gender 에 해당하는 섹션이 없거나 feature range 가 null 이면 CoordinateConfigError
@@ -12,43 +26,40 @@
 
 observed_ranges:
   female:
-    # SCUT-FBP5500 AF 2000장 InsightFace p10-p90 (2026-04-08)
-    # brow_eye_distance 는 추정값. 재캘리브레이션 후 교체 예정.
-    jaw_angle: [90.1, 117.2]
-    cheekbone_prominence: [0.522, 0.746]
-    eye_tilt: [-1.06, 5.50]
-    brow_arch: [0.026, 0.037]
-    eye_ratio: [0.284, 0.41]
-    eye_width_ratio: [0.178, 0.214]
-    lip_fullness: [0.003, 0.106]
-    nose_bridge_height: [0.472, 0.573]
-    brow_eye_distance: [0.1, 0.4]
-    forehead_ratio: [0.354, 0.465]
-    philtrum_ratio: [0.206, 0.339]
-    face_length_ratio: [1.158, 1.293]
+    # source: SCUT-FBP5500 AF subset (2000 images)
+    # date: 2026-04-21
+    # n_samples: 1209 (60.45% InsightFace detection success)
+    # engine: InsightFace buffalo_l (landmark_3d_68 + landmark_2d_106)
+    jaw_angle: [100.9, 119.2]
+    cheekbone_prominence: [0.5036, 0.668]
+    eye_tilt: [1.418, 5.878]
+    brow_arch: [0.0247, 0.034]
+    eye_ratio: [0.278, 0.3672]
+    eye_width_ratio: [0.177, 0.191]
+    lip_fullness: [0.0743, 0.1114]
+    nose_bridge_height: [0.467, 0.5292]
+    brow_eye_distance: [0.02, 0.0259]
+    forehead_ratio: [0.411, 0.4732]
+    philtrum_ratio: [0.188, 0.2662]
+    face_length_ratio: [1.2168, 1.408]
 
   male:
-    # TODO(calibration): SCUT-FBP5500 AM 2000장 InsightFace p10-p90 산출 후 채움.
-    # 실행:
-    #   python -m scripts.calibrate_face_stats \
-    #     --subset AM \
-    #     --image-dir ../experiments/scut-fbp5500/SCUT-FBP5500_v2/Images \
-    #     --output ../experiments/scut-fbp5500/calibration_am_insightface.json
-    #
-    # 현재 null placeholder. compute_coordinates(gender="male") 호출 시
-    # CoordinateConfigError 로 조기 실패 — 왜곡된 male 좌표 산출 차단.
-    jaw_angle: null
-    cheekbone_prominence: null
-    eye_tilt: null
-    brow_arch: null
-    eye_ratio: null
-    eye_width_ratio: null
-    lip_fullness: null
-    nose_bridge_height: null
-    brow_eye_distance: null
-    forehead_ratio: null
-    philtrum_ratio: null
-    face_length_ratio: null
+    # source: SCUT-FBP5500 AM subset (2000 images)
+    # date: 2026-04-21
+    # n_samples: 1432 (71.60% InsightFace detection success)
+    # engine: InsightFace buffalo_l (landmark_3d_68 + landmark_2d_106)
+    jaw_angle: [102.6, 121.19]
+    cheekbone_prominence: [0.4601, 0.6269]
+    eye_tilt: [0.131, 4.419]
+    brow_arch: [0.0239, 0.0335]
+    eye_ratio: [0.246, 0.3339]
+    eye_width_ratio: [0.178, 0.191]
+    lip_fullness: [0.0725, 0.1041]
+    nose_bridge_height: [0.483, 0.539]
+    brow_eye_distance: [0.0185, 0.0245]
+    forehead_ratio: [0.393, 0.454]
+    philtrum_ratio: [0.217, 0.274]
+    face_length_ratio: [1.227, 1.41]
 
 # 캘리브레이션 스크립트 산출 영역 (초기: 비어 있음)
 axis_distribution: {}

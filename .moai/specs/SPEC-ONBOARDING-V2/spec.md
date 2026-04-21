@@ -80,6 +80,10 @@ The system SHALL collect three structured fields at onboarding Step 0:
 WHEN the user submits Step 0 form,
 THE system SHALL persist `gender`, `birth_date` to `users` table and `ig_handle` to both `users` and `user_profiles`.
 
+**REQ-ONBD-002a** (Ubiquitous) — D2 contract #1:
+THE `user_profiles` row SHALL be created **at Step 0 submission** (not lazy-created later).
+This guarantees `gender` and `birth_date` are NOT NULL in `user_profiles` by the time Step 1/2/3 execute.
+
 **REQ-ONBD-003** (Unwanted):
 IF `ig_handle` is empty OR `IG_ENABLED=false`,
 THEN the system SHALL skip Step 1 IG fetching and proceed directly to Step 2.
@@ -133,16 +137,23 @@ THE Sia agent SHALL ask "어떻게 불러드릴까요?" as the first message and
 WHEN the user has Apple login with null name AND does not respond to the naming question,
 THE Sia agent SHALL omit 호칭 and maintain 존댓말 throughout the conversation.
 
-**REQ-SIA-006** (Ubiquitous):
-THE conversation session SHALL be stored in Redis with key `sia:session:{conversation_id}`, sliding TTL of 5 minutes (reset on each user message).
+**REQ-SIA-006** (Ubiquitous) — D2 contract #3:
+THE conversation session SHALL be stored in Redis (key `sia:session:{conversation_id}`,
+sliding TTL 5 minutes reset on each user message) **while active**.
+**THE system SHALL NOT write any row to `conversations` DB table during the active phase** —
+Redis is the single source of truth for active sessions.
 
-**REQ-SIA-007** (Event-driven):
+**REQ-SIA-007** (Event-driven) — D2 contract #3:
 WHEN the Redis session TTL expires (5-minute idle),
-THE system SHALL mark the conversation as `status="ended"` and trigger Sonnet extraction in the background.
+THE system SHALL perform the following atomic sequence:
+  1. INSERT new row into `conversations` with `status="ended"`, `messages` = Redis snapshot
+  2. Delete Redis session key
+  3. Trigger Sonnet extraction in background (REQ-EXT-001)
+  4. On extraction success: UPDATE row SET `status="extracted"`, `extraction_result=...`, `extracted_at=NOW()`
 
-**REQ-SIA-008** (Event-driven):
+**REQ-SIA-008** (Event-driven) — D2 contract #3:
 WHEN the user clicks "이만하면 됐어요" OR Sia issues the closing message,
-THE system SHALL end the session immediately and trigger Sonnet extraction.
+THE system SHALL execute the same atomic sequence as REQ-SIA-007 (end → DB insert → Redis delete → extraction trigger).
 
 **REQ-SIA-009** (Event-driven):
 WHEN `turn_count > 50` is reached,
@@ -167,8 +178,18 @@ THE Sia agent SHALL ask 1-2 fallback turns before final storage.
 IF Sonnet extraction fails (API error),
 THE system SHALL retry once and, on second failure, preserve the conversation for manual re-run and notify operations.
 
-**REQ-EXT-005** (Ubiquitous):
-THE extraction result SHALL be persisted to `conversations.extraction_result` (JSONB) AND merged into `user_profiles.structured_fields` (JSONB).
+**REQ-EXT-005** (Ubiquitous) — D2 contract #3:
+THE extraction result SHALL be persisted in this order:
+  1. `conversations.extraction_result` (JSONB) with `status="extracted"`, `extracted_at=NOW()`
+  2. `user_profiles.structured_fields` (JSONB) via shallow merge (not replace — existing
+     manually-edited fields preserved)
+  3. `user_profiles.onboarding_completed = TRUE`
+
+**Status lifecycle** (conversations.status 값 전이):
+  - (Redis only — DB row 없음)
+  - → INSERT `status="ended"` (대화 종료 시점)
+  - → UPDATE `status="extracted"` (Sonnet 성공 시)
+  - → UPDATE `status="failed"` (Sonnet 재시도 최종 실패 시)
 
 ---
 
@@ -241,6 +262,12 @@ THE system SHALL offer optional re-onboarding via a dashboard banner ("Sia와 �
 WHEN the user accepts re-onboarding,
 THE system SHALL preserve `users.onboarding_data` as archive and start fresh v2 flow.
 
+**REQ-MIGRATION-004** (Event-driven) — D2 contract #2:
+WHEN a v1 user accepts re-onboarding AND no `user_profiles` row exists yet,
+THE system SHALL create the `user_profiles` row by copying `users.gender` into
+`user_profiles.gender`. `birth_date` and `ig_handle` are collected fresh in Step 0
+(no v1 equivalent exists).
+
 ---
 
 ### 9. Male Path Compatibility
@@ -271,6 +298,32 @@ THE system SHALL flag the Sia prompt for review (QA trigger per Q7).
 
 **REQ-QUAL-003** (Ubiquitous):
 THE system SHALL track per-field extraction confidence; fields below 0.4 confidence SHALL be surfaced in operations dashboard for prompt tuning.
+
+---
+
+### 11. Schema Validation (Application Layer)
+
+**REQ-SCHEMA-001** (Ubiquitous) — D2 contract #4:
+THE system SHALL validate all JSONB payloads via Pydantic v2 schemas at the
+application layer (read AND write paths). DB-level JSONB constraint 은 없으므로
+모든 shape 보장은 application 에서 수행.
+
+**REQ-SCHEMA-002** (Ubiquitous):
+THE Pydantic schemas SHALL be colocated in `sigak/schemas/user_profile.py` (new module).
+Minimum schema set:
+  - `StructuredFields` — user_profiles.structured_fields 의 8 필드 + confidence
+  - `IgFeedCache` — user_profiles.ig_feed_cache 의 raw + 파싱된 4 필드
+  - `ExtractionResult` — conversations.extraction_result (Sonnet 출력)
+  - `ConversationMessage` — conversations.messages[] 의 개별 메시지
+
+**REQ-SCHEMA-003** (Event-driven):
+WHEN DB row is read for business logic,
+THE system SHALL parse JSONB column via Pydantic `.model_validate()` to guarantee shape.
+
+**REQ-SCHEMA-004** (Event-driven):
+WHEN writing JSONB,
+THE system SHALL construct via Pydantic model then serialize via `.model_dump(mode="json")`
+to prevent schema drift.
 
 ---
 

@@ -477,7 +477,7 @@ CREATE TABLE conversations (
   conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   messages JSONB NOT NULL DEFAULT '[]',          -- 전체 대화 로그
-  status VARCHAR(20) NOT NULL,                   -- active/ended/extracted/failed
+  status VARCHAR(20) NOT NULL,                   -- ended/extracted/failed (active 은 DB에 기록 안 함 — Redis 만)
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ended_at TIMESTAMPTZ,
   extracted_at TIMESTAMPTZ,
@@ -522,12 +522,19 @@ ALTER TABLE users ADD COLUMN ig_handle VARCHAR(50);     -- 편의상 중복 OK (
 -- 마이그레이션 기간 동안 dual-write 후 v3 에서 drop
 ```
 
-### 5-3. Migration 전략
+### 5-3. Migration 전략 (확정 — D2 contract #1, #2)
 
-1. Alembic revision: `v2_add_user_profiles_and_conversations.py`
-2. 배포 직후: 기존 `users.onboarding_completed=TRUE` 유저 → `user_profiles` 시드 (NULL 컬럼 = 재온보딩 유도)
-3. dual-write 기간 (2주): `onboarding/save-step` 엔드포인트 유지, 신규 유저만 대화 flow
-4. v3 release: questionnaire route 제거 + `users.onboarding_data` 컬럼 drop
+1. Alembic revision: `20260426_v2_onboarding_user_profiles_and_conversations.py` (커밋 6a97772)
+2. **user_profiles row 생성 시점**: Step 0 폼 제출 직후 (D2 contract #1)
+   - `gender` + `birth_date` 필수 보장 (NOT NULL 제약)
+   - `ig_handle` 은 nullable (optional 입력)
+   - 이후 Step 1/2/3 에서 동일 row 를 UPDATE (새로운 row 생성 X)
+3. **v1 → v2 재온보딩 시 gender 복사 규칙** (D2 contract #2):
+   - v1 유저가 "Sia와 대화해보기" 배너 클릭 → Step 0 진입
+   - Step 0 제출 시: `user_profiles.gender = users.gender` 복사 (v1 기존 값 유지)
+   - `birth_date`, `ig_handle` 은 Step 0 에서 새로 수집
+4. **dual-read 기간 (2주)**: `onboarding/save-step` 엔드포인트 유지, 신규 유저만 대화 flow
+5. v3 release: questionnaire route 제거 + `users.onboarding_data` 컬럼 drop
 
 ### 5-4. Redis 세션 키 구조 (확정판)
 
@@ -543,6 +550,28 @@ value: session_state JSON (§4-2)
 - Extraction worker: 별도 큐 (BullMQ / Celery / FastAPI BackgroundTasks)
 - Extraction 결과: `conversations.extraction_result` JSONB 로 영속 저장 (§5-1)
 - 세션 종료 후: Redis 키 즉시 삭제 (중복 종료 방지), DB 만 남음
+
+**Conversation 라이프사이클 (확정 — D2 contract #3)**:
+
+```
+[대화 활성]                  → Redis 만 존재, DB row 없음
+   ↓ (5min idle / 명시 종료 / Sia 마무리)
+[대화 종료]                  → atomic sequence:
+                                 1. INSERT conversations row (status="ended")
+                                 2. Redis 키 DELETE
+                                 3. Extraction 백그라운드 큐잉
+   ↓ (Sonnet 4.6 실행)
+[Extraction 성공]             → UPDATE status="extracted", extraction_result=..., extracted_at=NOW()
+                                → user_profiles.structured_fields shallow merge
+                                → user_profiles.onboarding_completed=TRUE
+   or
+[Extraction 실패 (재시도 후)]  → UPDATE status="failed"
+                                → 운영 알림 (Sentry/로그)
+                                → 유저에겐 "조금만 기다려주세요" 노출
+```
+
+→ DB 에 active 상태 row 없음. 크래시 등으로 Redis 손실 시 해당 대화 데이터 전량 소실
+   (onboarding snapshot 특성). Priority 2 에서 DB write-through 고려.
 
 ### 5-5. user_profile Refresh 정책 (확정판)
 
@@ -579,6 +608,94 @@ value: session_state JSON (§4-2)
    - gender / birth_date 는 수정 가능하되 경고 표시
      ("기존 진단은 현재 성별 기준으로 생성됐어요. 성별 변경 시 새 Verdict 권장.")
    - ig_handle 변경 → ig_feed_cache 즉시 재수집
+
+### 5-6. Pydantic Schema 레이어 (D2 contract #4)
+
+**위치**: `sigak/schemas/user_profile.py` (신규 모듈, D2 에서 생성)
+
+**원칙**:
+- 모든 JSONB 컬럼은 DB 제약 대신 **application level Pydantic v2 validation** 으로 shape 보장
+- Read path: DB JSONB → `Model.model_validate(row_dict)` 로 파싱, 실패 시 운영 알림
+- Write path: `Model(...)` 로 구성 → `.model_dump(mode="json")` 로 직렬화 후 INSERT/UPDATE
+- 스키마 변경 시 Pydantic `extra="ignore"` 로 forward-compat (old columns 존재 허용)
+
+**Minimum schema 세트**:
+
+```python
+# sigak/schemas/user_profile.py (D2 작성 예정)
+
+from datetime import datetime
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
+
+
+class ConversationMessage(BaseModel):
+    """conversations.messages[] 개별 엔트리."""
+    role: Literal["user", "assistant"]
+    content: str
+    ts: datetime
+
+
+class StructuredFieldsConfidence(BaseModel):
+    """Sonnet extraction 결과 내 confidence 맵."""
+    desired_image: float = Field(ge=0.0, le=1.0)
+    reference_style: float = Field(ge=0.0, le=1.0)
+    current_concerns: float = Field(ge=0.0, le=1.0)
+    self_perception: float = Field(ge=0.0, le=1.0)
+    lifestyle_context: float = Field(ge=0.0, le=1.0)
+    height: float = Field(ge=0.0, le=1.0)
+    weight: float = Field(ge=0.0, le=1.0)
+    shoulder_width: float = Field(ge=0.0, le=1.0)
+
+
+class StructuredFields(BaseModel):
+    """user_profiles.structured_fields 스키마.
+    대화 추출 8 필드 + confidence. 모든 필드 nullable (conf <0.4 → null).
+    """
+    desired_image: Optional[str] = None
+    reference_style: Optional[str] = None
+    current_concerns: Optional[list[str]] = None
+    self_perception: Optional[str] = None
+    lifestyle_context: Optional[str] = None
+    height: Optional[str] = None           # enum 또는 cm 수치 (예: "163_cm", "165_170")
+    weight: Optional[str] = None
+    shoulder_width: Optional[Literal["narrow", "medium", "wide"]] = None
+    confidence: Optional[StructuredFieldsConfidence] = None
+
+
+class IgFeedProfileBasics(BaseModel):
+    """ig_feed_cache.profile_basics 하위."""
+    username: str
+    profile_picture: Optional[str] = None
+    bio: Optional[str] = None
+    follower_count: int = 0
+    following_count: int = 0
+    post_count: int = 0
+
+
+class IgFeedCache(BaseModel):
+    """user_profiles.ig_feed_cache 스키마."""
+    scope: Literal["full", "public_profile_only"]
+    profile_basics: IgFeedProfileBasics
+    current_style_mood: Optional[list[str]] = None      # IG 기반 태그
+    style_trajectory: Optional[str] = None              # 시간에 따른 변화 요약
+    feed_highlights: Optional[list[str]] = None         # 최근 9-12 포스트 캡션 summary
+    raw: Optional[dict] = None                          # Apify 원본 payload (debug 용)
+    fetched_at: datetime
+
+
+class ExtractionResult(BaseModel):
+    """conversations.extraction_result 스키마 (Sonnet 4.6 출력).
+    StructuredFields + 메타데이터 (fallback_needed 리스트).
+    """
+    fields: StructuredFields
+    fallback_needed: list[str] = Field(default_factory=list)  # 재질문 필요 필드 목록
+```
+
+**검증 책임**:
+- Service layer (`services/user_profiles.py`) 에서 read/write 모두 Pydantic 파싱
+- Route layer 는 이미 검증된 `Model` 인스턴스만 받음 (Depends 주입)
+- 파싱 실패 시 500 + 운영 로그 (유저 에러 메시지 generic)
 
 ---
 

@@ -23,13 +23,46 @@ created: "2026-04-21"
 **Deliverable**: migration 파일 + Apify key. Dev DB 반영 완료.
 **Review gate**: migration SQL 승인.
 
-### D2 (2026-04-23) — IG 수집 + Profile CRUD
-- `sigak/services/ig_scraper.py` (Apify 래퍼, feature flag, 10s timeout, 폴백)
-- `sigak/services/user_profiles.py` (CRUD: get_profile, upsert_profile, refresh_ig, restart_conversation)
-- 유닛 테스트: Apify mock 응답 / 성공 / 비공개 / 실패 / timeout
+### D2 (2026-04-23) — IG 수집 + Profile CRUD + Schemas
 
-**Deliverable**: 2 서비스 모듈 + 유닛 테스트.
-**Review gate**: IG 수집 스키마 확정.
+**신규 파일 (4)**:
+- `sigak/schemas/__init__.py`
+- `sigak/schemas/user_profile.py` (Pydantic v2 schemas — D2 contract #4)
+  - `StructuredFields`, `IgFeedCache`, `ExtractionResult`, `ConversationMessage`
+  - 모든 JSONB 컬럼의 application-level validation
+- `sigak/services/ig_scraper.py` (Apify 래퍼, feature flag, 10s timeout, 폴백)
+- `sigak/services/user_profiles.py` (CRUD)
+
+**`services/user_profiles.py` 필수 함수**:
+```python
+def create_profile_on_onboarding(db, user_id, gender, birth_date, ig_handle=None) -> UserProfile
+  # D2 contract #1: Step 0 제출 직후 row 생성 (gender/birth_date NOT NULL 보장)
+
+def migrate_v1_user_to_v2(db, user_id, birth_date, ig_handle=None) -> UserProfile
+  # D2 contract #2: users.gender 복사 + Step 0 신규 필드
+
+def get_profile(db, user_id) -> Optional[UserProfile]
+def upsert_ig_feed_cache(db, user_id, cache: IgFeedCache, status: str) -> None
+def merge_structured_fields(db, user_id, fields: StructuredFields) -> None  # shallow merge
+def refresh_ig(db, user_id) -> None  # 강제 재수집
+def restart_conversation(db, user_id) -> None  # structured_fields 초기화
+```
+
+**conversation 라이프사이클 구현 (D2 contract #3)**:
+- 아직 route 단 구현은 D3. D2 는 util만:
+  - `services/conversations.py` (신규):
+    - `create_ended_conversation(db, user_id, conv_id, messages) -> None`
+      (INSERT with status="ended", messages=Redis snapshot)
+    - `mark_extracted(db, conv_id, result: ExtractionResult) -> None`
+    - `mark_failed(db, conv_id) -> None`
+
+**유닛 테스트**:
+- Apify mock 응답 (성공 / 비공개 / 실패 / timeout)
+- `migrate_v1_user_to_v2` 에서 users.gender 복사 검증
+- Pydantic schema valid / invalid payload
+
+**Deliverable**: 4 모듈 + 유닛 테스트.
+**Review gate**: IG 수집 스키마 + Pydantic 스키마 확정.
 
 ### D3 (2026-04-24) — Sia 대화 엔드포인트
 - `sigak/routes/sia.py` 신규:

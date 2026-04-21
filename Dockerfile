@@ -30,12 +30,11 @@ RUN mkdir -p /app/models && \
 COPY sigak/ ./
 
 ENV PYTHONPATH=/app
-# alembic upgrade head 를 uvicorn 앞에 실행 — 새 migration 자동 반영.
-# 실패 시 &&로 uvicorn 부팅 차단 → Railway restart 루프가 health check 실패로 가시화.
-# DATABASE_URL은 Railway 대시보드에서 주입되며 alembic/env.py 가 런타임 로드.
-# `python -m alembic` 로 호출 — console script PATH 이슈 방지 (이전 배포에서
-# `/bin/sh: 1: alembic: not found` 재현됐음).
-CMD echo "[startup] alembic upgrade head" && \
-    python -m alembic upgrade head && \
-    echo "[startup] migrations applied, starting uvicorn" && \
+# ⚠️ TEMP (recovery mode): alembic 실패해도 uvicorn 부팅.
+# DB 스키마와 alembic_version 이 수동 ALTER로 디싱크된 상태를 진단·복구하기
+# 위한 일시 완화. `/api/v1/_debug/schema-state` 호출로 상태 확인 후,
+# 수동 복구 완료되면 &&로 다시 조여야 함. TODO(ops): 복구 종료 후 strict 복원.
+CMD echo "[startup] alembic upgrade head (non-blocking recovery mode)" ; \
+    python -m alembic upgrade head ; \
+    echo "[startup] continuing to uvicorn regardless of migration exit" ; \
     uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

@@ -15,6 +15,54 @@ from deps import db_session, get_current_user
 router = APIRouter(prefix="/api/v1/_debug", tags=["_debug"])
 
 
+@router.get("/schema-state")
+def schema_state(
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """프로덕션 DB 스키마와 alembic_version의 현재 상태 스냅샷.
+
+    alembic upgrade 실패가 "이미 있는 컬럼을 또 추가" 패턴일 때 복구 케이스
+    판정용. alembic_version이 DB에 기록한 상태와 실제 스키마 상태의 갭을
+    한 눈에 보기.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    alembic_row = db.execute(text("SELECT version_num FROM alembic_version")).first()
+    alembic_version = alembic_row.version_num if alembic_row else None
+
+    probe = db.execute(
+        text(
+            "SELECT "
+            "  EXISTS(SELECT 1 FROM information_schema.columns "
+            "         WHERE table_name='users' AND column_name='consent_completed') AS u_consent_completed, "
+            "  EXISTS(SELECT 1 FROM information_schema.columns "
+            "         WHERE table_name='users' AND column_name='consent_data') AS u_consent_data, "
+            "  EXISTS(SELECT 1 FROM information_schema.columns "
+            "         WHERE table_name='users' AND column_name='sigak_report_released') AS u_sigak_report, "
+            "  EXISTS(SELECT 1 FROM information_schema.columns "
+            "         WHERE table_name='verdicts' AND column_name='diagnosis_unlocked') AS v_diagnosis_unlocked, "
+            "  EXISTS(SELECT 1 FROM information_schema.columns "
+            "         WHERE table_name='verdicts' AND column_name='gold_reading') AS v_gold_reading, "
+            "  EXISTS(SELECT 1 FROM information_schema.tables "
+            "         WHERE table_name='pi_reports') AS t_pi_reports"
+        )
+    ).first()
+
+    return {
+        "alembic_version": alembic_version,
+        "columns": {
+            "users.consent_completed": bool(probe.u_consent_completed),
+            "users.consent_data": bool(probe.u_consent_data),
+            "users.sigak_report_released": bool(probe.u_sigak_report),
+            "verdicts.diagnosis_unlocked": bool(probe.v_diagnosis_unlocked),
+            "verdicts.gold_reading": bool(probe.v_gold_reading),
+            "pi_reports_table_exists": bool(probe.t_pi_reports),
+        },
+    }
+
+
 @router.get("/verdict-dump")
 def verdict_dump(
     user: dict = Depends(get_current_user),

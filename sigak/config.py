@@ -23,6 +23,17 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-4-20250514"
     llm_max_tokens: int = 4096
 
+    # ── LLM v2 (Sia 대화 + extraction, Priority 1) ──
+    anthropic_model_haiku: str = "claude-haiku-4-5-20251001"   # Sia 대화 (턴당)
+    anthropic_model_sonnet: str = "claude-sonnet-4-6"          # Sonnet extraction (대화 종료 후 일괄)
+
+    # ── IG 피드 수집 (Apify, Priority 1 Step 1) ──
+    ig_enabled: bool = False                                    # MVP 초기 False. Apify 안정화 후 True
+    apify_api_key: str = ""                                     # Apify Instagram Profile Scraper Actor 키
+    ig_fetch_timeout: float = 10.0                              # 초. 초과 시 failed 처리
+    apify_actor_id: str = "apify~instagram-scraper"             # Actor slug (tilde URL-safe)
+    ig_refresh_days: int = 14                                   # 2주 stale 기준 (user_profiles.ig_fetched_at)
+
     # ── Auth (MVP v1.1 JWT) ──
     jwt_secret: str = ""                         # HS256 signing key. Must be 32+ random bytes in prod.
     jwt_expiry_days: int = 7                     # No refresh token for MVP. Rotating secret invalidates all sessions.

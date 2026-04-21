@@ -43,6 +43,9 @@ COST_MONTHLY_REPORT = 30        # monthly re-run; endpoint TBD
 COST_DIAGNOSIS_UNLOCK = 10      # verdict 단위 진단 해제 — /verdicts/{id}/unlock-diagnosis
 COST_PI_UNLOCK = 50             # 유저 1회 영속 PI 해제 — /pi/unlock
 
+# v2 Verdict 2.0 (2026-04-27, SPEC-ONBOARDING-V2 REQ-VERDICT-003)
+COST_VERDICT_V2_UNLOCK = 10     # full_content 해제 — /api/v2/verdict/{id}/unlock
+
 
 # ─────────────────────────────────────────────
 #  DB ops
@@ -56,6 +59,7 @@ KIND_CONSUME_MONTHLY_REPORT = "consume_monthly_report"
 KIND_CONSUME_OTHER = "consume_other"
 KIND_CONSUME_DIAGNOSIS = "consume_diagnosis"     # v2 BM
 KIND_CONSUME_PI = "consume_pi"                   # v2 BM
+KIND_CONSUME_VERDICT_V2 = "consume_verdict_v2"   # v2 BM (Verdict 2.0 full unlock)
 KIND_REFUND = "refund"
 KIND_ADMIN_GRANT = "admin_grant"
 

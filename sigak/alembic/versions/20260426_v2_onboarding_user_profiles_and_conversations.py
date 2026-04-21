@@ -26,7 +26,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 
-revision: str = "20260426_v2_onboarding_user_profiles_and_conversations"
+revision: str = "20260426_v2_onboarding"
 down_revision = "20260425_verdicts_gold_reading"
 branch_labels = None
 depends_on = None

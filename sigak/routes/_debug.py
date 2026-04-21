@@ -4,8 +4,11 @@
 Issue tracker: "remove _debug endpoint"
 
 모든 엔드포인트는 JWT 인증 필수이며 본인 데이터만 반환. 서드파티/익명 접근 불가.
+schema-repair 는 추가로 X-Admin-Key 헤더 검증 (ALTER TABLE/UPDATE 수행).
 """
-from fastapi import APIRouter, Depends, HTTPException
+import os
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import text
 
 from db import User as DBUser
@@ -60,6 +63,54 @@ def schema_state(
             "verdicts.gold_reading": bool(probe.v_gold_reading),
             "pi_reports_table_exists": bool(probe.t_pi_reports),
         },
+    }
+
+
+@router.post("/schema-repair")
+def schema_repair(
+    user: dict = Depends(get_current_user),
+    x_admin_key: str = Header(None, alias="X-Admin-Key"),
+    db=Depends(db_session),
+):
+    """Case B 복구: gold_reading 컬럼만 누락 + alembic_version 뒤처진 상태.
+
+    실행 SQL (단일 트랜잭션):
+      ALTER TABLE verdicts ADD COLUMN IF NOT EXISTS gold_reading TEXT;
+      UPDATE alembic_version SET version_num = '20260425_verdicts_gold_reading';
+
+    JWT + X-Admin-Key 둘 다 필요. ADMIN_KEY 미설정 env 에서는 무조건 403.
+    """
+    expected = os.getenv("ADMIN_KEY", "")
+    if not expected or x_admin_key != expected:
+        raise HTTPException(403, "admin key required")
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    before_row = db.execute(text("SELECT version_num FROM alembic_version")).first()
+    version_before = before_row.version_num if before_row else None
+
+    target_version = "20260425_verdicts_gold_reading"
+    try:
+        db.execute(
+            text("ALTER TABLE verdicts ADD COLUMN IF NOT EXISTS gold_reading TEXT")
+        )
+        db.execute(
+            text("UPDATE alembic_version SET version_num = :v"),
+            {"v": target_version},
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"repair failed: {e}")
+
+    after_row = db.execute(text("SELECT version_num FROM alembic_version")).first()
+    version_after = after_row.version_num if after_row else None
+
+    return {
+        "repaired": True,
+        "column_added": "verdicts.gold_reading",
+        "alembic_version_before": version_before,
+        "alembic_version_after": version_after,
     }
 
 

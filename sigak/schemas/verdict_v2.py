@@ -67,15 +67,33 @@ class VerdictNumbers(_BaseSchema):
     alignment_with_profile: Optional[str] = None  # 예: "일치" / "부분 일치" / "상충"
 
 
+class CtaPi(_BaseSchema):
+    """피드 분석 말미 '시각이 본 나' 진입 CTA (D5 Phase 3).
+
+    SPEC-ONBOARDING-V2 REQ-VERDICT-004 / REQ-NAMING-004.
+
+    Rules:
+    - "PI" 단일 단어 유저 노출 금지 → "시각이 본 나" 로 표기
+    - Sia 톤 서술형 정중체 유지 ("~합니다" / "~있습니다")
+    - 판정어 / 평가어 / 확인 요청 금지 (상위 Hard Rules 동일)
+    - headline: 30자 이내 훅 문구
+    - body: 1-2 문장, 피드 분석에서 드러난 갭을 '시각이 본 나' 로 잇는 교차 설명
+    - action_label: 20자 이내 버튼 카피 (예: "시각이 본 나 열기")
+    """
+    headline: str = Field(min_length=1, max_length=30)
+    body: str = Field(min_length=1, max_length=200)
+    action_label: str = Field(min_length=1, max_length=20)
+
+
 class FullContent(_BaseSchema):
     """결제 후 노출. photo_insights 는 업로드 사진 수와 일치."""
     verdict: str = Field(min_length=1, max_length=1500)
     photo_insights: list[PhotoInsight] = Field(default_factory=list)
     recommendation: Recommendation
     numbers: VerdictNumbers = Field(default_factory=VerdictNumbers)
-    # PI CTA (클로징) — Priority 1 은 카피 보류 (Q8 deferred to Priority 2)
-    # full_content 내부 embedded CTA 자리 확보. D5 Phase 3 에서 채움.
-    cta_pi: Optional[dict] = None
+    # '시각이 본 나' CTA — D5 Phase 3 에서 Sonnet 이 verdict 와 함께 동시 생성.
+    # Optional 로 둬 Priority 2 이후 PI 리포트 구조 변경 시 후방호환 여지 확보.
+    cta_pi: Optional[CtaPi] = None
 
 
 # ─────────────────────────────────────────────

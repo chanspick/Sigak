@@ -124,9 +124,35 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
       "dominant_tone_pct": 0-100,
       "chroma_multiplier": 0.0-2.0,
       "alignment_with_profile": "일치 | 부분 일치 | 상충"
+    },
+    "cta_pi": {
+      "headline": "30자 이내 훅. '시각이 본 나' 를 자연 연결",
+      "body": "1-2 문장. 피드 분석에서 드러난 갭을 '시각이 본 나' 가 얼굴·비율·컬러 레벨로 한 단계 더 드러낸다는 교차 설명.",
+      "action_label": "20자 이내 버튼 카피 (예: '시각이 본 나 열기')"
     }
   }
 }
+
+[cta_pi 작성 규칙 — Sia 톤 + 용어 안전]
+- "시각이 본 나" 라는 고유 명사로 노출 (유저에겐 우리 제품 이름).
+- "PI" / "Personal Image" 영문 단일 단어 노출 금지.
+- 판정어 / 평가어 / 확인 요청 금지 (상위 Hard Rules 동일).
+- headline 은 강권/명령 아닌 제시형 (예: "시각이 본 나, 같이 살펴보시겠습니까" ❌
+  대신 "피드 분석 너머 얼굴 단위까지 이어집니다" 류).
+- body 는 verdict 결과 (alignment / 갭 / 추구미 방향) 를 한 문장으로 짚고,
+  "시각이 본 나" 가 어떤 추가 정보를 주는지 한 문장으로 연결.
+
+✅ cta_pi 허용 예시:
+  {
+    "headline": "피드 분석에서 본 톤, 얼굴 단위로 이어집니다",
+    "body": "평소 추구미와 피드 분위기의 맞물림은 보셨습니다. 시각이 본 나 에서는 얼굴 비율·언더톤·라인까지 같은 방향인지 확인하실 수 있습니다.",
+    "action_label": "시각이 본 나 열기"
+  }
+
+❌ cta_pi 금지 예시:
+  - "PI 리포트로 이동하세요" (PI 단어 노출 + 명령형)
+  - "판정 결과를 자세히 보시겠습니까?" (판정 사용 + 확인 요청)
+  - "당신의 이미지를 멋지게 분석해드립니다" (평가 + 확인 요청)
 
 [preview 작성 규칙 — hook 효과 엄수]
 ✅ hook_line 허용:
@@ -293,7 +319,10 @@ USER_FACING_TEXT_FIELDS: tuple[str, ...] = (
 
 
 def _collect_user_facing_text(result: VerdictV2Result) -> str:
-    """Hard Rules 검증 대상 — 유저 노출 텍스트 전량 합체."""
+    """Hard Rules 검증 대상 — 유저 노출 텍스트 전량 합체.
+
+    D5 Phase 3: cta_pi (headline/body/action_label) 포함.
+    """
     parts: list[str] = []
     parts.append(result.preview.hook_line)
     parts.append(result.preview.reason_summary)
@@ -305,6 +334,11 @@ def _collect_user_facing_text(result: VerdictV2Result) -> str:
     parts.append(rec.style_direction)
     parts.append(rec.next_action)
     parts.append(rec.why)
+    cta = result.full_content.cta_pi
+    if cta is not None:
+        parts.append(cta.headline)
+        parts.append(cta.body)
+        parts.append(cta.action_label)
     return "\n".join(parts)
 
 

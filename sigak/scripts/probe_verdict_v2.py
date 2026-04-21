@@ -1,4 +1,4 @@
-"""Verdict 2.0 live probe with Sonnet 4.6 vision (Priority 1 D5 Phase 2).
+"""Verdict 2.0 live probe with Sonnet 4.6 vision (Priority 1 D5 Phase 2~3).
 
 실 Sonnet 4.6 vision 호출 3 시나리오:
   1photo   — 사진 1장 (정면 얼굴)
@@ -7,17 +7,25 @@
 
 비용 고지:
   Sonnet 4.6 vision ~$0.075/call × 3 = ~$0.23
-  D5 Phase 2 검수 1회 용도.
+  D5 Phase 2/3 검수.
 
 사용:
     cd sigak
     export ANTHROPIC_API_KEY=sk-ant-...
-    python scripts/probe_verdict_v2.py                      # 3 시나리오 전수
-    python scripts/probe_verdict_v2.py --scenario 3photos   # 단일
+    python scripts/probe_verdict_v2.py                                  # AM 3 시나리오
+    python scripts/probe_verdict_v2.py --scenario 3photos               # 단일 시나리오
+    python scripts/probe_verdict_v2.py --scenario 1photo --gender af    # Flag 1 검증용
 
 Fixture 이미지:
-  SCUT-FBP5500 AM 샘플 재사용 (D3 probe 와 동일 경로).
+  SCUT-FBP5500 AM (Asian Male) 또는 AF (Asian Female) 샘플 재사용.
+  --gender am (default) / af 로 성별 전환.
   base64 인코딩 후 Sonnet 에 전송.
+
+Flag 1 검증 (2026-04-21):
+  Phase 2 probe 에서 AM 이미지 + female profile → alignment="상충"은
+  성별 구조 mismatch 때문. --gender af 로 female 이미지 + female profile
+  재시도 시 alignment 가 "일치"/"부분 일치" 로 바뀌는지 확인하면
+  prompt 편향 검증 완료.
 """
 from __future__ import annotations
 
@@ -36,13 +44,19 @@ from services.sia_validators import find_violations
 
 
 # ─────────────────────────────────────────────
-#  Image fixtures — SCUT AM 샘플
+#  Image fixtures — SCUT AM / AF 샘플
 # ─────────────────────────────────────────────
 
 SCUT_IMAGE_DIR = Path(__file__).resolve().parent.parent.parent / "experiments" / "scut-fbp5500" / "SCUT-FBP5500_v2" / "Images"
 
 AM_CANDIDATES = ["AM1.jpg", "AM2.jpg", "AM5.jpg", "AM10.jpg", "AM20.jpg",
                  "AM50.jpg", "AM100.jpg", "AM200.jpg", "AM500.jpg", "AM1000.jpg"]
+
+AF_CANDIDATES = ["AF1.jpg", "AF2.jpg", "AF5.jpg", "AF10.jpg", "AF20.jpg",
+                 "AF50.jpg", "AF100.jpg", "AF200.jpg", "AF500.jpg", "AF1000.jpg"]
+
+# 현재 실행에서 선택된 후보 리스트. main() 에서 --gender 로 세팅.
+_ACTIVE_CANDIDATES: list[str] = AM_CANDIDATES
 
 
 def _load_photo_as_base64(filename: str) -> dict:
@@ -56,9 +70,9 @@ def _load_photo_as_base64(filename: str) -> dict:
 
 
 def _load_n_photos(n: int) -> list[dict]:
-    """AM*.jpg 에서 처음 n 장 로드."""
+    """_ACTIVE_CANDIDATES 에서 처음 n 장 로드."""
     photos = []
-    for fname in AM_CANDIDATES[:n]:
+    for fname in _ACTIVE_CANDIDATES[:n]:
         photos.append(_load_photo_as_base64(fname))
     if len(photos) != n:
         raise RuntimeError(f"requested {n} photos, loaded {len(photos)}")
@@ -155,6 +169,11 @@ def _collect_user_text(result: VerdictV2Result) -> str:
     parts.append(rec.style_direction)
     parts.append(rec.next_action)
     parts.append(rec.why)
+    cta = result.full_content.cta_pi
+    if cta is not None:
+        parts.append(cta.headline)
+        parts.append(cta.body)
+        parts.append(cta.action_label)
     return "\n".join(parts)
 
 
@@ -192,6 +211,26 @@ def audit(name: str, expected_photos: int, result: VerdictV2Result) -> None:
     print(f"\n  === numbers ===")
     print(f"  {fc.numbers.model_dump_json()}")
 
+    # cta_pi (D5 Phase 3)
+    cta = fc.cta_pi
+    if cta is not None:
+        print(f"\n  === cta_pi (시각이 본 나 CTA) ===")
+        print(f"  headline     [{len(cta.headline)}자]: {cta.headline}")
+        print(f"  body         [{len(cta.body)}자]: {cta.body}")
+        print(f"  action_label [{len(cta.action_label)}자]: {cta.action_label}")
+        # PI 단어 유출 여부 (소프트 체크 — validator 미포함)
+        combined_cta = f"{cta.headline} {cta.body} {cta.action_label}"
+        pi_literal_hits = [
+            tok for tok in combined_cta.split()
+            if tok.strip(".,!?()[]{}:;\"'") in ("PI", "pi")
+        ]
+        if pi_literal_hits:
+            print(f"  ⚠ PI 단어 유출: {pi_literal_hits}")
+        else:
+            print(f"  ✓ PI 단어 미유출")
+    else:
+        print(f"\n  ⚠ cta_pi 누락 — Sonnet 이 cta_pi 섹션 미생성")
+
     # Validation
     print(f"\n  === Hard Rules 검증 ===")
     combined = _collect_user_text(result)
@@ -224,11 +263,20 @@ def audit(name: str, expected_photos: int, result: VerdictV2Result) -> None:
 # ─────────────────────────────────────────────
 
 def main():
+    global _ACTIVE_CANDIDATES
+
     parser = argparse.ArgumentParser(description="Verdict 2.0 live probe (Sonnet vision)")
     parser.add_argument(
         "--scenario",
         default="all",
         choices=["1photo", "3photos", "10photos", "all"],
+    )
+    parser.add_argument(
+        "--gender",
+        default="am",
+        choices=["am", "af"],
+        help="SCUT 샘플 성별. am=Asian Male, af=Asian Female. "
+             "Flag 1 검증 시 'af' 로 female profile 과 매칭된 케이스 실증.",
     )
     args = parser.parse_args()
 
@@ -240,8 +288,14 @@ def main():
         print(f"ERROR: SCUT image dir not found: {SCUT_IMAGE_DIR}")
         sys.exit(1)
 
+    # --gender 선택 반영
+    _ACTIVE_CANDIDATES = AF_CANDIDATES if args.gender == "af" else AM_CANDIDATES
+    gender_label = "Asian Female (AF)" if args.gender == "af" else "Asian Male (AM)"
+
     print("=" * 60)
     print("  VERDICT 2.0 LIVE PROBE — Sonnet 4.6 vision")
+    print(f"  샘플: {gender_label}")
+    print(f"  Profile gender (mock): {MOCK_USER_PROFILE['gender']}")
     print(f"  비용: Sonnet vision call × {'3' if args.scenario == 'all' else '1'}")
     print("=" * 60)
 

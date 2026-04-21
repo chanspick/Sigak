@@ -141,5 +141,92 @@
       "image_front": "/assets/reference/hair/back-front/h-b13.jpg",
       "image_rear": "/assets/reference/hair/back-rear/h-b13.jpg"
     }
-  ]
+  ],
+  "male_styles": [
+    {
+      "id": "h-m01",
+      "gender": "male",
+      "name_kr": "애즈펌",
+      "name_en": "Azz Perm",
+      "source_file": "1 애즈펌 - 편집함.jpg"
+    },
+    {
+      "id": "h-m02",
+      "gender": "male",
+      "name_kr": "크롭컷",
+      "name_en": "Crop Cut",
+      "source_file": "2 크롭컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m03",
+      "gender": "male",
+      "name_kr": "가르마펌",
+      "name_en": "Side-Part Perm",
+      "source_file": "3 가르마펌 - 편집함.jpg"
+    },
+    {
+      "id": "h-m04",
+      "gender": "male",
+      "name_kr": "세미 리프컷",
+      "name_en": "Semi Leaf Cut",
+      "source_file": "4 세미 리프컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m05",
+      "gender": "male",
+      "name_kr": "가일컷",
+      "name_en": "Gile Cut",
+      "source_file": "가일컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m06",
+      "gender": "male",
+      "name_kr": "리프컷",
+      "name_en": "Leaf Cut",
+      "source_file": "리프컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m07",
+      "gender": "male",
+      "name_kr": "소프트 투블럭 댄디컷",
+      "name_en": "Soft Two-Block Dandy Cut",
+      "source_file": "소프트 투블럭 댄디컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m08",
+      "gender": "male",
+      "name_kr": "쉐도우펌",
+      "name_en": "Shadow Perm",
+      "source_file": "쉐도우펌 - 편집함.jpg"
+    },
+    {
+      "id": "h-m09",
+      "gender": "male",
+      "name_kr": "시스루 댄디컷",
+      "name_en": "See-Through Dandy Cut",
+      "source_file": "시스루 댄디컷 - 편집함.png"
+    },
+    {
+      "id": "h-m10",
+      "gender": "male",
+      "name_kr": "아이비리그컷",
+      "name_en": "Ivy League Cut",
+      "source_file": "아이비리그컷 - 편집함.jpg"
+    },
+    {
+      "id": "h-m11",
+      "gender": "male",
+      "name_kr": "장발 웨이브",
+      "name_en": "Long Wave",
+      "source_file": "장발 웨이브 - 편집함.jpg"
+    },
+    {
+      "id": "h-m12",
+      "gender": "male",
+      "name_kr": "중발 묶머",
+      "name_en": "Medium Tied Hair",
+      "source_file": "중발 묶머 - 편집함 - 편집함.jpg"
+    }
+  ],
+  "_male_styles_todo": "Phase B 백로그: 각 항목에 volume(low/medium/high), texture(straight/wave/curl), age_fit(fresh/mature), hair_length(short/medium/long) 태그 추가. source_file은 sigak/data/anchors/hair/male_hair/ 기준 상대 경로. 웹 serving path는 미확정 (후속 엔드포인트 또는 public asset 복사 필요)."
 }

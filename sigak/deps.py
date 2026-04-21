@@ -50,6 +50,7 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
             "kakao_id": user.kakao_id or "",
             "email": user.email or "",
             "name": user.name or "",
+            "gender": user.gender or "female",
             "tier": user.tier or "standard",
         }
     finally:
@@ -87,6 +88,7 @@ def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[d
             "kakao_id": user.kakao_id or "",
             "email": user.email or "",
             "name": user.name or "",
+            "gender": user.gender or "female",
             "tier": user.tier or "standard",
         }
     finally:

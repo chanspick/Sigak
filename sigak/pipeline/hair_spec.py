@@ -12,7 +12,13 @@ Pipeline:
     → LLM이 WHY 텍스트 생성 (이 함수 밖에서)
 """
 
-from pipeline.hair_styles import HAIR_STYLES, get_front_styles, get_back_styles
+from pipeline.hair_styles import (
+    HAIR_STYLES,
+    get_front_styles,
+    get_back_styles,
+    get_etc_styles,
+    get_complete_styles,
+)
 from pipeline.hair_rules import (
     FEATURE_MODIFIERS,
     LENGTH_CONSTRAINTS,
@@ -421,6 +427,57 @@ def compute_global_conditions(active_features: list[str], interview: dict) -> di
 # 5. Main Entry Point
 # ============================================================
 
+def generate_mono_combos(
+    complete_scores: list,
+    global_conditions: dict,
+    top_n: int = 3,
+) -> list:
+    """Male: TOP N 단일 complete cut. Female 의 front×back 조합 구조와 호환되도록
+    back_id=None 으로 반환하여 downstream (_build_hair_recommendation) 이 동일하게 처리."""
+    combos = []
+    top = sorted(complete_scores, key=lambda x: x["score"], reverse=True)[:top_n]
+
+    for rank, s in enumerate(top, start=1):
+        # WHY
+        why_parts = []
+        for m in s.get("modifiers_applied", []):
+            if m["mod"] > 0 and m["reason"]:
+                why_parts.append(m["reason"])
+        why_text = ". ".join(why_parts[:3]) + "." if why_parts else ""
+
+        # Salon instruction
+        salon_parts = []
+        lc = s.get("length_constraint")
+        if lc and lc.get("salon_note"):
+            salon_parts.append(lc["salon_note"])
+        for gc in global_conditions.values():
+            if gc.get("required") and gc.get("salon_instruction"):
+                salon_parts.append(gc["salon_instruction"])
+        salon_text = ". ".join(salon_parts) + "." if salon_parts else ""
+
+        # Trend tag — male styles not yet in HAIR_FRONT_TRENDS/HAIR_BACK_TRENDS.
+        # 값 있으면 front/back 동일 id 로 조회 시도 (현재는 미수록 → None 예상).
+        trend_tag = _get_trend_tag(s["style_id"], s["style_id"])
+
+        combos.append({
+            "front_id": s["style_id"],
+            "front_name": s["name_kr"],
+            "front_score": s["score"],
+            "back_id": None,
+            "back_name": None,
+            "back_score": None,
+            "cross_effect": 0,
+            "cross_reasons": [],
+            "combined_score": round(s["score"], 3),
+            "why": why_text,
+            "salon_instruction": salon_text,
+            "trend": trend_tag,
+            "rank": rank,
+        })
+
+    return combos
+
+
 def build_hair_spec(face_features: dict, interview: dict,
                     gap: dict | None = None,
                     gender: str = "female") -> dict:
@@ -437,10 +494,11 @@ def build_hair_spec(face_features: dict, interview: dict,
         {
             "cheat_sheet": str,
             "global_conditions": {...},
-            "front_styles": [...],
-            "back_styles": [...],
-            "etc_styles": [...],
-            "top_combos": [...],
+            "front_styles": [...],      # female: 8 scored / male: []
+            "back_styles": [...],       # female: 13 scored / male: []
+            "etc_styles": [...],        # female: 0~3 scored / male: []
+            "complete_styles": [...],   # female: []       / male: 12 scored
+            "top_combos": [...],        # 3 조합 (female: front×back / male: mono)
             "avoid": [...],
             "active_features": [...],
         }
@@ -448,12 +506,16 @@ def build_hair_spec(face_features: dict, interview: dict,
     # Step 1: 활성 feature 추출
     active_features = extract_active_features(face_features, interview)
 
-    # Step 2: 전체 스타일 스코어링
+    # Step 2: gender-filtered 전체 스타일 스코어링
     front_scores = []
     back_scores = []
     etc_scores = []
+    complete_scores = []
 
     for style_id, style in HAIR_STYLES.items():
+        # gender 필터 — 다른 성별 스타일은 skip (silent female default 차단)
+        if style.get("gender", "female") != gender:
+            continue
         if style.get("has_rating") is False:
             continue
 
@@ -461,27 +523,38 @@ def build_hair_spec(face_features: dict, interview: dict,
         if result is None:
             continue
 
-        if style["category"] == "front":
+        cat = style.get("category")
+        if cat == "front":
             front_scores.append(result)
-        elif style["category"] == "back":
+        elif cat == "back":
             back_scores.append(result)
-        elif style["category"] == "etc":
+        elif cat == "etc":
             etc_scores.append(result)
+        elif cat == "complete":
+            complete_scores.append(result)
 
     # Step 3: 정렬
     front_scores.sort(key=lambda x: x["score"], reverse=True)
     back_scores.sort(key=lambda x: x["score"], reverse=True)
     etc_scores.sort(key=lambda x: x["score"], reverse=True)
+    complete_scores.sort(key=lambda x: x["score"], reverse=True)
 
     # Step 4: 글로벌 조건 (combo에서 salon 지시문 생성에 필요)
     global_conditions = compute_global_conditions(active_features, interview)
 
-    # Step 5: TOP 조합
-    top_combos = generate_combos(front_scores, back_scores, global_conditions, top_n=3)
+    # Step 5: TOP 조합 — gender 에 따라 분기
+    if gender == "male":
+        top_combos = generate_mono_combos(complete_scores, global_conditions, top_n=3)
+    else:
+        top_combos = generate_combos(front_scores, back_scores, global_conditions, top_n=3)
 
-    # Step 6: AVOID (score < 0.35)
+    # Step 6: AVOID (score < 0.35) — gender 에 따라 pool 분기
     avoid = []
-    for scored in front_scores + back_scores + etc_scores:
+    if gender == "male":
+        avoid_pool = complete_scores
+    else:
+        avoid_pool = front_scores + back_scores + etc_scores
+    for scored in avoid_pool:
         if scored["score"] < 0.35:
             primary_mod = max(
                 scored["modifiers_applied"],
@@ -507,6 +580,7 @@ def build_hair_spec(face_features: dict, interview: dict,
         "front_styles": front_scores,
         "back_styles": back_scores,
         "etc_styles": etc_scores,
+        "complete_styles": complete_scores,
         "top_combos": top_combos,
         "avoid": avoid,
         "active_features": active_features,

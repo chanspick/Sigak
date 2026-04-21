@@ -1,17 +1,24 @@
 """
 SIGAK Hair Style Catalog
 ========================
-8 앞머리(front) + 13 뒷머리(back) + 3 기타(etc)
-레어리 헤어 보고서 구조 기반, SIGAK 3축 시스템 연동
+Female: 8 앞머리(front) + 13 뒷머리(back) + 3 기타(etc) = 24 styles
+Male:   12 complete styles (h-m01 ~ h-m12)
+
+Gender-aware routing (2026-04-21 Phase B):
+  - 각 style entry 의 `gender` 필드로 female/male 분기
+  - `get_front_styles(gender)` / `get_back_styles(gender)` / `get_etc_styles(gender)`
+    / `get_complete_styles(gender)` 는 gender 파라미터로 pool 선택
+  - build_hair_spec 이 gender 전달받아 필터링
+  - Female 은 front × back 조합 체계, Male 은 단일 complete cut 체계
 
 Each style has:
-- id, category, name_kr, name_en
+- id, category, gender, name_kr, name_en
 - description: 스타일 설명
 - base_score: 0.5 (모든 스타일 동일 출발)
 - curl_intensity: none/light_c/heavy_c/light_s/heavy_s/hippy
 - has_layers: bool
 - image_vector: [러블리, 청순, 도도시크, 우아차분, 개성] (0~1)
-- gaze_effect: {blocks, attracts, diverts, covers, extends}
+- gaze_effect: {blocks, attracts, diverts, covers, extends}  (female only — male 은 현재 미적용)
 """
 
 HAIR_STYLES = {
@@ -316,13 +323,154 @@ HAIR_STYLES = {
 }
 
 
-def get_front_styles():
-    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "front"}
+# ============================================================
+# MALE STYLES (complete cuts) — 12종
+# ============================================================
+# Female 은 front × back 조합 체계이나, 남성 헤어는 cut 단일 체계가 표준.
+# 따라서 category="complete" 단일 범주로 관리.
+#
+# image_vector 는 female 축 [러블리, 청순, 도도시크, 우아차분, 개성] 을 그대로 사용.
+# 남성 전용 축(예: masculine/clean_cut/edgy)은 Phase B 에서 재정의 예정.
+# 현재 값은 각 스타일의 통념적 인상 기반 초기 세트.
+#
+# FEATURE_MODIFIERS (hair_rules.py) 는 h-f*/h-b* female 스타일만 다룸.
+# 남성 스타일은 현재 face_features 기반 스코어 조정이 없음 (base_score 0.5 + image_bonus).
+# 얼굴 특징 교차 스코어링은 Phase B (hair_rules male branch) 에서 추가.
+_MALE_STYLES = {
+    "h-m01": {
+        "id": "h-m01", "category": "complete", "gender": "male",
+        "name_kr": "애즈펌", "name_en": "Azz Perm",
+        "description": "굵은 웨이브의 중단발 펌. 자연스럽고 여유있는 인상.",
+        "base_score": 0.5, "curl_intensity": "heavy_c", "has_layers": False,
+        "length_category": "mid",
+        "image_vector": [0.5, 0.4, 0.4, 0.5, 0.5],
+    },
+    "h-m02": {
+        "id": "h-m02", "category": "complete", "gender": "male",
+        "name_kr": "크롭컷", "name_en": "Crop Cut",
+        "description": "매우 짧은 cropped 스타일. 깔끔하고 샤프한 인상.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.1, 0.4, 0.8, 0.2, 0.6],
+    },
+    "h-m03": {
+        "id": "h-m03", "category": "complete", "gender": "male",
+        "name_kr": "가르마펌", "name_en": "Parting Perm",
+        "description": "뚜렷한 가르마에 자연 웨이브. 정돈된 격식 있는 인상.",
+        "base_score": 0.5, "curl_intensity": "light_s", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.3, 0.5, 0.5, 0.8, 0.3],
+    },
+    "h-m04": {
+        "id": "h-m04", "category": "complete", "gender": "male",
+        "name_kr": "세미 리프컷", "name_en": "Semi Leaf Cut",
+        "description": "리프컷의 순화 버전. 자연스러운 layer 와 볼륨.",
+        "base_score": 0.5, "curl_intensity": "light_c", "has_layers": True,
+        "length_category": "short",
+        "image_vector": [0.4, 0.5, 0.4, 0.5, 0.4],
+    },
+    "h-m05": {
+        "id": "h-m05", "category": "complete", "gender": "male",
+        "name_kr": "가일컷", "name_en": "Guile Cut",
+        "description": "Street Fighter 가일 캐릭터의 flat-top 스타일. 강한 개성.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.1, 0.2, 0.9, 0.1, 0.9],
+    },
+    "h-m06": {
+        "id": "h-m06", "category": "complete", "gender": "male",
+        "name_kr": "리프컷", "name_en": "Leaf Cut",
+        "description": "나뭇잎 형태 실루엣, 뚜렷한 layer. 자연스럽고 유행 민감.",
+        "base_score": 0.5, "curl_intensity": "light_c", "has_layers": True,
+        "length_category": "short",
+        "image_vector": [0.4, 0.5, 0.5, 0.5, 0.5],
+    },
+    "h-m07": {
+        "id": "h-m07", "category": "complete", "gender": "male",
+        "name_kr": "소프트 투블럭 댄디컷", "name_en": "Soft Two-Block Dandy Cut",
+        "description": "옆면을 살짝 친 투블럭에 부드러운 탑. 댄디한 인상.",
+        "base_score": 0.5, "curl_intensity": "light_s", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.4, 0.5, 0.5, 0.8, 0.3],
+    },
+    "h-m08": {
+        "id": "h-m08", "category": "complete", "gender": "male",
+        "name_kr": "쉐도우펌", "name_en": "Shadow Perm",
+        "description": "자연스러운 그림자 같은 웨이브 펌. 볼륨 강조.",
+        "base_score": 0.5, "curl_intensity": "heavy_s", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.5, 0.4, 0.4, 0.5, 0.5],
+    },
+    "h-m09": {
+        "id": "h-m09", "category": "complete", "gender": "male",
+        "name_kr": "시스루 댄디컷", "name_en": "See-Through Dandy Cut",
+        "description": "시스루 앞머리 + 댄디한 뒷머리 조합. 깔끔하고 세련된 인상.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.4, 0.6, 0.5, 0.8, 0.3],
+    },
+    "h-m10": {
+        "id": "h-m10", "category": "complete", "gender": "male",
+        "name_kr": "아이비리그컷", "name_en": "Ivy League Cut",
+        "description": "클래식한 미국 대학생 스타일. 격식 있고 지적인 인상.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "short",
+        "image_vector": [0.3, 0.6, 0.5, 0.9, 0.2],
+    },
+    "h-m11": {
+        "id": "h-m11", "category": "complete", "gender": "male",
+        "name_kr": "장발 웨이브", "name_en": "Long Wave",
+        "description": "어깨까지 오는 장발에 자연 웨이브. 표현적이고 개성있는 인상.",
+        "base_score": 0.5, "curl_intensity": "heavy_c", "has_layers": True,
+        "length_category": "long",
+        "image_vector": [0.6, 0.4, 0.3, 0.4, 0.8],
+    },
+    "h-m12": {
+        "id": "h-m12", "category": "complete", "gender": "male",
+        "name_kr": "중발 묶머", "name_en": "Mid-Length Tied",
+        "description": "중단발 길이를 뒤로 묶은 스타일. 자유롭고 독특한 인상.",
+        "base_score": 0.5, "curl_intensity": "none", "has_layers": False,
+        "length_category": "mid",
+        "image_vector": [0.4, 0.4, 0.4, 0.4, 0.7],
+    },
+}
+
+HAIR_STYLES.update(_MALE_STYLES)
+
+# Female 엔트리에 gender 필드 자동 할당 (male 은 _MALE_STYLES 에서 명시됨).
+# 기존 h-f*/h-b*/h-e* 24개 스타일을 한 곳에서 gender="female" 부여.
+for _sid, _s in HAIR_STYLES.items():
+    if "gender" not in _s:
+        _s["gender"] = "female"
 
 
-def get_back_styles():
-    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "back"}
+def get_front_styles(gender: str = "female"):
+    """앞머리 스타일. gender='female' 만 해당 (male 은 complete 체계)."""
+    return {
+        k: v for k, v in HAIR_STYLES.items()
+        if v.get("category") == "front" and v.get("gender") == gender
+    }
 
 
-def get_etc_styles():
-    return {k: v for k, v in HAIR_STYLES.items() if v["category"] == "etc"}
+def get_back_styles(gender: str = "female"):
+    """뒷머리 스타일. gender='female' 만 해당."""
+    return {
+        k: v for k, v in HAIR_STYLES.items()
+        if v.get("category") == "back" and v.get("gender") == gender
+    }
+
+
+def get_etc_styles(gender: str = "female"):
+    """기타 스타일 (가르마/포니테일 등). gender='female' 만 해당."""
+    return {
+        k: v for k, v in HAIR_STYLES.items()
+        if v.get("category") == "etc" and v.get("gender") == gender
+    }
+
+
+def get_complete_styles(gender: str = "male"):
+    """단일 cut 스타일. gender='male' 의 12 entries."""
+    return {
+        k: v for k, v in HAIR_STYLES.items()
+        if v.get("category") == "complete" and v.get("gender") == gender
+    }

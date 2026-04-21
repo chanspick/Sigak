@@ -163,16 +163,14 @@ def test_midturn_sentence_count_within_limit():
 
 
 @pytest.mark.parametrize("name,sample", ALL_SAMPLES.items())
-def test_no_long_sentences(name, sample):
-    """AC-SIA-007: 문장당 35자 이내.
+def test_no_long_sentences_hard_limit(name, sample):
+    """AC-SIA-007 (2026-04-22 정책 완화): 절당 ≤60자 hard limit.
 
-    리스트 선택지는 검증 제외 (bullet item — 한 문장이지만 상황 맥락 포함 가능).
+    45-60자 범위는 허용 (warning only). bullet 라인은 이제 각각 독립 절로 측정되므로
+    core/bullet 분리 불필요.
     """
-    core_only = "\n".join(
-        line for line in sample.split("\n") if not line.strip().startswith("- ")
-    )
-    too_long = long_sentences(core_only, max_chars=35)
-    assert not too_long, f"{name}: {too_long}"
+    too_long = long_sentences(sample, max_chars=60)
+    assert not too_long, f"{name}: 60자 초과 절 — {too_long}"
 
 
 # ─────────────────────────────────────────────

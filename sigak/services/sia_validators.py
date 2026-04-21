@@ -186,12 +186,20 @@ def validate_sia_output(text: str) -> None:
 
 # 종결부호 (문장 수 카운트 용 — 마침표/물음표/느낌표만)
 _TERMINAL_RE = re.compile(r"[.!?。！？]\s*")
-# 절 경계 (길이 검증 용 — 종결부호 + em-dash/en-dash)
-_CLAUSE_SPLIT_RE = re.compile(r"[.!?。！？]\s*|\s+[—–]\s+")
+# 절 경계 (길이 검증 용 — 종결부호 + em-dash/en-dash + 개행)
+# 개행은 4지선다 bullet 라인 각각 독립 절로 측정하기 위함 (2차 iteration 후 추가)
+_CLAUSE_SPLIT_RE = re.compile(r"[.!?。！？]\s*|\s+[—–]\s+|\n+")
+
+# 문장 길이 정책 (2차 iteration 후 완화):
+#   ≤ 45자: ideal
+#   46–60자: warning (metric 수집, 차단 X)
+#   > 60자: hard violation (fallback 발동)
+WARN_CHARS = 45
+HARD_CHARS = 60
 
 
 def count_sentences(text: str) -> int:
-    """문장 수 — 종결부호 기준. em-dash 는 단일 문장 내 절 연결로 취급.
+    """문장 수 — 종결부호 기준. em-dash/개행 은 단일 문장 내 절 연결 취급.
 
     AC-SIA-006 검증 (턴당 ≤3 문장, 오프닝 예외 4).
     """
@@ -199,13 +207,40 @@ def count_sentences(text: str) -> int:
     return sum(1 for p in parts if p.strip())
 
 
-def long_sentences(text: str, max_chars: int = 35) -> list[str]:
-    """max_chars 초과 '절' 목록 반환. em-dash 로 분리된 절 각각 체크.
+def _clauses(text: str) -> list[str]:
+    """내부 helper — 마크다운 문자 제거 + 절 단위 분할.
 
-    AC-SIA-007 검증 (절당 ≤35 chars). em-dash 로 이어진 관찰→해석 구조에서
-    각 절이 독립적으로 가독성 있어야 함.
-    markdown 문자 제거 후 측정. 공백 포함 글자 1자 카운트.
+    Bullet 라인 ("- 편안하고 기대고 싶은 인상") 의 하이픈 prefix 는
+    제거 후 내용만 카운트 (18자 → "편안하고 기대고 싶은 인상" 12자).
     """
     cleaned = re.sub(r"[*#>`]", "", text)
-    clauses = _CLAUSE_SPLIT_RE.split(cleaned.strip())
-    return [c.strip() for c in clauses if len(c.strip()) > max_chars]
+    raw = _CLAUSE_SPLIT_RE.split(cleaned.strip())
+    out = []
+    for c in raw:
+        s = c.strip()
+        if not s:
+            continue
+        # bullet prefix 제거: "- 편안하고..." → "편안하고..."
+        if s.startswith("- "):
+            s = s[2:].strip()
+        out.append(s)
+    return out
+
+
+def long_sentences(text: str, max_chars: int = HARD_CHARS) -> list[str]:
+    """max_chars 초과 '절' 목록 반환 — hard violation.
+
+    2026-04-22 정책 완화: 기본 한도 60자 (기존 35자).
+    개행도 절 경계로 취급 (bullet 라인 false positive 제거).
+    markdown 문자 제거 + hyphen bullet prefix 제거 후 측정.
+    """
+    return [c for c in _clauses(text) if len(c) > max_chars]
+
+
+def warn_sentences(text: str, warn_chars: int = WARN_CHARS,
+                   hard_chars: int = HARD_CHARS) -> list[str]:
+    """warn_chars ~ hard_chars 범위 절 목록 — warning only (차단 X).
+
+    45-60자는 "가능하면 분할 권장" 영역. metric 수집용.
+    """
+    return [c for c in _clauses(text) if warn_chars < len(c) <= hard_chars]

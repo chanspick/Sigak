@@ -1,7 +1,11 @@
 {
   "version": "3axis_v1",
   "updated": "2026-04-09",
-  "axes": ["shape", "volume", "age"],
+  "axes": [
+    "shape",
+    "volume",
+    "age"
+  ],
   "similarity_threshold": 0.3,
   "anchor_type": "ai_generated",
   "note_warm": "앵커 이름의 '따뜻한'은 색채 warm tone이 아니라 온화한/편안한 인상을 의미. 색채 warm/cool은 스킨톤 모듈에서만 사용.",
@@ -11,7 +15,11 @@
       "name_en": "Warm First Love",
       "gender": "female",
       "type_id": 1,
-      "coords": {"shape": -0.8, "volume": -0.7, "age": -0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": -0.7,
+        "age": -0.8
+      },
       "quadrant": "Soft Fresh",
       "one_liner": "둥글고 작고 어린 — 순수하고 따뜻한 강아지상",
       "description_kr": "둥근 얼굴형, 부드러운 턱선, 큰 둥근 눈, 도톰한 입술. 작은 이목구비에 어린 비율. 따뜻하고 부드러운 인상.",
@@ -20,9 +28,27 @@
         "작고 온화한 이목구비",
         "어리고 생기 있는 비율"
       ],
-      "aliases": ["타입1", "유형1", "첫사랑", "강아지상", "소프트프레시"],
-      "structural_keywords": ["둥근 얼굴형", "부드러운 턱선", "큰 둥근 눈", "눈꼬리 살짝 처짐", "도톰한 입술", "낮은 코", "짧은 인중"],
-      "image_files": ["1 (1).jpg", "1 (2).jpg", "1 (3).jpg"],
+      "aliases": [
+        "타입1",
+        "유형1",
+        "첫사랑",
+        "강아지상",
+        "소프트프레시"
+      ],
+      "structural_keywords": [
+        "둥근 얼굴형",
+        "부드러운 턱선",
+        "큰 둥근 눈",
+        "눈꼬리 살짝 처짐",
+        "도톰한 입술",
+        "낮은 코",
+        "짧은 인중"
+      ],
+      "image_files": [
+        "1 (1).jpg",
+        "1 (2).jpg",
+        "1 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_1.npy"
     },
     "type_2": {
@@ -30,7 +56,11 @@
       "name_en": "Lovely Doll",
       "gender": "female",
       "type_id": 2,
-      "coords": {"shape": -0.8, "volume": 0.7, "age": -0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": 0.7,
+        "age": -0.8
+      },
       "quadrant": "Soft Fresh",
       "one_liner": "둥글고 크고 어린 — 크고 또렷한 이목구비의 동안",
       "description_kr": "둥근 얼굴형, 부드러운 턱선, 매우 큰 눈, 도톰한 입술, 높은 코. 큰 이목구비에 어린 비율. 화려하지만 사랑스러운 인상.",
@@ -39,9 +69,25 @@
         "화려하지만 부드러운 인상",
         "어리고 사랑스러운 비율"
       ],
-      "aliases": ["타입2", "유형2", "인형상", "큰눈동안", "소프트볼드프레시"],
-      "structural_keywords": ["둥근 얼굴형", "큰 눈", "서늘한 눈매", "도톰한 입술", "오똑한 코"],
-      "image_files": ["2 (1).jpg", "2 (2).jpg", "2 (3).jpg"],
+      "aliases": [
+        "타입2",
+        "유형2",
+        "인형상",
+        "큰눈동안",
+        "소프트볼드프레시"
+      ],
+      "structural_keywords": [
+        "둥근 얼굴형",
+        "큰 눈",
+        "서늘한 눈매",
+        "도톰한 입술",
+        "오똑한 코"
+      ],
+      "image_files": [
+        "2 (1).jpg",
+        "2 (2).jpg",
+        "2 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_2.npy"
     },
     "type_3": {
@@ -49,7 +95,11 @@
       "name_en": "Cool Youthful",
       "gender": "female",
       "type_id": 3,
-      "coords": {"shape": 0.8, "volume": -0.7, "age": -0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": -0.7,
+        "age": -0.8
+      },
       "quadrant": "Sharp Fresh",
       "one_liner": "날카롭고 작고 어린 — 차갑고 어린 고양이상",
       "description_kr": "역삼각형 얼굴, 뾰족한 턱, 날카로운 눈매. 작은 이목구비에 어린 비율. 차갑지만 동안인 시크한 인상.",
@@ -58,9 +108,24 @@
         "작고 절제된 이목구비",
         "어린 비율에 서늘한 눈매"
       ],
-      "aliases": ["타입3", "유형3", "고양이상", "쿨동안", "샤프프레시"],
-      "structural_keywords": ["역삼각형 얼굴", "뾰족한 턱", "날카로운 눈매", "작은 이목구비", "높은 코", "작은 입"],
-      "image_files": ["3 (1).jpg"],
+      "aliases": [
+        "타입3",
+        "유형3",
+        "고양이상",
+        "쿨동안",
+        "샤프프레시"
+      ],
+      "structural_keywords": [
+        "역삼각형 얼굴",
+        "뾰족한 턱",
+        "날카로운 눈매",
+        "작은 이목구비",
+        "높은 코",
+        "작은 입"
+      ],
+      "image_files": [
+        "3 (1).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_3.npy"
     },
     "type_4": {
@@ -68,7 +133,11 @@
       "name_en": "Distinct Energy",
       "gender": "female",
       "type_id": 4,
-      "coords": {"shape": 0.8, "volume": 0.7, "age": -0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": 0.7,
+        "age": -0.8
+      },
       "quadrant": "Sharp Fresh",
       "one_liner": "날카롭고 크고 어린 — 선명하고 화려한 동안",
       "description_kr": "하트형 얼굴, 뾰족한 턱, 또렷한 이목구비, 쌍꺼풀, 높은 코, 두꺼운 입술. 어린 비율이지만 강렬한 존재감.",
@@ -77,9 +146,26 @@
         "또렷하고 에너지 넘치는 인상",
         "어린 비율에 화려한 존재감"
       ],
-      "aliases": ["타입4", "유형4", "또렷동안", "에너지", "샤프볼드프레시"],
-      "structural_keywords": ["하트형 얼굴", "뾰족한 턱", "또렷한 이목구비", "쌍꺼풀", "높은 코", "두꺼운 입술"],
-      "image_files": ["4 (1).jpg", "4 (2).jpg", "4 (3).jpg"],
+      "aliases": [
+        "타입4",
+        "유형4",
+        "또렷동안",
+        "에너지",
+        "샤프볼드프레시"
+      ],
+      "structural_keywords": [
+        "하트형 얼굴",
+        "뾰족한 턱",
+        "또렷한 이목구비",
+        "쌍꺼풀",
+        "높은 코",
+        "두꺼운 입술"
+      ],
+      "image_files": [
+        "4 (1).jpg",
+        "4 (2).jpg",
+        "4 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_4.npy"
     },
     "type_5": {
@@ -87,7 +173,11 @@
       "name_en": "Comfortable Elegance",
       "gender": "female",
       "type_id": 5,
-      "coords": {"shape": -0.8, "volume": -0.7, "age": 0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": -0.7,
+        "age": 0.8
+      },
       "quadrant": "Soft Mature",
       "one_liner": "둥글고 작고 성숙한 — 절제되고 편안한 성숙미",
       "description_kr": "타원형 얼굴, 부드러운 턱선에 길이감. 작은 이목구비에 성숙한 비율. 편안하고 우아한 인상.",
@@ -96,9 +186,26 @@
         "작고 절제된 이목구비",
         "성숙하고 편안한 비율"
       ],
-      "aliases": ["타입5", "유형5", "우아함", "편안한성숙", "소프트매추어"],
-      "structural_keywords": ["타원형 얼굴", "부드러운 턱선", "길이감", "중간 크기 눈", "잔잔한 눈매", "도톰한 입술"],
-      "image_files": ["5 (1).jpg", "5 (2).jpg", "5 (3).jpg"],
+      "aliases": [
+        "타입5",
+        "유형5",
+        "우아함",
+        "편안한성숙",
+        "소프트매추어"
+      ],
+      "structural_keywords": [
+        "타원형 얼굴",
+        "부드러운 턱선",
+        "길이감",
+        "중간 크기 눈",
+        "잔잔한 눈매",
+        "도톰한 입술"
+      ],
+      "image_files": [
+        "5 (1).jpg",
+        "5 (2).jpg",
+        "5 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_5.npy"
     },
     "type_6": {
@@ -106,7 +213,11 @@
       "name_en": "Soft Charisma",
       "gender": "female",
       "type_id": 6,
-      "coords": {"shape": -0.8, "volume": 0.7, "age": 0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": 0.7,
+        "age": 0.8
+      },
       "quadrant": "Soft Mature",
       "one_liner": "둥글고 크고 성숙한 — 온화하면서 압도적인 존재감",
       "description_kr": "둥근~타원형 얼굴, 부드러운 턱선. 크고 깊은 눈, 도톰한 입술, 높은 코. 성숙한 비율에 온화하지만 강한 존재감.",
@@ -115,9 +226,26 @@
         "온화하면서 존재감 있는 인상",
         "성숙하고 카리스마 있는 비율"
       ],
-      "aliases": ["타입6", "유형6", "카리스마", "부드러운존재감", "소프트볼드매추어"],
-      "structural_keywords": ["둥근 얼굴형", "부드러운 턱선", "또렷한 눈매", "짙은 눈썹", "높은 코", "두꺼운 입술"],
-      "image_files": ["6 (1).jpg", "6 (2).jpg", "6 (3).jpg"],
+      "aliases": [
+        "타입6",
+        "유형6",
+        "카리스마",
+        "부드러운존재감",
+        "소프트볼드매추어"
+      ],
+      "structural_keywords": [
+        "둥근 얼굴형",
+        "부드러운 턱선",
+        "또렷한 눈매",
+        "짙은 눈썹",
+        "높은 코",
+        "두꺼운 입술"
+      ],
+      "image_files": [
+        "6 (1).jpg",
+        "6 (2).jpg",
+        "6 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_6.npy"
     },
     "type_7": {
@@ -125,7 +253,11 @@
       "name_en": "Restrained Chic",
       "gender": "female",
       "type_id": 7,
-      "coords": {"shape": 0.8, "volume": -0.7, "age": 0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": -0.7,
+        "age": 0.8
+      },
       "quadrant": "Sharp Mature",
       "one_liner": "날카롭고 작고 성숙한 — 차갑고 절제된 시크함",
       "description_kr": "긴 얼굴, 각진 턱선, 높은 광대. 날카로운 눈매에 작은 이목구비. 성숙한 비율에 차갑고 절제된 시크 인상.",
@@ -134,9 +266,26 @@
         "작고 절제된 이목구비",
         "성숙하고 시크한 비율"
       ],
-      "aliases": ["타입7", "유형7", "시크", "절제된차가움", "샤프매추어"],
-      "structural_keywords": ["달걀형 얼굴", "갸름한 턱", "가늘고 긴 눈", "서늘한 눈매", "날렵한 코", "얇은 입술"],
-      "image_files": ["7 (1).jpg", "7 (2).jpg", "7 (3).jpg"],
+      "aliases": [
+        "타입7",
+        "유형7",
+        "시크",
+        "절제된차가움",
+        "샤프매추어"
+      ],
+      "structural_keywords": [
+        "달걀형 얼굴",
+        "갸름한 턱",
+        "가늘고 긴 눈",
+        "서늘한 눈매",
+        "날렵한 코",
+        "얇은 입술"
+      ],
+      "image_files": [
+        "7 (1).jpg",
+        "7 (2).jpg",
+        "7 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_7.npy"
     },
     "type_8": {
@@ -144,7 +293,11 @@
       "name_en": "Sharp Charisma",
       "gender": "female",
       "type_id": 8,
-      "coords": {"shape": 0.8, "volume": 0.7, "age": 0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": 0.7,
+        "age": 0.8
+      },
       "quadrant": "Sharp Mature",
       "one_liner": "날카롭고 크고 성숙한 — 강렬하고 압도적인 시크",
       "description_kr": "긴 각진 얼굴, 강한 턱선. 크고 날카로운 눈, 두꺼운 입술, 높은 코. 성숙한 비율에 압도적인 존재감. 강렬한 카리스마.",
@@ -153,9 +306,26 @@
         "압도적인 존재감과 카리스마",
         "성숙하고 강한 비율"
       ],
-      "aliases": ["타입8", "유형8", "카리스마시크", "강렬함", "샤프볼드매추어"],
-      "structural_keywords": ["긴 얼굴형", "각진 턱선", "큰 눈", "날카로운 눈매", "높은 코", "두꺼운 입술"],
-      "image_files": ["8 (1).jpg", "8 (2).jpg", "8 (3).jpg"],
+      "aliases": [
+        "타입8",
+        "유형8",
+        "카리스마시크",
+        "강렬함",
+        "샤프볼드매추어"
+      ],
+      "structural_keywords": [
+        "긴 얼굴형",
+        "각진 턱선",
+        "큰 눈",
+        "날카로운 눈매",
+        "높은 코",
+        "두꺼운 입술"
+      ],
+      "image_files": [
+        "8 (1).jpg",
+        "8 (2).jpg",
+        "8 (3).jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/female/type_8.npy"
     },
     "type_1m": {
@@ -163,7 +333,11 @@
       "name_en": "Warm Boy",
       "gender": "male",
       "type_id": 11,
-      "coords": {"shape": -0.8, "volume": -0.7, "age": -0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": -0.7,
+        "age": -0.8
+      },
       "quadrant": "Soft Fresh",
       "one_liner": "둥글고 작고 어린 — 순수하고 따뜻한 소년상",
       "description_kr": "둥근 얼굴형, 부드러운 턱선, 작고 온화한 눈, 얇은 입술. 작은 이목구비에 어린 비율. 따뜻하고 부드러운 인상.",
@@ -172,9 +346,22 @@
         "작고 온화한 이목구비",
         "어리고 생기 있는 비율"
       ],
-      "aliases": ["소년상", "따뜻한소년", "소프트프레시남"],
-      "structural_keywords": ["둥근 얼굴형", "부드러운 턱선", "작은 온화한 눈", "얇은 입술", "낮은 코", "짧은 인중"],
-      "image_files": ["1.jpg"],
+      "aliases": [
+        "소년상",
+        "따뜻한소년",
+        "소프트프레시남"
+      ],
+      "structural_keywords": [
+        "둥근 얼굴형",
+        "부드러운 턱선",
+        "작은 온화한 눈",
+        "얇은 입술",
+        "낮은 코",
+        "짧은 인중"
+      ],
+      "image_files": [
+        "1.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_1m.npy"
     },
     "type_2m": {
@@ -182,7 +369,11 @@
       "name_en": "Cute Presence",
       "gender": "male",
       "type_id": 12,
-      "coords": {"shape": -0.8, "volume": 0.8, "age": -0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": 0.8,
+        "age": -0.8
+      },
       "quadrant": "Soft Fresh",
       "one_liner": "둥글고 크고 어린 — 눈에 띄는 귀여움",
       "description_kr": "둥근 얼굴형, 부드러운 턱선, 크고 또렷한 눈, 도톰한 입술, 높은 코. 큰 이목구비에 어린 비율. 화려하지만 귀여운 인상.",
@@ -191,9 +382,22 @@
         "화려하지만 귀여운 인상",
         "어리고 사랑스러운 비율"
       ],
-      "aliases": ["귀여운남자", "큰눈동안남", "소프트볼드프레시남"],
-      "structural_keywords": ["둥근 얼굴형", "큰 또렷한 눈", "도톰한 입술", "높은 코", "볼살", "짧은 인중"],
-      "image_files": ["2.jpg"],
+      "aliases": [
+        "귀여운남자",
+        "큰눈동안남",
+        "소프트볼드프레시남"
+      ],
+      "structural_keywords": [
+        "둥근 얼굴형",
+        "큰 또렷한 눈",
+        "도톰한 입술",
+        "높은 코",
+        "볼살",
+        "짧은 인중"
+      ],
+      "image_files": [
+        "2.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_2m.npy"
     },
     "type_3m": {
@@ -201,7 +405,11 @@
       "name_en": "Cool Youthful",
       "gender": "male",
       "type_id": 13,
-      "coords": {"shape": 0.8, "volume": -0.7, "age": -0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": -0.7,
+        "age": -0.8
+      },
       "quadrant": "Sharp Fresh",
       "one_liner": "날카롭고 작고 어린 — 차갑고 시크한 동안",
       "description_kr": "역삼각형 얼굴, 뾰족한 턱, 날카로운 눈매. 작은 이목구비에 어린 비율. 차갑지만 동안인 시크한 인상.",
@@ -210,9 +418,21 @@
         "작고 절제된 이목구비",
         "어린 비율에 서늘한 눈매"
       ],
-      "aliases": ["쿨동안남", "고양이남", "샤프프레시남"],
-      "structural_keywords": ["역삼각형 얼굴", "뾰족한 턱", "날카로운 눈매", "높은 코", "얇은 입술"],
-      "image_files": ["3.jpg"],
+      "aliases": [
+        "쿨동안남",
+        "고양이남",
+        "샤프프레시남"
+      ],
+      "structural_keywords": [
+        "역삼각형 얼굴",
+        "뾰족한 턱",
+        "날카로운 눈매",
+        "높은 코",
+        "얇은 입술"
+      ],
+      "image_files": [
+        "3.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_3m.npy"
     },
     "type_4m": {
@@ -220,7 +440,11 @@
       "name_en": "Distinct Energy",
       "gender": "male",
       "type_id": 14,
-      "coords": {"shape": 0.8, "volume": 0.8, "age": -0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": 0.8,
+        "age": -0.8
+      },
       "quadrant": "Sharp Fresh",
       "one_liner": "날카롭고 크고 어린 — 화려하고 에너지 넘치는 동안",
       "description_kr": "각진 얼굴, 날카로운 턱선, 크고 또렷한 눈, 높은 코, 두꺼운 입술. 어린 비율이지만 강렬한 존재감.",
@@ -229,9 +453,21 @@
         "또렷하고 에너지 넘치는 인상",
         "어린 비율에 화려한 존재감"
       ],
-      "aliases": ["또렷동안남", "에너지남", "샤프볼드프레시남"],
-      "structural_keywords": ["각진 얼굴", "날카로운 턱선", "큰 또렷한 눈", "높은 코", "두꺼운 입술"],
-      "image_files": ["4.jpg"],
+      "aliases": [
+        "또렷동안남",
+        "에너지남",
+        "샤프볼드프레시남"
+      ],
+      "structural_keywords": [
+        "각진 얼굴",
+        "날카로운 턱선",
+        "큰 또렷한 눈",
+        "높은 코",
+        "두꺼운 입술"
+      ],
+      "image_files": [
+        "4.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_4m.npy"
     },
     "type_5m": {
@@ -239,7 +475,11 @@
       "name_en": "Comfortable Hyung",
       "gender": "male",
       "type_id": 15,
-      "coords": {"shape": -0.8, "volume": -0.7, "age": 0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": -0.7,
+        "age": 0.8
+      },
       "quadrant": "Soft Mature",
       "one_liner": "둥글고 작고 성숙한 — 편안하고 신뢰감 있는",
       "description_kr": "타원형 얼굴, 부드러운 턱선에 길이감. 작은 이목구비에 성숙한 비율. 편안하고 신뢰감 있는 인상.",
@@ -248,9 +488,21 @@
         "작고 절제된 이목구비",
         "성숙하고 편안한 비율"
       ],
-      "aliases": ["편안한형", "신뢰남", "소프트매추어남"],
-      "structural_keywords": ["타원형 얼굴", "부드러운 턱선", "중간 크기 눈", "잔잔한 눈매", "자연스러운 코"],
-      "image_files": ["5.jpg"],
+      "aliases": [
+        "편안한형",
+        "신뢰남",
+        "소프트매추어남"
+      ],
+      "structural_keywords": [
+        "타원형 얼굴",
+        "부드러운 턱선",
+        "중간 크기 눈",
+        "잔잔한 눈매",
+        "자연스러운 코"
+      ],
+      "image_files": [
+        "5.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_5m.npy"
     },
     "type_6m": {
@@ -258,7 +510,11 @@
       "name_en": "Soft Charisma",
       "gender": "male",
       "type_id": 16,
-      "coords": {"shape": -0.8, "volume": 0.8, "age": 0.8},
+      "coords": {
+        "shape": -0.8,
+        "volume": 0.8,
+        "age": 0.8
+      },
       "quadrant": "Soft Mature",
       "one_liner": "둥글고 크고 성숙한 — 온화하면서 압도적인 존재감",
       "description_kr": "타원형 얼굴, 부드러운 턱선. 크고 깊은 눈, 도톰한 입술, 높은 코. 성숙한 비율에 온화하지만 강한 존재감.",
@@ -267,9 +523,21 @@
         "온화하면서 존재감 있는 인상",
         "성숙하고 카리스마 있는 비율"
       ],
-      "aliases": ["카리스마남", "부드러운존재감남", "소프트볼드매추어남"],
-      "structural_keywords": ["타원형 얼굴", "부드러운 턱선", "크고 깊은 눈", "도톰한 입술", "높은 코"],
-      "image_files": ["6.jpg"],
+      "aliases": [
+        "카리스마남",
+        "부드러운존재감남",
+        "소프트볼드매추어남"
+      ],
+      "structural_keywords": [
+        "타원형 얼굴",
+        "부드러운 턱선",
+        "크고 깊은 눈",
+        "도톰한 입술",
+        "높은 코"
+      ],
+      "image_files": [
+        "6.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_6m.npy"
     },
     "type_7m": {
@@ -277,7 +545,11 @@
       "name_en": "Restrained Chic",
       "gender": "male",
       "type_id": 17,
-      "coords": {"shape": 0.8, "volume": -0.7, "age": 0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": -0.7,
+        "age": 0.8
+      },
       "quadrant": "Sharp Mature",
       "one_liner": "날카롭고 작고 성숙한 — 차갑고 절제된 시크함",
       "description_kr": "긴 얼굴, 각진 턱선, 높은 광대. 날카로운 눈매에 작은 이목구비. 성숙한 비율에 차갑고 절제된 시크 인상.",
@@ -286,9 +558,21 @@
         "작고 절제된 이목구비",
         "성숙하고 시크한 비율"
       ],
-      "aliases": ["시크남", "절제된차가움남", "샤프매추어남"],
-      "structural_keywords": ["긴 얼굴", "각진 턱선", "높은 광대", "가늘고 올라간 눈", "얇은 입술"],
-      "image_files": ["7.jpg"],
+      "aliases": [
+        "시크남",
+        "절제된차가움남",
+        "샤프매추어남"
+      ],
+      "structural_keywords": [
+        "긴 얼굴",
+        "각진 턱선",
+        "높은 광대",
+        "가늘고 올라간 눈",
+        "얇은 입술"
+      ],
+      "image_files": [
+        "7.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_7m.npy"
     },
     "type_8m": {
@@ -296,7 +580,11 @@
       "name_en": "Sharp Charisma",
       "gender": "male",
       "type_id": 18,
-      "coords": {"shape": 0.8, "volume": 0.8, "age": 0.8},
+      "coords": {
+        "shape": 0.8,
+        "volume": 0.8,
+        "age": 0.8
+      },
       "quadrant": "Sharp Mature",
       "one_liner": "날카롭고 크고 성숙한 — 강렬하고 압도적인 시크",
       "description_kr": "긴 각진 얼굴, 강한 턱선. 크고 날카로운 눈, 두꺼운 입술, 높은 코. 성숙한 비율에 압도적인 존재감.",
@@ -305,9 +593,21 @@
         "압도적인 존재감과 카리스마",
         "성숙하고 강한 비율"
       ],
-      "aliases": ["카리스마시크남", "강렬함남", "샤프볼드매추어남"],
-      "structural_keywords": ["긴 각진 얼굴", "강한 턱선", "크고 날카로운 눈", "두꺼운 입술", "높은 코"],
-      "image_files": ["8.jpg"],
+      "aliases": [
+        "카리스마시크남",
+        "강렬함남",
+        "샤프볼드매추어남"
+      ],
+      "structural_keywords": [
+        "긴 각진 얼굴",
+        "강한 턱선",
+        "크고 날카로운 눈",
+        "두꺼운 입술",
+        "높은 코"
+      ],
+      "image_files": [
+        "8.jpg"
+      ],
       "embedding_path": "sigak/data/embeddings/male/type_8m.npy"
     }
   }

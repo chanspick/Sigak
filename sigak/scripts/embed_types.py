@@ -98,8 +98,17 @@ def load_type_images(gender: str = "female") -> dict[str, list[np.ndarray]]:
             print(f"  [경고] {key}: type_id 없음, 건너뜀")
             continue
 
-        # 접두사 기반 자동 탐색
-        matched_files = _find_type_images(img_dir, type_id)
+        # 1. image_files 필드의 literal 파일명 우선 시도 (남성 앵커 등 단순 파일명)
+        matched_files: list[Path] = []
+        for fname in info.get("image_files", []) or []:
+            candidate = img_dir / fname
+            if candidate.exists() and candidate.suffix.lower() in SUPPORTED_EXTENSIONS:
+                matched_files.append(candidate)
+
+        # 2. literal 미발견 시 접두사 기반 자동 탐색으로 fallback
+        #    (여성 앵커 "1 (3) - 편집함.jpg" 같이 원본과 파일명이 다른 경우)
+        if not matched_files:
+            matched_files = _find_type_images(img_dir, type_id)
 
         images = []
         for img_path in matched_files:

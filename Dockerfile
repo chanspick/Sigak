@@ -30,4 +30,10 @@ RUN mkdir -p /app/models && \
 COPY sigak/ ./
 
 ENV PYTHONPATH=/app
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# alembic upgrade head 를 uvicorn 앞에 실행 — 새 migration 자동 반영.
+# 실패 시 &&로 uvicorn 부팅 차단 → Railway restart 루프가 health check 실패로 가시화.
+# DATABASE_URL은 Railway 대시보드에서 주입되며 alembic/env.py 가 런타임 로드.
+CMD echo "[startup] alembic upgrade head" && \
+    alembic upgrade head && \
+    echo "[startup] migrations applied, starting uvicorn" && \
+    uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}

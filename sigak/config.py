@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     # ── Database ──
     database_url: str = "postgresql+asyncpg://sigak:sigak@localhost:5432/sigak"
 
+    # ── Cache / Session Store (v2 Priority 1 D3) ──
+    redis_url: str = "redis://localhost:6379/0"                 # Sia session 저장. Railway 에선 rediss://...
+    sia_session_ttl_seconds: int = 300                          # 5분 sliding TTL
+    sia_session_max_turns: int = 50                             # soft limit — Sia 가 "정리하겠습니다" 제안
+
     # ── Storage (S3-compatible) ──
     s3_bucket: str = "sigak-uploads"
     s3_endpoint: str = ""  # Leave empty for AWS, set for MinIO

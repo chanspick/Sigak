@@ -41,3 +41,4 @@ pydantic-settings==2.5.0
 python-dotenv==1.0.1
 httpx==0.27.0
 boto3==1.35.0       # S3 for image storage
+redis==5.0.8        # Sia conversation session store (v2 Priority 1 D3, sliding TTL 5min)

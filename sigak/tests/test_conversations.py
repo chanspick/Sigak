@@ -60,9 +60,10 @@ def test_create_ended_conversation_inserts_with_status_ended():
     assert db.execute.call_count == 1
     sql = str(db.execute.call_args.args[0]).replace("\n", " ")
     assert "INSERT INTO conversations" in sql
-    assert "'ended'" in sql   # status 하드코딩 검증
-
+    # 2026-04-22: status 는 바인딩 파라미터로 변경. default="ended" 검증.
+    assert ":status" in sql
     params = db.execute.call_args.args[1]
+    assert params["status"] == "ended"
     assert params["cid"] == "conv-abc"
     assert params["uid"] == "u1"
     assert params["tc"] == 2

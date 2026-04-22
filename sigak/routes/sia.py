@@ -9,12 +9,16 @@ Flow:
 
 Redis active 기간에는 DB write 없음 (contract #3).
 Extraction 은 chat/end 또는 idle timeout 시점에 BackgroundTask 로 큐잉 (D4 구현).
+
+2026-04-22 D5 보강:
+  - StartResponse/MessageResponse 에 response_mode, choices 추가.
+  - /chat/message 에서 primary Redis TTL 만료 시 24h backup snapshot 을 DB flush.
 """
 from __future__ import annotations
 
 import logging
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -23,7 +27,12 @@ from deps import db_session, get_current_user
 from schemas.user_profile import ConversationMessage, StructuredFields
 from services import conversations as conv_service
 from services import sia_llm, sia_session
+from services.sia_parser import is_name_fallback_turn, parse_sia_output
 from services.user_profiles import get_profile
+
+
+# 응답 모드 — 프론트 UI 분기 (4지선다 / 주관식 / 호칭 확인).
+ResponseMode = Literal["choices", "freetext", "name_fallback"]
 
 
 logger = logging.getLogger(__name__)
@@ -37,8 +46,10 @@ router = APIRouter(prefix="/api/v1/sia", tags=["sia"])
 
 class StartResponse(BaseModel):
     conversation_id: str
-    opening_message: str
+    opening_message: str                # body — trailing choice 블록 제거
     turn_count: int = 0
+    response_mode: ResponseMode         # choices / freetext / name_fallback
+    choices: list[str] = []             # mode=="choices" 일 때 정확히 4개
 
 
 class MessageRequest(BaseModel):
@@ -48,9 +59,11 @@ class MessageRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     conversation_id: str
-    assistant_message: str
+    assistant_message: str              # body — trailing choice 블록 제거
     turn_count: int
     status: str                         # active / ending_soon / closed
+    response_mode: ResponseMode         # choices / freetext / name_fallback
+    choices: list[str] = []
 
 
 class EndRequest(BaseModel):
@@ -161,45 +174,83 @@ def chat_start(
         messages_history=[{"role": "user", "content": "(대화 시작)"}],
     )
 
-    # Redis 에 assistant 메시지 기록
+    # Redis 에 assistant 메시지 기록 — 원문 저장 (LLM 재전송 시 맥락 유지 필수).
     sia_session.append_message(
         conversation_id=conv_id,
         role="assistant",
         content=opening,
     )
 
+    # 파서로 body/choices/mode 분리. name_fallback 은 호출부(여기) 가 오버라이드.
+    body, choices, mode = parse_sia_output(opening)
+    if is_name_fallback_turn(
+        user_has_korean_name=sia_llm._has_korean(user.get("name") or ""),
+        resolved_name=None,   # 첫 턴은 아직 fallback 응답 수신 전
+        turn_count=0,
+    ):
+        mode = "name_fallback"
+        choices = []
+
     return StartResponse(
         conversation_id=conv_id,
-        opening_message=opening,
+        opening_message=body,
         turn_count=0,
+        response_mode=mode,
+        choices=choices,
     )
 
 
 @router.post("/chat/message", response_model=MessageResponse)
 def chat_message(
     body: MessageRequest,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> MessageResponse:
     """유저 발화 → Sia 응답. 세션이 만료/없으면 410.
 
     Flow:
-      1. Redis 세션 로드. 없으면 410 Gone (TTL expired 또는 미존재)
-      2. 유저 메시지 append
+      1. Redis 세션 로드.
+         - primary 없음 + backup 도 없음 → 410 (단순 미존재)
+         - primary 없음 + backup 있음 (TTL 만료 첫 probe) → backup 을 DB flush
+           (status="ended_by_timeout") + extraction 큐잉 + backup 삭제 → 410
+      2. 유저 메시지 append (primary TTL 리셋, 24h backup 도 갱신)
       3. Haiku 4.5 호출 (+retry)
       4. assistant 메시지 append
       5. turn_count 한계 체크 — 50 도달 시 status="ending_soon"
+      6. 파서로 body/choices/mode 분리. name_fallback 은 호출부가 오버라이드.
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
+    turn_before_user = 0   # name_fallback 판정 (user append 전 turn_count)
     state = sia_session.get_session(body.conversation_id)
     if state is None:
-        raise HTTPException(410, "session expired or not found")
+        # Primary 만료. Backup 에 있으면 첫 probe → DB flush.
+        backup = sia_session.get_backup(body.conversation_id)
+        if backup is not None and backup.get("user_id") == user["id"]:
+            _flush_expired_conversation(db, backup, background_tasks)
+            sia_session.delete_backup(body.conversation_id)
+        elif backup is not None:
+            # 다른 유저의 conversation — 조용히 무시 (유출 방지).
+            logger.warning(
+                "backup probe: user_id mismatch cid=%s",
+                body.conversation_id,
+            )
+        raise HTTPException(
+            status_code=410,
+            detail={
+                "message": "지금까지 나눈 대화를 정리했습니다.",
+                "next": "extracting",
+                "redirect": "/extracting",
+            },
+        )
     if state["user_id"] != user["id"]:
         raise HTTPException(403, "not your conversation")
     if state["status"] != "active":
         raise HTTPException(409, f"session not active: status={state['status']}")
+
+    turn_before_user = int(state.get("turn_count", 0))
 
     # 1. 유저 메시지 append (turn_count 증가)
     state = sia_session.append_message(
@@ -225,7 +276,7 @@ def chat_message(
         messages_history=history,
     )
 
-    # 3. assistant 메시지 append
+    # 3. assistant 메시지 append — 원문 저장 (LLM 재전송 맥락 유지).
     state = sia_session.append_message(
         conversation_id=body.conversation_id,
         role="assistant",
@@ -237,11 +288,23 @@ def chat_message(
     limit = get_settings().sia_session_max_turns
     status = "ending_soon" if state["turn_count"] >= limit else "active"
 
+    # 5. 파서로 body/choices/mode 분리.
+    msg_body, choices, mode = parse_sia_output(assistant_text)
+    if is_name_fallback_turn(
+        user_has_korean_name=sia_llm._has_korean(user.get("name") or ""),
+        resolved_name=state.get("resolved_name"),
+        turn_count=turn_before_user,
+    ):
+        mode = "name_fallback"
+        choices = []
+
     return MessageResponse(
         conversation_id=body.conversation_id,
-        assistant_message=assistant_text,
+        assistant_message=msg_body,
         turn_count=state["turn_count"],
         status=status,
+        response_mode=mode,
+        choices=choices,
     )
 
 
@@ -303,6 +366,50 @@ def chat_end(
         status="ended",
         messages_persisted=len(messages),
         extraction_queued=extraction_queued,
+    )
+
+
+# ─────────────────────────────────────────────
+#  TTL Expiry Recovery — backup snapshot → DB flush (D5 Task 3)
+# ─────────────────────────────────────────────
+
+def _flush_expired_conversation(
+    db,
+    state: dict,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Timeout 만료 세션을 DB 로 flush + extraction 큐잉.
+
+    `/chat/end` 와 동일한 atomic sequence 를 재사용하되 status="ended_by_timeout"
+    로 저장해 manual /chat/end 와 구분한다.
+
+    손상된 backup (Pydantic validation 실패) 은 조용히 drop — 유저에게는 동일한
+    410 응답이 가므로 UX 영향 없음. 운영자는 로그에서 식별.
+    """
+    raw_msgs = state.get("messages") or []
+    try:
+        messages = [ConversationMessage.model_validate(m) for m in raw_msgs]
+    except Exception:
+        logger.exception(
+            "backup snapshot corrupt: cid=%s",
+            state.get("conversation_id"),
+        )
+        return
+
+    conv_service.create_ended_conversation(
+        db,
+        user_id=state["user_id"],
+        conversation_id=state["conversation_id"],
+        messages=messages,
+        turn_count=state.get("turn_count", 0),
+        started_at_iso=state.get("created_at"),
+        status="ended_by_timeout",
+    )
+    db.commit()
+    background_tasks.add_task(
+        _run_extraction_job,
+        conversation_id=state["conversation_id"],
+        user_id=state["user_id"],
     )
 
 

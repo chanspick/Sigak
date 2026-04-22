@@ -45,15 +45,19 @@ def create_ended_conversation(
     messages: list[ConversationMessage],
     turn_count: int,
     started_at_iso: Optional[str] = None,
+    status: str = "ended",
 ) -> None:
     """Redis 세션 종료 atomic sequence 의 1단계: conversations INSERT.
 
-    status="ended" 로 즉시 저장. extraction 은 이후 worker 가 수행.
+    extraction 은 이후 worker 가 수행.
 
     Args:
         messages: Redis session_state.messages 스냅샷 (Pydantic validated)
         turn_count: 유저 발화 턴 수 (Sia 턴 제외, 프로덕트 분석용)
         started_at_iso: 원 대화 시작 시각 ISO string (None 이면 서버 NOW() 사용)
+        status: "ended" (명시 종료 /chat/end) | "ended_by_timeout" (primary TTL 만료
+            후 backup probe flush). conversations.status 는 VARCHAR(20) 이므로
+            추가 migration 불필요.
     """
     payload = [m.model_dump(mode="json") for m in messages]
     if started_at_iso:
@@ -62,12 +66,13 @@ def create_ended_conversation(
                 "INSERT INTO conversations "
                 "  (conversation_id, user_id, messages, status, turn_count, started_at, ended_at) "
                 "VALUES "
-                "  (:cid, :uid, CAST(:msgs AS jsonb), 'ended', :tc, :sa, NOW())"
+                "  (:cid, :uid, CAST(:msgs AS jsonb), :status, :tc, :sa, NOW())"
             ),
             {
                 "cid": conversation_id,
                 "uid": user_id,
                 "msgs": json.dumps(payload),
+                "status": status,
                 "tc": turn_count,
                 "sa": started_at_iso,
             },
@@ -78,12 +83,13 @@ def create_ended_conversation(
                 "INSERT INTO conversations "
                 "  (conversation_id, user_id, messages, status, turn_count, started_at, ended_at) "
                 "VALUES "
-                "  (:cid, :uid, CAST(:msgs AS jsonb), 'ended', :tc, NOW(), NOW())"
+                "  (:cid, :uid, CAST(:msgs AS jsonb), :status, :tc, NOW(), NOW())"
             ),
             {
                 "cid": conversation_id,
                 "uid": user_id,
                 "msgs": json.dumps(payload),
+                "status": status,
                 "tc": turn_count,
             },
         )

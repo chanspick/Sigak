@@ -3,7 +3,7 @@ id: SPEC-ONBOARDING-V2
 version: "1.0.0"
 status: "planned"
 created: "2026-04-21"
-updated: "2026-04-21"
+updated: "2026-04-22"
 author: "chanspick"
 priority: "critical"
 lifecycle: "spec-anchored"
@@ -20,6 +20,7 @@ design_doc: ".moai/specs/sigak_v2_onboarding_verdict.md"
 ## HISTORY
 
 - 2026-04-21: 초안 생성 (approved design doc 기반)
+- 2026-04-22: REQ-SIA-002 턴별 문장 한계 완화 (오프닝 8/중간 3-5/클로징 2-4). chat_design 대조 결과.
 
 ---
 
@@ -128,7 +129,8 @@ THE Sia system prompt SHALL enforce 서술형 정중체 tone:
   - 금지 어미: "~네요", "~같아요", "~거든요", "~이더라고요", "~시더라고요"
   - 유저 단정문: "{NAME}님은 X 인 분입니다" (질문 X, 확인 요청 X)
   - 관찰 → 데이터 숫자 → 해석 → 4지선다 질문 structure
-  - 턴당 2-3 sentences (오프닝만 4 허용), sentence ≤35 chars
+  - 턴당 버블 수: 오프닝 ≤8, 중간 3-5, 클로징 2-4. 리스트 블록은 1 버블
+  - 문장 길이: 45자 이내 권장, 60자 초과 시 분할
   - 평가 금지 ("좋아 보입니다", "잘 어울립니다")
   - 시적 비유 금지 ("봄바람 같은")
   - 확인 요청 금지 ("본인도 그렇게 생각하세요?")

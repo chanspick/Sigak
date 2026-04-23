@@ -1,13 +1,14 @@
 """JWT-related auth routes (MVP v1.1 phase B + v2.0 consent).
 
 Existing Kakao OAuth flow lives in main.py — we don't move it to avoid
-touching legacy endpoints. This file adds:
+touching legacy endpoints. This file provides:
 
   - POST /api/v1/auth/dev-issue-jwt   test-only JWT minting, ADMIN_KEY gated
-  - GET  /api/v1/auth/me              JWT-authenticated self lookup
+  - GET  /api/v1/auth/me              JWT-authenticated self lookup (3-stage gate flags)
   - POST /api/v1/auth/consent         v2.0 약관 동의 저장 (온보딩 welcome에서 호출)
-  - POST /api/v1/auth/test-login      Toss PG 심사용 email/password 임시 로그인
-                                      (PG 승인 후 TEST_LOGIN_ENABLED=false로 비활성)
+
+2026-04-23: Toss PG 심사 통과 후 test-login / email-login 엔드포인트 완전 제거.
+  Railway env (TEST_LOGIN_ENABLED 등) 도 대시보드에서 정리 필요.
 
 The legacy ``GET /auth/me?user_id=X`` in main.py stays for backward compat
 during the frontend migration window. Refactor backlog #3 tracks removal.
@@ -81,8 +82,13 @@ class MeResponse(BaseModel):
     email: str
     name: str
     tier: str
-    # v1.2 게이트 플래그 — 프론트 라우팅 가드가 참조.
+    # 게이트 플래그 — 프론트 useOnboardingGuard 가 참조.
+    #   consent_completed     : v2.0 약관 5+1 동의
+    #   essentials_completed  : Step 0 구조화 입력 (gender/birth_date/ig_handle) 저장됨
+    #                           판정: users.birth_date IS NOT NULL
+    #   onboarding_completed  : Sia 대화 종료 (v2) 또는 4스텝 완료 (v1 legacy)
     consent_completed: bool
+    essentials_completed: bool
     onboarding_completed: bool
 
 
@@ -93,15 +99,17 @@ def get_me(
 ):
     """Return the current user based on the Bearer JWT.
 
-    consent_completed / onboarding_completed 플래그는 프론트의 useOnboardingGuard가
-    라우팅 분기에 사용. DB 미가용 시 False로 폴백 (게이트가 안전 방향으로 걸림).
+    consent_completed / essentials_completed / onboarding_completed 플래그는
+    프론트 useOnboardingGuard 가 3단계 라우팅 분기에 사용.
+    DB 미가용 시 False 폴백 (게이트가 안전 방향으로 걸림).
     """
     consent_completed = False
+    essentials_completed = False
     onboarding_completed = False
     if db is not None:
         row = db.execute(
             text(
-                "SELECT consent_completed, onboarding_completed "
+                "SELECT consent_completed, onboarding_completed, birth_date "
                 "FROM users WHERE id = :uid"
             ),
             {"uid": user["id"]},
@@ -109,6 +117,7 @@ def get_me(
         if row is not None:
             consent_completed = bool(row.consent_completed)
             onboarding_completed = bool(row.onboarding_completed)
+            essentials_completed = row.birth_date is not None
 
     return MeResponse(
         id=user["id"],
@@ -117,6 +126,7 @@ def get_me(
         name=user.get("name", ""),
         tier=user.get("tier", "standard"),
         consent_completed=consent_completed,
+        essentials_completed=essentials_completed,
         onboarding_completed=onboarding_completed,
     )
 
@@ -153,130 +163,11 @@ class ConsentResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────
-#  Toss PG 심사용 테스트 로그인 (임시)
-#
-#  - 기본 활성화. PG 승인 후 Railway env에 TEST_LOGIN_ENABLED=false 추가하거나
-#    이 엔드포인트 블록 전체 삭제.
-#  - 테스트 유저는 DB에 자동 upsert되며 consent + onboarding 완료 상태로 세팅되어
-#    로그인 직후 /tokens/purchase 결제 플로우 바로 진입 가능.
+#  Toss PG 심사용 테스트 로그인 — 2026-04-23 제거
 # ─────────────────────────────────────────────
-
-TEST_LOGIN_ENABLED = os.getenv("TEST_LOGIN_ENABLED", "true").lower() != "false"
-TEST_LOGIN_EMAIL = os.getenv("TEST_LOGIN_EMAIL", "test@naver.com")
-TEST_LOGIN_PASSWORD = os.getenv("TEST_LOGIN_PASSWORD", "test1234")
-TEST_USER_ID = os.getenv("TEST_USER_ID", "test-user-tossdemo")
-
-
-class TestLoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class TestLoginResponse(BaseModel):
-    jwt: str
-    user_id: str
-    name: str
-    email: str
-
-
-def _test_onboarding_data() -> dict:
-    """테스트 유저 온보딩 답변 (완료 상태). Skip onboarding 목적."""
-    return {
-        "height": "160_165",
-        "weight": "50_55",
-        "shoulder_width": "medium",
-        "neck_length": "medium",
-        "face_concerns": "none",
-        "style_image_keywords": "modern,natural",
-        "desired_image": "깔끔하고 자연스러운 이미지",
-        "makeup_level": "basic",
-        "self_perception": "평범하다는 말을 자주 듣습니다",
-    }
-
-
-def _test_consent_data() -> dict:
-    return {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "ip_address": "test-login",
-        "terms_version": TERMS_VERSION,
-        "terms": True,
-        "privacy": True,
-        "sensitive": True,
-        "overseas_transfer": True,
-        "age_confirmed": True,
-        "marketing": False,
-    }
-
-
-def _ensure_test_user(db) -> DBUser:
-    """테스트 유저 upsert — consent + onboarding 완료 상태 보장."""
-    user = db.query(DBUser).filter(DBUser.id == TEST_USER_ID).first()
-    if user is None:
-        user = DBUser(
-            id=TEST_USER_ID,
-            email=TEST_LOGIN_EMAIL,
-            name="테스터",
-            phone="",
-            gender="female",
-            status="authenticated",
-            onboarding_completed=True,
-            onboarding_data=_test_onboarding_data(),
-            consent_completed=True,
-            consent_data=_test_consent_data(),
-            created_at=datetime.utcnow(),
-        )
-        db.add(user)
-        db.commit()
-        return user
-
-    # 기존 유저 — 필수 상태 유지 (누군가 수동으로 건드린 경우 복구)
-    dirty = False
-    if not user.consent_completed:
-        user.consent_completed = True
-        user.consent_data = _test_consent_data()
-        dirty = True
-    if not user.onboarding_completed:
-        user.onboarding_completed = True
-        user.onboarding_data = _test_onboarding_data()
-        dirty = True
-    if user.email != TEST_LOGIN_EMAIL:
-        user.email = TEST_LOGIN_EMAIL
-        dirty = True
-    if dirty:
-        db.commit()
-    return user
-
-
-@router.post("/test-login", response_model=TestLoginResponse)
-def test_login(
-    body: TestLoginRequest,
-    db=Depends(db_session),
-):
-    """Toss PG 심사용 테스트 로그인. email/password 일치 시 JWT 발급.
-
-    보안:
-      - TEST_LOGIN_ENABLED=false 시 404 (운영 비활성)
-      - 자격증명 불일치 시 401
-      - 일치 시 TEST_USER_ID 의 JWT 발급 — 이 유저는 미리 consent + onboarding
-        완료 상태로 세팅되어 있어 로그인 즉시 피드 → /tokens/purchase 가능.
-    """
-    if not TEST_LOGIN_ENABLED:
-        raise HTTPException(404, "Not Found")
-    if db is None:
-        raise HTTPException(500, "DB unavailable")
-
-    if body.email != TEST_LOGIN_EMAIL or body.password != TEST_LOGIN_PASSWORD:
-        raise HTTPException(401, "이메일 또는 비밀번호가 일치하지 않습니다")
-
-    user = _ensure_test_user(db)
-    token = issue_jwt(user.id, user.kakao_id or "")
-
-    return TestLoginResponse(
-        jwt=token,
-        user_id=user.id,
-        name=user.name or "테스터",
-        email=user.email or TEST_LOGIN_EMAIL,
-    )
+#  PG 심사 통과 후 test-login / email-login 엔드포인트 + 관련 helper 전체 삭제.
+#  Railway env (TEST_LOGIN_ENABLED / TEST_LOGIN_EMAIL / TEST_LOGIN_PASSWORD /
+#  TEST_USER_ID) 도 대시보드에서 제거 필요.
 
 
 def _client_ip(request: Request) -> str:

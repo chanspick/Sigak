@@ -13,7 +13,7 @@ export function CtaSection({ onStart }: CtaSectionProps) {
     <RevealOnScroll>
       <section className="px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 md:py-14 text-center">
         <Link
-          href="/start"
+          href="/sia"
           className="text-[clamp(24px,4vw,40px)] font-bold tracking-[1px] transition-opacity duration-200 hover:opacity-50 no-underline text-[var(--color-fg)]"
           onClick={(e) => {
             e.preventDefault();

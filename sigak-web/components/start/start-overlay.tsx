@@ -28,11 +28,6 @@ export function StartOverlay() {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
   const [kakaoLoading, setKakaoLoading] = useState(false);
 
-  // 이메일 로그인 상태 (심사용)
-  const [testEmail, setTestEmail] = useState("");
-  const [testPassword, setTestPassword] = useState("");
-  const [emailLoading, setEmailLoading] = useState(false);
-
   // localStorage에서 로그인 상태 확인
   useEffect(() => {
     const userId = localStorage.getItem("sigak_user_id");
@@ -63,39 +58,6 @@ export function StartOverlay() {
       }
     }
   }, []);
-
-  // 이메일 로그인 핸들러 (심사용)
-  const handleEmailLogin = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!testEmail || !testPassword) return;
-    setEmailLoading(true);
-    setError(null);
-    try {
-      const resp = await fetch(`${API_URL}/api/v1/auth/email-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: testEmail, password: testPassword }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        throw new Error(body.detail || "로그인 실패");
-      }
-      const result = await resp.json();
-      localStorage.setItem("sigak_user_id", result.user_id);
-      localStorage.setItem("sigak_user_name", result.name);
-      if (result.email) localStorage.setItem("sigak_user_email", result.email);
-      localStorage.setItem("sigak_kakao_id", result.kakao_id);
-      if (result.reports && result.reports.length > 0) {
-        const latest = result.reports[result.reports.length - 1];
-        router.replace(`/report/${latest.id}`);
-      } else {
-        window.location.reload();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "로그인 실패");
-      setEmailLoading(false);
-    }
-  }, [testEmail, testPassword, router]);
 
   // 전화번호 자동 포맷: 숫자만 추출 → 010-0000-0000
   const formatPhone = (raw: string) => {
@@ -191,31 +153,6 @@ export function StartOverlay() {
             )}
             {kakaoLoading ? "연결 중..." : "카카오로 시작하기"}
           </button>
-
-          {/* 이메일 로그인 — 심사용 */}
-          <form onSubmit={handleEmailLogin} className="mt-12 flex flex-col gap-2">
-            <input
-              type="email"
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              placeholder="email"
-              className="w-full px-3 py-2 text-[11px] bg-transparent border border-black/[0.08] text-[var(--color-fg)] placeholder:text-black/20 focus:border-black/20 outline-none transition-all rounded"
-            />
-            <input
-              type="password"
-              value={testPassword}
-              onChange={(e) => setTestPassword(e.target.value)}
-              placeholder="password"
-              className="w-full px-3 py-2 text-[11px] bg-transparent border border-black/[0.08] text-[var(--color-fg)] placeholder:text-black/20 focus:border-black/20 outline-none transition-all rounded"
-            />
-            <button
-              type="submit"
-              disabled={emailLoading || !testEmail || !testPassword}
-              className="w-full py-2 text-[11px] bg-transparent text-black/20 hover:text-black/40 transition-all disabled:opacity-30"
-            >
-              {emailLoading ? "..." : "sign in"}
-            </button>
-          </form>
         </div>
       </div>
     );

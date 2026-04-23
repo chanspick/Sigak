@@ -170,7 +170,7 @@ export default function CastingLandingPage() {
             </>
           )}
           <Link
-            href="/start"
+            href="/sia"
             className="text-[10px] md:text-[11px] font-medium tracking-[1.5px] md:tracking-[2.5px] px-3 py-1.5 border border-white/30 hover:border-white/60 transition-colors no-underline text-[var(--color-bg)]"
           >
             시작하기
@@ -199,7 +199,7 @@ export default function CastingLandingPage() {
             </div>
             <div className="md:text-right">
               <Link
-                href="/start"
+                href="/sia"
                 className="inline-block px-8 py-3.5 bg-fg text-bg text-[13px] font-semibold tracking-[0.3px] no-underline hover:opacity-90 transition-opacity"
               >
                 내 매력 분석 시작하기
@@ -248,7 +248,7 @@ export default function CastingLandingPage() {
 
             {/* 메인 초대장 카드 */}
             <Link
-              href="/start"
+              href="/sia"
               className="relative z-[1] w-full border border-black/[0.08] px-5 py-7 md:px-9 md:py-10 no-underline text-[var(--color-fg)] overflow-hidden transition-transform duration-400 hover:-translate-y-[3px]"
               style={{ background: "#FDFBF7" }}
             >
@@ -420,7 +420,7 @@ export default function CastingLandingPage() {
                     </p>
                     {/* CTA */}
                     <Link
-                      href="/start"
+                      href="/sia"
                       className={`inline-block px-6 py-3 text-[12px] font-semibold tracking-[0.3px] text-center whitespace-nowrap no-underline transition-opacity hover:opacity-80 ${
                         t.featured
                           ? "bg-fg text-bg"
@@ -452,7 +452,7 @@ export default function CastingLandingPage() {
       {/* ── FINAL CTA ── */}
       <Reveal>
         <Link
-          href="/start"
+          href="/sia"
           className="block px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)] py-10 md:py-14 text-center group"
         >
           <h2 className="font-[family-name:var(--font-serif)] text-[clamp(24px,4vw,40px)] font-normal mb-3">

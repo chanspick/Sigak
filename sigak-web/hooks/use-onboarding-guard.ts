@@ -1,13 +1,16 @@
-// SIGAK MVP v1.2 + v2.0 consent — useOnboardingGuard
+// SIGAK — useOnboardingGuard (3-stage gate: consent → essentials → Sia)
 //
 // 모든 authed 페이지에서 호출. 규칙:
 //   1. JWT 없음 → /auth/login
 //   2. 예외 경로(EXEMPT_PATH_PREFIXES) 는 가드 우회
-//   3. GET /api/v1/auth/me 로 consent_completed / onboarding_completed 확인
+//   3. GET /api/v1/auth/me 로 consent_completed / essentials_completed / onboarding_completed 확인
 //   4. consent_completed=false → /onboarding/welcome
-//   5. onboarding_completed=false → GET /state 로 next_step 조회 후 /onboarding/step/{n}
-//   6. 모두 true면 통과 (status="ready")
-//   7. 401 오면 토큰 정리 + /auth/login
+//   5. essentials_completed=false → /onboarding/essentials
+//                                   (Step 0: gender + birth_date + ig_handle)
+//   6. onboarding_completed=false → /sia/new (Sia 대화 진입)
+//                                   * Phase N3 Sia UI 완성 전 임시로 legacy step/{n} 경로도 지원
+//   7. 모두 true 면 통과 (status="ready")
+//   8. 401 오면 토큰 정리 + /auth/login
 //
 // 사용:
 //   "use client";
@@ -24,7 +27,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { getToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
-import { getMe, getOnboardingState } from "@/lib/api/onboarding";
+import { getMe } from "@/lib/api/onboarding";
 import type { AuthMeV2Response } from "@/lib/types/mvp";
 
 type GuardStatus = "checking" | "redirecting" | "ready";
@@ -79,30 +82,34 @@ export function useOnboardingGuard(): UseOnboardingGuardResult {
       return;
     }
 
-    // 3. me + 필요시 state 조회
+    // 3. me 조회 후 3단계 게이트 분기
     (async () => {
       try {
         const meData = await getMe();
         if (cancelled) return;
 
-        // 3-a. consent 미완료 → welcome
+        // 3-a. 약관 동의 미완료 → welcome
         if (!meData.consent_completed) {
           setStatus("redirecting");
           router.replace("/onboarding/welcome");
           return;
         }
 
-        // 3-b. onboarding 미완료 → next_step 조회 후 step 페이지
-        if (!meData.onboarding_completed) {
-          const state = await getOnboardingState();
-          if (cancelled) return;
-          const nextStep = state.next_step ?? 1;
+        // 3-b. Step 0 구조화 입력 미완료 → essentials
+        if (!meData.essentials_completed) {
           setStatus("redirecting");
-          router.replace(`/onboarding/step/${nextStep}`);
+          router.replace("/onboarding/essentials");
           return;
         }
 
-        // 3-c. 모두 완료
+        // 3-c. Sia 대화 미완료 → /sia/new
+        if (!meData.onboarding_completed) {
+          setStatus("redirecting");
+          router.replace("/sia");
+          return;
+        }
+
+        // 3-d. 모두 완료
         setMe(meData);
         setStatus("ready");
       } catch (e) {

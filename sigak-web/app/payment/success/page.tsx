@@ -83,7 +83,7 @@ function SuccessContent() {
           <>
             <h1 className="font-[family-name:var(--font-serif)] text-xl mb-2">결제 오류</h1>
             <p className="text-sm text-red-500 mb-4">{errorMsg}</p>
-            <a href="/start" className="text-sm font-medium underline text-[var(--color-fg)]">
+            <a href="/sia" className="text-sm font-medium underline text-[var(--color-fg)]">
               다시 시도하기
             </a>
           </>

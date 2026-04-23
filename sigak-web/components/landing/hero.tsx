@@ -26,7 +26,7 @@ export function Hero({ onStart }: HeroProps) {
           {/* 오른쪽 링크 */}
           <div className="text-left md:text-right md:pb-1">
             <Link
-              href="/start"
+              href="/sia"
               className="text-sm font-medium mb-1.5 transition-opacity duration-200 hover:opacity-60 no-underline text-[var(--color-fg)]"
               onClick={(e) => {
                 e.preventDefault();

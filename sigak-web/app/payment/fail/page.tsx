@@ -19,7 +19,7 @@ function FailContent() {
         <p className="text-sm text-[var(--color-muted)] mb-1">{message}</p>
         {code && <p className="text-xs text-[var(--color-muted)] mb-6">오류 코드: {code}</p>}
         <a
-          href="/start"
+          href="/sia"
           className="inline-block py-3 px-8 text-sm font-semibold border border-[var(--color-fg)] text-[var(--color-fg)] hover:bg-[var(--color-fg)] hover:text-[var(--color-bg)] transition-all"
         >
           돌아가기

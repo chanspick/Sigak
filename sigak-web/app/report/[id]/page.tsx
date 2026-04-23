@@ -75,7 +75,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
             잠시 후 다시 시도해 주세요.
           </p>
           <Link
-            href="/start"
+            href="/sia"
             className="inline-block px-8 py-3 text-sm font-bold bg-[var(--color-fg)] text-[var(--color-bg)] transition-opacity duration-200 hover:opacity-85"
           >
             처음으로 돌아가기

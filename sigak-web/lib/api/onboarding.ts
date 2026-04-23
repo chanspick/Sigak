@@ -5,6 +5,8 @@ import { authFetch } from "@/lib/api/fetch";
 import type {
   ConsentRequest,
   ConsentResponse,
+  EssentialsRequest,
+  EssentialsResponse,
   OnboardingData,
   OnboardingStateResponse,
   ResetOnboardingResponse,
@@ -36,6 +38,23 @@ export function saveOnboardingStep(
 export function resetOnboarding(): Promise<ResetOnboardingResponse> {
   return authFetch<ResetOnboardingResponse>("/api/v1/onboarding/reset", {
     method: "POST",
+  });
+}
+
+// ─────────────────────────────────────────────
+//  Essentials (Step 0 — SPEC-ONBOARDING-V2 REQ-ONBD-001/002)
+// ─────────────────────────────────────────────
+
+/**
+ * Step 0 구조화 입력 저장. gender + birth_date 필수, ig_handle 선택.
+ * Sia 대화(/sia/new) 진입 전에 반드시 호출되어야 함.
+ */
+export function saveEssentials(
+  body: EssentialsRequest,
+): Promise<EssentialsResponse> {
+  return authFetch<EssentialsResponse>("/api/v1/onboarding/essentials", {
+    method: "POST",
+    json: body,
   });
 }
 

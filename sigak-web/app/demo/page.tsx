@@ -63,7 +63,7 @@ export default function DemoPage() {
                 이목구비 비율 · 퍼스널컬러 · 맞춤 스타일링
               </p>
               <a
-                href="/start"
+                href="/sia"
                 className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-colors mt-2"
               >
                 분석 시작하기

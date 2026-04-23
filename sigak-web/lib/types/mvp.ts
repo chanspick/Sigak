@@ -110,6 +110,12 @@ export interface ConsentResponse {
 }
 
 // /auth/me response (v2.0: gate flags 포함)
+//
+// 3단계 게이트:
+//   consent_completed    : v2.0 약관 5+1 동의 (/onboarding/welcome)
+//   essentials_completed : Step 0 구조화 입력 완료 (/onboarding/essentials)
+//                          판정 = users.birth_date IS NOT NULL
+//   onboarding_completed : Sia 대화 종료 (v2) / 4스텝 완료 (v1 legacy)
 export interface AuthMeV2Response {
   id: string;
   kakao_id: string;
@@ -117,7 +123,29 @@ export interface AuthMeV2Response {
   name: string;
   tier: string;
   consent_completed: boolean;
+  essentials_completed: boolean;
   onboarding_completed: boolean;
+}
+
+// ─────────────────────────────────────────────
+//  Essentials (Step 0 — SPEC-ONBOARDING-V2 REQ-ONBD-001/002)
+// ─────────────────────────────────────────────
+
+export type Gender = "female" | "male";
+
+export interface EssentialsRequest {
+  gender: Gender;
+  /** ISO 8601 (YYYY-MM-DD). 만 14세 이상 필수. */
+  birth_date: string;
+  /** @prefix 자동 제거. 빈 문자열은 서버가 null 처리. */
+  ig_handle?: string | null;
+}
+
+export interface EssentialsResponse {
+  essentials_completed: boolean;
+  gender: Gender;
+  birth_date: string;
+  ig_handle: string | null;
 }
 
 // ─────────────────────────────────────────────

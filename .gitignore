@@ -185,3 +185,27 @@ dist-ssr/
 
 # ONNX 모델 바이너리
 sigak/models/*.onnx
+
+# ===========================================
+# SIGAK 쓰레기 방지 (2026-04-23 housekeeping)
+# ===========================================
+# 루트에 떠다니는 React JSX 오탑재
+A.java
+# 루트 레벨 이미지 (cat/deer/fox/owl 등) — 실 자산은 public/images/ 로
+/*.png
+# 파이프라인 debug 산출물
+debug_overlay*/
+# SCUT-FBP5500 데이터셋 아카이브 + 풀린 폴더 (git 에 절대 금지)
+scut-fbp5500.zip
+experiments/scut-fbp5500/SCUT-FBP5500_*/
+
+# 디버그 렌더링 산출물 (대용량)
+debug_landmarks/
+
+# 임시 UX 캡처 / playwright 스크립트
+sigak-web/test-screenshots/
+sigak-web/ux-test.mjs
+sigak-web/write-test.py
+
+# tsconfig 임시 변형
+sigak-web/tsconfig.check.json

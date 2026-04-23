@@ -28,7 +28,7 @@ export function Nav({ onStart }: NavProps) {
       {/* 오른쪽 시작 버튼 */}
       <div className="flex items-center">
         <Link
-          href="/start"
+          href="/sia"
           className="text-[11px] font-medium tracking-[2.5px] uppercase transition-opacity duration-200 hover:opacity-70 no-underline text-[var(--color-bg)]"
           onClick={(e) => {
             e.preventDefault();

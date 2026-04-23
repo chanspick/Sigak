@@ -23,7 +23,7 @@ export default async function QuestionnairePage({ searchParams }: PageProps) {
   // 필수 파라미터 누락 시 /start로 리다이렉트
   const validTiers = ["standard", "full", "basic", "creator", "wedding"];
   if (!userId || !tier || !validTiers.includes(tier)) {
-    redirect("/start");
+    redirect("/sia");
   }
 
   return (

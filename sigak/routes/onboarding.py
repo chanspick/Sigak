@@ -1,17 +1,21 @@
-"""Onboarding endpoints (MVP v1.2).
+"""Onboarding endpoints (MVP v1.2 + v2 essentials).
 
-Three endpoints backed by ``users.onboarding_data`` (JSONB) and
-``users.onboarding_completed`` (BOOL):
-
+v1.2 (legacy, Sia 대체 대상):
   POST /api/v1/onboarding/save-step   shallow-merge fields, auto-flip completed on step 4
   GET  /api/v1/onboarding/state       current progress + next_step hint
   POST /api/v1/onboarding/reset       unset completed; preserve onboarding_data for pre-fill
 
-Data shape is flat — keys match Pydantic ``SubmitRequest`` in main.py — so the
+v2 (SPEC-ONBOARDING-V2 REQ-ONBD-001/002):
+  POST /api/v1/onboarding/essentials  Step 0 structured input (gender/birth_date/ig_handle)
+                                      Sia 대화 진입 전 구조화 필드 확보.
+
+Data shape (v1 save-step) is flat — keys match Pydantic ``SubmitRequest`` in main.py — so the
 existing pipeline entrypoint ``_run_analysis_pipeline`` can read onboarding_data
 directly as the interview payload without transformation.
 """
 import json
+import re
+from datetime import date
 from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -185,3 +189,131 @@ def reset(
     )
     db.commit()
     return ResetResponse(onboarding_completed=False)
+
+
+# ─────────────────────────────────────────────
+#  Essentials — Step 0 structured input (SPEC-ONBOARDING-V2 REQ-ONBD-001/002)
+# ─────────────────────────────────────────────
+#
+# Sia 대화(/sia/new) 진입 전에 수집할 구조화 필드:
+#   - gender: 진단 엔진 분기 (female/male)
+#   - birth_date: 연령 기반 분석 + 만 14세 이상 강제 (consent age_confirmed 와 정합)
+#   - ig_handle: (선택) Apify IG 자동 수집 연결
+#
+# 저장 위치:
+#   - users 테이블 (primary) — gender/birth_date/ig_handle 컬럼 직접 갱신
+#   - user_profiles 테이블 (v2 profile cache) — upsert. Sia extraction 결과와 합쳐질 row.
+
+MIN_AGE_YEARS = 14
+
+# IG handle: A-Z/a-z/0-9/./_ 최대 30자 (Instagram 공식 규칙 + 50 컬럼 여유)
+IG_HANDLE_PATTERN = re.compile(r"[A-Za-z0-9._]{1,30}")
+
+
+class EssentialsRequest(BaseModel):
+    gender: Literal["female", "male"]
+    birth_date: date  # FastAPI 가 YYYY-MM-DD 문자열 → date 로 변환
+    ig_handle: Optional[str] = Field(default=None, max_length=50)
+
+
+class EssentialsResponse(BaseModel):
+    essentials_completed: bool
+    gender: str
+    birth_date: str  # ISO 날짜 (YYYY-MM-DD)
+    ig_handle: Optional[str]
+
+
+def _normalize_ig_handle(raw: Optional[str]) -> Optional[str]:
+    """빈 문자열/공백/None → None. 앞 '@' 제거 + 규칙 검증."""
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    if s.startswith("@"):
+        s = s[1:]
+    if not IG_HANDLE_PATTERN.fullmatch(s):
+        raise HTTPException(
+            400,
+            "ig_handle 은 영문/숫자/./_ 로 30자 이내여야 합니다",
+        )
+    return s
+
+
+def _ensure_min_age(birth: date) -> None:
+    """만 14세 미만 거부. consent age_confirmed 와 정합."""
+    today = date.today()
+    years = today.year - birth.year - (
+        (today.month, today.day) < (birth.month, birth.day)
+    )
+    if years < MIN_AGE_YEARS:
+        raise HTTPException(
+            400,
+            f"만 {MIN_AGE_YEARS}세 이상만 이용 가능해요",
+        )
+    if birth > today:
+        raise HTTPException(400, "생년월일이 미래일 수 없어요")
+
+
+@router.post("/essentials", response_model=EssentialsResponse)
+def save_essentials(
+    body: EssentialsRequest,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """Step 0 structured input — gender + birth_date + ig_handle (optional).
+
+    SPEC-ONBOARDING-V2 REQ-ONBD-001/002.
+    users (primary) + user_profiles (v2 profile cache) 동시 갱신.
+    Sia 대화(/sia/new) 진입 전에 반드시 호출되어야 함.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    _ensure_min_age(body.birth_date)
+    ig_handle = _normalize_ig_handle(body.ig_handle)
+
+    # 1. users 테이블 업데이트 (v1 primary).
+    db.execute(
+        text(
+            "UPDATE users SET "
+            "  gender = :gender, "
+            "  birth_date = :birth_date, "
+            "  ig_handle = :ig_handle "
+            "WHERE id = :uid"
+        ),
+        {
+            "gender": body.gender,
+            "birth_date": body.birth_date.isoformat(),
+            "ig_handle": ig_handle,
+            "uid": user["id"],
+        },
+    )
+
+    # 2. user_profiles upsert (v2 profile). Sia extraction 결과가 합쳐질 row.
+    db.execute(
+        text(
+            "INSERT INTO user_profiles (user_id, gender, birth_date, ig_handle) "
+            "VALUES (:uid, :gender, :birth_date, :ig_handle) "
+            "ON CONFLICT (user_id) DO UPDATE SET "
+            "  gender = EXCLUDED.gender, "
+            "  birth_date = EXCLUDED.birth_date, "
+            "  ig_handle = EXCLUDED.ig_handle, "
+            "  updated_at = NOW()"
+        ),
+        {
+            "gender": body.gender,
+            "birth_date": body.birth_date.isoformat(),
+            "ig_handle": ig_handle,
+            "uid": user["id"],
+        },
+    )
+
+    db.commit()
+
+    return EssentialsResponse(
+        essentials_completed=True,
+        gender=body.gender,
+        birth_date=body.birth_date.isoformat(),
+        ig_handle=ig_handle,
+    )

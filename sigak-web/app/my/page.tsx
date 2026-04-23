@@ -62,7 +62,7 @@ export default function MyPage() {
     if (name) setUserName(name);
 
     if (!userId) {
-      router.replace("/start");
+      router.replace("/sia");
       return;
     }
 
@@ -165,7 +165,7 @@ export default function MyPage() {
                   <div className="py-12 text-center border border-dashed border-[var(--color-border)]">
                     <p className="text-[13px] text-[var(--color-muted)] mb-4">아직 리포트가 없습니다.</p>
                     <Link
-                      href="/start"
+                      href="/sia"
                       className="inline-block px-6 py-2.5 bg-[var(--color-fg)] text-[var(--color-bg)] text-[11px] font-medium tracking-[1px] no-underline hover:opacity-80 transition-opacity"
                     >
                       진단 시작하기
@@ -200,7 +200,7 @@ export default function MyPage() {
                     ))}
 
                     <Link
-                      href="/start"
+                      href="/sia"
                       className="block text-center py-3 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-fg)] transition-colors"
                     >
                       + 새 진단 시작하기

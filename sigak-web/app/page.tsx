@@ -12,6 +12,7 @@ import { getKakaoRedirectUri } from "@/lib/kakao";
 import { TopBar } from "@/components/ui/sigak";
 import { FeedShell } from "@/components/sigak/feed-shell";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
+import { FeatureCards } from "@/components/sigak/feature-cards";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
@@ -57,6 +58,7 @@ function LoggedInFeed() {
       }}
     >
       <FeedShell verdictCount={verdictCount}>
+        <FeatureCards />
         <VerdictGrid onTotalChange={setVerdictCount} />
       </FeedShell>
       <SiteFooter />
@@ -220,25 +222,6 @@ function LoggedOutLanding() {
           </Link>
           에 동의하는 것으로 간주됩니다.
         </p>
-      </div>
-
-      {/* Toss PG 심사용 — 승인 후 제거 */}
-      <div style={{ padding: "0 28px 32px", textAlign: "center" }}>
-        <Link
-          href="/auth/test-login"
-          className="font-sans"
-          style={{
-            fontSize: 10,
-            letterSpacing: "1.5px",
-            textTransform: "uppercase",
-            opacity: 0.3,
-            color: "var(--color-ink)",
-            textDecoration: "underline",
-            textUnderlineOffset: 3,
-          }}
-        >
-          PG 심사 테스트 로그인
-        </Link>
       </div>
 
       <SiteFooter />

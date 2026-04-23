@@ -71,7 +71,14 @@ export default function OnboardingWelcomePage() {
       try {
         const me = await getMe();
         if (me.consent_completed) {
-          router.replace(me.onboarding_completed ? "/" : "/onboarding/step/1");
+          // 이미 동의 완료 — 다음 게이트 단계로
+          if (!me.essentials_completed) {
+            router.replace("/onboarding/essentials");
+          } else if (!me.onboarding_completed) {
+            router.replace("/sia");
+          } else {
+            router.replace("/");
+          }
           return;
         }
       } catch (e) {
@@ -120,7 +127,7 @@ export default function OnboardingWelcomePage() {
         age_confirmed: consents.age_confirmed,
         marketing: consents.marketing,
       });
-      router.replace("/onboarding/step/1");
+      router.replace("/onboarding/essentials");
     } catch (e) {
       setSubmitting(false);
       if (e instanceof ApiError && e.status === 401) {

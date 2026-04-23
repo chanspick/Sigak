@@ -19,7 +19,7 @@ export default async function QuestionnaireCompletePage({
   const userId = typeof params.user_id === "string" ? params.user_id : null;
 
   if (!userId) {
-    redirect("/start");
+    redirect("/sia");
   }
 
   return (

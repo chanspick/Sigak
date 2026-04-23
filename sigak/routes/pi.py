@@ -190,12 +190,15 @@ def get_pi_v2(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
-    """v2 해제 상태. GET 은 user_profiles 요구 없음 (해제 여부만 판정)."""
+    """v2 해제 상태. GET 은 user_profiles 요구 없음 (해제 여부만 판정).
+
+    Phase I: is_current 리포트 조회. 버전/스냅샷 포함 report_data 반환.
+    """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
-    row = _select_report(db, user["id"])
-    if not row or row.unlocked_at is None:
+    row = _select_current_v2(db, user["id"])
+    if row is None:
         return PIStatusResponse(
             unlocked=False,
             cost=tokens_service.COST_PI_UNLOCK,
@@ -213,46 +216,157 @@ def unlock_pi_v2(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
-    """50 토큰 차감 + user_profile seed 반영된 report_data 저장.
+    """PI 생성 / 재생성 (Phase I).
 
-    전제: user_profiles row 존재 (v2 온보딩 완료).
+    정책:
+      - 유저 is_current 리포트 없음 → **첫 1회 무료** 생성
+      - 유저 is_current 리포트 있음 → 50 토큰 재생성 (force_new_version=True)
 
-    흐름:
-      1. user_profile 로드 (없으면 409)
-      2. 이미 unlocked → idempotent 리턴 (재저장 없음, 기존 payload 유지)
-      3. 잔액 체크 + 차감 (v1 과 동일 idempotency_key)
-      4. services.pi.build_v2_report_data(user_profile) 로 payload 생성
-      5. pi_reports UPSERT
+    Phase H 완료 전까지 SiaWriter Stub 기반 placeholder copy. concrete 주입 후
+    별도 엔드포인트 호출 없이 자동 반영.
+
+    Legacy 호환:
+      - 구 placeholder (status='generating' / 'migrated_from_sigak_report') 는
+        "is_current 있음" 으로 처리하지 않는다 — 실제 PIReport 데이터 있는
+        version 만 "생성됨" 으로 카운트 (_has_real_current_report).
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
-    profile = user_profiles_service.get_profile(db, user["id"])
-    if profile is None:
+    # Vault 선행 — onboarding 완료 여부
+    from services.user_data_vault import load_vault
+    vault = load_vault(db, user["id"])
+    if vault is None:
         raise HTTPException(
             409,
             "시각이 본 나 리포트를 여시려면 온보딩이 먼저 필요합니다.",
         )
 
-    existing = _select_report(db, user["id"])
-    if existing and existing.unlocked_at is not None:
-        return PIUnlockResponse(
-            unlocked=True,
-            unlocked_at=existing.unlocked_at.isoformat(),
-            report_data=existing.report_data or {},
-            token_balance=tokens_service.get_balance(db, user["id"]),
+    had_real_current = _has_real_current_report(db, user["id"])
+
+    # 재생성 = 토큰 차감. 첫 1회 = 무료.
+    balance_after: int
+    if had_real_current:
+        balance_after = _debit_regenerate_tokens(db, user["id"])
+    else:
+        balance_after = tokens_service.get_balance(db, user["id"])
+
+    # 엔진 실행
+    from services.pi_engine import PIEngineError, generate_pi_report
+    try:
+        report = generate_pi_report(
+            db,
+            user_id=user["id"],
+            force_new_version=had_real_current,
         )
+    except PIEngineError as e:
+        logger.exception("PI engine failed: user=%s", user["id"])
+        # 재생성 차감했는데 실패하면 환불
+        if had_real_current:
+            _refund_regenerate_tokens(db, user["id"])
+            db.commit()
+            balance_after = tokens_service.get_balance(db, user["id"])
+        raise HTTPException(500, f"PI 리포트 생성 실패: {e}")
 
-    balance_after = _debit_tokens_for_unlock(db, user["id"])
-
-    payload = pi_service.build_v2_report_data(profile)
-    now = datetime.utcnow()
-    _upsert_report(db, user["id"], payload, now)
     db.commit()
 
+    import json
     return PIUnlockResponse(
         unlocked=True,
-        unlocked_at=now.isoformat(),
-        report_data=payload,
+        unlocked_at=report.generated_at.isoformat(),
+        report_data=json.loads(
+            json.dumps(report.model_dump(mode="json"), ensure_ascii=False, default=str)
+        ),
         token_balance=balance_after,
     )
+
+
+# ─────────────────────────────────────────────
+#  v2 helpers — Phase I
+# ─────────────────────────────────────────────
+
+def _select_current_v2(db, user_id: str):
+    """is_current=TRUE 리포트 1건 — 마이그레이션 전 스키마 호환 위해 defensive."""
+    try:
+        return db.execute(
+            text(
+                "SELECT unlocked_at, report_data "
+                "FROM pi_reports "
+                "WHERE user_id = :uid AND is_current = TRUE "
+                "LIMIT 1"
+            ),
+            {"uid": user_id},
+        ).first()
+    except Exception:
+        # Phase I 마이그레이션 전 — legacy 스키마 (user_id PK) 로 fallback
+        logger.debug("pi_reports is_current column missing — falling back to user_id PK read")
+        return _select_report(db, user_id)
+
+
+def _has_real_current_report(db, user_id: str) -> bool:
+    """version 1 이상 실 리포트 존재 여부 — legacy placeholder 제외."""
+    try:
+        row = db.execute(
+            text(
+                "SELECT report_data FROM pi_reports "
+                "WHERE user_id = :uid AND is_current = TRUE LIMIT 1"
+            ),
+            {"uid": user_id},
+        ).first()
+    except Exception:
+        # 마이그레이션 전 — 무료 첫 생성 허용
+        return False
+    if row is None or not row.report_data:
+        return False
+    # placeholder / legacy 는 실 리포트 아님
+    status = (row.report_data or {}).get("status")
+    if status in ("generating", "migrated_from_sigak_report"):
+        return False
+    # 실 PIReport 는 최소 report_id / version 키 보유
+    if "report_id" not in (row.report_data or {}):
+        return False
+    return True
+
+
+def _debit_regenerate_tokens(db, user_id: str) -> int:
+    """재생성 50 토큰 차감 — 1분 해상도 idempotency."""
+    import time
+    cost = tokens_service.COST_PI_UNLOCK
+    current = tokens_service.get_balance(db, user_id)
+    if current < cost:
+        raise HTTPException(
+            402,
+            f"토큰 부족 — 재생성 {cost} 필요, 보유 {current}",
+        )
+    minute_bucket = int(time.time()) // 60
+    key = f"pi_regenerate:{user_id}:{minute_bucket}"
+    try:
+        return tokens_service.credit_tokens(
+            db,
+            user_id=user_id,
+            amount=-cost,
+            kind=tokens_service.KIND_CONSUME_PI,
+            idempotency_key=key,
+            reference_type="pi_regenerate",
+        )
+    except IntegrityError:
+        db.rollback()
+        return tokens_service.get_balance(db, user_id)
+
+
+def _refund_regenerate_tokens(db, user_id: str) -> None:
+    """생성 실패 환불 — 동일 분 bucket 에 대응."""
+    import time
+    minute_bucket = int(time.time()) // 60
+    key = f"pi_regenerate:{user_id}:{minute_bucket}:refund"
+    try:
+        tokens_service.credit_tokens(
+            db,
+            user_id=user_id,
+            amount=+tokens_service.COST_PI_UNLOCK,
+            kind=tokens_service.KIND_REFUND,
+            idempotency_key=key,
+            reference_type="pi_regenerate_refund",
+        )
+    except IntegrityError:
+        db.rollback()

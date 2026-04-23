@@ -1,0 +1,34 @@
+# Knowledge Base 초기 seed — 2026 봄 남성 트렌드 샘플 2건.
+items:
+  - trend_id: male_2026_spring_001
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "쉬운 무게감 — 담백한 단색 레이어"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.7]
+    action_hints:
+      - 네이비 / 다크 그레이 위주 레이어
+      - 로고/패턴 배제
+      - 액세서리는 시계 하나 정도
+    detailed_guide: |
+      꾸밈 없이 담백한 인상을 유지하면서 신뢰감을 더한다.
+      중성/중간 좌표 유저에게 기본값으로 제시 가능.
+
+  - trend_id: male_2026_spring_002
+    season: "2026_spring"
+    gender: male
+    category: silhouette
+    title: "릴랙스드 드레이프 — 어깨 힘 뺀 재킷"
+    compatible_coordinates:
+      shape: [0.2, 0.6]
+      volume: [0.4, 0.8]
+      age: [0.4, 0.9]
+    action_hints:
+      - 재킷 어깨 패드 없음
+      - 하의는 크롭 or 앵클 포인트
+      - 스니커즈 대신 로우 부츠
+    detailed_guide: |
+      샤프 쪽이 아닌 소프트/성숙 인상 유저에게 어울리는 루즈핏 실루엣.

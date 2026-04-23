@@ -151,6 +151,10 @@ def create_session(
         "resolved_name": resolved_name,
         "ig_feed_cache": ig_feed_cache,
         "status": "active",
+        # v3 Phase B — 정조준 spectrum 추적
+        "spectrum_log": [],
+        "precision_hits": 0,       # spectrum 1/2 누적
+        "precision_misses": 0,     # spectrum 3/4 누적
         "created_at": now,
         "updated_at": now,
     }
@@ -281,6 +285,155 @@ def touch_session(conversation_id: str) -> bool:
     key = session_key(conversation_id)
     # Redis EXPIRE 는 키가 존재해야만 성공
     return bool(r.expire(key, settings.sia_session_ttl_seconds))
+
+
+# ─────────────────────────────────────────────
+#  v3 — Spectrum 응답 추적 + 다음 턴 결정 (Phase B)
+# ─────────────────────────────────────────────
+
+# 유저 canonical 4지선다 문구 (UI 버튼에서 그대로 전송될 때 빠른 경로)
+_CANONICAL_SPECTRUM: dict[str, int] = {
+    "네, 비슷하다": 1,
+    "절반 정도 맞다": 2,
+    "다르다": 3,
+    "전혀 다르다": 4,
+}
+
+
+def parse_spectrum_choice(user_message: str) -> Optional[int]:
+    """유저 메시지 → spectrum 1/2/3/4. 매치 실패 시 None.
+
+    우선순위:
+      1) canonical 4 문구 정확 일치
+      2) fuzzy 순서: 전혀 → 절반 → 비슷/맞 → 다르
+         ("반은 맞고 반은 다릅니다" 같은 복합문이 2 로 분류되도록 절반 우선)
+    """
+    if not user_message:
+        return None
+    normalized = user_message.strip()
+    if normalized in _CANONICAL_SPECTRUM:
+        return _CANONICAL_SPECTRUM[normalized]
+
+    # fuzzy — 특정 키워드 우선순위
+    # 4 (전혀 다르다) 먼저: "전혀" 키워드가 있으면 무조건 강한 반대
+    if "전혀" in normalized:
+        return 4
+    # 2 (절반) 우선: 복합문 "반은 맞고 반은 다르다" 등에서 절반 의도 포착
+    half_markers = ("절반", "반만", "반반", "반은")
+    if any(m in normalized for m in half_markers):
+        return 2
+    # 1 (비슷/맞) — "안 맞" 부정형은 제외
+    if "비슷" in normalized or ("맞" in normalized and "안 맞" not in normalized):
+        return 1
+    # 3 (다르) — 한국어 활용형 "다르/다른/다릅/달라" 전부 커버
+    disagree_markers = ("다르", "다른", "다릅", "달라")
+    if any(m in normalized for m in disagree_markers):
+        return 3
+    return None
+
+
+def record_spectrum_choice(
+    *,
+    conversation_id: str,
+    user_message: str,
+) -> Optional[dict]:
+    """유저 메시지에서 spectrum 파싱 → 세션에 로그 + 히트/미스 누적.
+
+    반환:
+      - 매치됐고 세션 존재: 업데이트된 state dict
+      - 매치 실패 OR 세션 없음: None (caller 는 분기 없이 일반 대화 흐름)
+    """
+    choice = parse_spectrum_choice(user_message)
+    if choice is None:
+        return None
+
+    r = get_redis()
+    key = session_key(conversation_id)
+    raw = r.get(key)
+    if raw is None:
+        return None
+
+    state = json.loads(raw)
+    log = state.get("spectrum_log") or []
+    log.append(choice)
+    state["spectrum_log"] = log
+
+    if choice in (1, 2):
+        state["precision_hits"] = int(state.get("precision_hits", 0)) + 1
+    else:
+        state["precision_misses"] = int(state.get("precision_misses", 0)) + 1
+
+    state["updated_at"] = _now_iso()
+    settings = get_settings()
+    _write_state(r, state, primary_ttl=settings.sia_session_ttl_seconds)
+    return state
+
+
+def decide_next_turn(state: dict) -> str:
+    """다음 Sia 응답 유형 결정. v3 14턴 구조.
+
+    Input: state (유저 직전 메시지가 append_message + record_spectrum_choice 를
+           통해 이미 반영된 상태).
+
+    Returns (turn_type string):
+      "opening"                      — turn_count == 0, Sia 첫 응답
+      "precision_continue"           — 내적 구간인데 spectrum 미파싱, 안전 재시도
+      "branch_agree"                 — 직전 유저 spectrum=1
+      "branch_half"                  — 직전 유저 spectrum=2
+      "branch_disagree"              — 직전 유저 spectrum=3
+      "branch_fail"                  — 직전 유저 spectrum=4
+      "force_external_transition"    — 3회 miss 누적 → 즉시 외적 전환
+      "external_desired_image"       — turn_count=4
+      "external_reference"           — turn_count=5
+      "external_body_height"         — turn_count=6
+      "external_body_weight"         — turn_count=7
+      "external_body_shoulder"       — turn_count=8
+      "external_concerns"            — turn_count=9
+      "external_lifestyle"           — turn_count=10
+      "closing"                      — turn_count>=11
+
+    Caller (routes/sia.py) 는 이 키를 system prompt 의 TURN_CONTEXT 에 주입.
+    """
+    turn_count = int(state.get("turn_count", 0))
+    spectrum_log = state.get("spectrum_log") or []
+    precision_misses = int(state.get("precision_misses", 0))
+
+    # 0: Sia 첫 응답 — 유저가 아직 말 안 함
+    if turn_count == 0:
+        return "opening"
+
+    # 내적 정조준 구간 (유저 1~3 응답 후)
+    if turn_count <= 3:
+        # 3회 연속 miss 누적 → 즉시 외적 전환 (복구)
+        if precision_misses >= 3:
+            return "force_external_transition"
+        last = spectrum_log[-1] if spectrum_log else None
+        if last == 1:
+            return "branch_agree"
+        if last == 2:
+            return "branch_half"
+        if last == 3:
+            return "branch_disagree"
+        if last == 4:
+            return "branch_fail"
+        # spectrum 파싱 실패 — 내적 계속 시도
+        return "precision_continue"
+
+    # 외적 수집 — turn_count 4~10
+    external_map = {
+        4: "external_desired_image",
+        5: "external_reference",
+        6: "external_body_height",
+        7: "external_body_weight",
+        8: "external_body_shoulder",
+        9: "external_concerns",
+        10: "external_lifestyle",
+    }
+    if turn_count in external_map:
+        return external_map[turn_count]
+
+    # 11 이상 — 클로징
+    return "closing"
 
 
 # ─────────────────────────────────────────────

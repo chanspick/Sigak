@@ -1,0 +1,31 @@
+{
+  "fixture_id": "female_branch_agree_v1",
+  "gender": "female",
+  "turn_type": "branch_agree",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "쿨뮤트",
+      "tone_percentage": 68,
+      "saturation_trend": "감소",
+      "environment": "실내 + 자연광",
+      "pose_frequency": "측면 > 정면",
+      "observed_adjectives": ["단정", "감성", "조용함"],
+      "style_consistency": 0.82,
+      "mood_signal": "정돈된 여운을 남기는 방식에 익숙하신 분입니다",
+      "three_month_shift": "채도가 점진적으로 낮아지는 방향"
+    },
+    "session_state": {
+      "spectrum_log": [1],
+      "precision_hits": 1,
+      "precision_misses": 0
+    }
+  },
+  "expected_response": "정세현님은 혼자 시간을 잘 쓰시는 분입니다.\n\n피드에는 단독 구도 비중이 크고, 사람이 많은 자리를 자주 선택하지 않으십니다.\n\n이 방향은 얼마나 가까우신가요?\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": true
+  }
+}

@@ -1,0 +1,326 @@
+"""UserDataVault — 유저 전수 데이터 중앙 집계 (Phase G5).
+
+CLAUDE.md §4.2 정의. 여러 테이블에 흩어진 유저 데이터를 한 객체로 집계.
+
+MVP 범위 (Phase G skeleton):
+- load_vault(db, user_id) — user_profiles / ig_feed_cache / conversations 경량 조합
+- get_user_taste_profile() — compute UserTasteProfile (coordinate + strength)
+
+Phase J/K/M 진행 시 확장:
+- aspiration_history (Phase J)
+- best_shot_history (Phase K)
+- monthly_reports (Phase M)
+- pi_versions (Phase I)
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from sqlalchemy import text
+from pydantic import BaseModel, ConfigDict, Field
+
+from schemas.user_taste import (
+    ConversationSignals,
+    PhotoReference,
+    UserTasteProfile,
+    compute_strength_score,
+)
+from services.coordinate_system import (
+    VisualCoordinate,
+    neutral_coordinate,
+)
+from services.user_profiles import get_profile
+
+
+logger = logging.getLogger(__name__)
+
+
+class UserBasicInfo(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    user_id: str
+    gender: Optional[str] = None
+    birth_date: Optional[str] = None
+    ig_handle: Optional[str] = None
+    name: Optional[str] = None
+
+
+class UserDataVault(BaseModel):
+    """유저 데이터 중앙 집계. 읽기 전용 스냅샷.
+
+    MVP 필드:
+      basic_info       — users + user_profiles 조합
+      ig_feed_cache    — user_profiles.ig_feed_cache (IgFeedAnalysis 포함)
+      structured_fields — user_profiles.structured_fields (Sia 대화 결과)
+      conversation_count — 완료된 Sia 세션 수
+
+    확장 예약 필드 (Phase I/J/K/M 진행 시 populate):
+      aspiration_count  — 추구미 분석 수행 횟수
+      best_shot_count   — Best Shot 수행 횟수
+      pi_version_count  — PI 리포트 생성 횟수
+      monthly_report_count — 이달의 시각 수행 횟수
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    basic_info: UserBasicInfo
+    ig_feed_cache: Optional[dict] = None
+    structured_fields: dict[str, Any] = Field(default_factory=dict)
+    conversation_count: int = 0
+
+    aspiration_count: int = 0
+    best_shot_count: int = 0
+    pi_version_count: int = 0
+    monthly_report_count: int = 0
+
+    snapshot_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # ─────────────────────────────────────────────
+    #  UserTasteProfile composition
+    # ─────────────────────────────────────────────
+
+    def get_user_taste_profile(self) -> UserTasteProfile:
+        """MVP 구현 — IG Vision + structured_fields 기반 경량 UserTasteProfile.
+
+        Phase I 이후 PhotoReference / trajectory / aspiration_vector 채움.
+        """
+        signals = self._compose_conversation_signals()
+        position = self._compose_current_position()
+        evidence = self._compose_preference_evidence()
+        phrases = self._compose_user_original_phrases()
+
+        filled_field_count = sum(
+            1 for v in (
+                signals.body_shape,
+                signals.current_concerns,
+                signals.specific_context,
+                signals.trial_history,
+            ) if v
+        )
+        # desired_image_keywords 도 하나의 필드로 취급
+        if signals.desired_image_keywords:
+            filled_field_count += 1
+
+        strength = compute_strength_score(
+            has_ig_analysis=bool(
+                self.ig_feed_cache
+                and self.ig_feed_cache.get("analysis")
+            ),
+            conversation_field_count=filled_field_count,
+            aspiration_count=self.aspiration_count,
+            best_shot_count=self.best_shot_count,
+            monthly_report_count=self.monthly_report_count,
+        )
+
+        return UserTasteProfile(
+            user_id=self.basic_info.user_id,
+            snapshot_at=self.snapshot_at,
+            current_position=position,
+            aspiration_vector=None,   # Phase J 에서 추구미 분석 결과로 채움
+            preference_evidence=evidence,
+            conversation_signals=signals,
+            trajectory=[],             # Phase M (이달의 시각) 에서 채움
+            user_original_phrases=phrases,
+            strength_score=strength,
+        )
+
+    # ─────────────────────────────────────────────
+    #  Internal composers — structured_fields 에서 추출
+    # ─────────────────────────────────────────────
+
+    def _compose_conversation_signals(self) -> ConversationSignals:
+        sf = self.structured_fields or {}
+        # CLAUDE.md §6.10 JSON 스키마 필드명 반영.
+        desired_raw = sf.get("desired_image") or sf.get("desired_image_keywords") or []
+        if isinstance(desired_raw, str):
+            keywords = [desired_raw] if desired_raw else []
+        elif isinstance(desired_raw, list):
+            keywords = [k for k in desired_raw if isinstance(k, str) and k.strip()]
+        else:
+            keywords = []
+
+        return ConversationSignals(
+            body_shape=_str_or_none(sf.get("body_shape")),
+            current_concerns=_str_or_none(sf.get("current_concerns")),
+            specific_context=_str_or_none(sf.get("specific_context")),
+            trial_history=_str_or_none(sf.get("trial_history")),
+            desired_image_keywords=keywords,
+            agreement_count=int(sf.get("agreement_count") or 0),
+            pushback_count=int(sf.get("pushback_count") or 0),
+        )
+
+    def _compose_current_position(self) -> Optional[VisualCoordinate]:
+        """structured_fields.coordinate 가 있으면 사용, 없으면 None.
+
+        Phase H 에서 Haiku 가 대화 중 매 메시지마다 shape/volume/age delta 산출
+        → structured_fields["coordinate"] = {"shape": .., "volume": .., "age": ..}
+        저장 예정. 현재 Phase A-F 는 coordinate 미산출이라 대부분 None.
+        """
+        sf = self.structured_fields or {}
+        coord_raw = sf.get("coordinate") or sf.get("current_position")
+        if not isinstance(coord_raw, dict):
+            return None
+        try:
+            return VisualCoordinate(
+                shape=float(coord_raw.get("shape", 0.5)),
+                volume=float(coord_raw.get("volume", 0.5)),
+                age=float(coord_raw.get("age", 0.5)),
+            )
+        except (TypeError, ValueError):
+            return None
+
+    def _compose_preference_evidence(self) -> list[PhotoReference]:
+        """현 vault 상태에서 확보 가능한 사진 레퍼런스.
+
+        MVP: latest_posts 의 display_url 보존분만 얇게 참조.
+        Phase I 이후 R2 stored_url 로 전환.
+        """
+        if not self.ig_feed_cache:
+            return []
+        posts = self.ig_feed_cache.get("latest_posts") or []
+        refs: list[PhotoReference] = []
+        for p in posts[:10]:
+            url = p.get("display_url") if isinstance(p, dict) else None
+            if not url:
+                continue
+            refs.append(PhotoReference(
+                photo_id=_photo_id_from_caption(p),
+                stored_url=url,
+                source="ig_feed",
+                captured_at=_parse_iso(p.get("timestamp")),
+                sia_comment=None,
+                coordinate=None,
+            ))
+        return refs
+
+    def _compose_user_original_phrases(self) -> list[str]:
+        """CLAUDE.md R2 원칙 — 리포트 재활용 키워드.
+
+        Phase H 에서 Haiku 가 user_original_phrase 필드 extraction.
+        MVP 에선 structured_fields 에 저장된 자유 텍스트 들을 그대로 반영.
+        """
+        sf = self.structured_fields or {}
+        collected = sf.get("user_original_phrases")
+        if isinstance(collected, list):
+            return [p for p in collected if isinstance(p, str) and p.strip()]
+        # 대체 소스 — current_concerns / trial_history 원문 일부
+        out: list[str] = []
+        for key in ("current_concerns", "trial_history", "specific_context"):
+            v = sf.get(key)
+            if isinstance(v, str) and v.strip():
+                out.append(v.strip())
+        return out
+
+
+# ─────────────────────────────────────────────
+#  Loader — DB 에서 vault 조립
+# ─────────────────────────────────────────────
+
+def load_vault(db, user_id: str) -> Optional[UserDataVault]:
+    """DB 에서 유저 전수 데이터를 읽어 vault 조립.
+
+    db is None 시 (테스트 환경) None 반환.
+    user_profiles row 없으면 None.
+    """
+    if db is None:
+        return None
+
+    profile = get_profile(db, user_id)
+    if profile is None:
+        return None
+
+    basic = UserBasicInfo(
+        user_id=user_id,
+        gender=profile.get("gender"),
+        birth_date=_date_to_str(profile.get("birth_date")),
+        ig_handle=profile.get("ig_handle"),
+        name=None,   # users 테이블 별도 조회 필요 — Phase H/I 에서 확장
+    )
+
+    # 상품별 카운트 — MVP 는 0. Phase I/J/K/M 진행 시 각 테이블 COUNT(*) 연결.
+    counts = _fetch_product_counts(db, user_id)
+
+    return UserDataVault(
+        basic_info=basic,
+        ig_feed_cache=profile.get("ig_feed_cache"),
+        structured_fields=profile.get("structured_fields") or {},
+        conversation_count=counts.get("conversation_count", 0),
+        aspiration_count=counts.get("aspiration_count", 0),
+        best_shot_count=counts.get("best_shot_count", 0),
+        pi_version_count=counts.get("pi_version_count", 0),
+        monthly_report_count=counts.get("monthly_report_count", 0),
+    )
+
+
+def _fetch_product_counts(db, user_id: str) -> dict[str, int]:
+    """상품별 수행 횟수. MVP — 존재하는 테이블만 카운트. 없으면 0."""
+    counts = {
+        "conversation_count": 0,
+        "aspiration_count": 0,
+        "best_shot_count": 0,
+        "pi_version_count": 0,
+        "monthly_report_count": 0,
+    }
+    # 현재 존재하는 테이블만 안전 카운트
+    try:
+        row = db.execute(
+            text("SELECT COUNT(*) FROM conversations WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).scalar()
+        counts["conversation_count"] = int(row or 0)
+    except Exception:
+        # 테이블 없음 or 스키마 불일치 — 무시
+        logger.debug("conversations count skipped for user=%s", user_id)
+
+    try:
+        row = db.execute(
+            text("SELECT COUNT(*) FROM pi_reports WHERE user_id = :uid"),
+            {"uid": user_id},
+        ).scalar()
+        counts["pi_version_count"] = int(row or 0)
+    except Exception:
+        logger.debug("pi_reports count skipped for user=%s", user_id)
+
+    # aspiration / best_shot / monthly_reports — 테이블 미생성. Phase J/K/M 에서 확장.
+    return counts
+
+
+# ─────────────────────────────────────────────
+#  helpers
+# ─────────────────────────────────────────────
+
+def _str_or_none(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
+
+
+def _date_to_str(v: Any) -> Optional[str]:
+    if v is None:
+        return None
+    if hasattr(v, "isoformat"):
+        return v.isoformat()
+    return str(v)
+
+
+def _parse_iso(v: Any) -> Optional[datetime]:
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, str):
+        try:
+            return datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _photo_id_from_caption(p: dict) -> str:
+    """latest_posts 원본에 id 없을 때 안정적 id 생성."""
+    if not isinstance(p, dict):
+        return "photo_unknown"
+    # timestamp + caption 앞 8자 해시 정도면 충분. 간단하게 str 조합.
+    ts = p.get("timestamp") or "nots"
+    return f"photo_{ts}"

@@ -38,6 +38,8 @@ from sqlalchemy.exc import IntegrityError
 from deps import db_session, get_current_user
 from schemas.verdict_v2 import FullContent, PreviewContent, VerdictV2Result
 from services import tokens as tokens_service
+from services.knowledge_matcher import match_trends_for_user
+from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
 from services.verdict_v2 import PhotoInput, VerdictV2Error, build_verdict_v2
 
@@ -144,12 +146,36 @@ async def create_verdict_v2(
             "user_profile 이 없습니다. Onboarding 먼저 완료해 주십시오.",
         )
 
-    # 4. Sonnet 4.6 cross-analysis
+    # 4. Knowledge Base 매칭 + UserTasteProfile 로드 (Phase L)
+    #    profile.gender 기준으로 현 시즌 매칭. vault 실패 시 조용히 None 진행.
+    matched_trends = None
+    taste_profile = None
+    try:
+        vault = load_vault(db, user["id"])
+        if vault is not None:
+            taste_profile = vault.get_user_taste_profile()
+            gender = (vault.basic_info.gender or profile.get("gender") or "female")
+            if gender in ("female", "male"):
+                matched_trends = match_trends_for_user(
+                    taste_profile,
+                    gender=gender,   # type: ignore[arg-type]
+                    season=None,     # 현 시즌 자동 선정 (env/config 연결은 Phase P)
+                    limit=5,
+                )
+    except Exception:
+        logger.exception(
+            "verdict v2 KB/vault load failed — degrading to no-trend mode: user_id=%s",
+            user["id"],
+        )
+
+    # 5. Sonnet 4.6 cross-analysis
     try:
         result = build_verdict_v2(
             user_profile=profile,
             photos=photo_inputs,
-            trend_data=None,   # Phase 1 에선 trend 미주입. Phase 3 에서 확장.
+            trend_data=None,       # Phase 1 에선 trend_data (legacy 벡터) 미주입
+            matched_trends=matched_trends,   # Phase L 확장
+            taste_profile=taste_profile,     # Phase L 확장
         )
     except VerdictV2Error as e:
         logger.exception("verdict v2 build failed: user_id=%s", user["id"])

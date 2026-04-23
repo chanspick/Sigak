@@ -1,0 +1,31 @@
+{
+  "fixture_id": "male_branch_disagree_v1",
+  "gender": "male",
+  "turn_type": "branch_disagree",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "중성",
+      "tone_percentage": 62,
+      "saturation_trend": "안정",
+      "environment": "외부 활동 + 야외",
+      "pose_frequency": "정면 > 측면",
+      "observed_adjectives": ["단정", "담백", "묵직함"],
+      "style_consistency": 0.75,
+      "mood_signal": "꾸밈 없이 담백한 인상을 전달하시는 분입니다",
+      "three_month_shift": null
+    },
+    "session_state": {
+      "spectrum_log": [3],
+      "precision_hits": 0,
+      "precision_misses": 1
+    }
+  },
+  "expected_response": "그러면 정세현님은 오히려 친구들이 어려울 때 먼저 찾는 분입니다.\n\n단호해 보이는 인상 뒤에 주변을 챙기는 무게감이 있으며, 중요한 순간에 먼저 판단을 내려주십니다.\n\n이 방향은 얼마나 가까우신가요?\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": true
+  }
+}

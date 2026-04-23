@@ -27,7 +27,7 @@ from typing import Literal, Optional
 import httpx
 
 from config import get_settings
-from schemas.user_profile import IgFeedCache, IgFeedProfileBasics
+from schemas.user_profile import IgFeedCache, IgFeedProfileBasics, IgLatestPost
 
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,17 @@ APIFY_ENDPOINT_TMPL = (
 #  Public API
 # ─────────────────────────────────────────────
 
-def fetch_ig_profile(ig_handle: Optional[str]) -> tuple[IgFetchStatus, Optional[IgFeedCache]]:
+def fetch_ig_profile(
+    ig_handle: Optional[str],
+    *,
+    results_limit: int = 10,
+) -> tuple[IgFetchStatus, Optional[IgFeedCache]]:
     """Fetch Instagram profile + recent posts via Apify Actor.
+
+    Args:
+      ig_handle: IG 핸들 ("@yuni" / "yuni" / None 허용)
+      results_limit: Apify 수집 포스트 수. 기본 10 (Sia 오프닝 고정 샘플).
+        PI 리포트 전용은 fetch_ig_profile_for_pi() 사용 → 30.
 
     Returns (status, cache). `cache` is None unless status in {success, private}.
     Never raises — all exceptions converted to ("failed", None) with logging.
@@ -82,6 +91,7 @@ def fetch_ig_profile(ig_handle: Optional[str]) -> tuple[IgFetchStatus, Optional[
             api_key=settings.apify_api_key,
             actor_id=settings.apify_actor_id,
             timeout=settings.ig_fetch_timeout,
+            results_limit=results_limit,
         )
     except httpx.TimeoutException:
         logger.warning("Apify timeout (>%.1fs) for handle=%s", settings.ig_fetch_timeout, handle)
@@ -97,17 +107,32 @@ def fetch_ig_profile(ig_handle: Optional[str]) -> tuple[IgFetchStatus, Optional[
         logger.warning("Apify returned 0 items for handle=%s (handle may not exist)", handle)
         return ("failed", None)
 
-    # 첫 item 이 profile. 나머지는 posts (actor 설정에 따라 다름 — defensive parse)
+    # addParentData=True 사용 시 모든 items 가 포스트이고, 각 포스트의 top-level 에
+    # 프로필 메타(username, followersCount, postsCount, private 등) 가 임베딩됨.
+    # profile_raw 는 items[0] 의 top-level 에서 꺼내 쓰되, posts_raw 는 items 전체.
     profile_raw = raw_items[0]
 
-    # 비공개 계정 분기
+    # 비공개 계정 분기 — 이 경우 posts 수집 불가, profile meta 만 남김.
     if bool(profile_raw.get("private", False)) or bool(profile_raw.get("is_private", False)):
         cache = _build_private_cache(profile_raw)
         return ("private", cache)
 
-    # 공개 계정: 피드 함께 수집
-    cache = _build_full_cache(profile_raw, posts_raw=raw_items[1:] if len(raw_items) > 1 else [])
+    # 공개 계정: items 전체를 posts 로 사용 (첫 포스트 손실 금지).
+    cache = _build_full_cache(
+        profile_raw,
+        posts_raw=raw_items,
+        posts_limit=results_limit,
+    )
     return ("success", cache)
+
+
+def fetch_ig_profile_for_pi(ig_handle: Optional[str]) -> tuple[IgFetchStatus, Optional[IgFeedCache]]:
+    """PI 리포트 전용 IG 수집 — Apify limit=30.
+
+    Phase I (CLAUDE.md §5.1) 에서 결정: Sia 대화용 10장과 별도로
+    PI 선별 풀을 30장까지 확장. 비용 +$0.06/유저, 가격 ₩5,000 마진 내.
+    """
+    return fetch_ig_profile(ig_handle, results_limit=30)
 
 
 def is_stale(ig_fetched_at: Optional[datetime]) -> bool:
@@ -119,6 +144,34 @@ def is_stale(ig_fetched_at: Optional[datetime]) -> bool:
     return age_seconds > (settings.ig_refresh_days * 24 * 3600)
 
 
+def is_analysis_stale(
+    cache: Optional[IgFeedCache],
+    current_post_count: int,
+    *,
+    delta_threshold: int = 3,
+) -> bool:
+    """Vision 재호출 필요 여부 — refresh 정책 B (delta 기반).
+
+    True cases:
+      - cache is None (최초 수집)
+      - cache.analysis is None (이전 호출 실패/스킵)
+      - cache.last_analyzed_post_count is None (레거시 cache)
+      - |current_post_count - last_analyzed_post_count| >= delta_threshold
+
+    False: 피드 변동 미미 → Vision 스킵, 기존 analysis 재사용.
+
+    14일 is_stale 은 Apify 재호출 트리거. Apify 후 post_count 확인하고
+    이 함수로 Vision 재호출 여부 최종 판정한다.
+    """
+    if cache is None:
+        return True
+    if cache.analysis is None:
+        return True
+    if cache.last_analyzed_post_count is None:
+        return True
+    return abs(current_post_count - cache.last_analyzed_post_count) >= delta_threshold
+
+
 # ─────────────────────────────────────────────
 #  Internal — Apify HTTP
 # ─────────────────────────────────────────────
@@ -128,19 +181,26 @@ def _call_apify_actor(
     api_key: str,
     actor_id: str,
     timeout: float,
+    *,
+    results_limit: int = 10,
 ) -> list[dict]:
     """Low-level Apify Actor 호출. 유닛 테스트에서 monkey-patch 대상.
 
     Actor: apify/instagram-scraper (또는 config.apify_actor_id)
-    Payload: usernames, resultsLimit (최근 9~12 포스트)
+    Payload: directUrls (profile URL) + resultsType="posts" + addParentData.
+    `usernames` 필드는 현 actor 스키마에 없음 — 무시됨. 반드시 directUrls.
 
-    Returns: list of dataset items. 첫 item 이 profile metadata, 나머지는 posts.
+    results_limit: Apify 수집 포스트 수. Sia 10 / PI 30.
+
+    Returns: list of dataset items. addParentData=True 이면 모든 item 이
+             포스트이고 top-level 에 프로필 메타가 임베딩된 상태.
     Raises: httpx.TimeoutException, httpx.HTTPStatusError, 기타 네트워크 예외.
     """
     url = APIFY_ENDPOINT_TMPL.format(actor_id=actor_id)
     payload = {
-        "usernames": [handle],
-        "resultsLimit": 9,
+        "directUrls": [f"https://www.instagram.com/{handle}/"],
+        "resultsType": "posts",
+        "resultsLimit": int(results_limit),
         "addParentData": True,
     }
     with httpx.Client(timeout=timeout) as client:
@@ -180,22 +240,68 @@ def _build_private_cache(profile_raw: dict) -> IgFeedCache:
     )
 
 
-def _build_full_cache(profile_raw: dict, posts_raw: list[dict]) -> IgFeedCache:
-    """공개 계정: profile + posts 로부터 feed_highlights 추출.
+def _build_full_cache(
+    profile_raw: dict,
+    posts_raw: list[dict],
+    *,
+    posts_limit: int = 10,
+) -> IgFeedCache:
+    """공개 계정: profile + posts 로부터 feed_highlights / latest_posts / analysis 추출.
 
-    current_style_mood / style_trajectory 는 LLM 기반 추출이므로 D2 에선 None.
-    D5+ 에서 Sia 대화 엔진이 feed_highlights + 유저 응답을 종합해 채움.
+    current_style_mood (DEPRECATED D6): 이제 analysis.observed_adjectives 로 대체.
+    style_trajectory: Phase B 시계열 예약, 현재 None 유지.
+    analysis: Sonnet Vision 호출. 실패 시 None 으로 degrade, cache 자체는 저장.
+
+    Privacy:
+      - latest_posts 의 comments 는 본문만 보존. 댓글 작성자(타인) username /
+        profile pic / user id 는 전부 제거.
+      - raw 에서도 동일하게 scrub — 제3자 개인정보 DB 영구저장 방지.
+
+    Vision 호출 타이밍 (CRITICAL):
+      - display_url 은 Instagram CDN URL 로 TTL 24-48h.
+      - 이 함수 내 즉시 호출 필수. 저장된 cache 에서 꺼내 나중 호출 금지.
     """
-    highlights = _extract_feed_highlights(posts_raw)
+    profile_basics = _extract_profile_basics(profile_raw)
+    scrubbed_posts = [_scrub_post_pii(p) for p in posts_raw[:posts_limit]]
+    highlights = _extract_feed_highlights(scrubbed_posts, limit=posts_limit)
+    latest_posts = _extract_latest_posts(scrubbed_posts, limit=posts_limit)
+
+    # Sonnet Vision — 동일 트랜잭션. 실패는 삼키고 analysis=None 으로 degrade.
+    analysis = _run_vision_analysis(
+        posts=latest_posts,
+        biography=profile_basics.bio,
+    )
+
     return IgFeedCache(
         scope="full",
-        profile_basics=_extract_profile_basics(profile_raw),
-        current_style_mood=None,       # D5+ LLM 추출
-        style_trajectory=None,         # D5+ LLM 추출
+        profile_basics=profile_basics,
+        current_style_mood=None,           # DEPRECATED (D6)
+        style_trajectory=None,             # Phase B 예약
         feed_highlights=highlights,
-        raw={"profile": profile_raw, "posts": posts_raw[:9]},
+        latest_posts=latest_posts,
+        analysis=analysis,
+        last_analyzed_post_count=(
+            profile_basics.post_count if analysis is not None else None
+        ),
+        raw={"profile": profile_raw, "posts": scrubbed_posts},
         fetched_at=datetime.now(timezone.utc),
     )
+
+
+def _run_vision_analysis(
+    posts: list[IgLatestPost],
+    biography: Optional[str],
+):
+    """Sonnet Vision 호출 래퍼. 임포트 순환 회피 위해 지연 임포트.
+
+    실패는 전부 흡수. caller 는 None 으로 degrade.
+    """
+    try:
+        from services.ig_feed_analyzer import analyze_ig_feed  # lazy
+        return analyze_ig_feed(posts=posts, biography=biography)
+    except Exception:
+        logger.exception("Vision analysis wrapper failed — degrading to analysis=None")
+        return None
 
 
 def _extract_profile_basics(profile_raw: dict) -> IgFeedProfileBasics:
@@ -215,15 +321,120 @@ def _extract_profile_basics(profile_raw: dict) -> IgFeedProfileBasics:
     )
 
 
-def _extract_feed_highlights(posts_raw: list[dict]) -> list[str]:
+def _extract_feed_highlights(posts_raw: list[dict], *, limit: int = 10) -> list[str]:
     """최근 포스트 캡션에서 짧은 텍스트 하이라이트 추출.
 
     - 각 캡션 200자 이하로 잘라서 저장
     - 빈 캡션/광고성 반복 텍스트 filter 는 D5+ LLM 단계로 미룸
     """
     highlights: list[str] = []
-    for post in posts_raw[:9]:
+    for post in posts_raw[:limit]:
         caption = post.get("caption") or ""
         if isinstance(caption, str) and caption.strip():
             highlights.append(caption[:200].strip())
     return highlights
+
+
+def _extract_latest_posts(posts_raw: list[dict], *, limit: int = 10) -> list[IgLatestPost]:
+    """최근 포스트 → IgLatestPost 스냅샷 (limit 최대).
+
+    Sia Haiku 의 뒷단 분석 input. 댓글은 본문(text) 만. 타인 식별자 제외.
+    입력은 이미 `_scrub_post_pii` 로 정제된 상태 가정.
+    """
+    result: list[IgLatestPost] = []
+    for post in posts_raw[:limit]:
+        caption = (post.get("caption") or "").strip()
+        ts = _parse_ig_timestamp(post.get("timestamp"))
+        hashtags = post.get("hashtags") or []
+        display_url = post.get("displayUrl") or None  # Sonnet Vision 입력, TTL 24-48h
+
+        comment_texts: list[str] = []
+        for c in post.get("latestComments") or []:
+            if not isinstance(c, dict):
+                continue
+            text = (c.get("text") or "").strip()
+            if text:
+                comment_texts.append(text)
+
+        result.append(IgLatestPost(
+            caption=caption[:500],
+            timestamp=ts,
+            hashtags=[h for h in hashtags if isinstance(h, str)][:20],
+            latest_comments=comment_texts[:10],
+            display_url=display_url if isinstance(display_url, str) else None,
+        ))
+    return result
+
+
+def _parse_ig_timestamp(ts_raw) -> Optional[datetime]:
+    """Apify ISO-8601 문자열 → datetime. 실패 시 None."""
+    if not ts_raw or not isinstance(ts_raw, str):
+        return None
+    try:
+        # "2026-01-07T13:27:39.000Z" 형태
+        return datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+# 댓글 작성자 식별 필드 — Apify 응답에서 전부 제거해야 하는 키 목록
+_COMMENT_PII_KEYS = {
+    "ownerUsername", "ownerProfilePicUrl", "owner",
+    "id",  # 댓글 고유 id 도 식별자로 쓰일 수 있음
+}
+
+
+def _scrub_post_pii(post: dict) -> dict:
+    """포스트 dict 에서 제3자 PII 를 제거한 사본 반환.
+
+    Apify 가 댓글 객체에 ownerUsername / ownerProfilePicUrl / owner.id 등
+    타인 식별자를 넣어주는데, Sigak 은 본인 데이터만 저장해야 한다.
+    본 함수는 non-destructive: 원본 변형 없이 scrubbed 복제 반환.
+
+    Scrub 대상:
+      - post.latestComments[]: text/timestamp/repliesCount 만 유지, owner* 제거
+      - post.taggedUsers[]: 전체 제거 (본인이 태그한 친구들 정보)
+      - post.owner: 본인이므로 유지 (profile_basics 에서 이미 쓰고 있음)
+    """
+    if not isinstance(post, dict):
+        return {}
+
+    scrubbed = dict(post)  # shallow copy
+
+    # 댓글 배열 scrub
+    comments = scrubbed.get("latestComments")
+    if isinstance(comments, list):
+        scrubbed["latestComments"] = [_scrub_comment(c) for c in comments]
+
+    # 태그된 유저들 제거
+    scrubbed.pop("taggedUsers", None)
+
+    # child posts 도 재귀 scrub (Sidecar 캐러셀)
+    children = scrubbed.get("childPosts")
+    if isinstance(children, list):
+        scrubbed["childPosts"] = [_scrub_post_pii(c) for c in children]
+
+    return scrubbed
+
+
+def _scrub_comment(comment: dict) -> dict:
+    """댓글 dict 에서 본문(text) + 메타(timestamp, repliesCount) 만 보존."""
+    if not isinstance(comment, dict):
+        return {}
+    text = comment.get("text") or ""
+    # replies 안에도 owner 정보 있을 수 있어 같이 정제
+    replies_raw = comment.get("replies") or []
+    replies_scrubbed = []
+    if isinstance(replies_raw, list):
+        for r in replies_raw:
+            if isinstance(r, dict) and r.get("text"):
+                replies_scrubbed.append({
+                    "text": r.get("text") or "",
+                    "timestamp": r.get("timestamp"),
+                })
+    return {
+        "text": text,
+        "timestamp": comment.get("timestamp"),
+        "repliesCount": comment.get("repliesCount", 0),
+        "replies": replies_scrubbed,
+    }

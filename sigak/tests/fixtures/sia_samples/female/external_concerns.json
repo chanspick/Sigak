@@ -1,0 +1,28 @@
+{
+  "fixture_id": "female_external_concerns_v1",
+  "gender": "female",
+  "turn_type": "external_concerns",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "세련되고 거리감 있는 인상",
+        "reference_style": "조용한 분위기의 일상 기록",
+        "height": "163-168cm",
+        "weight": "50-55kg",
+        "shoulder": "평균"
+      }
+    }
+  },
+  "expected_response": "요즘 스타일에서 가장 신경 쓰이시는 부분이 있다면 어디인지 여쭙겠습니다.\n\n(예: 톤/채도 조정, 체형 커버, 메이크업 방향, 스타일 정체성 등)\n\n한 문장이면 충분합니다.",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

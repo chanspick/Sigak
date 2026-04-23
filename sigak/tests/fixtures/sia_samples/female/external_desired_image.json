@@ -1,0 +1,31 @@
+{
+  "fixture_id": "female_external_desired_image_v1",
+  "gender": "female",
+  "turn_type": "external_desired_image",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "쿨뮤트",
+      "tone_percentage": 68,
+      "saturation_trend": "감소",
+      "environment": "실내 + 자연광",
+      "pose_frequency": "측면 > 정면",
+      "observed_adjectives": ["단정", "감성", "조용함"],
+      "style_consistency": 0.82,
+      "mood_signal": "정돈된 여운을 남기는 방식에 익숙하신 분입니다",
+      "three_month_shift": "채도가 점진적으로 낮아지는 방향"
+    },
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0
+    }
+  },
+  "expected_response": "정세현님께 방향을 구체적으로 여쭙겠습니다.\n\n어떤 방향의 인상을 만들고 싶으신가요?\n- 편안하고 기대고 싶은 인상\n- 세련되고 거리감 있는 인상\n- 특별한 날처럼 공들인 인상\n- 무심한데 센스 있는 인상",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

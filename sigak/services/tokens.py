@@ -46,6 +46,19 @@ COST_PI_UNLOCK = 50             # 유저 1회 영속 PI 해제 — /pi/unlock
 # v2 Verdict 2.0 (2026-04-27, SPEC-ONBOARDING-V2 REQ-VERDICT-003)
 COST_VERDICT_V2_UNLOCK = 10     # full_content 해제 — /api/v2/verdict/{id}/unlock
 
+# SIGAK v2.0 (CLAUDE.md §10.1, 2026-04-22) — 6 상품 전수 상수
+#   Idempotency key 패턴:
+#     pi_regenerate:{user_id}:{version}
+#     verdict:{user_id}:{session_id}
+#     best_shot:{user_id}:{upload_session_id}
+#     aspiration_ig:{user_id}:{target}:{timestamp}
+#     aspiration_pinterest:{user_id}:{board_hash}:{timestamp}
+#     monthly:{user_id}:{year_month}
+COST_ASPIRATION_IG        = 20    # /api/v2/aspiration/ig
+COST_ASPIRATION_PINTEREST = 20    # /api/v2/aspiration/pinterest
+COST_BEST_SHOT            = 30    # /api/v2/best-shot
+# MONTHLY_REPORT 는 기존 COST_MONTHLY_REPORT(30) 재사용.
+
 
 # ─────────────────────────────────────────────
 #  DB ops
@@ -60,6 +73,12 @@ KIND_CONSUME_OTHER = "consume_other"
 KIND_CONSUME_DIAGNOSIS = "consume_diagnosis"     # v2 BM
 KIND_CONSUME_PI = "consume_pi"                   # v2 BM
 KIND_CONSUME_VERDICT_V2 = "consume_verdict_v2"   # v2 BM (Verdict 2.0 full unlock)
+
+# SIGAK v2.0 신규 kind (6 상품)
+KIND_CONSUME_ASPIRATION_IG        = "consume_aspiration_ig"
+KIND_CONSUME_ASPIRATION_PINTEREST = "consume_aspiration_pinterest"
+KIND_CONSUME_BEST_SHOT            = "consume_best_shot"
+
 KIND_REFUND = "refund"
 KIND_ADMIN_GRANT = "admin_grant"
 

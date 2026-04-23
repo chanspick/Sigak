@@ -96,6 +96,13 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
 - user_profile.ig_feed_cache: Apify 수집 IG 피드 요약
 - photos: 이번에 올린 N 장 (1~10)
 - trend_data: 2026 S/S 트렌드 벡터 + 무드 요약
+- taste_profile (Phase L): 누적 UserTasteProfile 스냅샷.
+    current_position / aspiration_vector / user_original_phrases / strength_score
+    → 유저 의도 + 데이터 풍부도 파악용. 과거 대화 핵심 어휘는 user_original_phrases
+      에서 읽어 "말 들었구나" 감각 보존에 활용 (직접 인용 금지, 결 녹여 재사용).
+- matched_trends (Phase L): KnowledgeBase 매칭 결과 (유저 좌표 호환 순위).
+    각 항목 title / action_hints / score 형태. style_direction / cta_pi 작성시
+    참조. 단, trend_id 등 내부 식별자는 유저 텍스트에 노출 금지.
 
 [출력 구조 — 엄격 JSON]
 {
@@ -234,12 +241,63 @@ def _render_trend_for_prompt(trend_data: dict) -> str:
     return json.dumps(trend_data, ensure_ascii=False, indent=2)
 
 
+def _render_matched_trends(matched_trends: Optional[list]) -> str:
+    """KnowledgeMatcher 결과 → prompt 텍스트 (Phase L).
+
+    matched_trends 요소는 MatchedTrend (pydantic) 또는 dict 호환.
+    """
+    if not matched_trends:
+        return "(KB 매칭 없음)"
+    lines: list[str] = []
+    for m in matched_trends[:5]:
+        trend = m.trend if hasattr(m, "trend") else m.get("trend", {})
+        trend_id = getattr(trend, "trend_id", None) or trend.get("trend_id", "?") if isinstance(trend, dict) else getattr(trend, "trend_id", "?")
+        title = getattr(trend, "title", None) or (trend.get("title", "?") if isinstance(trend, dict) else "?")
+        action_hints = getattr(trend, "action_hints", None) if not isinstance(trend, dict) else trend.get("action_hints", [])
+        action_hints = action_hints or []
+        score = getattr(m, "score", None) if not isinstance(m, dict) else m.get("score", 0.0)
+        score_str = f"{float(score):.2f}" if score is not None else "0.00"
+        hints_str = " / ".join(action_hints[:3]) if action_hints else "-"
+        lines.append(f"- [{trend_id}] {title} (score={score_str}) · hints: {hints_str}")
+    return "\n".join(lines)
+
+
+def _render_taste_profile(taste_profile: Optional[dict]) -> str:
+    """UserTasteProfile snapshot → prompt 텍스트 (Phase L).
+
+    pydantic 인스턴스거나 model_dump 결과 dict 둘 다 허용.
+    """
+    if taste_profile is None:
+        return "(유저 취향 프로필 없음 — 현 profile 만으로 분석)"
+    dump = (
+        taste_profile.model_dump(mode="json")
+        if hasattr(taste_profile, "model_dump")
+        else taste_profile
+    )
+    # 노출 필드 선별 — 프롬프트에 꼭 필요한 것만
+    slim = {
+        "current_position": dump.get("current_position"),
+        "aspiration_vector": dump.get("aspiration_vector"),
+        "conversation_signals": dump.get("conversation_signals"),
+        "user_original_phrases": dump.get("user_original_phrases"),
+        "strength_score": dump.get("strength_score"),
+    }
+    return json.dumps(slim, ensure_ascii=False, indent=2)
+
+
 def _build_user_message(
     user_profile: dict,
     photos: list[PhotoInput],
     trend_data: dict,
+    matched_trends: Optional[list] = None,
+    taste_profile: Optional[Any] = None,
 ) -> list[dict]:
-    """Claude API `messages[0]["content"]` 용 블록 리스트."""
+    """Claude API `messages[0]["content"]` 용 블록 리스트.
+
+    Phase L 확장:
+      - matched_trends: KnowledgeMatcher 결과 (유저 좌표에 맞춘 KB 트렌드)
+      - taste_profile: UserTasteProfile snapshot (대화+IG 기반 누적 취향)
+    """
     blocks: list[dict] = []
 
     # 사진 블록 N 개 (max 10)
@@ -253,9 +311,15 @@ def _build_user_message(
         "아래 user_profile 과 위 사진들을 교차 분석해 피드 분석 결과를 "
         "JSON 으로 반환하십시오.\n\n"
         f"[user_profile]\n{_render_profile_for_prompt(user_profile)}\n\n"
-        f"[trend_data]\n{_render_trend_for_prompt(trend_data)}\n\n"
+        f"[taste_profile — 누적 취향 스냅샷]\n{_render_taste_profile(taste_profile)}\n\n"
+        f"[matched_trends — KB 매칭 (최신 시즌, 유저 좌표 호환)]\n"
+        f"{_render_matched_trends(matched_trends)}\n\n"
+        f"[trend_data — 시즌 베이스라인]\n{_render_trend_for_prompt(trend_data)}\n\n"
         f"[사진 수]\n{len(photos)} 장\n\n"
-        "system prompt 의 Hard Rules + 출력 JSON 스키마를 엄격 준수하십시오."
+        "recommendation.style_direction 과 cta_pi 작성 시 matched_trends 와 "
+        "taste_profile 을 참조하되, 숫자/출처 노출 없이 자연스러운 내러티브로 "
+        "녹여 주십시오. system prompt 의 Hard Rules + 출력 JSON 스키마를 "
+        "엄격 준수하십시오."
     )
     blocks.append({"type": "text", "text": text})
     return blocks
@@ -269,12 +333,18 @@ def _call_sonnet(
     user_profile: dict,
     photos: list[PhotoInput],
     trend_data: dict,
+    matched_trends: Optional[list] = None,
+    taste_profile: Optional[Any] = None,
     max_tokens: int = 3000,
 ) -> str:
     settings = get_settings()
     client = _get_client()
 
-    content_blocks = _build_user_message(user_profile, photos, trend_data)
+    content_blocks = _build_user_message(
+        user_profile, photos, trend_data,
+        matched_trends=matched_trends,
+        taste_profile=taste_profile,
+    )
 
     response = client.messages.create(
         model=settings.anthropic_model_sonnet,
@@ -373,6 +443,8 @@ def build_verdict_v2(
     user_profile: dict,
     photos: list[PhotoInput],
     trend_data: Optional[dict] = None,
+    matched_trends: Optional[list] = None,
+    taste_profile: Optional[Any] = None,
     max_retries: int = 1,
 ) -> VerdictV2Result:
     """Verdict 2.0 build — Sonnet 4.6 cross-analysis.
@@ -381,6 +453,9 @@ def build_verdict_v2(
         user_profile: user_profiles row dict (structured_fields + ig_feed_cache 포함)
         photos: 1~10 장의 PhotoInput (url or base64+media_type)
         trend_data: (optional) 2026 S/S 트렌드 벡터. None 이면 trend 무시.
+        matched_trends: (Phase L, optional) KnowledgeMatcher 매칭 결과 list[MatchedTrend].
+            유저 좌표에 맞춘 KB 트렌드. style_direction / cta_pi 내러티브에 참조.
+        taste_profile: (Phase L, optional) UserTasteProfile snapshot. 대화+IG 누적 취향.
         max_retries: 파싱/검증/API 실패 시 재시도 횟수. default 1.
 
     Returns:
@@ -400,7 +475,11 @@ def build_verdict_v2(
     last_error: Optional[Exception] = None
     for attempt in range(max_retries + 1):
         try:
-            raw = _call_sonnet(user_profile, photos, trend_data)
+            raw = _call_sonnet(
+                user_profile, photos, trend_data,
+                matched_trends=matched_trends,
+                taste_profile=taste_profile,
+            )
             clean = _strip_json_fence(raw)
             parsed = json.loads(clean)
             result = VerdictV2Result.model_validate(parsed)

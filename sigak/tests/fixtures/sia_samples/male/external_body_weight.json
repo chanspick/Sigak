@@ -1,0 +1,26 @@
+{
+  "fixture_id": "male_external_body_weight_v1",
+  "gender": "male",
+  "turn_type": "external_body_weight",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "무심한데 센스 있는 인상",
+        "reference_style": "담백한 데일리 룩",
+        "height": "172-178cm"
+      }
+    }
+  },
+  "expected_response": "체중 범위를 여쭙겠습니다.\n\n어느 범위에 가까우신가요?\n- 60kg 이하\n- 60-68kg\n- 68-75kg\n- 75-82kg\n- 82kg 이상",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "fixture_id": "male_external_body_height_v1",
+  "gender": "male",
+  "turn_type": "external_body_height",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "무심한데 센스 있는 인상",
+        "reference_style": "담백한 데일리 룩"
+      }
+    }
+  },
+  "expected_response": "분석 정확도를 위해 신체 정보를 여쭙겠습니다.\n\n키는 어느 범위이신가요?\n- 165cm 이하\n- 165-172cm\n- 172-178cm\n- 178-183cm\n- 183cm 이상",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

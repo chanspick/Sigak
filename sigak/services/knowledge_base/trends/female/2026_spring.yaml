@@ -1,0 +1,35 @@
+# Knowledge Base 초기 seed — 2026 봄 여성 트렌드 샘플 2건.
+# 본인/마케터가 Phase P 에서 확장.
+items:
+  - trend_id: female_2026_spring_001
+    season: "2026_spring"
+    gender: female
+    category: color_palette
+    title: "민트 + 크림 조합"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.6]
+      age: [0.2, 0.5]
+    action_hints:
+      - 상의 크림, 하의 민트 팬츠
+      - 악세서리 골드보다 실버
+      - 메이크업은 쿨뮤트 립
+    detailed_guide: |
+      2026 S/S 시즌의 주력 조합. 쿨뮤트 기반으로 서늘한 계절감 유지.
+      프레시 쪽 인상의 유저에게 자연스럽게 붙는다.
+
+  - trend_id: female_2026_spring_002
+    season: "2026_spring"
+    gender: female
+    category: silhouette
+    title: "테일러드 어깨 + 와이드 팬츠"
+    compatible_coordinates:
+      shape: [0.5, 1.0]
+      volume: [0.3, 0.7]
+      age: [0.4, 0.9]
+    action_hints:
+      - 재킷은 각진 어깨선
+      - 하의는 와이드 or 스트레이트
+      - 미들 힐보다 플랫폼 로퍼
+    detailed_guide: |
+      샤프 쪽 좌표 유저에게 실루엣 강화. 성숙 인상일수록 효과 증폭.

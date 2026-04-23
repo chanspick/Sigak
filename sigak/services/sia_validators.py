@@ -74,6 +74,9 @@ FORBIDDEN_SUFFIXES = [
 FORBIDDEN_SUFFIX_RE = re.compile("|".join(re.escape(s) for s in FORBIDDEN_SUFFIXES))
 
 # 톤 — 서술형 정중체 필수 어미 (최소 1개 필요)
+# "십니다" 는 일반 honorific ("분이십니다"/"계십니다"/"하십니다" 전부 커버) 추가.
+# 이전엔 "있으십니다"/"되십니다" 만 있어 실제 Haiku 출력 "분이십니다"/"계십니다" 에
+# tone_missing false positive 가 발생. Phase F live probe 에서 확인됨.
 REQUIRED_SUFFIXES = [
     "합니다",
     "습니다",
@@ -81,6 +84,7 @@ REQUIRED_SUFFIXES = [
     "입니다",
     "되십니다",
     "있으십니다",
+    "십니다",          # 분이십니다 / 계십니다 / 하십니다 / 드십니다 일반 커버
 ]
 REQUIRED_SUFFIX_RE = re.compile("|".join(re.escape(s) for s in REQUIRED_SUFFIXES))
 
@@ -105,6 +109,69 @@ CONFIRMATION_PHRASES = [
     "그렇죠?",
 ]
 CONFIRMATION_RE = re.compile("|".join(re.escape(p) for p in CONFIRMATION_PHRASES))
+
+
+# ─────────────────────────────────────────────
+#  v3 — 인격 단정 카운트 + 추상명사 blacklist (Phase B)
+# ─────────────────────────────────────────────
+
+# 인격 단정 — 이름(또는 당신) 주어 + 단정 종결.
+# "정세현님은 단정한 분입니다" / "당신은 ~한 쪽이십니다" 등.
+# [가-힣]+님 이 이미 "정세현님" 을 포함하므로 alternation 중복 제거.
+ASSERTION_PATTERN = re.compile(
+    r"([가-힣]+님(은|는)|당신(은|는))"
+    r".*?"
+    r"(입니다|있으십니다|드러납니다|편이십니다|편입니다|분입니다|쪽이십니다)"
+)
+
+# 기능 문장 — 인사/전환/질문 유도. 인격 단정으로 카운트하지 않음.
+FUNCTION_PATTERNS = [
+    re.compile(r"하나만 (먼저 )?확인(하|드리)"),
+    re.compile(r"다음 (질문|하나) "),
+    re.compile(r"Sia ?입니다"),
+    re.compile(r"맞다고 느끼시"),
+    re.compile(r"여쭙겠습니다"),
+    re.compile(r"[0-9]+(cm|kg)"),          # 수치 범위 선택지 라인
+]
+
+# 추상명사 blacklist — 구체 장면 없는 수식.
+# "결" 은 다양한 활용형으로 등장하므로 helper 에서 단어 경계로 매칭.
+ABSTRACT_NOUN_TOKENS = [
+    "결을", "결이", "결입", "결은",
+    "무드를", "무드가", "무드입",
+    "감도를", "감도가", "감도입",
+    "아우라",
+    "기운",
+]
+
+
+def count_assertions(text: str) -> int:
+    """인격 단정 개수 — "~님은/는 ... 입니다" 구조.
+
+    FUNCTION_PATTERNS 매칭 라인은 기능문으로 제외. 1 line = 최대 1 count
+    (한 라인에 여러 단정이 있어도 1로 처리 — MVP 단순화, 과대추출 방지).
+
+    Hard Rule 기준: ≤ 2 per 턴 (프롬프트 준수 확인 용).
+    """
+    count = 0
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        if any(fp.search(line) for fp in FUNCTION_PATTERNS):
+            continue
+        if ASSERTION_PATTERN.search(line):
+            count += 1
+    return count
+
+
+def has_abstract_noun(text: str) -> bool:
+    """추상명사 blacklist 히트 여부 — 구체 장면 없는 수식 검출.
+
+    토큰 기반 단순 substring 매칭. 한국어 조사 활용 다양성을 담기 위해
+    각 명사의 주요 활용형 (을/이/입/은) 을 개별 등록.
+    """
+    return any(token in text for token in ABSTRACT_NOUN_TOKENS)
 
 
 # ─────────────────────────────────────────────
@@ -161,6 +228,14 @@ def find_violations(text: str) -> dict[str, list[str]]:
         violations["eval_language"] = m
     if m := CONFIRMATION_RE.findall(text):
         violations["confirmation"] = m
+
+    # v3 — Phase B Hard Rules
+    assertion_count = count_assertions(text)
+    if assertion_count > 2:
+        violations["assertion_excess"] = [f"count={assertion_count}"]
+    if has_abstract_noun(text):
+        hits = [t for t in ABSTRACT_NOUN_TOKENS if t in text]
+        violations["abstract_noun"] = hits
 
     return violations
 

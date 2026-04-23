@@ -113,20 +113,66 @@ class IgFeedProfileBasics(_BaseSchema):
     is_verified: bool = False
 
 
+class IgLatestPost(_BaseSchema):
+    """ig_feed_cache.latest_posts[] — 최근 10개 포스트 스냅샷.
+
+    Sia Haiku 가 뒷단 분석용으로 소비. 댓글은 본문만 보존 (타인 식별자 제거).
+    프라이버시: ownerUsername / ownerProfilePicUrl / owner.id 등 모두 제거된 상태.
+    display_url: Instagram CDN URL. TTL 24-48h. Vision 분석은 fetch 직후 즉시만.
+    """
+    caption: str
+    timestamp: Optional[datetime] = None
+    hashtags: list[str] = Field(default_factory=list)
+    latest_comments: list[str] = Field(default_factory=list)  # 본문 text 만
+    display_url: Optional[str] = None  # Sonnet Vision 입력용, 만료 주의
+
+
+ToneCategory = Literal["쿨뮤트", "웜뮤트", "쿨비비드", "웜비비드", "중성"]
+SaturationTrend = Literal["감소", "안정", "증가"]
+
+
+class IgFeedAnalysis(_BaseSchema):
+    """ig_feed_cache.analysis — Sonnet 4.6 Vision 분석 결과 (D6 Phase A, Task 0).
+
+    Apify latest_posts 이미지 10장 + bio + 댓글 집계를 입력으로 받아
+    Sonnet 멀티모달이 JSON 산출. Sia Haiku 가 오프닝 데이터 리스트
+    생성 시 직접 참조하는 ground-truth.
+
+    analyzed_at: Vision 호출 시각. last_analyzed_post_count 와 결합하여
+    refresh 정책 (delta >= 3) 판정.
+    """
+    tone_category: ToneCategory
+    tone_percentage: int = Field(ge=0, le=100)
+    saturation_trend: SaturationTrend
+    environment: str
+    pose_frequency: str
+    observed_adjectives: list[str] = Field(default_factory=list, max_length=5)
+    style_consistency: float = Field(ge=0.0, le=1.0)
+    mood_signal: str  # 1문장 정중체
+    three_month_shift: Optional[str] = None
+    analyzed_at: datetime
+
+
 class IgFeedCache(_BaseSchema):
     """user_profiles.ig_feed_cache — Apify Instagram Scraper 정규화 결과.
 
     scope:
       - "full": 공개 계정, 피드 수집 완료
       - "public_profile_only": 비공개 계정 — profile_basics 만
+
+    analysis: Sonnet Vision 분석 결과. Vision 실패 or 비공개 계정이면 None.
+    last_analyzed_post_count: refresh 정책 B (delta>=3) 판정용.
     """
     scope: IgScope
     profile_basics: IgFeedProfileBasics
-    # 아래 3 필드는 full scope 일 때만 populated. private 이면 None/빈 리스트.
-    current_style_mood: Optional[list[str]] = None
-    style_trajectory: Optional[str] = None
+    # 아래 필드는 full scope 일 때만 populated. private 이면 None/빈 리스트.
+    current_style_mood: Optional[list[str]] = None   # DEPRECATED (D6): analysis.observed_adjectives 로 대체
+    style_trajectory: Optional[str] = None           # Phase B 시계열 분석 예약 (현재 None)
     feed_highlights: Optional[list[str]] = None
-    raw: Optional[dict] = None   # Apify 원본 payload (debug / 재파싱 용)
+    latest_posts: Optional[list[IgLatestPost]] = None   # 최근 10개, Sia 뒷단 분석용
+    analysis: Optional[IgFeedAnalysis] = None           # D6 Phase A — Sonnet Vision
+    last_analyzed_post_count: Optional[int] = None      # D6 Phase A — refresh delta 판정
+    raw: Optional[dict] = None   # Apify 원본 payload (debug / 재파싱 용 — PII scrubbed)
     fetched_at: datetime
 
 

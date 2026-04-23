@@ -1,0 +1,29 @@
+{
+  "fixture_id": "female_external_lifestyle_v1",
+  "gender": "female",
+  "turn_type": "external_lifestyle",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "세련되고 거리감 있는 인상",
+        "reference_style": "조용한 분위기의 일상 기록",
+        "height": "163-168cm",
+        "weight": "50-55kg",
+        "shoulder": "평균",
+        "current_concerns": "톤의 일관성을 더 단단하게 유지하고 싶습니다"
+      }
+    }
+  },
+  "expected_response": "일상 시간 대부분을 어디서 보내시는지 여쭙겠습니다.\n\n- 실내 중심\n- 외부 활동 중심\n- 비슷한 비율\n- 상황마다 크게 달라진다",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

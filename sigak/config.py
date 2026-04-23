@@ -35,9 +35,26 @@ class Settings(BaseSettings):
     # ── IG 피드 수집 (Apify, Priority 1 Step 1) ──
     ig_enabled: bool = False                                    # MVP 초기 False. Apify 안정화 후 True
     apify_api_key: str = ""                                     # Apify Instagram Profile Scraper Actor 키
-    ig_fetch_timeout: float = 10.0                              # 초. 초과 시 failed 처리
+    ig_fetch_timeout: float = 45.0                              # 초. 대형 계정 대응 여유. MCP 실측: 30 results ≈ 20s
     apify_actor_id: str = "apify~instagram-scraper"             # Actor slug (tilde URL-safe)
+    apify_pinterest_actor_id: str = "apify~pinterest-scraper"   # Pinterest 보드 scraper (Phase J)
+    pinterest_enabled: bool = False                              # MVP 초기 False. 추구미 Pinterest 스케폴드만.
     ig_refresh_days: int = 14                                   # 2주 stale 기준 (user_profiles.ig_fetched_at)
+
+    # ── Cloudflare R2 (Phase K) ──
+    r2_endpoint_url: str = ""                                    # https://{account_id}.r2.cloudflarestorage.com
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket_user_photos: str = "sigak-user-photos"
+    r2_bucket_aspiration: str = "sigak-aspiration-targets"
+    r2_public_base_url: str = ""                                 # CDN 퍼블릭 호스트 (optional)
+    r2_local_fallback_dir: str = ""                              # 미설정 시 ~/.sigak_r2_local
+
+    # ── Best Shot (Phase K) ──
+    best_shot_min_upload: int = 50                               # 50장 미만 → 피드 추천 유도
+    best_shot_max_upload: int = 500
+    best_shot_quality_cutoff: float = 0.35                       # heuristic 통과 기준 (0-1)
+    best_shot_cost_daily_usd_cap: float = 20.0                   # Sonnet 일일 총 비용 cap
 
     # ── Auth (MVP v1.1 JWT) ──
     jwt_secret: str = ""                         # HS256 signing key. Must be 32+ random bytes in prod.

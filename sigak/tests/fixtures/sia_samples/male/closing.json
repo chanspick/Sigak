@@ -1,0 +1,40 @@
+{
+  "fixture_id": "male_closing_v1",
+  "gender": "male",
+  "turn_type": "closing",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "중성",
+      "tone_percentage": 62,
+      "saturation_trend": "안정",
+      "environment": "외부 활동 + 야외",
+      "pose_frequency": "정면 > 측면",
+      "observed_adjectives": ["단정", "담백", "묵직함"],
+      "style_consistency": 0.75,
+      "mood_signal": "꾸밈 없이 담백한 인상을 전달하시는 분입니다",
+      "three_month_shift": null
+    },
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "무심한데 센스 있는 인상",
+        "reference_style": "담백한 데일리 룩",
+        "height": "172-178cm",
+        "weight": "68-75kg",
+        "shoulder": "평균",
+        "current_concerns": "평상복과 직장복의 경계를 매끄럽게 다듬고 싶습니다",
+        "lifestyle_context": "비슷한 비율"
+      }
+    }
+  },
+  "expected_response": "정세현님의 오늘 대화를 정리하겠습니다.\n\n- 추구 인상: 무심한데 센스 있는\n- 참고 스타일: 담백한 데일리 룩\n- 체형 정보: 172-178cm, 68-75kg, 평균 어깨\n- 현재 고민: 평상복과 직장복의 경계 다듬기\n- 생활 환경: 실내와 외부 비슷한 비율\n\n정세현님의 방향은 꾸밈을 덜어낸 담백함을 유지하시는 쪽으로 정리됩니다.\n\n앞으로 사진을 업로드하시면 이 기준에 맞춰 피드 분석이 이어집니다.\n\n얼굴 구조가 이 인상을 어떻게 만드는지 더 알고 싶으시다면, 시각이 본 나로 이어집니다. 5,000원에 한 번 받으면 영구 보관됩니다.",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

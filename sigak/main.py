@@ -317,6 +317,9 @@ from routes.pi import router_v2 as pi_v2_router             # v2 Priority 1 D5 P
 from routes.change import router as change_router
 from routes.sia import router as sia_router                 # v2 Priority 1 D3
 from routes.verdict_v2 import router as verdict_v2_router   # v2 Priority 1 D5 Phase 2
+from routes.aspiration import router as aspiration_router   # SIGAK v2.0 Phase J
+from routes.monthly import router as monthly_router         # SIGAK v2.0 Phase M
+from routes.best_shot import router as best_shot_router     # SIGAK v2.0 Phase K
 
 app.include_router(tokens_router)
 app.include_router(payments_confirm_router)
@@ -330,6 +333,9 @@ app.include_router(pi_v2_router)          # /api/v2/pi, /api/v2/pi/unlock
 app.include_router(change_router)
 app.include_router(sia_router)            # /api/v1/sia/chat/{start,message,end}
 app.include_router(verdict_v2_router)     # /api/v2/verdict/{create,{id}/unlock,{id}}
+app.include_router(aspiration_router)     # /api/v2/aspiration/{ig,pinterest,{id}}
+app.include_router(monthly_router)        # /api/v2/monthly/status, /api/v2/monthly/{id}
+app.include_router(best_shot_router)      # /api/v2/best-shot/{init,upload,run,abort,{id}}
 
 # ── In-memory stores ──
 USERS = {}

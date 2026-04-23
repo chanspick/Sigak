@@ -1,0 +1,31 @@
+{
+  "fixture_id": "male_force_external_transition_v1",
+  "gender": "male",
+  "turn_type": "force_external_transition",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "중성",
+      "tone_percentage": 62,
+      "saturation_trend": "안정",
+      "environment": "외부 활동 + 야외",
+      "pose_frequency": "정면 > 측면",
+      "observed_adjectives": ["단정", "담백", "묵직함"],
+      "style_consistency": 0.75,
+      "mood_signal": "꾸밈 없이 담백한 인상을 전달하시는 분입니다",
+      "three_month_shift": null
+    },
+    "session_state": {
+      "spectrum_log": [3, 4, 3],
+      "precision_hits": 0,
+      "precision_misses": 3
+    }
+  },
+  "expected_response": "정세현님에 대해 충분히 감을 잡았습니다.\n\n이제 방향을 좀 더 구체적으로 여쭙겠습니다.\n\n어떤 방향의 인상을 만들고 싶으신가요?\n- 편안하고 기대고 싶은 인상\n- 세련되고 거리감 있는 인상\n- 특별한 날처럼 공들인 인상\n- 무심한데 센스 있는 인상",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

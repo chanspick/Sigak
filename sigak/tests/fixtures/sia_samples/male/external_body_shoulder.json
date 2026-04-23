@@ -1,0 +1,27 @@
+{
+  "fixture_id": "male_external_body_shoulder_v1",
+  "gender": "male",
+  "turn_type": "external_body_shoulder",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "무심한데 센스 있는 인상",
+        "reference_style": "담백한 데일리 룩",
+        "height": "172-178cm",
+        "weight": "68-75kg"
+      }
+    }
+  },
+  "expected_response": "어깨 폭을 여쭙겠습니다.\n\n어느 쪽에 가까우신가요?\n- 좁은 편\n- 평균\n- 넓은 편\n- 잘 모르겠다",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

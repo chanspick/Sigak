@@ -161,13 +161,15 @@ def chat_start(
         missing_fields=missing,
     )
 
-    # Sia 첫 턴 생성
+    # Sia 첫 턴 — turn_type=opening (turn_count=0), gender from profile (Phase G2)
     system_prompt = sia_llm.build_system_prompt(
         user_name=_resolve_opening_user_name(user),
         resolved_name=None,
         collected_fields=profile.get("structured_fields") or {},
         missing_fields=missing,
         ig_feed_cache=profile.get("ig_feed_cache"),
+        turn_type=sia_session.decide_next_turn(state),   # "opening"
+        gender=profile.get("gender"),
     )
     opening = sia_llm.call_sia_turn_with_retry(
         system_prompt=system_prompt,
@@ -261,7 +263,15 @@ def chat_message(
     if state is None:
         raise HTTPException(410, "session expired during write")
 
-    # 2. Sia 응답 생성
+    # 1-b. spectrum 응답 파싱 → 세션에 누적 (Phase B) — decide_next_turn 입력 갱신
+    parsed_state = sia_session.record_spectrum_choice(
+        conversation_id=body.conversation_id,
+        user_message=body.user_message,
+    )
+    if parsed_state is not None:
+        state = parsed_state
+
+    # 2. Sia 응답 생성 — turn_type/gender 주입 (Phase G2, Phase C 누락 처리)
     profile = get_profile(db, user["id"]) or {}
     system_prompt = sia_llm.build_system_prompt(
         user_name=_resolve_opening_user_name(user),
@@ -269,6 +279,8 @@ def chat_message(
         collected_fields=state.get("collected_fields") or {},
         missing_fields=state.get("missing_fields") or V2_REQUIRED_FIELDS,
         ig_feed_cache=state.get("ig_feed_cache"),
+        turn_type=sia_session.decide_next_turn(state),
+        gender=profile.get("gender"),
     )
     history = _build_messages_for_llm(state)
     assistant_text = sia_llm.call_sia_turn_with_retry(

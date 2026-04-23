@@ -79,7 +79,7 @@ def test_fetch_ig_profile_missing_api_key_returns_failed():
 def test_fetch_ig_profile_public_success(monkeypatch):
     _set_settings(ig_enabled=True, apify_api_key="test_key")
 
-    def _mock_call(handle, api_key, actor_id, timeout):
+    def _mock_call(handle, api_key, actor_id, timeout, **kw):
         assert handle == "yuni"
         assert api_key == "test_key"
         return [
@@ -116,7 +116,7 @@ def test_fetch_ig_profile_public_success(monkeypatch):
 def test_fetch_ig_profile_private_returns_basics_only(monkeypatch):
     _set_settings(ig_enabled=True, apify_api_key="test_key")
 
-    def _mock_call(handle, api_key, actor_id, timeout):
+    def _mock_call(handle, api_key, actor_id, timeout, **kw):
         return [
             {
                 "username": "privacy_user",
@@ -145,7 +145,7 @@ def test_fetch_ig_profile_private_returns_basics_only(monkeypatch):
 def test_fetch_ig_profile_http_error_returns_failed(monkeypatch):
     _set_settings(ig_enabled=True, apify_api_key="test_key")
 
-    def _mock_call(handle, api_key, actor_id, timeout):
+    def _mock_call(handle, api_key, actor_id, timeout, **kw):
         req = httpx.Request("POST", "https://api.apify.com/test")
         resp = httpx.Response(503, request=req)
         raise httpx.HTTPStatusError("service unavailable", request=req, response=resp)
@@ -159,7 +159,7 @@ def test_fetch_ig_profile_http_error_returns_failed(monkeypatch):
 def test_fetch_ig_profile_timeout_returns_failed(monkeypatch):
     _set_settings(ig_enabled=True, apify_api_key="test_key", ig_fetch_timeout=10.0)
 
-    def _mock_call(handle, api_key, actor_id, timeout):
+    def _mock_call(handle, api_key, actor_id, timeout, **kw):
         raise httpx.TimeoutException("Apify slow", request=None)
 
     monkeypatch.setattr(ig_scraper, "_call_apify_actor", _mock_call)

@@ -1,0 +1,31 @@
+{
+  "fixture_id": "male_branch_agree_v1",
+  "gender": "male",
+  "turn_type": "branch_agree",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "중성",
+      "tone_percentage": 62,
+      "saturation_trend": "안정",
+      "environment": "외부 활동 + 야외",
+      "pose_frequency": "정면 > 측면",
+      "observed_adjectives": ["단정", "담백", "묵직함"],
+      "style_consistency": 0.75,
+      "mood_signal": "꾸밈 없이 담백한 인상을 전달하시는 분입니다",
+      "three_month_shift": null
+    },
+    "session_state": {
+      "spectrum_log": [1],
+      "precision_hits": 1,
+      "precision_misses": 0
+    }
+  },
+  "expected_response": "정세현님은 말보다 행동이 앞서는 분입니다.\n\n피드에도 설명보다 결과물이 먼저 있고, 준비 과정을 길게 드러내지 않으십니다.\n\n이 방향은 얼마나 가까우신가요?\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": true
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "started_at": "2026-04-22T06:35:56.838650+00:00",
+  "results": [
+    {
+      "id": "01_opening_female",
+      "gender": "female",
+      "turn_type": "opening",
+      "vision": true,
+      "duration_s": 4.33,
+      "response": "정세현님, Sia 입니다.\n\n피드를 살펴봤습니다.\n\n정세현님은 정돈된 여운을 남기는 데 익숙하신 분입니다. 쿨뮤트 톤이 일관되고, 채도가 최근 점진적으로 낮아지고 있습니다. 측면 각도를 선호하시며 자연광이 드는 실내 환경에서의 순간들을 담으시는 경향이 있습니다.\n\n이 인상이 본인에게 얼마나 가까우신가요?\n\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7620
+    },
+    {
+      "id": "02_opening_male",
+      "gender": "male",
+      "turn_type": "opening",
+      "vision": true,
+      "duration_s": 2.52,
+      "response": "정세현님, Sia 입니다.\n\n피드를 살펴봤습니다.\n\n정세현님은 꾸밈 없이 담백한 인상을 전달하시는 분입니다. 피드의 톤이 중성 우세이고, 일상을 있는 그대로 기록하시는 방식이 일관됩니다.\n\n이 단정이 본인에게 얼마나 가까우신가요?\n\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7580
+    },
+    {
+      "id": "03_branch_agree",
+      "gender": "female",
+      "turn_type": "branch_agree",
+      "vision": true,
+      "duration_s": 2.29,
+      "response": "정세현님은 말수보다 표정으로 말씀하시는 분이군요.\n\n피드에서 한 가지 더 확인하겠습니다. 정세현님이 타인에게 남기고 싶은 첫인상은 어느 쪽에 가까우신가요?\n\n- 편안하고 기대고 싶은 인상\n- 세련되고 거리감 있는 인상\n- 특별한 날처럼 공들인 인상\n- 무심한데 센스 있는 인상",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7512
+    },
+    {
+      "id": "04_branch_half",
+      "gender": "female",
+      "turn_type": "branch_half",
+      "vision": true,
+      "duration_s": 1.19,
+      "response": "절반 정도 맞다고 하신 건, 어느 쪽이 더 가까우신지 여쭙겠습니다.\n\n- 담담함은 맞는데 뉘앙스가 조금 다르다\n- 반은 맞고 반은 틀리다\n- 표면은 맞는데 속은 다르다\n- 구체 방향이 다르다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7509
+    },
+    {
+      "id": "05_branch_disagree",
+      "gender": "female",
+      "turn_type": "branch_disagree",
+      "vision": true,
+      "duration_s": 1.08,
+      "response": "그러면 정세현님은 오히려 섬세하게 감정을 담아내시는 분입니다.\n\n이 단정이 본인에게 얼마나 가까우신가요?\n\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7518
+    },
+    {
+      "id": "06_branch_fail",
+      "gender": "female",
+      "turn_type": "branch_fail",
+      "vision": true,
+      "duration_s": 1.86,
+      "response": "정세현님, 피드에서 읽히는 모습과 실제 정세현님 사이에 갭이 있으신 것 같습니다.\n보여지는 것보다 더 입체적인 분일 가능성이 높습니다.\n\n주변 사람들이 정세현님을 어떤 사람으로 기억한다고 느끼시나요?\n\n- 편안하고 다가가기 쉬운 사람\n- 신중하고 믿을 수 있는 사람\n- 독립적이고 자기 길이 분명한 사람\n- 감각적이고 분위기 있는 사람",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7612
+    },
+    {
+      "id": "07_force_external",
+      "gender": "female",
+      "turn_type": "force_external_transition",
+      "vision": true,
+      "duration_s": 1.19,
+      "response": "정세현님에 대해 충분히 감을 잡았습니다. 이제 방향을 좀 더 구체적으로 여쭙겠습니다.\n\n어떤 방향의 인상을 만들고 싶으신가요?\n\n- 편안하고 기대고 싶은 인상\n- 세련되고 거리감 있는 인상\n- 특별한 날처럼 공들인 인상\n- 무심한데 센스 있는 인상",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7563
+    },
+    {
+      "id": "08_external_desired_image",
+      "gender": "female",
+      "turn_type": "external_desired_image",
+      "vision": true,
+      "duration_s": 2.39,
+      "response": "피드에는 쿨뮤트 톤이 일관되게 드러납니다. 채도도 점진적으로 낮아지는 중입니다.\n\n정세현님이 지금 이 스타일을 지속하고 싶으신가요, 아니면 변화를 생각 중이신가요?\n\n- 지금 방향이 맞다고 느낀다\n- 톤은 유지하되 채도를 살리고 싶다\n- 좀 더 활기찬 느낌으로 바꾸고 싶다\n- 스타일이 정해지지 않아 고민 중이다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7488
+    },
+    {
+      "id": "09_body_female",
+      "gender": "female",
+      "turn_type": "external_body_height",
+      "vision": true,
+      "duration_s": 1.9,
+      "response": "정세현님의 방향이 명확하네요. 현재 피드에서 가장 고민되는 부분이 있으신가요?",
+      "violations": {
+        "tone_suffix": [
+          "네요"
+        ],
+        "tone_missing": [
+          ""
+        ]
+      },
+      "error": null,
+      "system_prompt_chars": 7532
+    },
+    {
+      "id": "10_body_male",
+      "gender": "male",
+      "turn_type": "external_body_height",
+      "vision": true,
+      "duration_s": 1.44,
+      "response": "정세현님은 이미 그 방향으로 움직이고 계십니다. 피드의 톤과 구도가 이미 그곳을 가리키고 있습니다.\n\n현재 고민이 있다면 어떤 부분인가요?",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7492
+    },
+    {
+      "id": "11_closing_female",
+      "gender": "female",
+      "turn_type": "closing",
+      "vision": true,
+      "duration_s": 4.27,
+      "response": "정세현님, 정리하겠습니다.\n\n지금까지 수집된 정보입니다.\n\n- 추구미: 세련되고 거리감 있는 인상\n- 참고 스타일: 조용한 분위기의 일상 기록\n- 체형: 163-168cm, 50-55kg, 평균 어깨\n- 현재 고민: 톤의 일관성을 더 단단하게 유지하고 싶음\n- 라이프스타일: 실내 중심\n\n정세현님은 피드에 정돈된 여운을 남기는 데 익숙하신 분입니다. 쿨뮤트 톤으로 조용하게 자신을 표현하되, 채도를 더 낮춰가며 방향을 정다듬고 계신 중입니다. 이 방향을 확실히 잡으면 주변에서 무게 있게 받아들여질 가능성이 높습니다.\n\n시각이 본 나는 한 번 받으면 계속 간직할 수 있도록 5,000원에 제공됩니다.\n\n추가 질문이 있으시면 말씀해주세요.",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7840
+    },
+    {
+      "id": "12_vision_null_fallback",
+      "gender": "female",
+      "turn_type": "opening",
+      "vision": false,
+      "duration_s": 8.85,
+      "response": "정세현님, Sia 입니다.\n\n피드를 살펴봤습니다.\n\n정세현님은 무게 있게 받아들여지는 분입니다. 일관되게 단정한 인상을 전달하고 있으며, 그것이 주변에서 자연스럽게 신뢰로 이어지고 있습니다.\n\n이 단정이 본인에게 얼마나 가까우신가요?\n\n- 네, 비슷하다\n- 절반 정도 맞다\n- 다르다\n- 전혀 다르다",
+      "violations": {},
+      "error": null,
+      "system_prompt_chars": 7452
+    }
+  ]
+}

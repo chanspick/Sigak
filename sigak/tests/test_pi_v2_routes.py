@@ -178,53 +178,82 @@ def test_v2_get_unlocked_with_row(client_v2):
 #  POST /api/v2/pi/unlock — happy + edge
 # ─────────────────────────────────────────────
 
-def test_v2_unlock_happy_path(client_v2, monkeypatch):
+def _stub_pi_report(report_id: str = "pi_abc", version: int = 1):
+    """Phase I generate_pi_report 가 반환하는 PIReport stub."""
+    from datetime import datetime, timezone
+    from schemas.pi_report import PIReport, PIReportSources
+    return PIReport(
+        report_id=report_id,
+        user_id="u1",
+        version=version,
+        is_current=True,
+        generated_at=datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc),
+        public_photos=[],
+        locked_photos=[],
+        user_taste_profile_snapshot={},
+        user_summary="정세현님은 정돈된 인상을 추구하시는 분입니다.",
+        needs_statement="그에 맞는 방향성이 필요합니다.",
+        user_original_phrases=[],
+        sia_overall_message="overall stub",
+        boundary_message="boundary stub",
+        matched_trend_ids=[],
+        matched_methodology_ids=[],
+        matched_reference_ids=[],
+        data_sources_used=PIReportSources(),
+    )
+
+
+def _stub_vault():
+    """Phase I: load_vault 가 반환하는 Vault stub."""
+    from services.user_data_vault import UserBasicInfo, UserDataVault
+    return UserDataVault(
+        basic_info=UserBasicInfo(
+            user_id="u1", gender="female", ig_handle="test_user", name="정세현",
+        ),
+        ig_feed_cache=None,
+        structured_fields={"desired_image": "편안한 인상"},
+    )
+
+
+def test_v2_unlock_first_time_is_free(client_v2, monkeypatch):
+    """Phase I 첫 1회 무료 정책. 기존 '항상 50 차감' 로직 폐기."""
     c, fake_db = client_v2
 
     monkeypatch.setattr(
-        "services.user_profiles.get_profile",
-        lambda db, uid: _fake_profile(),
+        "services.user_data_vault.load_vault",
+        lambda db, uid: _stub_vault(),
     )
-    # pi_reports 는 locked 상태
-    # tokens 차감 + get_balance stub
+    # 기존 is_current 없음 → _has_real_current_report = False
+    # credit_tokens 호출되면 안 됨 (무료)
+    called = {"credit": 0}
+    monkeypatch.setattr(
+        "services.tokens.credit_tokens",
+        lambda *a, **k: called.__setitem__("credit", called["credit"] + 1) or 100,
+    )
     monkeypatch.setattr(
         "services.tokens.get_balance",
         lambda db, uid: 100,
     )
+    # generate_pi_report stub
     monkeypatch.setattr(
-        "services.tokens.credit_tokens",
-        lambda db, **kw: 50,
+        "services.pi_engine.generate_pi_report",
+        lambda db, **kw: _stub_pi_report(),
     )
 
     r = c.post("/api/v2/pi/unlock")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["unlocked"] is True
-    assert body["token_balance"] == 50
-    assert body["report_data"]["version"] == "v2"
-    assert body["report_data"]["status"] == "generating"
-    assert body["report_data"]["profile_seed"]["gender"] == "female"
-
-    # structured_fields 화이트리스트 검증
-    seed_structured = body["report_data"]["profile_seed"]["structured_fields"]
-    assert seed_structured["reference_style"] == "한소희 초반"
-    assert "extra_legacy" not in seed_structured  # 화이트리스트 필터
-
-    # ig_feed_cache 에서 profile_basics 제거 검증
-    ig_seed = body["report_data"]["profile_seed"]["ig_feed_cache"]
-    assert "profile_basics" not in ig_seed
-    assert ig_seed["current_style_mood"][0]["tag"] == "쿨뮤트"
-
-    # UPSERT + commit 호출 확인
-    upsert_calls = [e for e in fake_db.executes if "INSERT INTO pi_reports" in e[0]]
-    assert len(upsert_calls) == 1
-    assert fake_db.committed == 1
+    assert body["token_balance"] == 100   # 차감 없음
+    assert called["credit"] == 0
+    assert body["report_data"]["report_id"] == "pi_abc"
+    assert body["report_data"]["version"] == 1
 
 
-def test_v2_unlock_no_profile_409(client_v2, monkeypatch):
+def test_v2_unlock_no_vault_409(client_v2, monkeypatch):
     c, _ = client_v2
     monkeypatch.setattr(
-        "services.user_profiles.get_profile",
+        "services.user_data_vault.load_vault",
         lambda db, uid: None,
     )
     r = c.post("/api/v2/pi/unlock")
@@ -232,55 +261,71 @@ def test_v2_unlock_no_profile_409(client_v2, monkeypatch):
     assert "온보딩" in r.json()["detail"]
 
 
-def test_v2_unlock_already_unlocked_idempotent(client_v2, monkeypatch):
+def test_v2_unlock_regenerate_charges_50(client_v2, monkeypatch):
+    """기존 is_current 있으면 재생성 = 50 토큰 차감 + force_new_version."""
     c, fake_db = client_v2
     monkeypatch.setattr(
-        "services.user_profiles.get_profile",
-        lambda db, uid: _fake_profile(),
+        "services.user_data_vault.load_vault",
+        lambda db, uid: _stub_vault(),
     )
-    # pi_reports 기존 해제 row
-    now = datetime(2026, 4, 20, 9, 0, 0)
+    # 기존 is_current 리포트 존재 → _has_real_current_report = True
     fake_db.queue_result(
-        "FROM pi_reports WHERE user_id",
-        _make_row(unlocked_at=now, report_data={"version": "v2", "status": "ready"}),
+        "FROM pi_reports "
+        "WHERE user_id = :uid AND is_current = TRUE LIMIT 1",
+        _make_row(report_data={"report_id": "pi_old", "version": 1, "status": "ready"}),
     )
     monkeypatch.setattr(
         "services.tokens.get_balance",
         lambda db, uid: 80,
     )
-    # credit_tokens 가 호출되면 실패해야 함 (idempotent 반환 전제)
-    called = {"n": 0}
+    credit_called = {"n": 0}
 
-    def _credit(*a, **k):
-        called["n"] += 1
-        return 30
+    def _credit(db, **k):
+        credit_called["n"] += 1
+        return 30    # 80 - 50
 
     monkeypatch.setattr("services.tokens.credit_tokens", _credit)
 
+    # generate 가 force_new_version=True 로 호출됐는지 확인
+    force_new_seen = {"v": None}
+
+    def _gen(db, **kw):
+        force_new_seen["v"] = kw.get("force_new_version")
+        return _stub_pi_report(report_id="pi_new", version=2)
+
+    monkeypatch.setattr("services.pi_engine.generate_pi_report", _gen)
+
     r = c.post("/api/v2/pi/unlock")
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     body = r.json()
-    assert body["unlocked"] is True
-    assert body["unlocked_at"] == now.isoformat()
-    assert body["report_data"]["status"] == "ready"
-    assert body["token_balance"] == 80
-    # credit 호출 없음 (idempotent)
-    assert called["n"] == 0
+    assert body["report_data"]["version"] == 2
+    assert body["token_balance"] == 30
+    assert credit_called["n"] == 1          # 1회 차감
+    assert force_new_seen["v"] is True      # 재생성
 
 
-def test_v2_unlock_insufficient_tokens_402(client_v2, monkeypatch):
-    c, _ = client_v2
+def test_v2_unlock_regenerate_insufficient_tokens_402(client_v2, monkeypatch):
+    """재생성인데 잔액 < 50 → 402."""
+    c, fake_db = client_v2
     monkeypatch.setattr(
-        "services.user_profiles.get_profile",
-        lambda db, uid: _fake_profile(),
+        "services.user_data_vault.load_vault",
+        lambda db, uid: _stub_vault(),
+    )
+    fake_db.queue_result(
+        "FROM pi_reports "
+        "WHERE user_id = :uid AND is_current = TRUE LIMIT 1",
+        _make_row(report_data={"report_id": "pi_old", "version": 1}),
     )
     monkeypatch.setattr(
         "services.tokens.get_balance",
-        lambda db, uid: 10,  # 50 미만
+        lambda db, uid: 10,   # 50 미만
     )
     r = c.post("/api/v2/pi/unlock")
     assert r.status_code == 402
-    assert "토큰이 부족" in r.json()["detail"]
+
+
+# (구 test_v2_unlock_insufficient_tokens_402 삭제 — Phase I 첫 1회 무료 정책에
+#  맞춰 test_v2_unlock_regenerate_insufficient_tokens_402 로 대체됨)
 
 
 # ─────────────────────────────────────────────

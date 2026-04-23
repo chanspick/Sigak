@@ -1,0 +1,40 @@
+{
+  "fixture_id": "female_closing_v1",
+  "gender": "female",
+  "turn_type": "closing",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "쿨뮤트",
+      "tone_percentage": 68,
+      "saturation_trend": "감소",
+      "environment": "실내 + 자연광",
+      "pose_frequency": "측면 > 정면",
+      "observed_adjectives": ["단정", "감성", "조용함"],
+      "style_consistency": 0.82,
+      "mood_signal": "정돈된 여운을 남기는 방식에 익숙하신 분입니다",
+      "three_month_shift": "채도가 점진적으로 낮아지는 방향"
+    },
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "세련되고 거리감 있는 인상",
+        "reference_style": "조용한 분위기의 일상 기록",
+        "height": "163-168cm",
+        "weight": "50-55kg",
+        "shoulder": "평균",
+        "current_concerns": "톤의 일관성을 더 단단하게 유지하고 싶습니다",
+        "lifestyle_context": "실내 중심"
+      }
+    }
+  },
+  "expected_response": "정세현님의 오늘 대화를 정리하겠습니다.\n\n- 추구 인상: 세련되고 거리감 있는\n- 참고 스타일: 조용한 분위기의 일상 기록\n- 체형 정보: 163-168cm, 50-55kg, 평균 어깨\n- 현재 고민: 톤의 일관성 유지\n- 생활 환경: 실내 중심\n\n정세현님의 방향은 정돈된 감성을 꾸준히 유지하시는 쪽으로 정리됩니다.\n\n앞으로 사진을 업로드하시면 이 기준에 맞춰 피드 분석이 이어집니다.\n\n얼굴 구조가 이 인상을 어떻게 만드는지 더 알고 싶으시다면, 시각이 본 나로 이어집니다. 5,000원에 한 번 받으면 영구 보관됩니다.",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

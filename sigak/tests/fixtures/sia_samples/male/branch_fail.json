@@ -1,0 +1,31 @@
+{
+  "fixture_id": "male_branch_fail_v1",
+  "gender": "male",
+  "turn_type": "branch_fail",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": {
+      "tone_category": "중성",
+      "tone_percentage": 62,
+      "saturation_trend": "안정",
+      "environment": "외부 활동 + 야외",
+      "pose_frequency": "정면 > 측면",
+      "observed_adjectives": ["단정", "담백", "묵직함"],
+      "style_consistency": 0.75,
+      "mood_signal": "꾸밈 없이 담백한 인상을 전달하시는 분입니다",
+      "three_month_shift": null
+    },
+    "session_state": {
+      "spectrum_log": [4],
+      "precision_hits": 0,
+      "precision_misses": 1
+    }
+  },
+  "expected_response": "피드에서 읽히는 정세현님과 실제 정세현님 사이에 갭이 있으십니다.\n\n보여지는 것보다 더 입체적인 분일 가능성이 높습니다.\n\n먼저 정세현님께서 생각하시는 본인의 인상을 여쭙겠습니다.\n\n주변 사람들이 정세현님을 어떤 사람으로 기억한다고 느끼시나요?\n- 편안하고 다가가기 쉬운 사람\n- 신중하고 믿을 수 있는 사람\n- 독립적이고 자기 길이 분명한 사람\n- 감각적이고 분위기 있는 사람",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

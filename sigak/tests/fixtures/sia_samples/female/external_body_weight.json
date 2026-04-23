@@ -1,0 +1,26 @@
+{
+  "fixture_id": "female_external_body_weight_v1",
+  "gender": "female",
+  "turn_type": "external_body_weight",
+  "context": {
+    "user_name_display": "정세현님",
+    "mock_analysis": null,
+    "session_state": {
+      "spectrum_log": [1, 1],
+      "precision_hits": 2,
+      "precision_misses": 0,
+      "collected_fields": {
+        "desired_image": "세련되고 거리감 있는 인상",
+        "reference_style": "조용한 분위기의 일상 기록",
+        "height": "163-168cm"
+      }
+    }
+  },
+  "expected_response": "체중 범위를 여쭙겠습니다.\n\n어느 범위에 가까우신가요?\n- 45kg 이하\n- 45-50kg\n- 50-55kg\n- 55-60kg\n- 60kg 이상",
+  "validator_expectations": {
+    "assertion_count_max": 2,
+    "abstract_noun_count": 0,
+    "banned_ending_count": 0,
+    "whitelist_alignment": false
+  }
+}

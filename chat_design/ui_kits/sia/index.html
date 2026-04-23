@@ -1,0 +1,105 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>Sia — UI Kit (Persona B)</title><link rel="stylesheet" href="../../colors_and_type.css"><style>
+html,body{margin:0;padding:0;background:#1a1a1a;color:var(--color-ink);font-family:var(--font-sans)}
+.phone{max-width:440px;margin:0 auto;min-height:100vh;background:var(--color-paper);display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,0.12)}
+.top{height:52px;border-bottom:1px solid rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:sticky;top:0;background:var(--color-paper);z-index:10}
+.top .name{font-family:var(--font-sans);font-size:12px;font-weight:600;letter-spacing:6px}
+.stream{flex:1;padding:24px 20px 24px;overflow-y:auto}
+.turn{display:flex;flex-direction:column;gap:4px;margin-bottom:28px}
+.turn.me{align-items:flex-end}
+.b{max-width:78%;padding:11px 14px;font-family:var(--font-sans);font-size:14px;line-height:1.5;letter-spacing:-0.005em;white-space:pre-wrap}
+.ai{background:#F4F4F5;color:#000;border-radius:16px 16px 16px 4px;align-self:flex-start}
+.me .b{background:#111827;color:#fff;border-radius:16px 16px 4px 16px}
+.dots{display:inline-flex;gap:4px;padding:14px 14px;background:#F4F4F5;border-radius:16px 16px 16px 4px;align-self:flex-start}
+.dots span{width:5px;height:5px;border-radius:50%;background:rgba(0,0,0,0.45);animation:bb 1.3s infinite ease-in-out}
+.dots span:nth-child(2){animation-delay:0.18s}
+.dots span:nth-child(3){animation-delay:0.36s}
+@keyframes bb{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.input-dock{padding:12px 20px 20px;border-top:1px solid rgba(0,0,0,0.06);background:var(--color-paper);position:sticky;bottom:0;display:flex;gap:8px;align-items:center}
+.input-dock textarea{flex:1;min-height:44px;max-height:88px;padding:11px 16px;background:#F4F4F5;border:none;border-radius:22px;font-family:var(--font-sans);font-size:14px;line-height:1.5;color:#000;outline:none;caret-color:#000;resize:none}
+.input-dock textarea::placeholder{color:rgba(0,0,0,0.4)}
+.send{height:44px;padding:0 18px;border-radius:9999px;background:#000;color:var(--color-paper);border:none;cursor:pointer;font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:0.3px}
+.send[disabled]{background:transparent;color:rgba(0,0,0,0.3);border:1px solid rgba(0,0,0,0.15);cursor:not-allowed}
+.turn-gap{height:12px}
+.list-line{font-family:var(--font-sans);font-size:14px;line-height:1.65}
+</style></head><body>
+<!--
+  Sia UI kit — 페르소나 B (친밀 해요체).
+  샘플 dialogue: 세션 #4 v2 §3.2 샘플 2 "만재" (외부 권위 회귀형) M1 ~ M5.
+  이전 버전 (페르소나 A, 정세현, 4지선다) 은 @deprecated.
+-->
+<div class="phone">
+  <header class="top"><span class="name">Sia</span></header>
+  <div class="stream" id="stream">
+    <!-- M1 [OPENING_DECLARATION + OBSERVATION] — 결합 출력, 1 메시지 내 3 버블 -->
+    <div class="turn">
+      <div class="b ai">만재님 인스타 좀 들여다봤어요.</div>
+      <div class="b ai">스무 장 넘게 올리셨는데 만재님 얼굴 나온 건 두 장이더라구요.</div>
+      <div class="b ai">원래 본인 잘 안 찍으시는 편이에요?</div>
+    </div>
+
+    <!-- U1 -->
+    <div class="turn me">
+      <div class="b">아 네네!</div>
+    </div>
+
+    <!-- M2 [OBSERVATION] -->
+    <div class="turn">
+      <div class="b ai">피드 톤도 좀 일관되더라구요.</div>
+      <div class="b ai">베이지 그레이 아이보리 이런 색만 거의 쭉이던데 원래 이런 톤 좋아하세요?</div>
+    </div>
+
+    <!-- U2 -->
+    <div class="turn me">
+      <div class="b">예전에 퍼스널컬러 컨설팅 받았는데 거기서 그런 계열의 톤으로 맞추라고 했어요. 그래서 그런 쪽 배경을 그나마 주려고 노력해요.</div>
+    </div>
+
+    <!-- M3 [PROBE] -->
+    <div class="turn">
+      <div class="b ai">아 컨설팅 받으셨구나.</div>
+      <div class="b ai">무슨 톤 나오셨어요?</div>
+    </div>
+
+    <!-- U3 -->
+    <div class="turn me">
+      <div class="b">봄 웜톤이요.</div>
+    </div>
+
+    <!-- M4 [OBSERVATION + PROBE] -->
+    <div class="turn">
+      <div class="b ai">근데 봄웜이면 보통 코랄이나 오렌지 쪽도 잘 붙을 텐데 피드엔 그런 색이 잘 안 보이더라구요.</div>
+      <div class="b ai">일부러 빼시는 거예요?</div>
+    </div>
+
+    <!-- U4 -->
+    <div class="turn me">
+      <div class="b">코랄은 입어보면 좀 튀어서요. 어색하더라구요.</div>
+    </div>
+
+    <!-- M5 [EMPATHY_MIRROR] -->
+    <div class="turn">
+      <div class="b ai">아 어색하셨구나.</div>
+      <div class="b ai">그럴 수 있어요.</div>
+    </div>
+
+    <!-- Loading indicator sample (Sia 응답 대기 중) -->
+    <div class="turn" aria-label="loading sample">
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <!--
+    Open-ended input dock — 100% 주관식. 선택지 버튼 / 카드 / 퀵리플라이 일체 없음.
+    textarea auto-grow (max 4 lines), send 버튼 텍스트 "보내기" (아이콘 금지).
+    IME 조합 중 Enter 전송 차단은 React 구현 (components/sia/SiaInputDock.tsx) 기준.
+  -->
+  <div class="input-dock">
+    <textarea
+      rows="1"
+      placeholder="Sia에게 답하기"
+      aria-label="Sia에게 답하기"
+      maxlength="500"
+    ></textarea>
+    <button class="send" type="button" aria-label="전송">보내기</button>
+  </div>
+</div>
+</body></html>

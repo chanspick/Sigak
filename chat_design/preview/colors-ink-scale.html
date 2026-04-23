@@ -1,0 +1,24 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><link rel="stylesheet" href="../colors_and_type.css"><style>body{margin:0;padding:22px;background:var(--color-paper);font-family:var(--font-sans);color:var(--color-ink)}.grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}.cell{height:64px;position:relative;display:flex;align-items:flex-end;padding:6px}.cell b{font-family:var(--font-sans);font-size:10px;font-weight:600;letter-spacing:1px}.inv{height:64px;display:flex;align-items:flex-end;padding:6px;color:var(--color-paper);font-size:10px;letter-spacing:1px;font-weight:600}.cap{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.4;margin:14px 0 6px}</style></head><body>
+<div class="cap">Ink opacity ramp — depth via α, not grey</div>
+<div class="grid">
+  <div class="cell" style="background:rgba(0,0,0,0.04)"><b>04</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.06)"><b>06</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.10)"><b>10</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.15)"><b>15</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.30);color:#F3F0EB"><b>30</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.40);color:#F3F0EB"><b>40</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.55);color:#F3F0EB"><b>55</b></div>
+  <div class="cell" style="background:rgba(0,0,0,0.85);color:#F3F0EB"><b>85</b></div>
+</div>
+<div class="cap">Paper opacity (on ink) — inverted usage on TopBar</div>
+<div class="grid" style="background:#000;padding:8px;gap:8px">
+  <div class="inv" style="background:rgba(243,240,235,0.15)">15</div>
+  <div class="inv" style="background:rgba(243,240,235,0.40)">40</div>
+  <div class="inv" style="background:rgba(243,240,235,0.70)">70</div>
+  <div class="inv" style="background:rgba(243,240,235,0.85)">85</div>
+  <div class="inv" style="background:rgba(243,240,235,1)" >100</div>
+  <div class="inv" style="background:rgba(243,240,235,1);color:#000">Paper</div>
+  <div class="inv" style="background:rgba(243,240,235,1);color:#000">on ink</div>
+  <div class="inv" style="background:rgba(243,240,235,0.55)">55</div>
+</div>
+</body></html>

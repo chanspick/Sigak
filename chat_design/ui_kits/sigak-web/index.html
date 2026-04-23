@@ -1,0 +1,172 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>sigak-web — UI Kit</title><link rel="stylesheet" href="../../colors_and_type.css"><style>
+html,body{margin:0;padding:0;background:#1a1a1a;font-family:var(--font-sans)}
+.frame{max-width:440px;margin:0 auto;background:var(--color-paper);min-height:100vh;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,0.12);color:var(--color-ink)}
+.top{height:52px;background:#000;color:#F3F0EB;display:flex;align-items:center;padding:0 20px;flex-shrink:0;position:sticky;top:0;z-index:10}
+.wm{font-family:var(--font-sans);font-size:12px;font-weight:600;letter-spacing:6px}
+.right{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:13px}
+.av{width:28px;height:28px;border-radius:50%;background:rgba(243,240,235,0.15);display:flex;align-items:center;justify-content:center;color:#F3F0EB;font-size:11px}
+.ico{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer}
+.tabs{display:flex;gap:0;border-bottom:1px solid rgba(0,0,0,0.1);padding:0 20px;background:var(--color-paper);position:sticky;top:52px;z-index:9}
+.tab{padding:14px 14px;font-family:var(--font-sans);font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;opacity:0.4;background:transparent;border:none;cursor:pointer;color:#000}
+.tab.active{opacity:1;border-bottom:1px solid #000;margin-bottom:-1px}
+.view{flex:1;display:flex;flex-direction:column}
+.hide{display:none !important}
+h1.page{font-family:var(--font-serif);font-weight:400;font-size:40px;line-height:1.2;letter-spacing:-0.02em;margin:0}
+.meta{font-family:var(--font-sans);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;opacity:0.4;margin:0}
+.rule{height:1px;background:#000;opacity:0.15;margin:0 28px}
+.lede{font-family:var(--font-serif);font-size:18px;line-height:1.7;letter-spacing:-0.01em}
+.btn-primary{width:100%;height:56px;background:#000;color:#F3F0EB;border:none;border-radius:0;font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:0.5px;cursor:pointer}
+.btn-secondary{width:100%;height:48px;background:transparent;color:#000;border:1px solid rgba(0,0,0,0.25);border-radius:0;font-family:var(--font-sans);font-size:13px;font-weight:600;letter-spacing:0.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn-disabled{background:transparent;color:#000;border:1px solid rgba(0,0,0,0.15);opacity:0.3}
+.kakao{width:100%;height:56px;background:#FEE500;color:rgba(0,0,0,0.85);border:none;border-radius:0;font-family:var(--font-sans);font-size:14px;font-weight:600;letter-spacing:0.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.fineprint{font-family:var(--font-sans);font-size:11px;line-height:1.7;opacity:0.4;text-align:center;letter-spacing:-0.005em}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+.cell{aspect-ratio:1/1;background:rgba(0,0,0,0.04);overflow:hidden;position:relative;border:none;padding:0;cursor:pointer}
+.cell img{width:100%;height:100%;object-fit:cover;display:block}
+.cell.plus{display:flex;align-items:center;justify-content:center;cursor:pointer}
+.plus-glyph{position:relative;width:28px;height:28px}
+.plus-glyph::before,.plus-glyph::after{content:"";position:absolute;background:#000}
+.plus-glyph::before{top:13.5px;left:0;width:28px;height:1px}
+.plus-glyph::after{left:13.5px;top:0;width:1px;height:28px}
+.upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.u-cell{aspect-ratio:1/1;background:rgba(0,0,0,0.04);overflow:hidden;position:relative}
+.u-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.u-cell .x{position:absolute;top:6px;right:6px;width:20px;height:20px;background:#000;color:#F3F0EB;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.u-empty{aspect-ratio:1/1;border:1px solid rgba(0,0,0,0.15);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.u-empty-glyph{width:14px;height:14px;position:relative}
+.u-empty-glyph::before,.u-empty-glyph::after{content:"";position:absolute;background:#000}
+.u-empty-glyph::before{top:6.5px;left:0;width:14px;height:1px}
+.u-empty-glyph::after{left:6.5px;top:0;width:1px;height:14px}
+.hero-16-10{width:100%;aspect-ratio:16/10;border:1px solid rgba(0,0,0,0.15);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:transparent}
+.card-outline{border:1px solid rgba(0,0,0,0.15);padding:24px 22px}
+.photo-hero{width:100%;aspect-ratio:4/5;overflow:hidden;background:rgba(0,0,0,0.04)}
+.photo-hero img{width:100%;height:100%;object-fit:cover;display:block}
+</style></head><body>
+
+<div class="frame">
+  <header class="top">
+    <span class="wm" id="topLeft">SIGAK</span>
+    <div class="right" id="topRight">
+      <span style="font-variant-numeric:tabular-nums;opacity:0.85;letter-spacing:0.02em" class="hide" id="balance">5</span>
+      <button class="ico hide" id="avBtn"><div class="av">•</div></button>
+      <button class="ico hide" id="newBtn" aria-label="새 판정"><svg width="20" height="20"><path d="M10 2v16M2 10h16" stroke="#F3F0EB" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="landing">Landing</button>
+    <button class="tab" data-view="feed">Feed</button>
+    <button class="tab" data-view="upload">Upload</button>
+    <button class="tab" data-view="result">Result</button>
+  </nav>
+
+  <!-- ── Landing ─────────────────────────── -->
+  <section class="view" id="v-landing">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 28px">
+      <h1 class="page">오늘 한 장.</h1>
+      <p style="margin-top:20px;font-size:14px;opacity:0.55;line-height:1.7;letter-spacing:-0.005em">3~10장 중 가장 나다운 한 장을.</p>
+    </div>
+    <div style="padding:0 28px 20px">
+      <button class="kakao">
+        <svg width="18" height="16" viewBox="0 0 18 16"><path d="M9 0C4.029 0 0 3.14 0 7.015c0 2.496 1.66 4.69 4.162 5.943-.183.667-.664 2.423-.76 2.8-.12.467.172.46.36.335.148-.098 2.358-1.6 3.311-2.247.625.09 1.27.137 1.927.137 4.971 0 9-3.14 9-7.015C18 3.14 13.971 0 9 0Z" fill="currentColor"/></svg>
+        <span>카카오로 시작하기</span>
+      </button>
+    </div>
+    <div style="padding:0 28px 32px">
+      <p class="fineprint">계속 진행하면 <u>이용약관</u> · <u>개인정보처리방침</u>에 동의하는 것으로 간주됩니다.</p>
+    </div>
+  </section>
+
+  <!-- ── Feed ─────────────────────────── -->
+  <section class="view hide" id="v-feed">
+    <div class="grid3" style="margin-top:0">
+      <button class="cell plus"><span class="plus-glyph"></span></button>
+      <button class="cell"><img src="../../assets/type_1.jpg" alt=""></button>
+      <button class="cell"><img src="../../assets/type_2.jpg" alt=""></button>
+      <button class="cell"><img src="../../assets/type_3.jpg" alt=""></button>
+      <button class="cell"><img src="../../assets/type_4.jpg" alt=""></button>
+      <button class="cell"><img src="../../assets/type_5.jpg" alt=""></button>
+    </div>
+  </section>
+
+  <!-- ── Upload ─────────────────────────── -->
+  <section class="view hide" id="v-upload">
+    <div style="padding:48px 28px 40px">
+      <h1 class="page" style="font-size:34px;line-height:1.3;letter-spacing:-0.01em">한 장을 골라드립니다.</h1>
+      <p style="margin-top:16px;font-size:13px;opacity:0.5;line-height:1.6">3~10장 올려주세요.</p>
+    </div>
+    <div class="rule"></div>
+    <div style="padding:28px 28px 24px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="meta">사진</span>
+        <span class="type-serif-numeric">4 / 10</span>
+      </div>
+      <div class="upload-grid" style="margin-top:12px">
+        <div class="u-cell"><img src="../../assets/type_1.jpg" alt=""><button class="x">✕</button></div>
+        <div class="u-cell"><img src="../../assets/type_2.jpg" alt=""><button class="x">✕</button></div>
+        <div class="u-cell"><img src="../../assets/type_3.jpg" alt=""><button class="x">✕</button></div>
+        <div class="u-cell"><img src="../../assets/type_4.jpg" alt=""><button class="x">✕</button></div>
+        <button class="u-empty"><span class="u-empty-glyph"></span></button>
+      </div>
+    </div>
+    <div style="flex:1"></div>
+    <div style="padding:20px 28px 24px">
+      <button class="btn-primary">시작</button>
+    </div>
+  </section>
+
+  <!-- ── Result ─────────────────────────── -->
+  <section class="view hide" id="v-result">
+    <div style="padding:40px 28px 32px">
+      <p class="meta" style="letter-spacing:2px">2026 · 04 · 22</p>
+      <h1 class="page" style="margin-top:16px">시각이 본 당신.</h1>
+    </div>
+    <div style="padding:0 28px">
+      <div class="photo-hero"><img src="../../assets/type_2.jpg" alt=""></div>
+    </div>
+    <div style="padding:20px 28px 0">
+      <button class="btn-secondary">
+        <span>진단 보기</span>
+        <svg width="11" height="12"><rect x="1.5" y="5.5" width="8" height="6" rx="0.8" stroke="#000" stroke-width="1" fill="none"/><path d="M3.5 5.5V3.5a2 2 0 014 0v2" stroke="#000" stroke-width="1" stroke-linecap="round" fill="none"/></svg>
+        <span class="type-serif-numeric">10 토큰</span>
+      </button>
+    </div>
+    <section style="padding:28px 28px 36px">
+      <p class="lede">오늘의 당신은 과시하지 않는 쪽을 택했습니다.
+여운이 앞서고, 색은 한 번만 쓰였습니다.</p>
+    </section>
+    <div class="rule"></div>
+    <div style="padding:32px 28px 24px;display:flex;justify-content:center">
+      <a href="#" style="font-family:var(--font-sans);font-size:13px;opacity:0.55;color:#000;text-decoration:none;letter-spacing:-0.005em">공유</a>
+    </div>
+  </section>
+</div>
+
+<script>
+const views = ["landing","feed","upload","result"];
+const topL = document.getElementById("topLeft");
+const balance = document.getElementById("balance");
+const avBtn = document.getElementById("avBtn");
+const newBtn = document.getElementById("newBtn");
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.view;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t===btn));
+    views.forEach(v => document.getElementById("v-"+v).classList.toggle("hide", v !== target));
+    // top-bar variant
+    const isLanding = target === "landing";
+    // landing uses centered wordmark only; others show SIGAK left + right cluster
+    if (isLanding) {
+      topL.style.margin = "0 auto";
+      balance.classList.add("hide"); avBtn.classList.add("hide"); newBtn.classList.add("hide");
+    } else {
+      topL.style.margin = "0";
+      balance.classList.remove("hide"); avBtn.classList.remove("hide"); newBtn.classList.remove("hide");
+    }
+    window.scrollTo(0,0);
+  });
+});
+// initial: landing — no right cluster
+topL.style.margin = "0 auto";
+</script>
+</body></html>

@@ -24,6 +24,10 @@
   --color-mute: rgba(0, 0, 0, 0.55);
   --color-mute-2: rgba(0, 0, 0, 0.4);
 
+  /* Sia 대화 버블 (D6) */
+  --color-bubble-ai: #F4F4F5;
+  --color-bubble-user: #111827;
+
   /* 폰트 — Serif 승격 */
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: "Noto Serif KR", Georgia, serif;
@@ -130,3 +134,30 @@ body {
 .animate-pulse-opacity { animation: sigak-pulse-opacity 900ms ease-out both; }
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ──────────────────────────────────────────────
+ * Sia 타이핑 점 바운스 (D6)
+ * chat_design/ui_kits/sia/index.html 의 @keyframes bb 이식
+ * ────────────────────────────────────────────── */
+@keyframes sia-dot-bounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-3px); }
+}
+.sia-dot {
+  animation: sia-dot-bounce 1.3s infinite ease-in-out;
+}
+.sia-dot-2 { animation-delay: 0.18s; }
+.sia-dot-3 { animation-delay: 0.36s; }
+
+/* ──────────────────────────────────────────────
+ * Sia countdown pulse (0:30 이하 경고 — Phase H ⑤)
+ * 1.5s cycle, 0.7 ↔ 1.0 opacity. ease-in-out, infinite.
+ * 디자인 토큰: var(--color-danger) 와 조합해서 "warning + pulse".
+ * ────────────────────────────────────────────── */
+@keyframes sia-countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+.animate-sia-countdown-pulse {
+  animation: sia-countdown-pulse 1.5s ease-in-out infinite;
+}

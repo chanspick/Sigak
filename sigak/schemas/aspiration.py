@@ -77,11 +77,26 @@ class AspirationAnalysis(BaseModel):
 
     # ── Knowledge Base 매칭
     matched_trend_ids: list[str] = Field(default_factory=list)
+    # STEP 11 — 프론트 노출용 trend 객체 (읽기 시 KB 에서 hydrate, 저장 생략 가능)
+    matched_trends: list["MatchedTrendView"] = Field(default_factory=list)
 
     # ── 디버그/추적용 raw
     target_analysis_snapshot: Optional[dict] = None   # IgFeedAnalysis dump
     images_captured_count: int = 0
     r2_target_dir: Optional[str] = None               # R2 저장 prefix
+
+
+class MatchedTrendView(BaseModel):
+    """STEP 11 — 프론트 노출용 트렌드 뷰. GET 시 KB 에서 hydrate."""
+    model_config = ConfigDict(extra="ignore")
+
+    trend_id: str
+    title: str
+    category: str                       # color_palette / silhouette / mood / styling_method 등
+    detailed_guide: Optional[str] = None
+    action_hints: list[str] = Field(default_factory=list)
+    # 유저 좌표와의 매칭 정도 (없으면 None)
+    score: Optional[float] = None
 
 
 class BlocklistEntry(BaseModel):

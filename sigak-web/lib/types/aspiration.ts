@@ -34,6 +34,15 @@ export interface PhotoPair {
   pair_axis_hint: string | null;
 }
 
+export interface MatchedTrendView {
+  trend_id: string;
+  title: string;
+  category: string;
+  detailed_guide: string | null;
+  action_hints: string[];
+  score: number | null;
+}
+
 export interface AspirationAnalysis {
   analysis_id: string;
   user_id: string;
@@ -51,6 +60,7 @@ export interface AspirationAnalysis {
 
   sia_overall_message: string;
   matched_trend_ids: string[];
+  matched_trends: MatchedTrendView[];
 
   target_analysis_snapshot: Record<string, unknown> | null;
   images_captured_count: number;

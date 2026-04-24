@@ -168,6 +168,11 @@ def create_aspiration_ig(
     _append_aspiration_history(db, user_id=user["id"], analysis=result.analysis)
     db.commit()
 
+    # STEP 11 — 응답에서도 matched_trends hydrate (첫 조회 CTA 노출)
+    result.analysis.matched_trends = _hydrate_matched_trends(
+        result.analysis.matched_trend_ids
+    )
+
     return AspirationStartResponse(
         analysis_id=result.analysis.analysis_id,
         status="completed",
@@ -277,7 +282,10 @@ def get_aspiration(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> AspirationAnalysis:
-    """소유자만 조회. 타 유저 → 403."""
+    """소유자만 조회. 타 유저 → 403.
+
+    STEP 11: matched_trend_ids 를 KB 에서 hydrate 해서 matched_trends 채움.
+    """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
@@ -293,7 +301,41 @@ def get_aspiration(
     if row.user_id != user["id"]:
         raise HTTPException(403, "본인 분석이 아닙니다.")
 
-    return AspirationAnalysis.model_validate(row.result_data)
+    analysis = AspirationAnalysis.model_validate(row.result_data)
+    analysis.matched_trends = _hydrate_matched_trends(analysis.matched_trend_ids)
+    return analysis
+
+
+def _hydrate_matched_trends(trend_ids: list[str]):
+    """STEP 11 — trend_id 목록을 KB 에서 resolve 해서 MatchedTrendView 리스트 반환.
+
+    KB 로드 실패 / 미존재 id 는 skip. 예외 전부 흡수.
+    """
+    if not trend_ids:
+        return []
+    try:
+        from schemas.aspiration import MatchedTrendView
+        from services.knowledge_base import load_trends
+        # 전체 로드 (여성 + 남성 + 모든 시즌) 후 id 매칭 — KB 크기 작음 (~50 items)
+        all_trends = load_trends()
+        by_id = {t.trend_id: t for t in all_trends}
+        views = []
+        for tid in trend_ids:
+            t = by_id.get(tid)
+            if t is None:
+                continue
+            views.append(MatchedTrendView(
+                trend_id=t.trend_id,
+                title=t.title,
+                category=str(t.category),
+                detailed_guide=t.detailed_guide,
+                action_hints=list(t.action_hints or []),
+                score=None,
+            ))
+        return views
+    except Exception:
+        logger.exception("hydrate_matched_trends failed for ids=%s", trend_ids)
+        return []
 
 
 # ─────────────────────────────────────────────

@@ -25,6 +25,7 @@ import { ApiError } from "@/lib/api/fetch";
 import { getAspirationAnalysis } from "@/lib/api/aspiration";
 import type {
   AspirationAnalysis,
+  MatchedTrendView,
   PhotoPair,
 } from "@/lib/types/aspiration";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
@@ -160,6 +161,10 @@ export default function AspirationResultPage() {
               ))}
             </div>
           </section>
+        )}
+
+        {analysis.matched_trends && analysis.matched_trends.length > 0 && (
+          <MatchedTrendsSection trends={analysis.matched_trends} />
         )}
 
         {analysis.sia_overall_message && (
@@ -348,6 +353,154 @@ function PairHalf({
     </div>
   );
 }
+
+// STEP 11 — 추구미 방향 매칭 트렌드 카드 (KB hydrate)
+function MatchedTrendsSection({ trends }: { trends: MatchedTrendView[] }) {
+  return (
+    <section style={{ marginTop: 36 }}>
+      <h2
+        className="font-sans"
+        style={{
+          margin: "0 0 4px",
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          color: "var(--color-mute)",
+        }}
+      >
+        이쪽으로 가면 겹치는 결
+      </h2>
+      <p
+        className="font-sans"
+        style={{
+          margin: "0 0 14px",
+          fontSize: 11,
+          letterSpacing: "0.02em",
+          color: "var(--color-mute-2)",
+        }}
+      >
+        2026 S/S 트렌드 중 추구미 방향과 가까운 항목
+      </p>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          overflowX: "auto",
+          paddingBottom: 8,
+          WebkitOverflowScrolling: "touch",
+          scrollSnapType: "x mandatory",
+        }}
+      >
+        {trends.slice(0, 5).map((t) => (
+          <TrendCard key={t.trend_id} trend={t} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+
+function TrendCard({ trend }: { trend: MatchedTrendView }) {
+  const [expanded, setExpanded] = useState(false);
+  const guide = (trend.detailed_guide || "").trim();
+  const truncated = guide.length > 110 ? guide.slice(0, 110).trimEnd() + "…" : guide;
+  const displayGuide = expanded ? guide : truncated;
+
+  return (
+    <article
+      style={{
+        flex: "0 0 74%",
+        minWidth: 260,
+        maxWidth: 320,
+        padding: "16px 16px 14px",
+        background: "rgba(0, 0, 0, 0.04)",
+        scrollSnapAlign: "start",
+      }}
+    >
+      <p
+        className="font-sans"
+        style={{
+          margin: 0,
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          color: "var(--color-mute-2)",
+          textTransform: "uppercase",
+        }}
+      >
+        {renderCategoryLabel(trend.category)}
+      </p>
+      <h3
+        className="font-serif"
+        style={{
+          margin: "6px 0 10px",
+          fontSize: 15,
+          fontWeight: 500,
+          letterSpacing: "-0.005em",
+          lineHeight: 1.35,
+          color: "var(--color-ink)",
+        }}
+      >
+        {trend.title}
+      </h3>
+      {guide && (
+        <p
+          className="font-sans"
+          style={{
+            margin: "0 0 8px",
+            fontSize: 12,
+            lineHeight: 1.55,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.003em",
+            whiteSpace: "pre-line",
+          }}
+        >
+          {displayGuide}
+        </p>
+      )}
+      {guide.length > 110 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="font-sans"
+          style={{
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            fontSize: 11,
+            color: "var(--color-mute)",
+            textDecoration: "underline",
+            cursor: "pointer",
+            letterSpacing: "0.02em",
+          }}
+        >
+          {expanded ? "접기" : "자세히"}
+        </button>
+      )}
+    </article>
+  );
+}
+
+
+function renderCategoryLabel(category: string): string {
+  switch (category) {
+    case "mood":
+      return "무드";
+    case "color_palette":
+      return "컬러";
+    case "silhouette":
+      return "실루엣";
+    case "styling_method":
+      return "스타일링";
+    case "makeup_method":
+      return "메이크업";
+    case "grooming_method":
+      return "그루밍";
+    default:
+      return "트렌드";
+  }
+}
+
 
 function OverallMessage({ text }: { text: string }) {
   return (

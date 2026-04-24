@@ -14,15 +14,19 @@ existing pipeline entrypoint ``_run_analysis_pipeline`` can read onboarding_data
 directly as the interview payload without transformation.
 """
 import json
+import logging
 import re
 from datetime import date
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from deps import db_session, get_current_user
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
@@ -221,6 +225,27 @@ class EssentialsResponse(BaseModel):
     gender: str
     birth_date: str  # ISO 날짜 (YYYY-MM-DD)
     ig_handle: Optional[str]
+    # IG wiring — 비동기 fetch 트리거 결과 시그널
+    #   pending : ig_handle 있음, BackgroundTask 예약됨. 프론트는 ig-status 폴링 시작
+    #   skipped : ig_handle 없음. 프론트는 즉시 Sia 진입 가능
+    ig_fetch_status: Literal["pending", "skipped"] = "skipped"
+
+
+class IgStatusResponse(BaseModel):
+    """GET /api/v1/onboarding/ig-status — 프론트 폴링용.
+
+    상태:
+      pending          — essentials 직후, 아직 Apify 호출 시작 전/중
+      pending_vision   — Apify 성공 + preview DB flush 완료, Vision 진행 중
+                         → preview_urls 렌더 시작해도 OK
+      success / private / failed / skipped — 최종 상태 (Sia 진입 허용)
+
+    preview_urls 는 pending_vision 부터 채워짐. Instagram CDN URL (TTL 24-48h).
+    """
+    status: str
+    preview_urls: List[str] = Field(default_factory=list)
+    username: Optional[str] = None
+    analyzed: bool = False
 
 
 def _normalize_ig_handle(raw: Optional[str]) -> Optional[str]:
@@ -258,6 +283,7 @@ def _ensure_min_age(birth: date) -> None:
 @router.post("/essentials", response_model=EssentialsResponse)
 def save_essentials(
     body: EssentialsRequest,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ):
@@ -266,6 +292,11 @@ def save_essentials(
     SPEC-ONBOARDING-V2 REQ-ONBD-001/002.
     users (primary) + user_profiles (v2 profile cache) 동시 갱신.
     Sia 대화(/sia/new) 진입 전에 반드시 호출되어야 함.
+
+    IG wiring (신규):
+      - ig_handle 있을 때 BackgroundTask 로 Apify + Vision 비동기 수집 시작.
+      - preview cache 먼저 flush → 프론트가 ig-status 폴링으로 미리보기 렌더.
+      - Vision 완료 후 최종 flush (status=success).
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
@@ -291,29 +322,169 @@ def save_essentials(
     )
 
     # 2. user_profiles upsert (v2 profile). Sia extraction 결과가 합쳐질 row.
+    #    ig_handle 있으면 ig_fetch_status='pending' 으로 초기화.
+    initial_ig_status = "pending" if ig_handle else None
     db.execute(
         text(
-            "INSERT INTO user_profiles (user_id, gender, birth_date, ig_handle) "
-            "VALUES (:uid, :gender, :birth_date, :ig_handle) "
+            "INSERT INTO user_profiles "
+            "  (user_id, gender, birth_date, ig_handle, ig_fetch_status) "
+            "VALUES (:uid, :gender, :birth_date, :ig_handle, :ig_status) "
             "ON CONFLICT (user_id) DO UPDATE SET "
             "  gender = EXCLUDED.gender, "
             "  birth_date = EXCLUDED.birth_date, "
             "  ig_handle = EXCLUDED.ig_handle, "
+            "  ig_fetch_status = EXCLUDED.ig_fetch_status, "
             "  updated_at = NOW()"
         ),
         {
             "gender": body.gender,
             "birth_date": body.birth_date.isoformat(),
             "ig_handle": ig_handle,
+            "ig_status": initial_ig_status,
             "uid": user["id"],
         },
     )
 
     db.commit()
 
+    # 3. IG 비동기 fetch — handle 있을 때만
+    ig_fetch_signal: Literal["pending", "skipped"] = "skipped"
+    if ig_handle:
+        background_tasks.add_task(
+            _run_ig_fetch_job,
+            user_id=user["id"],
+            ig_handle=ig_handle,
+        )
+        ig_fetch_signal = "pending"
+
     return EssentialsResponse(
         essentials_completed=True,
         gender=body.gender,
         birth_date=body.birth_date.isoformat(),
         ig_handle=ig_handle,
+        ig_fetch_status=ig_fetch_signal,
     )
+
+
+# ─────────────────────────────────────────────
+#  GET /ig-status — 프론트 대기 화면 폴링 엔드포인트
+# ─────────────────────────────────────────────
+
+@router.get("/ig-status", response_model=IgStatusResponse)
+def get_ig_status(
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """현 유저의 IG fetch 진행 상황 조회. 2-3 초 간격 폴링 전제.
+
+    preview_urls: 최대 6장 (pending_vision 부터 렌더 시작 가능).
+    analyzed: Vision 분석 완료 여부. False + status=pending_vision = 로딩 중.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    from services.user_profiles import get_profile
+    profile = get_profile(db, user["id"])
+    if profile is None:
+        raise HTTPException(404, "user_profile not found")
+
+    status = profile.get("ig_fetch_status") or "skipped"
+    cache = profile.get("ig_feed_cache") or {}
+
+    preview_urls: List[str] = []
+    username: Optional[str] = None
+    analyzed = False
+
+    if cache:
+        basics = cache.get("profile_basics") or {}
+        username = basics.get("username")
+        posts = cache.get("latest_posts") or []
+        preview_urls = [
+            p.get("display_url") for p in posts
+            if isinstance(p, dict) and p.get("display_url")
+        ][:6]
+        analyzed = cache.get("analysis") is not None
+
+    return IgStatusResponse(
+        status=status,
+        preview_urls=preview_urls,
+        username=username,
+        analyzed=analyzed,
+    )
+
+
+# ─────────────────────────────────────────────
+#  BackgroundTask — 분리 저장 Apify + Vision
+# ─────────────────────────────────────────────
+
+def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
+    """Apify 수집 + preview flush + Vision + 최종 flush.
+
+    상태 전이:
+      pending (essentials 직후)
+      → pending_vision (preview flush 완료)
+      → success | private | failed | skipped (최종)
+
+    각 전이마다 user_profiles.ig_fetch_status 업데이트 + db.commit().
+    BackgroundTask 는 독립 DB session (request session 은 이미 close 됨).
+    """
+    from db import get_db
+    from services import ig_scraper, user_profiles
+
+    db = get_db()
+    if db is None:
+        logger.error(
+            "ig_fetch job: DB unavailable user=%s (IG 상태 pending 유지)",
+            user_id,
+        )
+        return
+
+    try:
+        # 1. Apify 수집 (Vision 미실행)
+        status, preview_cache = ig_scraper.fetch_ig_raw(ig_handle)
+
+        if status != "success" or preview_cache is None:
+            # private / failed / skipped — 단일 flush
+            user_profiles.upsert_ig_feed_cache(
+                db, user_id=user_id, cache=preview_cache, status=status,
+            )
+            db.commit()
+            logger.info(
+                "ig_fetch job: user=%s status=%s (no vision)",
+                user_id, status,
+            )
+            return
+
+        # 2. Preview 선 flush (pending_vision)
+        user_profiles.upsert_ig_feed_cache(
+            db, user_id=user_id, cache=preview_cache, status="pending_vision",
+        )
+        db.commit()
+        logger.info(
+            "ig_fetch job: user=%s preview flushed (pending_vision)", user_id,
+        )
+
+        # 3. Vision 분석 — 실패 시 analysis=None 인 채 success 처리
+        analyzed_cache = ig_scraper.attach_vision_analysis(preview_cache)
+
+        # 4. 최종 flush (success) — Vision 성공/실패 무관 scope=full 이면 success
+        user_profiles.upsert_ig_feed_cache(
+            db, user_id=user_id, cache=analyzed_cache, status="success",
+        )
+        db.commit()
+        logger.info(
+            "ig_fetch job: user=%s done (analysis=%s)",
+            user_id,
+            analyzed_cache.analysis is not None,
+        )
+    except Exception:
+        logger.exception("ig_fetch job: unexpected error user=%s", user_id)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass

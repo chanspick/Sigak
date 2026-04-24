@@ -30,7 +30,20 @@ from schemas.sia_state import (
     UserMessageFlags,
     UserTurn,
 )
-from services.sia_decision import decide_next_message
+from services.sia_decision import (
+    DISCLAIMER_MEMORY_TURNS,
+    SELF_PR_PREFIX_MAX,
+    decide,
+    decide_next_message,
+    detect_eval_request,
+    detect_exit_signal,
+    detect_generalization,
+    detect_overattachment,
+    detect_self_pr,
+    detect_user_disclaimer,
+    is_trivial,
+    update_state_from_user_turn,
+)
 from services.sia_flag_extractor import extract_flags
 
 
@@ -400,3 +413,370 @@ def test_priority_no_consecutive_same_type():
     # 직전 OBSERVATION → PROBE 로 분산 (2 연속 회피)
     assert result == MsgType.PROBE
     assert result != MsgType.OBSERVATION
+
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 신규 — 관리 3 타입 트리거
+# ─────────────────────────────────────────────
+
+class TestM1CombinedOutput:
+    """세션 #4 v2 §6: 첫 턴 = OPENING_DECLARATION + OBSERVATION 결합."""
+
+    def test_empty_state_returns_combined_composition(self):
+        comp = decide(_new_state())
+        assert comp.primary_type == MsgType.OPENING_DECLARATION
+        assert comp.secondary_type == MsgType.OBSERVATION
+        assert comp.is_combined is True
+
+    def test_decide_next_message_returns_primary_only(self):
+        """기존 호출부 호환: primary_type 만 반환."""
+        assert decide_next_message(_new_state()) == MsgType.OPENING_DECLARATION
+
+
+class TestA11Overattachment:
+    """세션 #6 v2 §4 A-11 과몰입 → RANGE_DISCLOSURE."""
+
+    def test_mild_overattachment_returns_range_disclosure(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "너 진짜 나 잘 아네")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.RANGE_DISCLOSURE
+        assert comp.range_mode == "limit"
+        assert s.overattachment_severity == "mild"
+
+    def test_severe_overattachment_sets_severity(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "들어줄 사람 없었는데 네가 낫네")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.RANGE_DISCLOSURE
+        assert s.overattachment_severity == "severe"
+
+    def test_overattachment_beats_other_triggers(self):
+        """과몰입은 최우선 — concede / defensive 보다 먼저."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        for _ in range(3):
+            _add_assistant(s, MsgType.OBSERVATION)
+        s.observation_count = 3
+        _add_user(s, "너 진짜 나 잘 아네 맞아요",
+                  flags=UserMessageFlags(has_concede=True))
+        assert decide(s).primary_type == MsgType.RANGE_DISCLOSURE
+
+
+class TestA10ExitSignal:
+    """세션 #6 v2 §3 A-10 직접 이탈 → CHECK_IN."""
+
+    def test_exit_signal_returns_check_in(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "나중에 할게요")
+        assert decide(s).primary_type == MsgType.CHECK_IN
+
+    def test_geuman_triggers_check_in(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "그만 할래요")
+        assert decide(s).primary_type == MsgType.CHECK_IN
+
+
+class TestA9TrivialStreak:
+    """세션 #6 v2 §2 A-9 단답 스트릭 분기."""
+
+    def test_streak_3_returns_check_in(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        s.trivial_streak = 3
+        _add_user(s, "네")
+        assert decide(s).primary_type == MsgType.CHECK_IN
+
+    def test_streak_1_after_observation_returns_extraction(self):
+        """B 경로 — 같은 축 좁힘. last=OBSERVATION → EXTRACTION."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        s.trivial_streak = 1
+        _add_user(s, "네")
+        assert decide(s).primary_type == MsgType.EXTRACTION
+
+    def test_streak_1_after_probe_returns_probe(self):
+        """B 경로 — last != OBSERVATION → PROBE."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.PROBE)
+        s.trivial_streak = 1
+        _add_user(s, "네")
+        assert decide(s).primary_type == MsgType.PROBE
+
+    def test_streak_2_returns_observation_and_sets_axis_switch(self):
+        """D 경로 — 수용부 + 축 전환 복귀."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        s.trivial_streak = 2
+        _add_user(s, "네")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.OBSERVATION
+        assert s.axis_switch_required is True
+
+
+class TestCheckInToReEntry:
+    """세션 #6 v2 §8.1 step 6: CHECK_IN 직후 → RE_ENTRY."""
+
+    def test_after_check_in_returns_re_entry_normal(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.CHECK_IN)
+        _add_user(s, "그냥 할 말이 없어서요")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.RE_ENTRY
+        assert comp.exit_confirmed is False
+
+    def test_after_check_in_with_exit_signal_sets_exit_confirmed(self):
+        """세션 #6 v2 §3.3: 이탈 선택 시 RE_ENTRY V5 종결 버전."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.CHECK_IN)
+        _add_user(s, "네 나중에 할게요")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.RE_ENTRY
+        assert comp.exit_confirmed is True
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 신규 — C6 / C7 / EMPATHY 결합 / A-13 prefix
+# ─────────────────────────────────────────────
+
+class TestC6EvalRequest:
+    """세션 #7 §2: C6 평가 의존 돌파 분기."""
+
+    def test_eval_request_with_rich_self_disclosure_returns_c6(self):
+        """자기개시 풍부 → CONFRONTATION C6."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        # 50자+ 발화 2건으로 rich self-disclosure 조건 충족
+        _add_user(s, "실은 제가 평소에 자신감이 없어서 그런지 사진 찍을 때마다 뭔가 어색하고 억지로 웃는 느낌이 들어요")
+        _add_assistant(s, MsgType.RECOGNITION)
+        _add_user(s, "본연의 매력이 있긴 한가요?")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.CONFRONTATION
+        assert comp.confrontation_block == "C6"
+
+    def test_eval_request_with_sparse_self_disclosure_returns_range_reaffirm(self):
+        """막막함 우세 → RANGE_DISCLOSURE reaffirm."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "네")
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "제가 어때 보여요?")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.RANGE_DISCLOSURE
+        assert comp.range_mode == "reaffirm"
+
+
+class TestC7Generalization:
+    """세션 #7 §3: C7 일반화 회피 돌파."""
+
+    def test_generalization_returns_c7_confrontation(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "뭐 다들 그렇지 않나요")
+        comp = decide(s)
+        assert comp.primary_type == MsgType.CONFRONTATION
+        assert comp.confrontation_block == "C7"
+
+    def test_pyeongbeom_triggers_c7(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "저는 평범해요")
+        assert decide(s).confrontation_block == "C7"
+
+
+class TestEmpathyCombinedOutput:
+    """세션 #7 §1: 감정 트리거 시 EMPATHY 결합 출력."""
+
+    def test_emotion_word_returns_combined_empathy_probe_default(self):
+        """obs_count < 3 + no eval → EMPATHY + PROBE."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "좀 부담스러워서요", flags=UserMessageFlags(
+            has_emotion_word=True, emotion_word_raw="부담",
+        ))
+        comp = decide(s)
+        assert comp.primary_type == MsgType.EMPATHY_MIRROR
+        assert comp.secondary_type == MsgType.PROBE
+        assert comp.is_combined is True
+
+    def test_emotion_with_enough_obs_returns_combined_empathy_recognition(self):
+        """obs_count >= 3 + no eval → EMPATHY + RECOGNITION."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        for _ in range(3):
+            _add_assistant(s, MsgType.OBSERVATION)
+        s.observation_count = 3
+        _add_user(s, "좀 부담스러워서요", flags=UserMessageFlags(
+            has_emotion_word=True, emotion_word_raw="부담",
+        ))
+        comp = decide(s)
+        assert comp.primary_type == MsgType.EMPATHY_MIRROR
+        assert comp.secondary_type == MsgType.RECOGNITION
+
+    def test_emotion_with_eval_and_rich_disclosure_returns_empathy_c6(self):
+        """서연 fixture M5 경로 재현: EMPATHY + CONFRONTATION(C6)."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(s, "실은 제가 평소에 자신감이 없어서 그런지 사진 찍을 때마다 뭔가 어색하고 억지로 웃는 느낌이 들어요")
+        _add_assistant(s, MsgType.EMPATHY_MIRROR)
+        _add_user(
+            s,
+            "본연의 매력이 있긴 한가요? 저는 부담스러워서 사진이 꺼려져요",
+            flags=UserMessageFlags(has_emotion_word=True, emotion_word_raw="부담"),
+        )
+        comp = decide(s)
+        assert comp.primary_type == MsgType.EMPATHY_MIRROR
+        assert comp.secondary_type == MsgType.CONFRONTATION
+        assert comp.confrontation_block == "C6"
+
+    def test_emotion_with_eval_and_sparse_disclosure_returns_empathy_reaffirm(self):
+        """막막함 우세 → EMPATHY + RANGE_REAFFIRM."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "네")
+        _add_assistant(s, MsgType.OBSERVATION)
+        _add_user(
+            s,
+            "제가 어때 보여요 부담스러워요",
+            flags=UserMessageFlags(has_emotion_word=True, emotion_word_raw="부담"),
+        )
+        comp = decide(s)
+        assert comp.primary_type == MsgType.EMPATHY_MIRROR
+        assert comp.secondary_type == MsgType.RANGE_DISCLOSURE
+        assert comp.range_mode == "reaffirm"
+
+
+class TestA13SelfPrPrefix:
+    """세션 #7 §5: A-13 자기 PR 라포 prefix."""
+
+    def test_self_pr_sets_prefix_flag_on_observation_cycle(self):
+        """자기 PR 감지 + obs<3 → apply_self_pr_prefix=True."""
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "딱히 신경안써요 누가봐도 제 몸은 좋아보이니까요")
+        comp = decide(s)
+        # Decide 결정이 obs<3 cycle → OBSERVATION with prefix
+        assert comp.apply_self_pr_prefix is True
+
+    def test_self_pr_prefix_capped_at_max_uses(self):
+        """세션당 최대 SELF_PR_PREFIX_MAX (=2) 회 한정."""
+        s = _new_state()
+        s.self_pr_prefix_used = SELF_PR_PREFIX_MAX   # 상한 도달
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "누가봐도 제 몸은 좋아보이니까요")
+        comp = decide(s)
+        assert comp.apply_self_pr_prefix is False
+
+    def test_no_self_pr_marker_no_prefix(self):
+        s = _new_state()
+        _add_assistant(s, MsgType.OPENING_DECLARATION)
+        _add_user(s, "그냥 편해서요")
+        comp = decide(s)
+        assert comp.apply_self_pr_prefix is False
+
+
+# ─────────────────────────────────────────────
+#  Detectors — 개별 함수 양성/음성
+# ─────────────────────────────────────────────
+
+class TestDetectors:
+    def test_is_trivial_exact_set(self):
+        for text in ("네", "넹", "ㅇㅇ", "응"):
+            assert is_trivial(text)
+
+    def test_is_trivial_ambiguous_includes_jalmoreugesseoyo(self):
+        """세션 #6 v2 §2.1 §10.2 (a): '잘 모르겠어요' 포함 확정."""
+        assert is_trivial("잘 모르겠어요")
+
+    def test_is_trivial_rejects_content(self):
+        assert is_trivial("좋아해요") is False
+        assert is_trivial("그거 맞는 거 같아요") is False
+
+    def test_detect_exit_signal_matches(self):
+        for text in ("나중에 할게요", "이따가요", "그만할래요", "지금 바빠요"):
+            assert detect_exit_signal(text)
+
+    def test_detect_exit_signal_rejects(self):
+        assert not detect_exit_signal("그래요 좋아요")
+
+    def test_detect_overattachment_severe_wins(self):
+        ok, sev = detect_overattachment("들어줄 사람 없었는데 진짜 나 잘 아네")
+        assert ok
+        assert sev == "severe"
+
+    def test_detect_overattachment_mild(self):
+        ok, sev = detect_overattachment("AI 인데 신기해요")
+        assert ok
+        assert sev == "mild"
+
+    def test_detect_overattachment_negative(self):
+        ok, sev = detect_overattachment("그냥 편해서요")
+        assert not ok
+        assert sev == ""
+
+    def test_detect_eval_request(self):
+        for text in ("제가 어때 보여요?", "솔직히 말해주세요", "매력 있긴 한가요"):
+            assert detect_eval_request(text)
+
+    def test_detect_generalization(self):
+        for text in ("다들 그렇지 않나요", "보통 다 그래요", "저는 평범해요"):
+            assert detect_generalization(text)
+
+    def test_detect_user_disclaimer(self):
+        for text in ("잘 모르겠어요", "딱히 신경 안 써요", "생각 안 해봤어요"):
+            assert detect_user_disclaimer(text)
+
+    def test_detect_self_pr(self):
+        for text in ("누가봐도 좋아보이니까요", "딱 보면 모르나", "근육 좋잖아요"):
+            assert detect_self_pr(text)
+
+
+# ─────────────────────────────────────────────
+#  update_state_from_user_turn
+# ─────────────────────────────────────────────
+
+class TestPreDecideStateUpdater:
+    def test_trivial_streak_increments(self):
+        s = _new_state()
+        update_state_from_user_turn(s, "네")
+        assert s.trivial_streak == 1
+        update_state_from_user_turn(s, "넹")
+        assert s.trivial_streak == 2
+
+    def test_trivial_streak_resets_on_content(self):
+        s = _new_state()
+        s.trivial_streak = 5
+        update_state_from_user_turn(s, "사실 저는 요즘 피곤해서요")
+        assert s.trivial_streak == 0
+
+    def test_disclaimer_memory_set_on_detection(self):
+        s = _new_state()
+        update_state_from_user_turn(s, "잘 모르겠어요")
+        assert s.user_disclaimer_memory.get("recent") == DISCLAIMER_MEMORY_TURNS
+
+    def test_disclaimer_memory_decays_each_turn(self):
+        s = _new_state()
+        s.user_disclaimer_memory = {"recent": 2}
+        update_state_from_user_turn(s, "그래요")   # 무 disclaimer
+        assert s.user_disclaimer_memory.get("recent") == 1
+        update_state_from_user_turn(s, "네")
+        # 1 → 0 도달 시 삭제
+        assert "recent" not in s.user_disclaimer_memory

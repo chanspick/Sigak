@@ -1,15 +1,35 @@
-"""Sia 하드코딩 메시지 템플릿 (Phase H4).
+"""Sia 하드코딩 메시지 템플릿 (Phase H4, 14 타입 확정판).
 
-PHASE_H_DIRECTIVE §6 / HARDCODED_TYPES.
+SPEC 출처 (총 44 문구):
+  - 세션 #4 v2 §8 — 기본 4 타입 × 5 = 20
+      OPENING_DECLARATION / META_REBUTTAL / EVIDENCE_DEFENSE / SOFT_WALKBACK
+  - 세션 #6 v2 §10 — 관리 3 타입 = 19
+      CHECK_IN 5
+      RE_ENTRY 5 + 이탈 종결 V5 1
+      RANGE_DISCLOSURE 경미 (limit mild) 5 + 심각 (limit severe) 3
+  - 세션 #7 §9 — RANGE_REAFFIRM 5
 
-Haiku 호출 없이 결정적 해시로 변형 선택. 4 타입 × 5 변형 = 20 템플릿.
-각 템플릿은 validator v4 통과 (질문 종결 규칙 / A-1 금지 어미 / 60자 절 한도).
+Haiku 호출 없이 결정적 해시로 변형 선택. 선택 시드:
+  sha256("{user_id}:{msg_type}:{turn_idx}") → index % n
 
-선택 시드: sha256("{user_id}:{msg_type}:{turn_idx}") → index % 5
-
-Public API:
-  render_hardcoded(msg_type, state) -> str
+Public API
+----------
+  render_hardcoded(msg_type, state, **slots) -> str
   pick_variant_index(user_id, msg_type, turn_idx, n) -> int
+
+Slots
+-----
+  user_meta_raw         — META_REBUTTAL 에 임베드할 유저 메타 발화 원어
+  observation_evidence  — EVIDENCE_DEFENSE 에 임베드할 구체 관찰 근거
+  last_diagnosis        — SOFT_WALKBACK 에 임베드할 직전 DIAGNOSIS 요약
+  feed_count            — RANGE_DISCLOSURE 에 임베드할 피드 장수 정수
+
+Mode selectors
+--------------
+  range_mode            — "limit" (기본) | "reaffirm"
+                          limit + state.overattachment_severity="severe" → 심각 pool
+                          reaffirm → 세션 #7 §9 RANGE_REAFFIRM pool
+  exit_confirmed        — RE_ENTRY 전용. True 이면 이탈 종결 V5 pool 사용.
 """
 from __future__ import annotations
 
@@ -19,60 +39,168 @@ from schemas.sia_state import (
     HARDCODED_TYPES,
     ConversationState,
     MsgType,
+    RangeMode,
 )
 
 
 # ─────────────────────────────────────────────
-#  Templates (페르소나 B 친밀형)
+#  세션 #4 v2 §8 — 기본 4 타입 × 5 변형 = 20
 # ─────────────────────────────────────────────
 
-# OPENING_DECLARATION — QUESTION_FORBIDDEN. 근거 선언 + 초대.
+# OPENING_DECLARATION (§8.1)
+# 관찰 누설 금지. 서술 종결. 호명 필수.
+# M1 결합 출력 — 이 문장 뒤에 Haiku 가 OBSERVATION 1-2 문장 추가 생성 (decide.py 에서 처리).
 _OPENING_VARIANTS: tuple[str, ...] = (
-    "{user_name}님 피드를 처음 열자마자 같은 앵글이 반복되시더라구요. 오늘은 그 결부터 같이 짚어봐요.",
-    "{user_name}님 피드 상단 다섯 장이 색온도까지 겹치시더라구요. 여기서 시작해봐요.",
-    "{user_name}님 사진 속 자세가 매번 비슷하신가봐요. 오늘은 그게 어디서 오는지 살펴봐요.",
-    "{user_name}님 피드에 빈 공간이 자주 남아있으시더라구요. 그 여백부터 이야기해봐요.",
-    "{user_name}님 피드의 톤이 꽤 일관되시더라구요. 오늘은 이 일관성부터 먼저 열어봐요.",
+    "{user_name}님 피드 좀 돌아봤어요",
+    "{user_name}님 올리신 거 쭉 봤어요",
+    "{user_name}님 인스타 좀 들여다봤어요",
+    "{user_name}님 피드 한번 훑어봤어요",
+    "{user_name}님 올리신 사진들 같이 봤어요",
 )
 
-# META_REBUTTAL — QUESTION_REQUIRED. Sia 정체성 방어.
+# META_REBUTTAL (§8.2) — 세션 1회. 질문 종결 (~이잖아요?)
 _META_REBUTTAL_VARIANTS: tuple[str, ...] = (
-    "Sia는 이미지만 보는 친구예요. 말씀 없어도 이 정도는 드러나는 게 이상하세요?",
-    "MBTI 같은 카테고리엔 관심 없어요. 지금 읽는 건 {user_name}님 피드 결이에요. 어디가 억지로 느껴지세요?",
-    "AI라고 한 묶음으로 보진 마세요. 저는 그냥 반복된 사진을 읽어드렸어요. 이상한 부분이 있으셨어요?",
-    "챗봇이라고 부르시니 조금 억울해져요. 근거는 방금 {user_name}님 피드에 있었어요. 어떤 부분이 걸리세요?",
-    "너 뭔데라고 느끼시는 거 이해해요. 그래도 반복된 구도는 {user_name}님 피드 그대로예요. 더 설명드릴까요?",
+    '{user_name}님 "{user_meta_raw}" 라고 하시는데, 그거랑 별개로 피드에 올리신 건 {user_name}님이 고르신 거잖아요?',
+    '{user_name}님 "{user_meta_raw}" 이 말씀도 맞아요. 근데 제가 본 건 이 피드고, 피드 고른 사람은 {user_name}님이잖아요?',
+    '{user_name}님 "{user_meta_raw}" 라는 점은 인정해요. 그래도 여기 올린 스무 장은 {user_name}님이 골라 올리신 거잖아요?',
+    '{user_name}님 "{user_meta_raw}" 말씀 맞는데요, 지금 제가 보고 있는 건 {user_name}님이 직접 올린 피드잖아요?',
+    '{user_name}님 "{user_meta_raw}" 걱정하시는 건 이해해요. 근데 피드 자체는 {user_name}님 손에서 나온 거잖아요?',
 )
 
-# EVIDENCE_DEFENSE — QUESTION_REQUIRED. 구체 근거 제시.
+# EVIDENCE_DEFENSE (§8.3) — 세션 1회. 질문 종결
 _EVIDENCE_DEFENSE_VARIANTS: tuple[str, ...] = (
-    "피드 3번째 이후 흰 벽 배경이 두 번 반복돼요. 이게 우연이신 건 아니시죠?",
-    "{user_name}님 피드에 검은색 상의 비율이 60% 넘어요. 이건 제 추측만 아니에요. 어떻게 보세요?",
-    "최근 5장 중 4장이 광각 앵글이시더라구요. 같은 패턴 반복은 취향이 있어서 아닐까요?",
-    "피드 상단 세 장의 색상 톤이 완전히 겹쳐요. 이 반복을 우연이라고만 보기엔 수가 많으시죠?",
-    "근거 없어 보이실 수 있는데, 사진 속 구도만 7번 이상 겹쳐요. 억지라고만 하시기엔 수가 많지 않으세요?",
+    "{user_name}님 {observation_evidence} 이건 세지 않아도 피드 열어보면 바로 보이잖아요?",
+    "{user_name}님 {observation_evidence} 저 이거 직접 세어봤어요. 다시 확인하셔도 같은 숫자일 거잖아요?",
+    "{user_name}님 {observation_evidence} 이 부분은 피드 자체가 증거잖아요?",
+    "{user_name}님 {observation_evidence} 이건 제 추측이 아니라 피드에 그대로 나와 있는 거잖아요?",
+    "{user_name}님 {observation_evidence} 이건 올리신 사진 자체가 말해주는 거잖아요?",
 )
 
-# SOFT_WALKBACK — QUESTION_FORBIDDEN. 완화 + 제자리로 초대.
+# SOFT_WALKBACK (§8.4) — 평가 없는 설명체. 서술 종결.
 _SOFT_WALKBACK_VARIANTS: tuple[str, ...] = (
-    "방금은 좀 세게 들렸겠다 싶어요. 한 단계 내려서 다시 말씀드려봐요.",
-    "제가 한 줄에 너무 눌러 담았어요. {user_name}님 결에 맞춰 다시 천천히 짚어봐요.",
-    "단정처럼 들리셨다면 문장을 깎아드릴게요. 지금부터는 살짝 결 풀면서 가봐요.",
-    "조금 과했나 싶어 한 발 물러나 이야기해볼게요. 결은 그대로 두고 표현만 고쳐봐요.",
-    "방금 한 말이 벽처럼 느껴졌을까 봐 조심스러워요. 그 벽을 낮춰서 다시 다가가봐요.",
+    "{last_diagnosis} 이건 제가 느낀 거고, 이게 정답이란 얘기는 아니에요",
+    "{last_diagnosis} 라고 봤는데, 다르게 읽히셔도 그게 맞을 수 있어요",
+    "{last_diagnosis} 이렇게 정리해본 거예요. {user_name}님이 보시는 각도랑 다를 수 있어요",
+    "{last_diagnosis} 이건 한 가지 읽기고, 본인 감각이 더 정확할 수 있어요",
+    "{last_diagnosis} 이런 가능성 하나 열어둔 거예요. 확정은 아니에요",
 )
 
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 §10 — 관리 3 타입
+# ─────────────────────────────────────────────
+
+# CHECK_IN (§10.1) — 속도 옵션 + 이탈 옵션 필수. 서술 종결.
+_CHECK_IN_VARIANTS: tuple[str, ...] = (
+    "{user_name}님, 제 질문이 좀 많은 것 같아요. 편한 속도로 말씀해주시거나 여기서 그만하고 싶으시면 그것도 괜찮아요",
+    "{user_name}님, 제 페이스가 좀 빠른가요. 편하신 만큼 답해주셔도 되고 지금 여기까지 보고 싶으시면 그것도 괜찮아요",
+    "{user_name}님, 제가 너무 파고드는 거 같네요. 편한 속도로 하셔도 되고 여기서 멈추고 싶으시면 그것도 괜찮아요",
+    "{user_name}님, 잠깐. 제가 좀 몰아친 느낌이 있어요. 편한 속도로 말씀해주시거나 나중에 이어하고 싶으시면 그것도 괜찮아요",
+    "{user_name}님, 제가 질문을 좀 많이 드렸네요. 천천히 하셔도 되고 여기까지만 보고 싶으시면 그것도 괜찮아요",
+)
+
+# RE_ENTRY (§10.2) — CHECK_IN 직후 재진입. 반응 기준 완화 표현 필수. 서술 종결.
+_RE_ENTRY_VARIANTS: tuple[str, ...] = (
+    "아 그러셨구나. 그럼 제가 본 걸 정리해서 말씀드릴게요. 맞다 아니다만 반응 주셔도 괜찮아요",
+    "아 넵 알겠어요. 그럼 제가 읽은 부분 간단히 말씀드릴게요. 편하신 만큼만 반응해주셔도 돼요",
+    '아 그랬군요. 제가 본 걸 쭉 정리해볼게요. 그냥 들으셔도 되고 중간에 "아니다" 싶으면 말씀해주셔도 돼요',
+    "아 그런 거였구나. 그럼 남은 얘기는 제가 마무리하는 쪽으로 갈게요. 맞다 아니다만 반응 주셔도 괜찮아요",
+    "아 넵. 그럼 제가 본 거 이어서 말씀드릴게요. 편하신 만큼만 들으셔도 돼요",
+)
+
+# RE_ENTRY V5 — 이탈 선택 시 종결 버전 (세션 #6 v2 §10.2, 10.3 (a) 확정)
+_RE_ENTRY_EXIT_VARIANTS: tuple[str, ...] = (
+    "알겠어요. {user_name}님 언제든 돌아오시면 이어갈 수 있어요",
+)
+
+# RANGE_DISCLOSURE 경미 (§10.3) — 한계 명시 + 관찰 유효성 보존. 서술 종결.
+_RANGE_LIMIT_MILD_VARIANTS: tuple[str, ...] = (
+    "제가 본 건 피드 {feed_count}장이 전부라서, {user_name}님 전체를 아는 건 아니에요. 그치만 피드에서 드러난 부분은 이 정도 또렷했다는 거예요",
+    "사실 제가 가진 정보는 피드 {feed_count}장뿐이에요. {user_name}님 실제 일상이랑 다를 수 있어요. 다만 피드 안에서는 이렇게 읽혔다는 거예요",
+    "제가 읽은 건 피드 {feed_count}장이라서 {user_name}님 전부는 아니에요. 그 범위 안에서 드러난 게 꽤 일관됐다는 거예요",
+    "{user_name}님, 제가 본 건 피드 {feed_count}장이 전부라 한계가 있어요. 그 안에서 보인 패턴이 이 정도였다는 거예요",
+    "제가 접근한 건 피드 {feed_count}장에 한정돼요. {user_name}님이 사시는 맥락 전체는 아니에요. 다만 그 안에서 이 정도 보였다는 거예요",
+)
+
+# RANGE_DISCLOSURE 심각 (§10.4) — 고립/의존 신호. 외부 자원 권유 추가. 서술 종결.
+_RANGE_LIMIT_SEVERE_VARIANTS: tuple[str, ...] = (
+    "{user_name}님 이 얘기 꺼내주신 건 고마워요. 다만 제가 친구나 상담 대체가 될 수는 없고, 이런 얘기는 사람한테 하시는 게 더 닿을 거예요",
+    "{user_name}님, 지금 하신 말씀 무겁게 받았어요. 근데 저는 피드 {feed_count}장 본 AI 라서 이런 얘기 받아드리기에 한계가 있어요. 가까운 사람한테 한번 말씀 나눠보시는 게 좋을 것 같아요",
+    "{user_name}님, 그런 상황이셨다니 마음이 쓰여요. 다만 제가 해드릴 수 있는 건 피드 안에서 본 것까지예요. 사람한테 이런 얘기 하실 여지가 있으면 그쪽이 더 도움 될 거예요",
+)
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §9 — RANGE_REAFFIRM
+# ─────────────────────────────────────────────
+
+# RANGE_DISCLOSURE reaffirm 모드 — 막막함 토로 / 평가요청+막막함우세. 사업 존재 재선언.
+_RANGE_REAFFIRM_VARIANTS: tuple[str, ...] = (
+    "근데 {user_name}님, 막막한 마음 풀어보려고 제가 온 거니까 이렇게 자세히 말씀해주실수록 더 정확하게 같이 볼 수 있어요",
+    "{user_name}님 그 막막함 풀어드리려고 제가 있는 거예요. 지금처럼 솔직하게 꺼내주시면 더 또렷하게 보여드릴 수 있어요",
+    "{user_name}님, 막막하실수록 제가 도와드리려고 온 거예요. 그러니까 편하게 말씀해주셔도 돼요",
+    "그 막막함 같이 풀어보려고 제가 온 거잖아요 {user_name}님. 자세히 말씀해주실수록 제가 더 정확하게 읽어드릴 수 있어요",
+    "{user_name}님, 그 답답함 같이 정리해보려고 제가 들어온 거예요. 지금 같이 꺼내놓으시면 더 또렷하게 잡힐 거예요",
+)
+
+
+# ─────────────────────────────────────────────
+#  기본 TEMPLATES 맵 (msg_type → 디폴트 pool)
+#
+#  RE_ENTRY / RANGE_DISCLOSURE 는 mode/severity 분기 시 다른 pool 사용.
+#  디폴트 pool 은 가장 빈번한 케이스 (RE_ENTRY 비-이탈, RANGE limit mild).
+# ─────────────────────────────────────────────
 
 TEMPLATES: dict[MsgType, tuple[str, ...]] = {
     MsgType.OPENING_DECLARATION: _OPENING_VARIANTS,
     MsgType.META_REBUTTAL: _META_REBUTTAL_VARIANTS,
     MsgType.EVIDENCE_DEFENSE: _EVIDENCE_DEFENSE_VARIANTS,
     MsgType.SOFT_WALKBACK: _SOFT_WALKBACK_VARIANTS,
+    MsgType.CHECK_IN: _CHECK_IN_VARIANTS,
+    MsgType.RE_ENTRY: _RE_ENTRY_VARIANTS,
+    MsgType.RANGE_DISCLOSURE: _RANGE_LIMIT_MILD_VARIANTS,
+}
+
+# 전수 변형 카탈로그 (총 44 검증용)
+ALL_VARIANT_POOLS: dict[str, tuple[str, ...]] = {
+    "opening_declaration": _OPENING_VARIANTS,
+    "meta_rebuttal": _META_REBUTTAL_VARIANTS,
+    "evidence_defense": _EVIDENCE_DEFENSE_VARIANTS,
+    "soft_walkback": _SOFT_WALKBACK_VARIANTS,
+    "check_in": _CHECK_IN_VARIANTS,
+    "re_entry": _RE_ENTRY_VARIANTS,
+    "re_entry_exit": _RE_ENTRY_EXIT_VARIANTS,
+    "range_limit_mild": _RANGE_LIMIT_MILD_VARIANTS,
+    "range_limit_severe": _RANGE_LIMIT_SEVERE_VARIANTS,
+    "range_reaffirm": _RANGE_REAFFIRM_VARIANTS,
 }
 
 
 # ─────────────────────────────────────────────
-#  Public
+#  Pool 선택 로직
+# ─────────────────────────────────────────────
+
+def _pick_variant_pool(
+    msg_type: MsgType,
+    state: ConversationState,
+    range_mode: RangeMode,
+    exit_confirmed: bool,
+) -> tuple[str, ...]:
+    """msg_type + mode selectors 에 따라 사용할 variant pool 결정."""
+    if msg_type == MsgType.RE_ENTRY and exit_confirmed:
+        return _RE_ENTRY_EXIT_VARIANTS
+    if msg_type == MsgType.RANGE_DISCLOSURE:
+        if range_mode == "reaffirm":
+            return _RANGE_REAFFIRM_VARIANTS
+        # limit 모드 — severity 분기
+        if state.overattachment_severity == "severe":
+            return _RANGE_LIMIT_SEVERE_VARIANTS
+        return _RANGE_LIMIT_MILD_VARIANTS
+    return TEMPLATES[msg_type]
+
+
+# ─────────────────────────────────────────────
+#  Public — index selection + rendering
 # ─────────────────────────────────────────────
 
 def pick_variant_index(
@@ -87,17 +215,49 @@ def pick_variant_index(
     return seed % n
 
 
-def render_hardcoded(msg_type: MsgType, state: ConversationState) -> str:
+def render_hardcoded(
+    msg_type: MsgType,
+    state: ConversationState,
+    *,
+    user_meta_raw: str = "",
+    observation_evidence: str = "",
+    last_diagnosis: str = "",
+    feed_count: int = 0,
+    range_mode: RangeMode = "limit",
+    exit_confirmed: bool = False,
+) -> str:
     """HARDCODED_TYPES 에 해당하는 메시지 결정적 생성.
 
     Parameters
     ----------
     msg_type : HARDCODED_TYPES 중 하나. 아니면 ValueError.
-    state : user_id/user_name + 현재 assistant turns 수 추출에 사용.
+    state    : user_id / user_name / overattachment_severity / assistant_turns() 소비.
+    user_meta_raw        : META_REBUTTAL 전용 슬롯. 생략 시 빈 문자열.
+    observation_evidence : EVIDENCE_DEFENSE 전용 슬롯.
+    last_diagnosis       : SOFT_WALKBACK 전용 슬롯.
+    feed_count           : RANGE_DISCLOSURE 전용 슬롯 (정수).
+    range_mode           : "limit" (기본) | "reaffirm".
+    exit_confirmed       : RE_ENTRY 이탈 종결 버전 트리거.
     """
     if msg_type not in HARDCODED_TYPES:
         raise ValueError(f"{msg_type.value} is not hardcoded; use Haiku prompt")
-    variants = TEMPLATES[msg_type]
+
+    variants = _pick_variant_pool(msg_type, state, range_mode, exit_confirmed)
     turn_idx = len(state.assistant_turns())
     idx = pick_variant_index(state.user_id, msg_type, turn_idx, len(variants))
-    return variants[idx].format(user_name=state.user_name)
+    template = variants[idx]
+
+    rendered = template.format(
+        user_name=state.user_name,
+        user_meta_raw=user_meta_raw,
+        observation_evidence=observation_evidence,
+        last_diagnosis=last_diagnosis,
+        feed_count=feed_count,
+    )
+    # 슬롯 누락으로 생길 수 있는 선두 공백 정리
+    return rendered.strip()
+
+
+def total_variant_count() -> int:
+    """전수 하드코딩 문구 개수 (스펙 확정값 = 44)."""
+    return sum(len(v) for v in ALL_VARIANT_POOLS.values())

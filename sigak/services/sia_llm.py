@@ -523,8 +523,10 @@ def call_sia_turn(
 
     text = "\n".join(text_blocks).strip()
 
-    # Hard Rules 사전 검증 — 위반 시 caller 가 retry
-    validate_sia_output(text)
+    # STEP 2-G v4 cutover: 페르소나 A `validate_sia_output` 호출 제거.
+    # 페르소나 B 응답 (~더라구요 / ~가봐요?) 이 페르소나 A 기준 `tone_missing` 으로
+    # 오탐되는 문제 회피. 라우트 레이어 (routes/sia.py) 에서 `sia_validators_v4.validate`
+    # 로 msg_type 맥락 포함 검증을 이미 수행.
     return text
 
 

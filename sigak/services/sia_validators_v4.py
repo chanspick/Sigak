@@ -1,36 +1,40 @@
-"""Sia validator v4 — 페르소나 B + 메시지 단위 규칙 (Phase H3).
+"""Sia validator v4 — 페르소나 B + 메시지 단위 규칙 (Phase H3, 14 타입 확정판).
 
-PHASE_H_DIRECTIVE §5 + SIA_SESSION4_V2 §5.2 drop-in.
+SPEC 출처: .moai/specs/SPEC-SIA/
+  - 세션 #4 v2 §5.2 (A-1~A-8 base + §5.2 drop-in)
+  - 세션 #6 v2 §9.1-9.3 (CHECK_IN / RE_ENTRY / RANGE_DISCLOSURE 전용 체크)
+  - 세션 #7 §1.3 (EMPATHY 결합 출력 — is_combined 시 `?` 허용)
+  - 세션 #7 §2.8 (C6 draft 검증 — 평가 직접 답변 금지)
+  - 세션 #7 §3.8 (C7 draft 검증 — 위로형/전면 부정 금지)
+  - 세션 #7 §8.3 (check_haiku_naturalness — 분석 jargon + 어색 종결)
 
-기존 `sia_validators.find_violations` 는 turn-agnostic base (HR1-5 + tone + eval
-+ assertion + abstract_noun). v4 는 msg_type + ConversationState 문맥을 받아
-A-1 ~ A-8 규칙을 추가로 검증한다.
+규칙 요약 (기존 유지):
+  A-1  전역 금지 어미 + §5.2 확장
+  A-2  ~잖아요 3턴 창 / ~예요 연타 softener / EMPATHY 누적 비율 경고
+  A-3  ~더라구요 3턴 창
+  A-4  같은 msg_type 3연속
+  A-5  RECOGNITION 단정 ~예요 금지
+  A-6  QUESTION_REQUIRED 질문 종결 누락 / QUESTION_FORBIDDEN 질문 부호 금지
+       (세션 #7 §1.3: EMPATHY is_combined=True 시 `?` 허용)
+  A-7  EMPATHY_MIRROR 감정 원어 미반사
+  A-8  60자 초과 절
 
-규칙 요약 (기존):
-  A-1  a1_forbidden_suffix     — 네요/군요/같아요/같습니다/것 같/수 있습니다
-  A-2  a2_jangayo_window       — 최근 3턴 ~잖아요 합 > 2
-  A-3  a3_deoraguyo_window     — 최근 3턴 ~더라구요 합 > 1
-  A-4  a4_same_type_streak     — 같은 msg_type 3연속
-  A-5  a5_question_missing     — QUESTION_REQUIRED 타입인데 '?' 없음
-  A-6  a6_question_forbidden   — QUESTION_FORBIDDEN 타입인데 '?' 있음
-  A-7  a7_emotion_mirror_miss  — EMPATHY_MIRROR 인데 유저 emotion_word_raw 미반사
-  A-8  a8_too_long             — 60자 초과 절
-
-§5.2 Drop-in 확장 (FN 4건 해소):
-  A-1 전역: ㅋ / ~구나 단독 / 반말 종결 / 이중 대비 / 축 라벨 단독 / 승리 표현
-            / OBSERVATION 계열 절대 관찰 (거의 전부 / 하나도 없 / 한 번도 없)
-  A-4 EMPATHY_MIRROR 에서 ~잖아요 금지 (타입 조건부)
-  A-5 RECOGNITION 단정 ~예요 금지 (타입 조건부)
-  A-2 cross-turn: ~잖아요 3 메시지 창 합 > 2, ~예요 연타 시 softener 필요
-                   EMPATHY_MIRROR 누적 비율 > 15% 경고 (A-3 트리거 우선 시 허용)
+신규 (세션 #6 v2 / 세션 #7):
+  CHECK_IN           전용 — 속도 옵션 + 이탈 옵션 필수 + 금지 표현
+  RE_ENTRY           전용 — 직전 CHECK_IN + 완화 표현 필수
+  RANGE_DISCLOSURE   전용 — 범위 명시 (limit 모드만) + 자기부정/관계형성 금지
+  C6                 블록 — 평가 직접 답변 / 무조건 칭찬 / 해석 회피 금지
+  C7                 블록 — 위로형 부정 / 전면 부정 금지
+  ~구나 solo         — 뒤에 서술 연결 없으면 위반 (세션 #4 v2 §9.5 정확 해석)
+  Haiku naturalness  — 분석 jargon (모드/포지셔닝/디퓨전/메타인지/클러스터링/매핑/프로파일) +
+                      어색 종결 (~면요/~이긴 한데요/~인 셈이죠)
 
 공개 API:
-  find_violations_v4(text, msg_type, state, emotion_word_raw) -> dict   # 기존 dict 통합
-  validate(draft, msg_type, state) -> ValidationResult                    # 마케터 §5.2 공식
-
-어미 카운트 헬퍼:
-  count_jangayo / count_deoraguyo / count_neyo / count_yeyo
-    → AssistantTurn.*_count populate 용
+  find_violations_v4(text, msg_type, state, emotion_word_raw, *, range_mode,
+                     confrontation_block, is_combined) -> dict
+  validate(draft, msg_type, state, *, range_mode, confrontation_block,
+           is_combined) -> ValidationResult
+  check_haiku_naturalness(draft) -> list[str]
 """
 from __future__ import annotations
 
@@ -43,6 +47,8 @@ from schemas.sia_state import (
     AssistantTurn,
     ConversationState,
     MsgType,
+    OverattachmentSeverity,
+    RangeMode,
 )
 from services.sia_validators import (
     find_violations as _find_violations_base,
@@ -133,8 +139,13 @@ def find_violations_v4(
     msg_type: MsgType,
     state: Optional[ConversationState] = None,
     emotion_word_raw: Optional[str] = None,
+    *,
+    range_mode: RangeMode = "limit",
+    confrontation_block: Optional[str] = None,
+    is_combined: bool = False,
+    exit_confirmed: bool = False,
 ) -> dict[str, list[str]]:
-    """Phase H 전수 검증. base violations + A-1~A-8 결과 dict 병합.
+    """Phase H 14 타입 전수 검증. base violations + A-1~A-8 + 세션 #6/7 결과 dict 병합.
 
     Parameters
     ----------
@@ -142,10 +153,15 @@ def find_violations_v4(
     msg_type : 현재 생성 타입 (A-5/A-6/A-7 맥락).
     state : 누적 state — A-2/A-3/A-4 창 체크에 필요. None 이면 스킵.
     emotion_word_raw : 최근 유저 메시지의 첫 감정 원어 — A-7 체크에 필요.
+    range_mode : RANGE_DISCLOSURE 모드 게이팅.
+    confrontation_block : CONFRONTATION 세부 블록 (C1~C7). C6/C7 이면 블록 체크.
+    is_combined : EMPATHY 결합 출력 — 질문 부호 허용.
+    exit_confirmed : RE_ENTRY V5 (향후 확장용).
 
     Returns
     -------
-    dict — base (페르소나 A tone 제외) + A-1 ~ A-8 키. 빈 dict 면 clean.
+    dict — base + A-1~A-8 + marketer_errors + marketer_warnings +
+           type_specific / block_specific / haiku_naturalness 키. 빈 dict = clean.
     """
     base = _find_violations_base(text)
     # 페르소나 A 전제 규칙 제외 — v4 는 해요체 허용.
@@ -220,10 +236,41 @@ def find_violations_v4(
 
     # ─────────────────────────────────────────────
     # §5.2 drop-in: 마케터 FN 4건 해소 + A-1 확장 + 타입 조건부 + cross-turn
+    # + 세션 #6/7 전용 체크 (CHECK_IN/RE_ENTRY/RANGE/C6/C7/naturalness)
     # ─────────────────────────────────────────────
     m_errors: list[str] = []
     m_errors.extend(check_global_forbidden(text, msg_type))
-    m_errors.extend(check_type_conditional(text, msg_type))
+    m_errors.extend(
+        check_type_conditional(
+            text, msg_type,
+            is_combined=is_combined,
+            confrontation_block=confrontation_block,
+        )
+    )
+
+    # 관리 3 타입 전용
+    if msg_type == MsgType.CHECK_IN:
+        m_errors.extend(check_check_in(text))
+    elif msg_type == MsgType.RE_ENTRY:
+        m_errors.extend(
+            check_re_entry(text, state=state, exit_confirmed=exit_confirmed)
+        )
+    elif msg_type == MsgType.RANGE_DISCLOSURE:
+        sev = state.overattachment_severity if state is not None else ""
+        m_errors.extend(
+            check_range_disclosure(text, range_mode=range_mode, severity=sev)
+        )
+
+    # CONFRONTATION 블록
+    if msg_type == MsgType.CONFRONTATION:
+        if confrontation_block == "C6":
+            m_errors.extend(check_confrontation_c6(text))
+        elif confrontation_block == "C7":
+            m_errors.extend(check_confrontation_c7(text))
+
+    # Haiku naturalness 전 타입 공통
+    m_errors.extend(check_haiku_naturalness(text))
+
     m_warnings: list[str] = []
     if state is not None:
         ce, cw = check_cross_turn_rules(text, msg_type, state)
@@ -249,12 +296,34 @@ def find_violations_v4(
 
 # A-1 전역
 _KU_PATTERN = re.compile(r"ㅋ+")
-_GUNNA_PATTERN = re.compile(
+
+# 세션 #4 v2 §9.5: "단독 'X구나' 금지 (뒤에 서술 연결 필수)".
+# 정확 해석 — 구나 뒤에 실질 서술이 이어지면 허용. 단독이면 위반.
+# 검출 2단계:
+#   (a) 구나 어간 위치 탐색 (_GUNNA_STEM_RE.finditer)
+#   (b) 각 매치 뒤 텍스트에 실질 content 있는지 확인 (_is_gunna_solo)
+_GUNNA_STEM_RE = re.compile(
     r"(했|했었|었|였|셨|느꼈|느끼셨|봤|보셨|들었|들으셨|먹었|갔|가셨)구나(?!요)"
 )
 _BANMAL_END_PATTERN = re.compile(
-    r"(?<=[가-힣])[네나야지군](?=[.!?]|\s*$)(?!요)"
+    # (?<!구) — "구나" 어미는 _GUNNA_STEM_RE 가 전담 (solo vs connected 분기).
+    # BANMAL 은 "구나" 를 무조건 반말로 처리하지 않음 (세션 #6 v2 RE_ENTRY "아 그러셨구나." 허용).
+    r"(?<=[가-힣])(?<!구)[네나야지군](?=[.!?]|\s*$)(?!요)"
 )
+
+
+def _is_gunna_solo(draft: str) -> bool:
+    """구나 종결 후 실질 서술 연결이 없으면 True (단독 위반).
+
+    뒤 텍스트에서 공백/구두점 제외한 내용이 있으면 "연결" — 허용.
+    RE_ENTRY V0 "아 그러셨구나. 그럼 제가 본 걸 정리해서..." 같은 케이스 보호.
+    """
+    for m in _GUNNA_STEM_RE.finditer(draft):
+        after = draft[m.end():]
+        stripped = re.sub(r"[.!?,\s]", "", after)
+        if not stripped:
+            return True
+    return False
 _DOUBLE_CONTRAST_PATTERN = re.compile(r"인 거예요[,\s.]*\S*\s*아니")
 _AXIS_LABEL_PATTERN = re.compile(
     r"(?<![\w가-힣])(색깔|구도|표정|체형)요(?![\w가-힣])"
@@ -279,11 +348,15 @@ _COLLECTION_TYPES = {MsgType.OBSERVATION, MsgType.PROBE, MsgType.EXTRACTION}
 
 
 def check_global_forbidden(draft: str, msg_type: MsgType) -> list[str]:
-    """§5.2 전역 A-1 확장 체크. 타입 독립."""
+    """§5.2 전역 A-1 확장 체크. 타입 독립.
+
+    Note: `_is_gunna_solo` 는 세션 #4 v2 §9.5 "단독 금지" 규정 정확 반영 — 구나
+    뒤 서술 연결이 있으면 허용 (RE_ENTRY V0 등 정상 케이스 보호).
+    """
     errors: list[str] = []
     if _KU_PATTERN.search(draft):
         errors.append("A-1: ㅋ 전역 금지")
-    if _GUNNA_PATTERN.search(draft):
+    if _is_gunna_solo(draft):
         errors.append("A-1: ~구나 단독 사용 금지")
     if _BANMAL_END_PATTERN.search(draft):
         errors.append("A-1: 반말 종결 금지")
@@ -301,17 +374,249 @@ def check_global_forbidden(draft: str, msg_type: MsgType) -> list[str]:
     return errors
 
 
-def check_type_conditional(draft: str, msg_type: MsgType) -> list[str]:
-    """§5.2 타입 조건부 체크. A-4 EMPATHY ~잖아요 / A-5 RECOGNITION ~예요 단정."""
+def check_type_conditional(
+    draft: str,
+    msg_type: MsgType,
+    *,
+    is_combined: bool = False,
+    confrontation_block: Optional[str] = None,
+) -> list[str]:
+    """§5.2 타입 조건부 체크. A-4 EMPATHY ~잖아요 / A-5 RECOGNITION ~예요 단정.
+
+    is_combined (세션 #7 §1.3 + §1.5 일반화):
+      결합 출력 시 primary 타입의 질문 종결 규정이 완화됨 — secondary 문장이
+      `?` 유/무를 정할 수 있으므로.
+      - QUESTION_REQUIRED + is_combined: `?` 누락 허용 (secondary 가 서술 마감 가능)
+      - QUESTION_FORBIDDEN + is_combined: `?` 허용 (secondary 가 질문 마감 가능)
+      - EMPATHY_MIRROR `~잖아요` + is_combined: 허용 (secondary RECOGNITION 등 자연)
+
+    confrontation_block == "C7" (세션 #7 §3.7):
+      일반화 회피 돌파 블록은 질문 종결 OR 진단 예고 둘 다 허용. 진단 예고 시
+      `?` 없어도 A-8 에러 아님.
+    """
     errors: list[str] = []
     if msg_type in QUESTION_REQUIRED and "?" not in draft:
-        errors.append(f"A-8: {msg_type.value} 질문 종결 누락")
+        # is_combined: secondary 가 서술 마감 가능
+        # C7: 진단 예고 모드
+        if is_combined:
+            pass
+        elif msg_type == MsgType.CONFRONTATION and confrontation_block == "C7":
+            pass
+        else:
+            errors.append(f"A-8: {msg_type.value} 질문 종결 누락")
     if msg_type in QUESTION_FORBIDDEN and "?" in draft:
-        errors.append(f"A-8: {msg_type.value} 질문 부호 금지")
+        # is_combined: secondary 가 질문 마감 가능
+        if not is_combined:
+            errors.append(f"A-8: {msg_type.value} 질문 부호 금지")
     if msg_type == MsgType.EMPATHY_MIRROR and "잖아요" in draft:
-        errors.append("A-4: EMPATHY_MIRROR 에서 ~잖아요 금지")
+        # is_combined: secondary 문장에 잖아요 허용
+        if not is_combined:
+            errors.append("A-4: EMPATHY_MIRROR 에서 ~잖아요 금지")
     if msg_type == MsgType.RECOGNITION and _RECOGNITION_YEYO_RE.search(draft):
         errors.append("A-5: RECOGNITION 에서 단정 ~예요 금지")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 §9.1-9.3 — 관리 3 타입 전용 체크
+# ─────────────────────────────────────────────
+
+# CHECK_IN 필수 표현 (§9.1)
+_CHECK_IN_PACE_MARKERS = ("편한 속도", "천천히", "편하신 만큼")
+_CHECK_IN_EXIT_MARKERS = ("그만", "여기까지", "나중에", "다음에", "멈추")
+_CHECK_IN_FORBIDDEN = ("조금만 더", "벌써요", "아쉽네요", "왜 그러세요")
+
+# RE_ENTRY 반응 기준 완화 표현 (§9.2)
+_RE_ENTRY_RELAXED_MARKERS = (
+    "맞다 아니다만", "편하신 만큼", "반응만 주셔도", "반응해주셔도",
+    "반응 주셔도", "그냥 들으셔도", "들으셔도 되고", "들으셔도 돼",
+    "언제든 돌아오시면",   # V5 이탈 종결 — 재진입 경로도 완화 의미 포함
+)
+
+# RANGE_DISCLOSURE 범위 명시 (§9.3, limit 모드 전용)
+_RANGE_SCOPE_RE = re.compile(r"피드\s*(만|을|에서|안|\d+장)")
+
+# RANGE_DISCLOSURE 자기부정 금지 (§9.3)
+_RANGE_SELF_NEGATE = (
+    "별 의미 없", "저는 AI 라서",
+    "한 건 아무것도", "무시하셔도",
+)
+
+# RANGE_DISCLOSURE 관계 형성 금지 (§9.3)
+# 주의: "언제든 돌아오시면" (RE_ENTRY V5) 과 "언제든 말씀" 구별 위해 정확 매치
+_RANGE_RELATIONAL = (
+    "저도 좋아", "언제든 말씀", "친구처럼",
+)
+
+
+def check_check_in(draft: str) -> list[str]:
+    """CHECK_IN 구조 검증 (세션 #6 v2 §9.1).
+
+    요구사항: 속도 옵션 + 이탈 옵션 둘 다 필수. 금지 표현 불가.
+    """
+    errors: list[str] = []
+    has_pace = any(m in draft for m in _CHECK_IN_PACE_MARKERS)
+    has_exit = any(m in draft for m in _CHECK_IN_EXIT_MARKERS)
+    if not has_pace:
+        errors.append("CHECK_IN: 속도 옵션 누락 (편한 속도 / 천천히 / 편하신 만큼)")
+    if not has_exit:
+        errors.append(
+            "CHECK_IN: 이탈 옵션 누락 (그만 / 여기까지 / 나중에 / 다음에 / 멈추)"
+        )
+    for forbidden in _CHECK_IN_FORBIDDEN:
+        if forbidden in draft:
+            errors.append(f"A-10: CHECK_IN 금지 표현 ({forbidden})")
+    return errors
+
+
+def check_re_entry(
+    draft: str,
+    state: Optional[ConversationState] = None,
+    *,
+    exit_confirmed: bool = False,
+) -> list[str]:
+    """RE_ENTRY 구조 검증 (세션 #6 v2 §9.2).
+
+    요구사항:
+      - 직전 assistant 턴이 CHECK_IN (state 전달 시 확인)
+      - 반응 기준 완화 표현 필수 (V0~V4) 또는 종결 V5 표현 ("언제든 돌아오시면")
+    """
+    errors: list[str] = []
+    if state is not None:
+        a_turns = state.assistant_turns()
+        if not a_turns or a_turns[-1].msg_type != MsgType.CHECK_IN:
+            errors.append("RE_ENTRY: 직전 assistant 턴이 CHECK_IN 이어야 함")
+    if not any(m in draft for m in _RE_ENTRY_RELAXED_MARKERS):
+        errors.append(
+            "RE_ENTRY: 반응 기준 완화 표현 필요 "
+            "(맞다 아니다만 / 편하신 만큼 / 반응만 주셔도 / 들으셔도)"
+        )
+    return errors
+
+
+def check_range_disclosure(
+    draft: str,
+    *,
+    range_mode: RangeMode = "limit",
+    severity: OverattachmentSeverity = "",
+) -> list[str]:
+    """RANGE_DISCLOSURE 구조 검증 (세션 #6 v2 §9.3).
+
+    limit + non-severe: 범위 명시 ("피드 N장" / "피드 안" 등) 필수.
+    limit + severe (세션 #6 v2 §10.4 SV0 등): 외부 자원 권유가 주 목적이라 범위 명시
+      우회 가능 — 체크 제외.
+    reaffirm (세션 #7 §1.6): 범위 명시 불필요 — 사업 존재 재선언이 핵심.
+    공통: 자기부정 금지 + 관계 형성 금지.
+    """
+    errors: list[str] = []
+    if (
+        range_mode == "limit"
+        and severity != "severe"
+        and not _RANGE_SCOPE_RE.search(draft)
+    ):
+        errors.append("RANGE_DISCLOSURE(limit): 범위 명시 필요 (피드 N장 / 피드 안)")
+    for neg in _RANGE_SELF_NEGATE:
+        if neg in draft:
+            errors.append(f"A-11: RANGE_DISCLOSURE 자기부정 금지 ({neg})")
+    for rel in _RANGE_RELATIONAL:
+        if rel in draft:
+            errors.append(f"A-11: RANGE_DISCLOSURE 관계 형성 금지 ({rel})")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §2.8 / §3.8 — C6 / C7 블록별 체크
+# ─────────────────────────────────────────────
+
+# C6 평가 직접 답변 금지 (§2.6)
+_C6_EVAL_ANSWER_PATTERNS = [
+    re.compile(r"(네|예)\s*(예뻐|매력\s*있|과한|부족|어색|이상)"),
+    re.compile(r"예뻐요"),
+    re.compile(r"과한\s*(부분|게)"),
+    re.compile(r"부족한\s*(부분|게)"),
+    # "본인만의 매력" substring — 조사/어미 상관없이 무조건 칭찬 예시 커버
+    re.compile(r"본인만의\s*매력"),
+    re.compile(r"답할\s*수\s*없"),
+    re.compile(r"진단\s*결과에서"),
+]
+
+# C7 위로형 / 전면 부정 금지 (§3.6)
+_C7_PLACATE_PATTERNS = [
+    re.compile(r"(특별해요|특별하세요|특별하신)"),
+    re.compile(r"다들\s*그런\s*게\s*아니"),
+    re.compile(r"다들이?\s*아니라"),   # "다들이 아니라 X님의 정답" 류
+]
+
+
+def check_confrontation_c6(draft: str) -> list[str]:
+    """C6 평가 의존 돌파 블록 검증 (세션 #7 §2.8).
+
+    금지:
+      - 평가 직접 답변 ("네 매력 있어요" / "좀 과해요")
+      - 무조건 칭찬 ("본인만의 매력이 있어요")
+      - 해석 회피 ("그건 제가 답할 수 없어요")
+      - 진단 회피로 후퇴 ("그건 진단 결과에서 보여드릴게요")
+    """
+    errors: list[str] = []
+    for pat in _C6_EVAL_ANSWER_PATTERNS:
+        if pat.search(draft):
+            errors.append(f"C6: 평가 직접 답변/회피 금지 ({pat.pattern})")
+    return errors
+
+
+def check_confrontation_c7(draft: str) -> list[str]:
+    """C7 일반화 회피 돌파 블록 검증 (세션 #7 §3.8).
+
+    금지:
+      - 위로형 부정 ("도윤님은 특별해요")
+      - 전면 부정 ("다들 그런 게 아니에요")
+      - 일반화 부정 후 정답 제시 ("다들이 아니라 X님의 정답은 ~예요")
+    """
+    errors: list[str] = []
+    for pat in _C7_PLACATE_PATTERNS:
+        if pat.search(draft):
+            errors.append(f"C7: 위로형/전면 부정 금지 ({pat.pattern})")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §8.3 — Haiku 어휘 자연스러움 (A-2 확장)
+# ─────────────────────────────────────────────
+
+# 분석 jargon (base.jinja 금지 목록)
+# "모드" 는 복합 단어 ("다른 모드로", "모드 전환" 등) 에서도 jargon 으로 본다 —
+# lookbehind 로 단어 시작 경계만 체크 ("모두" 는 매치 안 됨, 첫 글자 다름).
+_JARGON_PATTERNS = [
+    re.compile(r"(?<![\w가-힣])모드"),
+    re.compile(r"포지셔닝"),
+    re.compile(r"디퓨전"),
+    re.compile(r"메타인지"),
+    re.compile(r"클러스터링"),
+    re.compile(r"매핑"),
+    re.compile(r"프로파일"),
+]
+
+# 어색 종결
+_AWKWARD_END_PATTERNS = [
+    re.compile(r"면요\s*[.!?]?\s*$"),
+    re.compile(r"이긴\s*한데요\s*[.!?]?\s*$"),
+    re.compile(r"인\s*셈이죠\s*[.!?]?\s*$"),
+]
+
+
+def check_haiku_naturalness(draft: str) -> list[str]:
+    """A-2 Haiku 어휘 자연스러움 — 분석 jargon + 어색 종결 검출.
+
+    세션 #7 §8.3 validator 추가. A-14 사족 금지는 의미 판정이라 Haiku self-check
+    로만 처리 (validator 자동 불가).
+    """
+    errors: list[str] = []
+    for pat in _JARGON_PATTERNS:
+        if pat.search(draft):
+            errors.append(f"A-2: 분석 jargon ({pat.pattern})")
+    for pat in _AWKWARD_END_PATTERNS:
+        if pat.search(draft):
+            errors.append(f"A-2: 어색한 종결 ({pat.pattern})")
     return errors
 
 
@@ -361,14 +666,57 @@ def validate(
     draft: str,
     msg_type: MsgType,
     state: Optional[ConversationState] = None,
+    *,
+    range_mode: RangeMode = "limit",
+    confrontation_block: Optional[str] = None,
+    is_combined: bool = False,
+    exit_confirmed: bool = False,
 ) -> ValidationResult:
-    """§5.2 공식 drop-in API.
+    """14 타입 드롭인 validator API.
 
-    state None 허용 (테스트 편의). state 없으면 cross-turn 체크 생략.
+    Parameters
+    ----------
+    draft : 검증 대상 Sia 응답 텍스트.
+    msg_type : 현재 생성 타입.
+    state : 누적 state — cross-turn 체크에 필요. None 이면 cross-turn 생략.
+    range_mode : RANGE_DISCLOSURE 모드 (limit | reaffirm). limit 에서만 범위 명시 강제.
+    confrontation_block : CONFRONTATION 세부 블록 ("C1"..."C7"). C6 / C7 이면 블록 체크.
+    is_combined : EMPATHY 결합 출력 (세션 #7 §1.3). True 이면 질문 부호 허용.
+    exit_confirmed : RE_ENTRY V5 종결 플래그. 현재 체크에 사용 안 됨 (향후 확장용).
     """
     result = ValidationResult()
     result.errors.extend(check_global_forbidden(draft, msg_type))
-    result.errors.extend(check_type_conditional(draft, msg_type))
+    result.errors.extend(
+        check_type_conditional(
+            draft, msg_type,
+            is_combined=is_combined,
+            confrontation_block=confrontation_block,
+        )
+    )
+
+    # 관리 3 타입 전용 체크 (세션 #6 v2 §9.1-9.3)
+    if msg_type == MsgType.CHECK_IN:
+        result.errors.extend(check_check_in(draft))
+    elif msg_type == MsgType.RE_ENTRY:
+        result.errors.extend(
+            check_re_entry(draft, state=state, exit_confirmed=exit_confirmed)
+        )
+    elif msg_type == MsgType.RANGE_DISCLOSURE:
+        sev = state.overattachment_severity if state is not None else ""
+        result.errors.extend(
+            check_range_disclosure(draft, range_mode=range_mode, severity=sev)
+        )
+
+    # CONFRONTATION 블록 체크 (세션 #7 §2.8, §3.8)
+    if msg_type == MsgType.CONFRONTATION:
+        if confrontation_block == "C6":
+            result.errors.extend(check_confrontation_c6(draft))
+        elif confrontation_block == "C7":
+            result.errors.extend(check_confrontation_c7(draft))
+
+    # Haiku 어휘 자연스러움 (세션 #7 §8.3) — 전 타입 공통
+    result.errors.extend(check_haiku_naturalness(draft))
+
     if state is not None:
         ce, cw = check_cross_turn_rules(draft, msg_type, state)
         result.errors.extend(ce)

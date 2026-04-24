@@ -32,7 +32,14 @@ from schemas.user_profile import IgFeedCache, IgFeedProfileBasics, IgLatestPost
 
 logger = logging.getLogger(__name__)
 
-IgFetchStatus = Literal["success", "failed", "skipped", "private"]
+IgFetchStatus = Literal[
+    "success",          # 공개 계정 + Vision 완료
+    "failed",           # Apify 오류 / 타임아웃 / 빈 응답
+    "skipped",          # ig_enabled off 또는 handle 빈값
+    "private",          # 비공개 계정 (profile_basics 만)
+    "pending",          # essentials 직후, BackgroundTask 미실행/대기
+    "pending_vision",   # Apify 성공 직후 preview flush, Vision 진행 중
+]
 
 APIFY_ENDPOINT_TMPL = (
     "https://api.apify.com/v2/acts/{actor_id}/run-sync-get-dataset-items"
@@ -133,6 +140,151 @@ def fetch_ig_profile_for_pi(ig_handle: Optional[str]) -> tuple[IgFetchStatus, Op
     PI 선별 풀을 30장까지 확장. 비용 +$0.06/유저, 가격 ₩5,000 마진 내.
     """
     return fetch_ig_profile(ig_handle, results_limit=30)
+
+
+# ─────────────────────────────────────────────
+#  분리 저장 (STEP IG-Wiring) — Apify 수집 선 flush + Vision 후 flush
+#
+#  온보딩 UX: essentials 직후 BackgroundTask 가
+#    (1) fetch_ig_raw → preview cache (status=pending_vision) 먼저 DB flush
+#        → 프론트 폴링에서 preview_urls 보이기 시작
+#    (2) attach_vision_analysis → analysis 첨부 → 최종 flush (status=success)
+# ─────────────────────────────────────────────
+
+def fetch_ig_raw(
+    ig_handle: Optional[str],
+    *,
+    results_limit: int = 10,
+) -> tuple[IgFetchStatus, Optional[IgFeedCache]]:
+    """Apify 수집 only — Vision 미실행. 분리 저장 워크플로용.
+
+    `fetch_ig_profile` 와 동일한 status 분기 (success / private / skipped / failed)
+    이지만 success 케이스에서 `analysis=None` 인 preview cache 반환.
+
+    이후 caller 가 `attach_vision_analysis(cache)` 로 Vision 을 덧붙여 최종 저장.
+    """
+    settings = get_settings()
+
+    if not settings.ig_enabled:
+        logger.info("fetch_ig_raw skipped: IG_ENABLED=false")
+        return ("skipped", None)
+
+    handle = _normalize_handle(ig_handle)
+    if not handle:
+        logger.info("fetch_ig_raw skipped: empty handle")
+        return ("skipped", None)
+
+    if not settings.apify_api_key:
+        logger.warning(
+            "fetch_ig_raw: APIFY_API_KEY missing — failed (check Railway env)"
+        )
+        return ("failed", None)
+
+    try:
+        raw_items = _call_apify_actor(
+            handle=handle,
+            api_key=settings.apify_api_key,
+            actor_id=settings.apify_actor_id,
+            timeout=settings.ig_fetch_timeout,
+            results_limit=results_limit,
+        )
+    except httpx.TimeoutException:
+        logger.warning(
+            "fetch_ig_raw timeout (>%.1fs) for handle=%s",
+            settings.ig_fetch_timeout, handle,
+        )
+        return ("failed", None)
+    except httpx.HTTPStatusError as e:
+        logger.warning(
+            "fetch_ig_raw HTTP %d for handle=%s: %s",
+            e.response.status_code, handle, e,
+        )
+        return ("failed", None)
+    except Exception:
+        logger.exception("fetch_ig_raw unexpected error for handle=%s", handle)
+        return ("failed", None)
+
+    if not raw_items:
+        logger.warning(
+            "fetch_ig_raw returned 0 items for handle=%s (handle may not exist)",
+            handle,
+        )
+        return ("failed", None)
+
+    profile_raw = raw_items[0]
+    if bool(profile_raw.get("private", False)) or bool(profile_raw.get("is_private", False)):
+        cache = _build_private_cache(profile_raw)
+        return ("private", cache)
+
+    # 공개 계정 — preview cache (Vision 미실행)
+    cache = _build_preview_cache(
+        profile_raw,
+        posts_raw=raw_items,
+        posts_limit=results_limit,
+    )
+    return ("success", cache)
+
+
+def _build_preview_cache(
+    profile_raw: dict,
+    posts_raw: list[dict],
+    *,
+    posts_limit: int = 10,
+) -> IgFeedCache:
+    """공개 계정 preview cache — profile + posts 만 정제. analysis=None.
+
+    `_build_full_cache` 에서 Vision 호출부를 분리한 버전. 동일 정제/scrub
+    경로 사용. 이후 `attach_vision_analysis` 로 analysis 첨부 가능.
+    """
+    profile_basics = _extract_profile_basics(profile_raw)
+    scrubbed_posts = [_scrub_post_pii(p) for p in posts_raw[:posts_limit]]
+    highlights = _extract_feed_highlights(scrubbed_posts, limit=posts_limit)
+    latest_posts = _extract_latest_posts(scrubbed_posts, limit=posts_limit)
+
+    return IgFeedCache(
+        scope="full",
+        profile_basics=profile_basics,
+        current_style_mood=None,
+        style_trajectory=None,
+        feed_highlights=highlights,
+        latest_posts=latest_posts,
+        analysis=None,                     # ← preview 단계에선 Vision 미수행
+        last_analyzed_post_count=None,
+        raw={"profile": profile_raw, "posts": scrubbed_posts},
+        fetched_at=datetime.now(timezone.utc),
+    )
+
+
+def attach_vision_analysis(cache: IgFeedCache) -> IgFeedCache:
+    """Preview cache 에 Sonnet Vision 분석을 덧붙인 새 IgFeedCache 반환.
+
+    - scope == "full" + latest_posts 유효한 경우에만 Vision 호출
+    - Vision 실패 / None 시 원본 cache 그대로 반환 (degrade)
+    - display_url TTL (24-48h) 이슈: preview flush 직후 호출 전제 — 지연 시 이미지
+      다운로드 실패할 수 있음
+    """
+    if cache.scope != "full":
+        return cache
+    if not cache.latest_posts:
+        return cache
+
+    try:
+        from services.ig_feed_analyzer import analyze_ig_feed  # lazy
+        analysis = analyze_ig_feed(
+            posts=cache.latest_posts,
+            biography=cache.profile_basics.bio,
+        )
+    except Exception:
+        logger.exception("attach_vision_analysis failed")
+        return cache
+
+    if analysis is None:
+        return cache
+
+    return cache.model_copy(update={
+        "analysis": analysis,
+        "last_analyzed_post_count": cache.profile_basics.post_count,
+    })
 
 
 def is_stale(ig_fetched_at: Optional[datetime]) -> bool:

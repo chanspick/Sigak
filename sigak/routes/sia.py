@@ -1,38 +1,57 @@
-"""Sia conversation endpoints (v2 Priority 1 D3).
+"""Sia conversation endpoints — Phase H v4 cutover.
 
-SPEC-ONBOARDING-V2 REQ-SIA-*.
+SPEC 출처: .moai/specs/SPEC-SIA/ 세션 #4 v2 + #6 v2 + #7 + SPEC-ONBOARDING-V2.
 
 Flow:
-  POST /api/v1/sia/chat/start      session 생성 + 첫 Sia 메시지 (오프닝)
-  POST /api/v1/sia/chat/message    유저 발화 수신 → Sia 응답 반환
+  POST /api/v1/sia/chat/start      세션 생성 + M1 결합 출력 (OPENING + OBSERVATION)
+  POST /api/v1/sia/chat/message    유저 발화 수신 → decide() → v4 렌더러 → 응답
   POST /api/v1/sia/chat/end        명시 종료 → DB INSERT (status="ended") + extraction 큐잉
 
-Redis active 기간에는 DB write 없음 (contract #3).
-Extraction 은 chat/end 또는 idle timeout 시점에 BackgroundTask 로 큐잉 (D4 구현).
+v4 재배선 (STEP 2-G):
+  - sia_session → sia_session_v4 (ConversationState JSON round-trip)
+  - sia_llm.build_system_prompt → sia_prompts_v4.load_haiku_prompt + sia_hardcoded.render_hardcoded
+  - parse_sia_output (choices[4] + mode) 제거 — 100% 주관식 (세션 #4 v2, 페르소나 B 원칙)
+  - 응답 스키마에서 choices / response_mode 제거
+  - Composition 플래그 (is_combined / secondary / block / range_mode / exit_confirmed /
+    apply_self_pr_prefix) 를 Haiku 프롬프트 + validator 로 전달
 
-2026-04-22 D5 보강:
-  - StartResponse/MessageResponse 에 response_mode, choices 추가.
-  - /chat/message 에서 primary Redis TTL 만료 시 24h backup snapshot 을 DB flush.
+Redis active 기간에는 DB write 없음 (contract #3). Extraction 은 chat/end 또는 TTL
+만료 첫 probe 시 BackgroundTask 로 Sonnet 4.6 호출.
 """
 from __future__ import annotations
 
 import logging
+import re
 import uuid
-from typing import Literal, Optional
+from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from deps import db_session, get_current_user
-from schemas.user_profile import ConversationMessage, StructuredFields
+from schemas.sia_state import (
+    HARDCODED_TYPES,
+    AssistantTurn,
+    ConversationState,
+    MsgType,
+    UserTurn,
+)
+from schemas.user_profile import ConversationMessage
 from services import conversations as conv_service
-from services import sia_llm, sia_session
-from services.sia_parser import is_name_fallback_turn, parse_sia_output
+from services import sia_llm, sia_session_v4
+from services.sia_decision import (
+    Composition,
+    decide,
+    update_state_from_user_turn,
+)
+from services.sia_flag_extractor import extract_flags
+from services.sia_hardcoded import render_hardcoded
+from services.sia_llm import _render_ig_summary
+from services.sia_prompts_v4 import load_haiku_prompt
+from services.sia_session import _backup_key, session_key  # Redis 키 재사용
+from services.sia_validators_v4 import populate_turn_counts, validate
 from services.user_profiles import get_profile
-
-
-# 응답 모드 — 프론트 UI 분기 (4지선다 / 주관식 / 호칭 확인).
-ResponseMode = Literal["choices", "freetext", "name_fallback"]
 
 
 logger = logging.getLogger(__name__)
@@ -41,15 +60,13 @@ router = APIRouter(prefix="/api/v1/sia", tags=["sia"])
 
 
 # ─────────────────────────────────────────────
-#  Request / Response models
+#  Request / Response models (v4 — choices 제거)
 # ─────────────────────────────────────────────
 
 class StartResponse(BaseModel):
     conversation_id: str
-    opening_message: str                # body — trailing choice 블록 제거
+    opening_message: str                # M1 결합 출력 (OPENING + OBSERVATION 1문장)
     turn_count: int = 0
-    response_mode: ResponseMode         # choices / freetext / name_fallback
-    choices: list[str] = []             # mode=="choices" 일 때 정확히 4개
 
 
 class MessageRequest(BaseModel):
@@ -59,11 +76,9 @@ class MessageRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     conversation_id: str
-    assistant_message: str              # body — trailing choice 블록 제거
+    assistant_message: str
     turn_count: int
     status: str                         # active / ending_soon / closed
-    response_mode: ResponseMode         # choices / freetext / name_fallback
-    choices: list[str] = []
 
 
 class EndRequest(BaseModel):
@@ -78,50 +93,268 @@ class EndResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────
-#  Helpers
+#  Helpers — state / message conversion
 # ─────────────────────────────────────────────
 
-V2_REQUIRED_FIELDS = [
-    "desired_image",
-    "reference_style",
-    "current_concerns",
-    "self_perception",
-    "lifestyle_context",
-    "height",
-    "weight",
-    "shoulder_width",
-]
+def _resolve_user_name(user: dict, profile: Optional[dict]) -> str:
+    """호명에 사용할 이름 — users.name 우선, 없으면 빈 문자열."""
+    name = (user.get("name") or "").strip()
+    if name:
+        return name
+    return ""
 
 
-def _missing_from_profile(profile: Optional[dict]) -> list[str]:
-    """user_profile.structured_fields 에서 아직 비어 있는 필드 목록."""
-    if not profile:
-        return list(V2_REQUIRED_FIELDS)
-    structured = profile.get("structured_fields") or {}
-    return [f for f in V2_REQUIRED_FIELDS if not structured.get(f)]
+# 최종 상태 (safety net 발동 안 함) — Sia 가 곧장 대화 진입 가능
+_IG_TERMINAL_STATUSES = {"success", "private", "skipped", "failed"}
 
 
-def _build_messages_for_llm(session_state: dict) -> list[dict]:
-    """Redis session messages → Claude API messages 포맷.
+def _ensure_ig_cache_ready(db, user_id: str, profile: dict) -> dict:
+    """IG 수집이 아직 안 끝났으면 동기 재시도 (safety net).
 
-    ts 제거 (API 는 role/content 만 수용). 빈 messages 일 때 dummy user prompt
-    삽입 (Claude API 는 첫 메시지가 user 여야 함).
+    정상 흐름:
+      프론트 → /ig-status 폴링 → status in 최종 상태 → chat/start 호출.
+      이 함수는 no-op (pending/pending_vision 아니므로 fetch 안 함).
+
+    비정상 흐름 (프론트 폴링 스킵):
+      status in {None, 'pending', 'pending_vision'} + ig_handle 존재 →
+      동기 refresh_ig_feed(force=True) 실행. 최대 ~45s 블로킹.
     """
-    raw = session_state.get("messages") or []
-    out = []
-    for m in raw:
-        if m["role"] in ("user", "assistant"):
-            out.append({"role": m["role"], "content": m["content"]})
+    status = profile.get("ig_fetch_status")
+    ig_handle = profile.get("ig_handle")
 
-    # 첫 턴 오프닝 용 dummy — Claude messages 는 최소 1개 user 필요
+    if not ig_handle:
+        return profile
+    if status in _IG_TERMINAL_STATUSES:
+        return profile
+
+    # pending / pending_vision / None — 동기 재시도
+    logger.info(
+        "chat_start safety net: sync IG refresh for user=%s (status=%s)",
+        user_id, status,
+    )
+    try:
+        from services import user_profiles
+        user_profiles.refresh_ig_feed(db, user_id, force=True)
+        db.commit()
+        refreshed = user_profiles.get_profile(db, user_id)
+        if refreshed is not None:
+            return refreshed
+    except Exception:
+        logger.exception(
+            "chat_start safety net failed for user=%s — proceeding without Vision",
+            user_id,
+        )
+    return profile
+
+
+def _history_for_haiku(state: ConversationState) -> list[dict]:
+    """ConversationState.turns → Claude API messages history (role/content).
+
+    첫 턴일 때는 dummy user prompt 삽입 (Claude API 첫 메시지 = user 필수).
+    """
+    out: list[dict] = []
+    for t in state.turns:
+        if isinstance(t, UserTurn):
+            out.append({"role": "user", "content": t.text})
+        elif isinstance(t, AssistantTurn):
+            out.append({"role": "assistant", "content": t.text})
     if not out:
         out = [{"role": "user", "content": "(대화 시작)"}]
     return out
 
 
-def _resolve_opening_user_name(user: dict) -> Optional[str]:
-    """카톡 user dict 에서 name 추출. 애플 로그인 등 None 가능."""
-    return user.get("name") or None
+def _state_to_persist_messages(state: ConversationState) -> list[ConversationMessage]:
+    """ConversationState.turns → conversations.messages JSONB 리스트.
+
+    ts 는 state.created_at 을 baseline 으로 턴 인덱스에 따라 약간 증가시켜 생성.
+    (저장용 근사치 — 정확한 per-turn ts 는 schema 확장 없이 불가. MVP 로 충분.)
+    """
+    try:
+        base = datetime.fromisoformat((state.created_at or "").replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        base = datetime.now(timezone.utc)
+
+    msgs: list[ConversationMessage] = []
+    for idx, t in enumerate(state.turns):
+        ts = base.replace(microsecond=(idx * 1000) % 1_000_000)
+        if isinstance(t, UserTurn):
+            msgs.append(ConversationMessage(role="user", content=t.text, ts=ts))
+        elif isinstance(t, AssistantTurn):
+            msgs.append(ConversationMessage(role="assistant", content=t.text, ts=ts))
+    return msgs
+
+
+def _update_counters_for_assistant(
+    state: ConversationState,
+    msg_type: MsgType,
+    composition: Composition,
+) -> None:
+    """AssistantTurn append 후 집계 카운터 업데이트.
+
+    세션 #6 v2 §8.1 + 세션 #7 반영:
+    - type_counts: primary_type += 1
+    - observation_count: primary=OBSERVATION 또는 M1 secondary=OBSERVATION → +1
+    - collection_streak: 수집 타입 (OBS/PROBE/EXT) → +1 / 그 외 → 0
+    - observations_since_recognition: OBS → +1 / RECOG → 0
+    - meta_rebuttal_used / evidence_defense_used: 세션 1회 플래그
+    - self_pr_prefix_used: A-13 prefix 사용 시 +1
+    """
+    state.type_counts[msg_type] = state.type_counts.get(msg_type, 0) + 1
+
+    # OBSERVATION 효과 카운트 — primary 또는 M1/EMPATHY 결합 secondary
+    obs_delivered = (
+        msg_type == MsgType.OBSERVATION
+        or composition.secondary_type == MsgType.OBSERVATION
+    )
+    if obs_delivered:
+        state.observation_count += 1
+        state.observations_since_recognition += 1
+
+    # 수집 버킷 연속 카운트
+    if msg_type in {MsgType.OBSERVATION, MsgType.PROBE, MsgType.EXTRACTION}:
+        state.collection_streak += 1
+    else:
+        state.collection_streak = 0
+
+    # RECOGNITION 누적 시 since_recognition 리셋
+    if msg_type == MsgType.RECOGNITION:
+        state.observations_since_recognition = 0
+
+    # 세션 1회 한정 플래그
+    if msg_type == MsgType.META_REBUTTAL:
+        state.meta_rebuttal_used = True
+    if msg_type == MsgType.EVIDENCE_DEFENSE:
+        state.evidence_defense_used = True
+
+    # A-13 prefix 카운터
+    if composition.apply_self_pr_prefix:
+        state.self_pr_prefix_used += 1
+
+
+def _render_assistant_message(
+    composition: Composition,
+    state: ConversationState,
+) -> str:
+    """Composition → assistant 메시지 텍스트.
+
+    HARDCODED_TYPES 는 sia_hardcoded.render_hardcoded, HAIKU_TYPES 는
+    sia_prompts_v4.load_haiku_prompt + sia_llm.call_sia_turn_with_retry.
+
+    M1 결합 출력 (OPENING + OBSERVATION) 은 OPENING 하드코딩 + OBSERVATION Haiku
+    두 호출의 결과를 한 문자열로 합쳐서 반환.
+    """
+    msg_type = composition.primary_type
+
+    # M1 결합 — OPENING 하드코딩 + secondary=OBSERVATION Haiku
+    is_m1_combined = (
+        msg_type == MsgType.OPENING_DECLARATION
+        and composition.is_combined
+        and composition.secondary_type == MsgType.OBSERVATION
+    )
+    if is_m1_combined:
+        opening_text = render_hardcoded(MsgType.OPENING_DECLARATION, state)
+        obs_text = _call_haiku(
+            MsgType.OBSERVATION, state, composition, is_first_turn=True,
+        )
+        # M1 호명/행위 중복 방지 — Haiku 가 observation.md HARD 지시 무시 시 후처리
+        obs_text = _strip_m1_meta_preamble(obs_text, state.user_name)
+        return f"{opening_text} {obs_text}".strip()
+
+    # HARDCODED 단독
+    if msg_type in HARDCODED_TYPES:
+        return render_hardcoded(
+            msg_type, state,
+            range_mode=composition.range_mode,
+            exit_confirmed=composition.exit_confirmed,
+            # user_meta_raw / observation_evidence / last_diagnosis / feed_count 은
+            # 상위 orchestrator 가 필요 시 주입. v4 cutover 최소 스코프에선 빈값.
+        )
+
+    # HAIKU 단독 or EMPATHY 결합
+    return _call_haiku(msg_type, state, composition, is_first_turn=False)
+
+
+# M1 결합 시 OBSERVATION 앞부분이 OPENING 의 meta 선언과 중복되는 경우 제거.
+# 패턴 예시 (Haiku 실 출력):
+#   "{name}님 피드 한번 봤어요. 포스트가 한 장인데..."
+#   "{name}님 인스타 살펴봤어요. 최근 올리신..."
+#   "피드를 보니 최근 5장이..."
+# 목표: 구체 관찰 시작부만 남김.
+_M1_META_PREAMBLE_TEMPLATE = (
+    r"^(?P<name_prefix>{name}님\s+)?"
+    r"(?P<target>피드|인스타|올리신\s+(?:것|사진|거|사진들))"
+    r"[^.!?\n]*?"
+    r"(?:봤어요|들여다봤어요|훑어봤어요|살펴봤어요|돌아봤어요|보니까?)"
+    r"[.,]*\s*"
+)
+
+
+def _strip_m1_meta_preamble(obs_text: str, user_name: str) -> str:
+    """M1 OBSERVATION 앞부분의 meta 선언 (피드/인스타 재-봤어요 류) 제거.
+
+    Haiku 가 observation.md HARD 지시 준수 시 이 함수는 no-op.
+    지시 불이행 시 band-aid 로 깨끗한 옵닝 결합 출력 보장.
+
+    user_name 이 빈 문자열이면 name_prefix 부분 optional 로 매칭.
+    """
+    if not obs_text:
+        return obs_text
+    name = re.escape(user_name) if user_name else ""
+    pattern = re.compile(
+        _M1_META_PREAMBLE_TEMPLATE.format(name=name),
+        flags=re.IGNORECASE,
+    )
+    stripped = pattern.sub("", obs_text, count=1).lstrip()
+    return stripped or obs_text   # 전부 지워지면 원본 반환 (안전망)
+
+
+def _call_haiku(
+    msg_type: MsgType,
+    state: ConversationState,
+    composition: Composition,
+    *,
+    is_first_turn: bool,
+) -> str:
+    """load_haiku_prompt 조립 + call_sia_turn_with_retry."""
+    last_user = state.last_user()
+    user_flags = last_user.flags if last_user else None
+
+    vision_summary = _render_ig_summary(state.ig_feed_cache)
+
+    prompt = load_haiku_prompt(
+        msg_type,
+        state,
+        user_flags=user_flags,
+        vision_summary=vision_summary,
+        is_first_turn=is_first_turn,
+        is_combined=composition.is_combined,
+        secondary_type=composition.secondary_type,
+        confrontation_block=composition.confrontation_block,
+        apply_self_pr_prefix=composition.apply_self_pr_prefix,
+        range_mode=composition.range_mode,
+    )
+    history = _history_for_haiku(state)
+    return sia_llm.call_sia_turn_with_retry(
+        system_prompt=prompt,
+        messages_history=history,
+    )
+
+
+def _record_assistant_turn(
+    state: ConversationState,
+    text: str,
+    composition: Composition,
+) -> AssistantTurn:
+    """AssistantTurn 생성 + 어미 카운트 populate + state.turns append + 집계 업데이트."""
+    turn = AssistantTurn(
+        text=text,
+        msg_type=composition.primary_type,
+        turn_idx=len(state.turns),
+    )
+    populate_turn_counts(turn)
+    state.turns.append(turn)
+    _update_counters_for_assistant(state, composition.primary_type, composition)
+    return turn
 
 
 # ─────────────────────────────────────────────
@@ -133,11 +366,12 @@ def chat_start(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> StartResponse:
-    """신규 conversation 생성 + Sia 오프닝 메시지 반환.
+    """신규 conversation 생성 + Sia 오프닝 (M1 결합 출력).
 
-    - Redis 세션 생성 (TTL 5분 sliding)
-    - user_profile 에서 ig_feed_cache / structured_fields 복사
-    - Haiku 4.5 첫 턴 호출 (오프닝)
+    - Redis 세션 생성 (primary 5m sliding + backup 24h, v4 shape)
+    - user_profile 에서 gender / ig_feed_cache 주입
+    - decide(state) → M1 결합 Composition
+    - OPENING 하드코딩 + OBSERVATION Haiku 합쳐서 한 메시지 전송
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
@@ -149,56 +383,40 @@ def chat_start(
             "user_profile not found — Step 0 폼 제출 먼저 완료해 주십시오.",
         )
 
+    # IG wiring safety net (STEP IG-Wiring Q2):
+    #   정상 경로: /onboarding/essentials 직후 BackgroundTask 가 Apify+Vision 돌리고
+    #             프론트가 /ig-status 폴링 완료 후에만 chat/start 호출.
+    #   safety net: 프론트가 폴링 스킵하고 chat/start 직진한 경우만 보호.
+    #               ig_handle 있고 최종 상태 아니면 동기 재시도 (45s 감수).
+    profile = _ensure_ig_cache_ready(db, user["id"], profile)
+
     conv_id = uuid.uuid4().hex
-    missing = _missing_from_profile(profile)
+    user_name = _resolve_user_name(user, profile)
 
-    # Redis 세션 생성
-    state = sia_session.create_session(
-        conversation_id=conv_id,
+    state = sia_session_v4.create_conversation_state(
+        session_id=conv_id,
         user_id=user["id"],
-        resolved_name=None,
-        ig_feed_cache=profile.get("ig_feed_cache"),
-        missing_fields=missing,
+        user_name=user_name,
     )
+    state.gender = profile.get("gender") if profile.get("gender") in ("female", "male") else None
+    state.ig_feed_cache = profile.get("ig_feed_cache")
 
-    # Sia 첫 턴 — turn_type=opening (turn_count=0), gender from profile (Phase G2)
-    system_prompt = sia_llm.build_system_prompt(
-        user_name=_resolve_opening_user_name(user),
-        resolved_name=None,
-        collected_fields=profile.get("structured_fields") or {},
-        missing_fields=missing,
-        ig_feed_cache=profile.get("ig_feed_cache"),
-        turn_type=sia_session.decide_next_turn(state),   # "opening"
-        gender=profile.get("gender"),
-    )
-    opening = sia_llm.call_sia_turn_with_retry(
-        system_prompt=system_prompt,
-        messages_history=[{"role": "user", "content": "(대화 시작)"}],
-    )
+    composition = decide(state)
+    if composition.primary_type != MsgType.OPENING_DECLARATION:
+        # decide() 가 첫 턴에서 M1 결합을 보장하는데, 다른 타입이 나오면 로직 버그.
+        logger.error(
+            "chat_start: decide returned %s instead of OPENING_DECLARATION",
+            composition.primary_type,
+        )
 
-    # Redis 에 assistant 메시지 기록 — 원문 저장 (LLM 재전송 시 맥락 유지 필수).
-    sia_session.append_message(
-        conversation_id=conv_id,
-        role="assistant",
-        content=opening,
-    )
-
-    # 파서로 body/choices/mode 분리. name_fallback 은 호출부(여기) 가 오버라이드.
-    body, choices, mode = parse_sia_output(opening)
-    if is_name_fallback_turn(
-        user_has_korean_name=sia_llm._has_korean(user.get("name") or ""),
-        resolved_name=None,   # 첫 턴은 아직 fallback 응답 수신 전
-        turn_count=0,
-    ):
-        mode = "name_fallback"
-        choices = []
+    opening_message = _render_assistant_message(composition, state)
+    _record_assistant_turn(state, opening_message, composition)
+    sia_session_v4.save_conversation_state(state)
 
     return StartResponse(
         conversation_id=conv_id,
-        opening_message=body,
+        opening_message=opening_message,
         turn_count=0,
-        response_mode=mode,
-        choices=choices,
     )
 
 
@@ -209,35 +427,29 @@ def chat_message(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> MessageResponse:
-    """유저 발화 → Sia 응답. 세션이 만료/없으면 410.
+    """유저 발화 → Sia 응답 (v4).
 
     Flow:
-      1. Redis 세션 로드.
-         - primary 없음 + backup 도 없음 → 410 (단순 미존재)
-         - primary 없음 + backup 있음 (TTL 만료 첫 probe) → backup 을 DB flush
-           (status="ended_by_timeout") + extraction 큐잉 + backup 삭제 → 410
-      2. 유저 메시지 append (primary TTL 리셋, 24h backup 도 갱신)
-      3. Haiku 4.5 호출 (+retry)
-      4. assistant 메시지 append
-      5. turn_count 한계 체크 — 50 도달 시 status="ending_soon"
-      6. 파서로 body/choices/mode 분리. name_fallback 은 호출부가 오버라이드.
+      1. Redis primary load. 없으면 backup probe → flush or 410.
+      2. UserTurn append (flags 추출) + state 업데이트 (A-9 / A-16 memory).
+      3. decide(state) → Composition.
+      4. Assistant message 렌더 (HARDCODED or HAIKU).
+      5. validate() — 위반 시 경고 로그만, 본문 유지.
+      6. AssistantTurn append + 집계 갱신.
+      7. save_conversation_state (primary+backup dual-write).
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
-    turn_before_user = 0   # name_fallback 판정 (user append 전 turn_count)
-    state = sia_session.get_session(body.conversation_id)
+    state = sia_session_v4.load_conversation_state(body.conversation_id)
     if state is None:
-        # Primary 만료. Backup 에 있으면 첫 probe → DB flush.
-        backup = sia_session.get_backup(body.conversation_id)
-        if backup is not None and backup.get("user_id") == user["id"]:
+        backup = sia_session_v4.get_backup_state(body.conversation_id)
+        if backup is not None and backup.user_id == user["id"]:
             _flush_expired_conversation(db, backup, background_tasks)
-            sia_session.delete_backup(body.conversation_id)
+            sia_session_v4.delete_conversation_state(body.conversation_id)
         elif backup is not None:
-            # 다른 유저의 conversation — 조용히 무시 (유출 방지).
             logger.warning(
-                "backup probe: user_id mismatch cid=%s",
-                body.conversation_id,
+                "backup probe: user_id mismatch cid=%s", body.conversation_id,
             )
         raise HTTPException(
             status_code=410,
@@ -247,76 +459,62 @@ def chat_message(
                 "redirect": "/extracting",
             },
         )
-    if state["user_id"] != user["id"]:
+
+    if state.user_id != user["id"]:
         raise HTTPException(403, "not your conversation")
-    if state["status"] != "active":
-        raise HTTPException(409, f"session not active: status={state['status']}")
+    if state.status != "active":
+        raise HTTPException(409, f"session not active: status={state.status}")
 
-    turn_before_user = int(state.get("turn_count", 0))
+    # 1. UserTurn append + 상태 업데이트
+    user_flags = extract_flags(body.user_message)
+    state.turns.append(UserTurn(
+        text=body.user_message,
+        turn_idx=len(state.turns),
+        flags=user_flags,
+    ))
+    update_state_from_user_turn(state, body.user_message)
 
-    # 1. 유저 메시지 append (turn_count 증가)
-    state = sia_session.append_message(
-        conversation_id=body.conversation_id,
-        role="user",
-        content=body.user_message,
+    # 2. 의사결정
+    composition = decide(state)
+    msg_type = composition.primary_type
+
+    # 3. 응답 렌더
+    assistant_text = _render_assistant_message(composition, state)
+
+    # 4. Validator — 경고만 (STEP 2-G 스코프: 파이프라인 개통 우선)
+    v = validate(
+        assistant_text, msg_type, state=state,
+        range_mode=composition.range_mode,
+        confrontation_block=composition.confrontation_block,
+        is_combined=composition.is_combined,
+        exit_confirmed=composition.exit_confirmed,
     )
-    if state is None:
-        raise HTTPException(410, "session expired during write")
+    if v.errors:
+        logger.warning(
+            "sia validate errors cid=%s type=%s errs=%s",
+            body.conversation_id, msg_type.value, v.errors,
+        )
+    if v.warnings:
+        logger.info(
+            "sia validate warnings cid=%s: %s",
+            body.conversation_id, v.warnings,
+        )
 
-    # 1-b. spectrum 응답 파싱 → 세션에 누적 (Phase B) — decide_next_turn 입력 갱신
-    parsed_state = sia_session.record_spectrum_choice(
-        conversation_id=body.conversation_id,
-        user_message=body.user_message,
-    )
-    if parsed_state is not None:
-        state = parsed_state
+    # 5. AssistantTurn append + 집계
+    _record_assistant_turn(state, assistant_text, composition)
+    sia_session_v4.save_conversation_state(state)
 
-    # 2. Sia 응답 생성 — turn_type/gender 주입 (Phase G2, Phase C 누락 처리)
-    profile = get_profile(db, user["id"]) or {}
-    system_prompt = sia_llm.build_system_prompt(
-        user_name=_resolve_opening_user_name(user),
-        resolved_name=state.get("resolved_name"),
-        collected_fields=state.get("collected_fields") or {},
-        missing_fields=state.get("missing_fields") or V2_REQUIRED_FIELDS,
-        ig_feed_cache=state.get("ig_feed_cache"),
-        turn_type=sia_session.decide_next_turn(state),
-        gender=profile.get("gender"),
-    )
-    history = _build_messages_for_llm(state)
-    assistant_text = sia_llm.call_sia_turn_with_retry(
-        system_prompt=system_prompt,
-        messages_history=history,
-    )
-
-    # 3. assistant 메시지 append — 원문 저장 (LLM 재전송 맥락 유지).
-    state = sia_session.append_message(
-        conversation_id=body.conversation_id,
-        role="assistant",
-        content=assistant_text,
-    )
-
-    # 4. turn_count 한계 체크 (§4-5 soft limit)
+    # 6. 세션 한계 체크
     from config import get_settings
     limit = get_settings().sia_session_max_turns
-    status = "ending_soon" if state["turn_count"] >= limit else "active"
-
-    # 5. 파서로 body/choices/mode 분리.
-    msg_body, choices, mode = parse_sia_output(assistant_text)
-    if is_name_fallback_turn(
-        user_has_korean_name=sia_llm._has_korean(user.get("name") or ""),
-        resolved_name=state.get("resolved_name"),
-        turn_count=turn_before_user,
-    ):
-        mode = "name_fallback"
-        choices = []
+    turn_count = len(state.turns) // 2  # user+assistant 왕복 기준
+    status = "ending_soon" if turn_count >= limit else "active"
 
     return MessageResponse(
         conversation_id=body.conversation_id,
-        assistant_message=msg_body,
-        turn_count=state["turn_count"],
+        assistant_message=assistant_text,
+        turn_count=turn_count,
         status=status,
-        response_mode=mode,
-        choices=choices,
     )
 
 
@@ -327,45 +525,30 @@ def chat_end(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> EndResponse:
-    """명시 종료 (유저 "이만하면 됐어요" 버튼).
-
-    Contract #3 atomic sequence:
-      1. conversations INSERT (status="ended")
-      2. Redis session DELETE
-      3. Extraction 백그라운드 큐잉 (D4 구현, 지금은 placeholder)
-    """
+    """명시 종료 — conversations INSERT (status="ended") + Sonnet extraction 큐잉."""
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
-    state = sia_session.get_session(body.conversation_id)
+    state = sia_session_v4.load_conversation_state(body.conversation_id)
     if state is None:
         raise HTTPException(410, "session expired or not found")
-    if state["user_id"] != user["id"]:
+    if state.user_id != user["id"]:
         raise HTTPException(403, "not your conversation")
 
-    # Redis messages → ConversationMessage 리스트 (Pydantic validation)
-    raw_msgs = state.get("messages") or []
-    try:
-        messages = [ConversationMessage.model_validate(m) for m in raw_msgs]
-    except Exception as e:
-        logger.exception("invalid messages in Redis: cid=%s", body.conversation_id)
-        raise HTTPException(500, f"session payload corrupt: {e}")
+    messages = _state_to_persist_messages(state)
 
-    # 1. DB INSERT status="ended"
     conv_service.create_ended_conversation(
         db,
         user_id=user["id"],
         conversation_id=body.conversation_id,
         messages=messages,
-        turn_count=state.get("turn_count", 0),
-        started_at_iso=state.get("created_at"),
+        turn_count=len(state.turns),
+        started_at_iso=state.created_at,
     )
     db.commit()
 
-    # 2. Redis session DELETE
-    sia_session.delete_session(body.conversation_id)
+    sia_session_v4.delete_conversation_state(body.conversation_id)
 
-    # 3. Extraction 백그라운드 큐잉 (D4 구현 완료)
     extraction_queued = True
     background_tasks.add_task(
         _run_extraction_job,
@@ -382,66 +565,49 @@ def chat_end(
 
 
 # ─────────────────────────────────────────────
-#  TTL Expiry Recovery — backup snapshot → DB flush (D5 Task 3)
+#  TTL expiry recovery
 # ─────────────────────────────────────────────
 
 def _flush_expired_conversation(
     db,
-    state: dict,
+    state: ConversationState,
     background_tasks: BackgroundTasks,
 ) -> None:
-    """Timeout 만료 세션을 DB 로 flush + extraction 큐잉.
-
-    `/chat/end` 와 동일한 atomic sequence 를 재사용하되 status="ended_by_timeout"
-    로 저장해 manual /chat/end 와 구분한다.
-
-    손상된 backup (Pydantic validation 실패) 은 조용히 drop — 유저에게는 동일한
-    410 응답이 가므로 UX 영향 없음. 운영자는 로그에서 식별.
-    """
-    raw_msgs = state.get("messages") or []
+    """Backup 스냅샷을 DB (status="ended_by_timeout") 로 flush + extraction 큐잉."""
     try:
-        messages = [ConversationMessage.model_validate(m) for m in raw_msgs]
+        messages = _state_to_persist_messages(state)
     except Exception:
         logger.exception(
-            "backup snapshot corrupt: cid=%s",
-            state.get("conversation_id"),
+            "backup snapshot corrupt: cid=%s", state.session_id,
         )
         return
 
     conv_service.create_ended_conversation(
         db,
-        user_id=state["user_id"],
-        conversation_id=state["conversation_id"],
+        user_id=state.user_id,
+        conversation_id=state.session_id,
         messages=messages,
-        turn_count=state.get("turn_count", 0),
-        started_at_iso=state.get("created_at"),
+        turn_count=len(state.turns),
+        started_at_iso=state.created_at,
         status="ended_by_timeout",
     )
     db.commit()
     background_tasks.add_task(
         _run_extraction_job,
-        conversation_id=state["conversation_id"],
-        user_id=state["user_id"],
+        conversation_id=state.session_id,
+        user_id=state.user_id,
     )
 
 
 # ─────────────────────────────────────────────
-#  Background: Extraction job (D4)
+#  Background: Sonnet 4.6 extraction (STEP 2-G: 기존 경로 유지)
 # ─────────────────────────────────────────────
 
 def _run_extraction_job(conversation_id: str, user_id: str) -> None:
-    """FastAPI BackgroundTask 에서 실행되는 Sonnet 4.6 extraction.
+    """chat/end 또는 timeout flush 후 BackgroundTask — Sonnet 4.6 extraction.
 
-    Flow (contract #3):
-      1. DB 에서 conversation 로드 (status="ended")
-      2. messages → Pydantic 파싱
-      3. extraction.extract_structured_fields() 호출 (Sonnet 1회 + 재시도 1회)
-      4-a. 성공: mark_extracted (status="extracted" + structured_fields merge +
-           onboarding_completed=TRUE)
-      4-b. 실패: mark_failed (status="failed", user_profiles 변경 없음)
-
-    BackgroundTask 는 독립 DB session 필요 (request session 은 이미 close 됨).
-    session 생성/종료 명시 관리.
+    STEP 2-G 스코프: 기존 D4 경로 유지 (structured_fields 8 필드 추출 + merge +
+    onboarding_completed TRUE). Haiku 축 delta 누적 flush 는 Phase I 로 이월.
     """
     from services import conversations as conv_svc
     from services import extraction
@@ -450,8 +616,7 @@ def _run_extraction_job(conversation_id: str, user_id: str) -> None:
     db = get_db()
     if db is None:
         logger.error(
-            "extraction job: DB unavailable cid=%s (conversation stays status=ended)",
-            conversation_id,
+            "extraction job: DB unavailable cid=%s", conversation_id,
         )
         return
 
@@ -491,7 +656,6 @@ def _run_extraction_job(conversation_id: str, user_id: str) -> None:
             db.commit()
             return
 
-        # Success path — conversations UPDATE + user_profiles merge + completed=TRUE
         conv_svc.mark_extracted(
             db,
             conversation_id=conversation_id,
@@ -504,7 +668,6 @@ def _run_extraction_job(conversation_id: str, user_id: str) -> None:
             conversation_id, result.fallback_needed,
         )
     except Exception:
-        # 안전망 — 예외 버블업으로 BackgroundTask 조용히 죽는 거 방지
         logger.exception(
             "extraction job: unexpected error cid=%s", conversation_id,
         )

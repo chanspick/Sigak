@@ -22,6 +22,7 @@ from schemas.sia_state import (
     CONFRONT,
     HAIKU_TYPES,
     HARDCODED_TYPES,
+    MANAGEMENT,
     QUESTION_FORBIDDEN,
     QUESTION_REQUIRED,
     UNDERSTANDING,
@@ -35,43 +36,63 @@ from schemas.sia_state import (
 
 
 # ─────────────────────────────────────────────
-#  MsgType 그룹핑
+#  MsgType 그룹핑 (14 타입, 세션 #6 v2 §6.1)
 # ─────────────────────────────────────────────
 
-def test_msg_type_count_is_eleven():
-    """HOOK 삭제 후 11개 타입 유지."""
-    assert len(list(MsgType)) == 11
+def test_msg_type_count_is_fourteen():
+    """14 타입 체계 (세션 #6 v2 확정): 기존 11 + 관리 버킷 3."""
+    assert len(list(MsgType)) == 14
+    # 신규 3 타입 존재 확인
+    assert MsgType.CHECK_IN.value == "check_in"
+    assert MsgType.RE_ENTRY.value == "re_entry"
+    assert MsgType.RANGE_DISCLOSURE.value == "range_disclosure"
 
 
 def test_group_coverage_is_full_and_disjoint():
-    """그룹 4개가 11개 전부를 덮고 교집합 없음."""
-    all_grouped = COLLECTION | UNDERSTANDING | WHITESPACE | CONFRONT
+    """그룹 5개 (수집/이해/여백/대결/관리) 가 14개 전부를 덮고 교집합 없음."""
+    all_grouped = COLLECTION | UNDERSTANDING | WHITESPACE | CONFRONT | MANAGEMENT
     assert all_grouped == set(MsgType)
 
-    pairs = [
-        (COLLECTION, UNDERSTANDING),
-        (COLLECTION, WHITESPACE),
-        (COLLECTION, CONFRONT),
-        (UNDERSTANDING, WHITESPACE),
-        (UNDERSTANDING, CONFRONT),
-        (WHITESPACE, CONFRONT),
+    groups = [
+        ("COLLECTION", COLLECTION),
+        ("UNDERSTANDING", UNDERSTANDING),
+        ("WHITESPACE", WHITESPACE),
+        ("CONFRONT", CONFRONT),
+        ("MANAGEMENT", MANAGEMENT),
     ]
-    for a, b in pairs:
-        assert not (a & b), f"group intersection: {a & b}"
+    for i, (ni, gi) in enumerate(groups):
+        for nj, gj in groups[i + 1:]:
+            assert not (gi & gj), f"group intersection: {ni} ∩ {nj} = {gi & gj}"
+
+
+def test_management_bucket_is_three_new_types():
+    """관리 버킷 = 세션 #6 v2 신규 3 타입."""
+    assert MANAGEMENT == frozenset({
+        MsgType.CHECK_IN, MsgType.RE_ENTRY, MsgType.RANGE_DISCLOSURE,
+    })
 
 
 def test_hardcoded_vs_haiku_partition():
-    """하드코딩 4 + Haiku 7 = 11, 교집합 0."""
-    assert len(HARDCODED_TYPES) == 4
+    """하드코딩 7 (기존 4 + 관리 3) + Haiku 7 = 14, 교집합 0."""
+    assert len(HARDCODED_TYPES) == 7
     assert len(HAIKU_TYPES) == 7
     assert not (HARDCODED_TYPES & HAIKU_TYPES)
     assert (HARDCODED_TYPES | HAIKU_TYPES) == set(MsgType)
+    # 관리 3 타입 전부 하드코딩
+    for mt in MANAGEMENT:
+        assert mt in HARDCODED_TYPES
 
 
 def test_question_required_forbidden_partition():
-    """질문 required / forbidden 이 11개 전부 커버 + 교집합 0."""
+    """질문 required / forbidden 이 14개 전부 커버 + 교집합 0.
+
+    세션 #6 v2 §6.2: CHECK_IN / RE_ENTRY / RANGE_DISCLOSURE 전부 질문 금지.
+    """
     assert not (QUESTION_REQUIRED & QUESTION_FORBIDDEN)
     assert (QUESTION_REQUIRED | QUESTION_FORBIDDEN) == set(MsgType)
+    # 관리 3 타입 전부 질문 금지
+    for mt in MANAGEMENT:
+        assert mt in QUESTION_FORBIDDEN
 
 
 # ─────────────────────────────────────────────
@@ -240,6 +261,105 @@ def test_round_trip_user_flags_preserved():
     assert lu.flags.has_evidence_doubt
     assert lu.flags.has_emotion_word
     assert lu.flags.emotion_word_raw == "부담"
+
+
+# ─────────────────────────────────────────────
+#  신규 필드 round-trip (세션 #6 v2 + 세션 #7 + 본 cutover)
+# ─────────────────────────────────────────────
+
+def test_round_trip_failure_mode_state_preserved():
+    """세션 #6 v2 §8.2 실패 모드 필드 round-trip."""
+    s = ConversationState(session_id="s", user_id="u", user_name="준호")
+    s.trivial_streak = 2
+    s.axis_switch_required = True
+    s.overattachment_severity = "mild"
+    s.overattachment_warned = True
+
+    restored = ConversationState.from_dict(s.to_dict())
+    assert restored.trivial_streak == 2
+    assert restored.axis_switch_required is True
+    assert restored.overattachment_severity == "mild"
+    assert restored.overattachment_warned is True
+
+
+def test_round_trip_disclaimer_memory_and_prefix_count():
+    """세션 #7 A-16 disclaimer memory + A-13 prefix 카운터 round-trip."""
+    s = ConversationState(session_id="s", user_id="u", user_name="도윤")
+    s.user_disclaimer_memory = {"color": 2, "age": 1}
+    s.self_pr_prefix_used = 1
+
+    restored = ConversationState.from_dict(s.to_dict())
+    assert restored.user_disclaimer_memory == {"color": 2, "age": 1}
+    assert restored.self_pr_prefix_used == 1
+
+
+def test_round_trip_gender_and_ig_feed_cache():
+    """본 cutover 추가: gender + ig_feed_cache round-trip."""
+    ig_cache = {
+        "scope": "full",
+        "profile_basics": {"username": "yuni"},
+        "analysis": {"tone_category": "쿨뮤트", "tone_percentage": 68},
+    }
+    s = ConversationState(
+        session_id="s", user_id="u", user_name="유니",
+        gender="female", ig_feed_cache=ig_cache,
+    )
+
+    restored = ConversationState.from_dict(s.to_dict())
+    assert restored.gender == "female"
+    assert restored.ig_feed_cache is not None
+    assert restored.ig_feed_cache["scope"] == "full"
+    assert restored.ig_feed_cache["analysis"]["tone_percentage"] == 68
+
+
+def test_round_trip_invalid_gender_falls_back_to_none():
+    """gender 가 female/male 외 값이면 None 으로 fallback (방어선)."""
+    d = {
+        "session_id": "s", "user_id": "u", "user_name": "n",
+        "turns": [],
+        "gender": "unknown",
+    }
+    restored = ConversationState.from_dict(d)
+    assert restored.gender is None
+
+
+def test_round_trip_invalid_overattachment_severity_falls_back():
+    """overattachment_severity 가 "" / "mild" / "severe" 외면 "" 으로 fallback."""
+    d = {
+        "session_id": "s", "user_id": "u", "user_name": "n",
+        "turns": [],
+        "overattachment_severity": "catastrophic",
+    }
+    restored = ConversationState.from_dict(d)
+    assert restored.overattachment_severity == ""
+
+
+def test_round_trip_legacy_payload_without_new_fields():
+    """구 payload (신규 필드 없음) 로드 시 기본값으로 채워짐."""
+    d = {
+        "session_id": "s", "user_id": "u", "user_name": "n",
+        "turns": [],
+    }
+    restored = ConversationState.from_dict(d)
+    assert restored.trivial_streak == 0
+    assert restored.axis_switch_required is False
+    assert restored.overattachment_severity == ""
+    assert restored.overattachment_warned is False
+    assert restored.user_disclaimer_memory == {}
+    assert restored.self_pr_prefix_used == 0
+    assert restored.gender is None
+    assert restored.ig_feed_cache is None
+
+
+def test_round_trip_ig_feed_cache_non_dict_falls_back_to_none():
+    """ig_feed_cache 에 dict 외 값이 들어오면 None."""
+    d = {
+        "session_id": "s", "user_id": "u", "user_name": "n",
+        "turns": [],
+        "ig_feed_cache": "not a dict",
+    }
+    restored = ConversationState.from_dict(d)
+    assert restored.ig_feed_cache is None
 
 
 # ─────────────────────────────────────────────

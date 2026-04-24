@@ -10,7 +10,12 @@ FN 회수 대상 (§5):
 """
 from __future__ import annotations
 
+import os
+import sys
+
 import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from schemas.sia_state import (
     AssistantTurn,
@@ -21,6 +26,7 @@ from services.sia_validators_v4 import (
     ValidationResult,
     check_cross_turn_rules,
     check_global_forbidden,
+    check_haiku_naturalness,
     check_type_conditional,
     find_violations_v4,
     validate,
@@ -343,32 +349,453 @@ class TestFindViolationsV4Merge:
 # ─────────────────────────────────────────────
 
 class TestHardcodedStillClean:
-    """기존 20 하드코딩 변형이 §5.2 추가 후에도 clean."""
+    """기존 하드코딩 4 타입 변형이 §5.2 추가 후에도 clean.
+
+    STEP 2-B 이후 META_REBUTTAL / EVIDENCE_DEFENSE / SOFT_WALKBACK 은 user_name 외에
+    추가 슬롯 (user_meta_raw / observation_evidence / last_diagnosis) 도 포함.
+    """
+
+    _SLOTS = dict(
+        user_name="만재",
+        user_meta_raw="MBTI 같은 거 맞추는 거 아니에요",
+        observation_evidence="최근 10장 중 7장이 같은 각도예요.",
+        last_diagnosis="만재님 피드는 배경이 본인보다 먼저 자리잡고 있어요.",
+        feed_count=15,
+    )
 
     def test_opening_variants(self):
         from services.sia_hardcoded import TEMPLATES
         for raw in TEMPLATES[MsgType.OPENING_DECLARATION]:
-            text = raw.format(user_name="만재")
+            text = raw.format(**self._SLOTS)
             r = validate(text, MsgType.OPENING_DECLARATION)
             assert r.ok, f"opening §5.2 fail: {r.errors}\n  text={text}"
 
     def test_meta_rebuttal_variants(self):
         from services.sia_hardcoded import TEMPLATES
         for raw in TEMPLATES[MsgType.META_REBUTTAL]:
-            text = raw.format(user_name="만재")
+            text = raw.format(**self._SLOTS)
             r = validate(text, MsgType.META_REBUTTAL)
             assert r.ok, f"meta §5.2 fail: {r.errors}\n  text={text}"
 
     def test_evidence_defense_variants(self):
         from services.sia_hardcoded import TEMPLATES
         for raw in TEMPLATES[MsgType.EVIDENCE_DEFENSE]:
-            text = raw.format(user_name="만재")
+            text = raw.format(**self._SLOTS)
             r = validate(text, MsgType.EVIDENCE_DEFENSE)
             assert r.ok, f"evidence §5.2 fail: {r.errors}\n  text={text}"
 
     def test_soft_walkback_variants(self):
         from services.sia_hardcoded import TEMPLATES
         for raw in TEMPLATES[MsgType.SOFT_WALKBACK]:
-            text = raw.format(user_name="만재")
+            text = raw.format(**self._SLOTS)
             r = validate(text, MsgType.SOFT_WALKBACK)
             assert r.ok, f"soft_walkback §5.2 fail: {r.errors}\n  text={text}"
+
+
+# ─────────────────────────────────────────────
+#  세션 #4 v2 §9.5 — 구나 "단독 vs 연결" 정밀 검증
+# ─────────────────────────────────────────────
+
+class TestGunnaSoloVsConnected:
+    """구나 solo-check 정확 해석: 뒤에 서술 연결 있으면 허용."""
+
+    def test_standalone_geureosseonguna_fails(self):
+        """단독 '그러셨구나' (뒤 내용 없음) → 위반."""
+        errs = check_global_forbidden(
+            "아 그러셨구나", MsgType.EMPATHY_MIRROR,
+        )
+        assert any("~구나" in e for e in errs)
+
+    def test_geureosseonguna_with_period_only_fails(self):
+        """구두점만 따라오면 단독으로 간주."""
+        errs = check_global_forbidden(
+            "아 그러셨구나.", MsgType.EMPATHY_MIRROR,
+        )
+        assert any("~구나" in e for e in errs)
+
+    def test_geureosseonguna_with_continuation_passes(self):
+        """RE_ENTRY V0 케이스 — 서술 연결 있으면 허용.
+
+        세션 #6 v2 §10.2: '아 그러셨구나. 그럼 제가 본 걸 정리해서 말씀드릴게요.'
+        """
+        errs = check_global_forbidden(
+            "아 그러셨구나. 그럼 제가 본 걸 정리해서 말씀드릴게요. 맞다 아니다만 반응 주셔도 괜찮아요",
+            MsgType.RE_ENTRY,
+        )
+        assert not any("~구나" in e for e in errs)
+
+    def test_geureongeoyeotguna_with_continuation_passes(self):
+        """RE_ENTRY V3 '아 그런 거였구나. 그럼 남은 얘기는...' 케이스."""
+        errs = check_global_forbidden(
+            "아 그런 거였구나. 그럼 남은 얘기는 제가 마무리하는 쪽으로 갈게요. 맞다 아니다만 반응 주셔도 괜찮아요",
+            MsgType.RE_ENTRY,
+        )
+        assert not any("~구나" in e for e in errs)
+
+    def test_gunayo_still_allowed(self):
+        """~구나요 는 기존처럼 금지 아님."""
+        errs = check_global_forbidden(
+            "그러셨구나요 좋아요", MsgType.EMPATHY_MIRROR,
+        )
+        assert not any("~구나" in e for e in errs)
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §1.3 — EMPATHY 결합 출력 시 ? 허용
+# ─────────────────────────────────────────────
+
+class TestEmpathyCombinedQuestionAllowance:
+    """is_combined=True 이면 EMPATHY_MIRROR draft 에 `?` 허용."""
+
+    def test_empathy_with_question_and_combined_passes(self):
+        errs = check_type_conditional(
+            "아 어색하셨구나. 빛삭하셨던 사진들은 어느 부분이 걸리셨어요?",
+            MsgType.EMPATHY_MIRROR,
+            is_combined=True,
+        )
+        assert not any("질문 부호 금지" in e for e in errs)
+
+    def test_empathy_with_question_and_not_combined_fails(self):
+        errs = check_type_conditional(
+            "아 어색하셨네. 어떠세요?",
+            MsgType.EMPATHY_MIRROR,
+            is_combined=False,
+        )
+        assert any("질문 부호 금지" in e for e in errs)
+
+    def test_empathy_jangayo_allowed_in_combined_output(self):
+        """A-4: ~잖아요 는 is_combined=True 이면 허용 (secondary RECOGNITION 등에서 자연).
+
+        세션 #7 §1.5 서연 M5 fixture: EMPATHY + RECOGNITION(=C6) 결합 시
+        secondary 에 '...작동하고 있는 거잖아요' 패턴이 합법적으로 포함.
+        단독 EMPATHY (is_combined=False) 에선 기존대로 A-4 엄격 적용.
+        """
+        errs_combined = check_type_conditional(
+            "어색하셨구나. 이 두 기준이 한 사람 안에서 작동하고 있는 거잖아요?",
+            MsgType.EMPATHY_MIRROR,
+            is_combined=True,
+        )
+        errs_not = check_type_conditional(
+            "어색하셨잖아요",
+            MsgType.EMPATHY_MIRROR,
+            is_combined=False,
+        )
+        assert not any("잖아요" in e for e in errs_combined), (
+            f"combined 모드에선 허용되어야 함: {errs_combined}"
+        )
+        assert any("잖아요" in e for e in errs_not)
+
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 §9.1 — CHECK_IN 전용 체크
+# ─────────────────────────────────────────────
+
+class TestCheckInTypeCheck:
+    """CHECK_IN 속도 옵션 + 이탈 옵션 필수 + 금지 표현 체크."""
+
+    def test_clean_check_in_variant_passes(self):
+        """하드코딩 V0 변형 = clean."""
+        text = "만재님, 제 질문이 좀 많은 것 같아요. 편한 속도로 말씀해주시거나 여기서 그만하고 싶으시면 그것도 괜찮아요"
+        r = validate(text, MsgType.CHECK_IN)
+        assert r.ok, f"errors: {r.errors}"
+
+    def test_missing_pace_option_fails(self):
+        text = "만재님, 좀 쉬시면서 그만하고 싶으시면 괜찮아요"
+        r = validate(text, MsgType.CHECK_IN)
+        assert any("속도 옵션" in e for e in r.errors)
+
+    def test_missing_exit_option_fails(self):
+        text = "만재님, 편한 속도로 이야기하셔도 돼요"
+        r = validate(text, MsgType.CHECK_IN)
+        assert any("이탈 옵션" in e for e in r.errors)
+
+    def test_forbidden_pressure_phrase_fails(self):
+        text = "만재님, 편한 속도로 조금만 더 해보실래요 그만하고 싶으시면 괜찮아요"
+        r = validate(text, MsgType.CHECK_IN)
+        assert any("조금만 더" in e for e in r.errors)
+
+    def test_forbidden_byeolsseoyo_fails(self):
+        text = "만재님, 벌써요? 편한 속도로 그만하셔도 돼요"
+        r = validate(text, MsgType.CHECK_IN)
+        # 질문 금지 또는 "벌써요" 둘 중 하나 걸림
+        assert any("벌써요" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 §9.2 — RE_ENTRY 전용 체크
+# ─────────────────────────────────────────────
+
+class TestReEntryTypeCheck:
+    """RE_ENTRY 직전 CHECK_IN + 완화 표현 필수."""
+
+    def test_clean_re_entry_variant_passes(self):
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="만재님, 편한 속도로 하셔도 되고 그만하셔도 괜찮아요",
+            msg_type=MsgType.CHECK_IN,
+            turn_idx=0,
+        ))
+        text = "아 그러셨구나. 그럼 제가 본 걸 정리해서 말씀드릴게요. 맞다 아니다만 반응 주셔도 괜찮아요"
+        r = validate(text, MsgType.RE_ENTRY, state=state)
+        assert r.ok, f"errors: {r.errors}"
+
+    def test_missing_relaxed_marker_fails(self):
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="만재님, 편한 속도로 그만하셔도 돼요",
+            msg_type=MsgType.CHECK_IN, turn_idx=0,
+        ))
+        text = "아 그러셨구나. 제가 본 걸 정리해드릴게요. 계속 진행할게요"
+        r = validate(text, MsgType.RE_ENTRY, state=state)
+        assert any("완화 표현" in e for e in r.errors)
+
+    def test_v5_exit_variant_passes_with_unjedeun(self):
+        """V5 '언제든 돌아오시면' 은 완화 표현으로 간주."""
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="편한 속도로 그만하셔도 돼요", msg_type=MsgType.CHECK_IN, turn_idx=0,
+        ))
+        text = "알겠어요. 만재님 언제든 돌아오시면 이어갈 수 있어요"
+        r = validate(text, MsgType.RE_ENTRY, state=state, exit_confirmed=True)
+        assert r.ok, f"errors: {r.errors}"
+
+    def test_missing_prior_check_in_fails(self):
+        """직전 assistant 가 CHECK_IN 아니면 RE_ENTRY 위반."""
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="관찰 1", msg_type=MsgType.OBSERVATION, turn_idx=0,
+        ))
+        text = "아 그러셨구나. 제가 본 걸 정리해볼게요. 맞다 아니다만 반응 주셔도 괜찮아요"
+        r = validate(text, MsgType.RE_ENTRY, state=state)
+        assert any("직전 assistant" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  세션 #6 v2 §9.3 — RANGE_DISCLOSURE 전용 체크
+# ─────────────────────────────────────────────
+
+class TestRangeDisclosureTypeCheck:
+    """RANGE_DISCLOSURE 범위 명시 (limit 만) + 자기부정 + 관계 형성 금지."""
+
+    def test_clean_limit_mild_variant_passes(self):
+        text = "제가 본 건 피드 15장이 전부라서, 만재님 전체를 아는 건 아니에요. 그치만 피드에서 드러난 부분은 이 정도 또렷했다는 거예요"
+        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
+        assert r.ok, f"errors: {r.errors}"
+
+    def test_limit_without_scope_fails(self):
+        """limit 모드인데 피드 범위 명시 없으면 위반."""
+        text = "만재님 전체를 아는 건 아니에요. 그치만 드러난 부분은 또렷했다는 거예요"
+        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
+        assert any("범위 명시" in e for e in r.errors)
+
+    def test_reaffirm_without_scope_passes(self):
+        """reaffirm 모드에선 피드 범위 명시 불필요."""
+        text = "근데 만재님, 막막한 마음 풀어보려고 제가 온 거니까 이렇게 자세히 말씀해주실수록 더 정확하게 같이 볼 수 있어요"
+        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="reaffirm")
+        assert r.ok, f"errors: {r.errors}"
+
+    def test_self_negation_fails(self):
+        text = "제가 본 건 피드 15장이 전부라서 별 의미 없지만 괜찮아요"
+        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
+        assert any("자기부정" in e for e in r.errors)
+
+    def test_relational_fails(self):
+        text = "제가 본 건 피드 15장이지만 만재님 저도 좋아요"
+        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
+        assert any("관계 형성" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §2.8 / §3.8 — C6 / C7 블록 체크
+# ─────────────────────────────────────────────
+
+class TestC6BlockCheck:
+    """C6 평가 의존 돌파 — 평가 직접 답변 / 회피 금지."""
+
+    def test_clean_c6_reframe_passes(self):
+        """서연 M5 형 C6 응답 — 유저 발화 기반 재프레임."""
+        text = (
+            "근데 서연님, 방금 말씀해주신 거 보면 빛삭 기준이 "
+            "기괴해진 순간이고, 살아남은 기준이 원래 선이 살아있는 순간이잖아요. "
+            "서연님이 본인 얼굴의 원래 선이 뭔지에 대한 감각은 이미 갖고 계신 거 아닐까요?"
+        )
+        r = validate(
+            text, MsgType.CONFRONTATION, confrontation_block="C6",
+        )
+        # C6 위반은 없어야 함 — 다른 A 규칙으로 안 걸리도록 설계됨 check
+        c6_errors = [e for e in r.errors if "C6" in e]
+        assert not c6_errors, f"C6 errors: {c6_errors}"
+
+    def test_direct_pretty_answer_fails(self):
+        text = "서연님 예뻐요. 본인 매력이 있잖아요?"
+        r = validate(text, MsgType.CONFRONTATION, confrontation_block="C6")
+        assert any("C6" in e for e in r.errors)
+
+    def test_dodge_to_diagnosis_fails(self):
+        text = "그건 진단 결과에서 보여드릴게요. 지금은 넘어가요"
+        r = validate(text, MsgType.CONFRONTATION, confrontation_block="C6")
+        assert any("C6" in e for e in r.errors)
+
+    def test_ceremony_praise_fails(self):
+        text = "서연님은 본인만의 매력이 있어요. 그러니까 괜찮아요"
+        r = validate(text, MsgType.CONFRONTATION, confrontation_block="C6")
+        assert any("C6" in e for e in r.errors)
+
+
+class TestC7BlockCheck:
+    """C7 일반화 회피 돌파 — 위로형/전면 부정 금지."""
+
+    def test_clean_c7_partial_acceptance_passes(self):
+        """도윤 M6 형 C7 응답 — 일반화 부분 인정 + specifics 재제시."""
+        text = (
+            "다들 모노톤 + 머슬핏 어울린다고 하긴 하죠. 근데 도윤님 피드 보면 "
+            "무채색 안에서도 블랙 비중이 압도적이에요"
+        )
+        r = validate(
+            text, MsgType.CONFRONTATION, confrontation_block="C7",
+        )
+        c7_errors = [e for e in r.errors if "C7" in e]
+        assert not c7_errors, f"C7 errors: {c7_errors}"
+
+    def test_placating_denial_special_fails(self):
+        text = "도윤님은 특별해요. 일반화 하지 마세요"
+        r = validate(text, MsgType.CONFRONTATION, confrontation_block="C7")
+        assert any("C7" in e for e in r.errors)
+
+    def test_full_denial_fails(self):
+        text = "다들 그런 게 아니에요. 각자 달라요"
+        r = validate(text, MsgType.CONFRONTATION, confrontation_block="C7")
+        assert any("C7" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  세션 #7 §8.3 — check_haiku_naturalness
+# ─────────────────────────────────────────────
+
+class TestHaikuNaturalness:
+    """분석 jargon + 어색 종결 검출."""
+
+    def test_clean_friend_tone_passes(self):
+        text = "지은님 피드 보다 보니 베이지랑 식물 초록만 거의 쭉이던데"
+        r = validate(text, MsgType.OBSERVATION)
+        # A-8 질문 종결 누락은 별개 — naturalness 는 clean
+        nat_errors = [e for e in r.errors if "A-2:" in e and "jargon" in e]
+        assert not nat_errors
+
+    def test_jargon_mode_fails(self):
+        text = "피드 톤이 다른 모드로 갈려 있더라구요"
+        r = validate(text, MsgType.OBSERVATION)
+        assert any("분석 jargon" in e for e in r.errors)
+
+    def test_jargon_clustering_fails(self):
+        text = "컬러 팔레트가 베이지/그린 톤으로 클러스터링되어 있어요"
+        r = validate(text, MsgType.OBSERVATION)
+        assert any("분석 jargon" in e for e in r.errors)
+
+    def test_jargon_metaincognition_fails(self):
+        text = "메타인지 작동이 드러나 있어요"
+        r = validate(text, MsgType.DIAGNOSIS)
+        assert any("분석 jargon" in e for e in r.errors)
+
+    def test_awkward_end_myeonyo_fails(self):
+        text = "만재님, 그럴 거면요"
+        r = validate(text, MsgType.OBSERVATION)
+        assert any("어색한 종결" in e for e in r.errors)
+
+    def test_awkward_end_seomijyeo_fails(self):
+        text = "그건 만재님 선택인 셈이죠"
+        r = validate(text, MsgType.DIAGNOSIS)
+        assert any("어색한 종결" in e for e in r.errors)
+
+    def test_mode_in_compound_word_ignored(self):
+        """'모드' 가 단독 단어일 때만 jargon — '모드' 는 lookahead 로 격리."""
+        # "모두" 는 jargon 아님 — false positive 회피 확인
+        text = "모두 함께 보실 수 있어요"
+        errs = check_haiku_naturalness(text)
+        assert not any("모드" in e for e in errs)
+
+
+# ─────────────────────────────────────────────
+#  44 하드코딩 전수 — 세션 #6/7 신규 타입 clean 검증
+# ─────────────────────────────────────────────
+
+class TestHardcodedSeventypesClean:
+    """관리 3 타입 + RANGE_REAFFIRM 변형이 validator v4 pass."""
+
+    _SLOTS = dict(
+        user_name="만재",
+        user_meta_raw="MBTI 같은 거 맞추는 거 아니에요",
+        observation_evidence="최근 10장 중 7장이 같은 각도예요.",
+        last_diagnosis="만재님 피드는 배경이 본인보다 먼저 자리잡고 있어요.",
+        feed_count=15,
+    )
+
+    def test_check_in_variants(self):
+        from services.sia_hardcoded import TEMPLATES
+        for raw in TEMPLATES[MsgType.CHECK_IN]:
+            text = raw.format(**self._SLOTS)
+            r = validate(text, MsgType.CHECK_IN)
+            assert r.ok, f"CHECK_IN fail: {r.errors}\n  text={text}"
+
+    def test_re_entry_default_variants(self):
+        from services.sia_hardcoded import TEMPLATES
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="편한 속도로 그만하셔도 돼요",
+            msg_type=MsgType.CHECK_IN, turn_idx=0,
+        ))
+        for raw in TEMPLATES[MsgType.RE_ENTRY]:
+            text = raw.format(**self._SLOTS)
+            r = validate(text, MsgType.RE_ENTRY, state=state)
+            assert r.ok, f"RE_ENTRY fail: {r.errors}\n  text={text}"
+
+    def test_re_entry_exit_variant(self):
+        from services.sia_hardcoded import ALL_VARIANT_POOLS
+        state = _state()
+        state.turns.append(AssistantTurn(
+            text="편한 속도로 그만하셔도 돼요",
+            msg_type=MsgType.CHECK_IN, turn_idx=0,
+        ))
+        for raw in ALL_VARIANT_POOLS["re_entry_exit"]:
+            text = raw.format(**self._SLOTS)
+            r = validate(text, MsgType.RE_ENTRY, state=state, exit_confirmed=True)
+            assert r.ok, f"RE_ENTRY V5 fail: {r.errors}\n  text={text}"
+
+    def test_range_limit_mild_variants(self):
+        from services.sia_hardcoded import ALL_VARIANT_POOLS
+        for raw in ALL_VARIANT_POOLS["range_limit_mild"]:
+            text = raw.format(**self._SLOTS)
+            r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
+            assert r.ok, f"RANGE limit mild fail: {r.errors}\n  text={text}"
+
+    def test_range_limit_severe_variants(self):
+        """severity=severe 인 state 로 검증 — SV0 의 비-피드 범위 문구 허용."""
+        from services.sia_hardcoded import ALL_VARIANT_POOLS
+        severe_state = _state()
+        severe_state.overattachment_severity = "severe"
+        for raw in ALL_VARIANT_POOLS["range_limit_severe"]:
+            text = raw.format(**self._SLOTS)
+            r = validate(
+                text, MsgType.RANGE_DISCLOSURE,
+                state=severe_state, range_mode="limit",
+            )
+            block_errors = [
+                e for e in r.errors
+                if any(k in e for k in ("범위 명시", "자기부정", "관계 형성"))
+            ]
+            assert not block_errors, (
+                f"RANGE severe fail (block checks): {block_errors}\n  text={text}"
+            )
+
+    def test_range_reaffirm_variants(self):
+        from services.sia_hardcoded import ALL_VARIANT_POOLS
+        for raw in ALL_VARIANT_POOLS["range_reaffirm"]:
+            text = raw.format(**self._SLOTS)
+            r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="reaffirm")
+            block_errors = [
+                e for e in r.errors
+                if any(k in e for k in ("범위 명시", "자기부정", "관계 형성"))
+            ]
+            assert not block_errors, (
+                f"RANGE reaffirm fail (block checks): {block_errors}\n  text={text}"
+            )

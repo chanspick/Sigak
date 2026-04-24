@@ -296,6 +296,119 @@ def is_stale(ig_fetched_at: Optional[datetime]) -> bool:
     return age_seconds > (settings.ig_refresh_days * 24 * 3600)
 
 
+# ─────────────────────────────────────────────
+#  STEP 2 — IG 스냅샷 R2 영구 저장
+# ─────────────────────────────────────────────
+#  Apify 수집 결과 (display_url = IG CDN, TTL 24-48h) 를 R2 로 복사 후
+#  latest_posts 의 display_url 을 R2 public URL 로 교체. 이후 cache 재열람 시
+#  CDN 만료 무관. aspiration / history 등 하위 파이프라인 자동 정합.
+# ─────────────────────────────────────────────
+
+def materialize_snapshot_to_r2(
+    cache: "IgFeedCache",
+    *,
+    user_id: str,
+    snapshot_ts: Optional[str] = None,
+) -> "IgFeedCache":
+    """IG 피드 스냅샷을 R2 영구 저장 + cache 업데이트.
+
+    Args:
+      cache: fetch_ig_profile / fetch_ig_raw / attach_vision_analysis 결과.
+        scope != 'full' 또는 latest_posts 없으면 원본 그대로 반환.
+      user_id: R2 key prefix 소유자.
+      snapshot_ts: R2 디렉토리명 (None 이면 cache.fetched_at 기반 YYYYMMDDTHHMMSSZ).
+
+    Returns:
+      새 IgFeedCache 인스턴스. latest_posts 의 display_url 이 R2 URL 로 교체됨
+      (업로드 실패한 사진은 CDN URL 유지). r2_snapshot_dir 필드 채워짐.
+    """
+    if cache.scope != "full" or not cache.latest_posts:
+        return cache
+
+    ts = snapshot_ts or cache.fetched_at.strftime("%Y%m%dT%H%M%SZ")
+
+    updated_posts, r2_dir = _materialize_latest_posts_to_r2(
+        list(cache.latest_posts), user_id=user_id, snapshot_ts=ts,
+    )
+    return cache.model_copy(update={
+        "latest_posts": updated_posts,
+        "r2_snapshot_dir": r2_dir,
+    })
+
+
+def _materialize_latest_posts_to_r2(
+    posts: list[IgLatestPost],
+    *,
+    user_id: str,
+    snapshot_ts: str,
+) -> tuple[list[IgLatestPost], Optional[str]]:
+    """CDN URL → R2 업로드 + display_url 교체. 실패 개별은 CDN 유지.
+
+    반환 tuple:
+      - updated posts (순서 유지)
+      - r2_dir (최소 1장 성공 시 dir prefix, 전체 실패 시 None)
+    """
+    if not posts:
+        return posts, None
+
+    import httpx
+    from services import r2_client
+
+    r2_dir = r2_client.ig_snapshot_dir(user_id, snapshot_ts)
+
+    updated: list[IgLatestPost] = []
+    any_success = False
+    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+        for idx, p in enumerate(posts):
+            if not p.display_url:
+                updated.append(p)
+                continue
+            new_url = _upload_snapshot_photo_to_r2(
+                client, p.display_url,
+                user_id=user_id, snapshot_ts=snapshot_ts, index=idx,
+            )
+            if new_url:
+                updated.append(p.model_copy(update={"display_url": new_url}))
+                any_success = True
+            else:
+                updated.append(p)
+
+    return updated, (r2_dir if any_success else None)
+
+
+def _upload_snapshot_photo_to_r2(
+    http_client,
+    src_url: str,
+    *,
+    user_id: str,
+    snapshot_ts: str,
+    index: int,
+) -> Optional[str]:
+    """IG CDN 이미지 1장 → R2 put → public URL. 실패 시 None."""
+    if not src_url:
+        return None
+    from services import r2_client
+
+    key = r2_client.ig_snapshot_photo_key(user_id, snapshot_ts, index)
+    try:
+        resp = http_client.get(src_url)
+        resp.raise_for_status()
+        content_type = (
+            resp.headers.get("content-type", "image/jpeg")
+            .split(";")[0]
+            .strip()
+            .lower()
+        )
+        if not content_type.startswith("image/"):
+            content_type = "image/jpeg"
+        r2_client.put_bytes(key, resp.content, content_type=content_type)
+    except Exception:
+        logger.exception("IG snapshot R2 put failed: key=%s", key)
+        return None
+
+    return r2_client.public_url(key) or f"r2://{key}"
+
+
 def is_analysis_stale(
     cache: Optional[IgFeedCache],
     current_post_count: int,

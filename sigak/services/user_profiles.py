@@ -14,13 +14,18 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from sqlalchemy import text
 
 from schemas.user_profile import IgFeedCache, StructuredFields
-from services.ig_scraper import IgFetchStatus, fetch_ig_profile, is_stale
+from services.ig_scraper import (
+    IgFetchStatus,
+    fetch_ig_profile,
+    is_stale,
+    materialize_snapshot_to_r2,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -190,20 +195,86 @@ def upsert_ig_feed_cache(
 
 
 def refresh_ig_feed(db, user_id: str, *, force: bool = False) -> IgFetchStatus:
-    """IG 피드 refresh. stale (>=2주) 이거나 force=True 일 때만 Apify 호출.
+    """IG 피드 refresh. 24h 스냅샷 캐시 hit 이면 skip, 초과 or force=True 면 Apify.
 
-    Returns: fetch status (success/failed/skipped/private/"not_stale").
-    "not_stale" — refresh 조건 불충족 (아직 신선함), 기존 cache 유지.
+    STEP 2 전환 (2026-04-24):
+      기존 14일 is_stale 대신 users.ig_last_snapshot_at 의 24h TTL 사용.
+      Apify 성공 후 R2 로 사진 전수 영구 저장 + ig_last_snapshot_at 갱신.
+
+    Returns: fetch status (success/failed/skipped/private).
     """
     profile = require_profile(db, user_id)
-    if not force and not is_stale(profile.get("ig_fetched_at")):
-        logger.info("IG refresh skipped (not stale): user_id=%s", user_id)
-        return "skipped"   # caller 에게 "신선함" 시그널
+    if not force and not should_refresh_ig_snapshot(db, user_id):
+        logger.info("IG refresh skipped (24h cache hit): user_id=%s", user_id)
+        return "skipped"
 
     ig_handle = profile.get("ig_handle")
     status, cache = fetch_ig_profile(ig_handle)
+
+    # R2 영구 저장 — 성공 scope=full 만 (private/failed/skipped 제외)
+    if cache is not None and cache.scope == "full":
+        try:
+            cache = materialize_snapshot_to_r2(cache, user_id=user_id)
+        except Exception:
+            logger.exception(
+                "IG snapshot R2 materialize failed user=%s — keeping CDN URLs",
+                user_id,
+            )
+
     upsert_ig_feed_cache(db, user_id=user_id, cache=cache, status=status)
+    if cache is not None:
+        mark_ig_snapshot_taken(db, user_id)
     return status
+
+
+# ─────────────────────────────────────────────
+#  24h 스냅샷 캐시 (STEP 2)
+#  users.ig_last_snapshot_at 기준. Sia 재진입 시 Apify 비용 절감.
+# ─────────────────────────────────────────────
+
+def should_refresh_ig_snapshot(db, user_id: str) -> bool:
+    """True = 24h 경과 (또는 기록 없음) → Apify 재호출 필요.
+
+    config.ig_snapshot_ttl_hours (default 24) 기준.
+    users 테이블이 없거나 row 가 없으면 True 로 보수 처리 (refresh 진행).
+    """
+    from config import get_settings
+    settings = get_settings()
+    ttl_hours = settings.ig_snapshot_ttl_hours
+
+    try:
+        row = db.execute(
+            text("SELECT ig_last_snapshot_at FROM users WHERE id = :uid"),
+            {"uid": user_id},
+        ).first()
+    except Exception:
+        # Migration 미적용 dev 환경 — 컬럼 없음. 기존 동작 (cache 유지) 존중.
+        logger.warning(
+            "should_refresh_ig_snapshot: column missing — using cache (migration needed)"
+        )
+        return False
+
+    if row is None or row.ig_last_snapshot_at is None:
+        return True
+    age_seconds = (datetime.now(timezone.utc) - row.ig_last_snapshot_at).total_seconds()
+    return age_seconds > (ttl_hours * 3600)
+
+
+def mark_ig_snapshot_taken(db, user_id: str) -> None:
+    """Apify 성공 직후 호출 — users.ig_last_snapshot_at = NOW().
+
+    users 테이블에 컬럼 없으면 (migration 미적용 dev) warning 만 로깅.
+    """
+    try:
+        db.execute(
+            text("UPDATE users SET ig_last_snapshot_at = NOW() WHERE id = :uid"),
+            {"uid": user_id},
+        )
+    except Exception:
+        logger.warning(
+            "mark_ig_snapshot_taken skipped (column missing?): user=%s",
+            user_id,
+        )
 
 
 # ─────────────────────────────────────────────

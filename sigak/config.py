@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     best_shot_quality_cutoff: float = 0.35                       # heuristic 통과 기준 (0-1)
     best_shot_cost_daily_usd_cap: float = 20.0                   # Sonnet 일일 총 비용 cap
 
+    # ── user_history / IG 스냅샷 (Aspiration v1 풀 패치 STEP 1) ──
+    user_history_max_per_type: int = 10                          # 각 history 배열 최대 길이 (초과 시 tail pop)
+    ig_snapshot_ttl_hours: int = 24                              # Sia 재진입 24h 캐시 기준
+    inject_history_token_limit: int = 80_000                     # LLM 주입 시 history 토큰 상한 (초과 시 summarize)
+
     # ── Auth (MVP v1.1 JWT) ──
     jwt_secret: str = ""                         # HS256 signing key. Must be 32+ random bytes in prod.
     jwt_expiry_days: int = 7                     # No refresh token for MVP. Rotating secret invalidates all sessions.

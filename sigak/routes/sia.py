@@ -109,31 +109,43 @@ _IG_TERMINAL_STATUSES = {"success", "private", "skipped", "failed"}
 
 
 def _ensure_ig_cache_ready(db, user_id: str, profile: dict) -> dict:
-    """IG 수집이 아직 안 끝났으면 동기 재시도 (safety net).
+    """IG 수집 상태 + 24h 스냅샷 캐시 보장 (STEP 2 전환).
 
-    정상 흐름:
-      프론트 → /ig-status 폴링 → status in 최종 상태 → chat/start 호출.
-      이 함수는 no-op (pending/pending_vision 아니므로 fetch 안 함).
+    정상 흐름 (cache fresh):
+      status 최종 + ig_last_snapshot_at < 24h → no-op (기존 cache 사용).
 
-    비정상 흐름 (프론트 폴링 스킵):
-      status in {None, 'pending', 'pending_vision'} + ig_handle 존재 →
-      동기 refresh_ig_feed(force=True) 실행. 최대 ~45s 블로킹.
+    24h 초과 재스크랩:
+      status 최종이어도 스냅샷 > 24h 면 동기 refresh → R2 새 디렉토리.
+      R2 URL 이 CDN 만료 무관하게 영구 보존.
+
+    Safety net (비정상):
+      status in {None, 'pending', 'pending_vision'} + ig_handle → 동기 refresh.
+      최대 ~45s 블로킹.
     """
+    from services import user_profiles
+
     status = profile.get("ig_fetch_status")
     ig_handle = profile.get("ig_handle")
 
     if not ig_handle:
         return profile
-    if status in _IG_TERMINAL_STATUSES:
-        return profile
 
-    # pending / pending_vision / None — 동기 재시도
-    logger.info(
-        "chat_start safety net: sync IG refresh for user=%s (status=%s)",
-        user_id, status,
-    )
+    # 최종 상태 + 24h 캐시 hit → cache 그대로 사용
+    if status in _IG_TERMINAL_STATUSES:
+        if not user_profiles.should_refresh_ig_snapshot(db, user_id):
+            return profile
+        logger.info(
+            "chat_start: IG snapshot > 24h — rescraping user=%s (status=%s)",
+            user_id, status,
+        )
+    else:
+        # pending / pending_vision / None — 백그라운드 미완
+        logger.info(
+            "chat_start safety net: sync IG refresh for user=%s (status=%s)",
+            user_id, status,
+        )
+
     try:
-        from services import user_profiles
         user_profiles.refresh_ig_feed(db, user_id, force=True)
         db.commit()
         refreshed = user_profiles.get_profile(db, user_id)
@@ -141,7 +153,7 @@ def _ensure_ig_cache_ready(db, user_id: str, profile: dict) -> dict:
             return refreshed
     except Exception:
         logger.exception(
-            "chat_start safety net failed for user=%s — proceeding without Vision",
+            "chat_start IG refresh failed for user=%s — proceeding without Vision",
             user_id,
         )
     return profile

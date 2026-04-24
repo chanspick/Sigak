@@ -174,6 +174,8 @@ class IgFeedCache(_BaseSchema):
     last_analyzed_post_count: Optional[int] = None      # D6 Phase A — refresh delta 판정
     raw: Optional[dict] = None   # Apify 원본 payload (debug / 재파싱 용 — PII scrubbed)
     fetched_at: datetime
+    # STEP 2 — R2 영구 저장 전환. display_url 이 R2 public URL (또는 업로드 실패 시 CDN URL).
+    r2_snapshot_dir: Optional[str] = None   # "user_media/{user_id}/ig_snapshots/{ts}/" — None 이면 R2 미업로드
 
 
 # ─────────────────────────────────────────────

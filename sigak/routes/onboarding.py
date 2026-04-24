@@ -509,10 +509,22 @@ def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
         # 3. Vision 분석 — 실패 시 analysis=None 인 채 success 처리
         analyzed_cache = ig_scraper.attach_vision_analysis(preview_cache)
 
+        # 3.5. STEP 2 — R2 영구 저장 + latest_posts display_url 교체
+        try:
+            analyzed_cache = ig_scraper.materialize_snapshot_to_r2(
+                analyzed_cache, user_id=user_id,
+            )
+        except Exception:
+            logger.exception(
+                "ig_fetch job: R2 materialize failed user=%s — keeping CDN URLs",
+                user_id,
+            )
+
         # 4. 최종 flush (success) — Vision 성공/실패 무관 scope=full 이면 success
         user_profiles.upsert_ig_feed_cache(
             db, user_id=user_id, cache=analyzed_cache, status="success",
         )
+        user_profiles.mark_ig_snapshot_taken(db, user_id)
         db.commit()
         logger.info(
             "ig_fetch job: user=%s done (analysis=%s)",

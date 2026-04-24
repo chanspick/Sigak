@@ -321,13 +321,17 @@ def _mock_profile_row(ig_handle="@yuni", ig_fetched_at=None):
 
 
 def test_refresh_ig_feed_not_stale_skipped(monkeypatch):
-    """신선한 cache 면 fetch 호출 없이 skipped 반환.
-    Note: user_profiles 모듈이 fetch_ig_profile 을 top-level import 하므로
-    monkeypatch 타겟은 user_profiles.fetch_ig_profile (bound name).
+    """STEP 2 이후: should_refresh_ig_snapshot False → fetch skip.
+
+    기존 14-day is_stale 대신 24h ig_last_snapshot_at 기준으로 전환됨.
     """
     db = _fake_db()
     recent = datetime.now(timezone.utc) - timedelta(days=3)
     db.execute.return_value = _mock_profile_row(ig_fetched_at=recent)
+
+    # STEP 2 새 캐시 판정 — 24h 내 이므로 skip
+    monkeypatch.setattr(user_profiles, "should_refresh_ig_snapshot",
+                        lambda db, uid: False)
 
     called = []
     monkeypatch.setattr(
@@ -343,16 +347,23 @@ def test_refresh_ig_feed_not_stale_skipped(monkeypatch):
 def test_refresh_ig_feed_stale_triggers_fetch(monkeypatch):
     db = _fake_db()
     old = datetime.now(timezone.utc) - timedelta(days=30)
-    # 1st call: SELECT profile, 2nd call: UPDATE ig_feed_cache
+    # 1st call: SELECT profile, 2nd call: UPDATE ig_feed_cache, 3rd: mark_snapshot_taken
     db.execute.side_effect = [
         _mock_profile_row(ig_fetched_at=old),
         MagicMock(),
+        MagicMock(),
     ]
+    # STEP 2 — 24h 초과 → refresh
+    monkeypatch.setattr(user_profiles, "should_refresh_ig_snapshot",
+                        lambda db, uid: True)
     cache = _sample_ig_cache()
     monkeypatch.setattr(
         user_profiles, "fetch_ig_profile",
         lambda h: ("success", cache),
     )
+    # R2 materialization 우회 — dev 환경에서 R2 local fallback 이면 OK 이지만 단순화
+    monkeypatch.setattr(user_profiles, "materialize_snapshot_to_r2",
+                        lambda cache, *, user_id: cache)
     status = user_profiles.refresh_ig_feed(db, "u1", force=False)
     assert status == "success"
 

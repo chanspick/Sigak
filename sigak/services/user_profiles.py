@@ -254,9 +254,16 @@ def should_refresh_ig_snapshot(db, user_id: str) -> bool:
         )
         return False
 
-    if row is None or row.ig_last_snapshot_at is None:
+    if row is None:
         return True
-    age_seconds = (datetime.now(timezone.utc) - row.ig_last_snapshot_at).total_seconds()
+    ts = getattr(row, "ig_last_snapshot_at", None)
+    if ts is None or not isinstance(ts, datetime):
+        return True
+    try:
+        age_seconds = (datetime.now(timezone.utc) - ts).total_seconds()
+    except Exception:
+        logger.warning("should_refresh_ig_snapshot: age calc failed — refreshing")
+        return True
     return age_seconds > (ttl_hours * 3600)
 
 

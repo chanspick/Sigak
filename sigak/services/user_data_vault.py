@@ -55,6 +55,26 @@ class UserBasicInfo(BaseModel):
     name: Optional[str] = None
 
 
+class PiVersionEntry(BaseModel):
+    """pi_reports row 경량 요약 — CLAUDE.md §4.2 pi_versions list 항목."""
+    model_config = ConfigDict(extra="ignore")
+    report_id: str
+    version: int = 1
+    is_current: bool = False
+    created_at: Optional[datetime] = None
+    unlocked_at: Optional[datetime] = None
+
+
+class MonthlyReportEntry(BaseModel):
+    """monthly_reports row 경량 요약 — CLAUDE.md §4.2 monthly_reports list 항목."""
+    model_config = ConfigDict(extra="ignore")
+    report_id: str
+    year_month: str
+    status: str
+    scheduled_for: Optional[datetime] = None
+    generated_at: Optional[datetime] = None
+
+
 class UserDataVault(BaseModel):
     """유저 데이터 중앙 집계. 읽기 전용 스냅샷.
 
@@ -89,6 +109,12 @@ class UserDataVault(BaseModel):
     # 최신 aspiration 의 GapVector — UserTasteProfile.aspiration_vector 연결용.
     # load_vault 에서 aspiration_analyses.result_data 에서 파싱.
     latest_aspiration_gap: Optional[GapVector] = None
+
+    # CLAUDE.md §4.2 pi_versions / monthly_reports 리스트 — 테이블 조회 결과.
+    # Phase I (PI 엔진) / Phase M (이달의 시각) 이 정식 구현되기 전에도
+    # "있는 row 들" 을 vault 가 노출해서 UI 분기 가능하게 함.
+    pi_versions: list[PiVersionEntry] = Field(default_factory=list)
+    monthly_reports: list[MonthlyReportEntry] = Field(default_factory=list)
 
     snapshot_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -317,6 +343,10 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
     # 최신 aspiration GapVector — UserTasteProfile.aspiration_vector 연결용.
     latest_gap = _fetch_latest_aspiration_gap(db, user_id)
 
+    # pi_versions / monthly_reports — 테이블 직접 조회, 경량 요약.
+    pi_versions = _fetch_pi_versions(db, user_id)
+    monthly_reports = _fetch_monthly_reports(db, user_id)
+
     return UserDataVault(
         basic_info=basic,
         ig_feed_cache=ig_feed_cache,
@@ -328,7 +358,71 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
         monthly_report_count=counts.get("monthly_report_count", 0),
         user_history=user_history,
         latest_aspiration_gap=latest_gap,
+        pi_versions=pi_versions,
+        monthly_reports=monthly_reports,
     )
+
+
+def _fetch_pi_versions(db, user_id: str) -> list[PiVersionEntry]:
+    """pi_reports 전수 목록 (최신 created_at 순). 테이블/컬럼 없으면 []."""
+    try:
+        rows = db.execute(
+            text(
+                "SELECT report_id, version, is_current, created_at, unlocked_at "
+                "FROM pi_reports WHERE user_id = :uid "
+                "ORDER BY version DESC, created_at DESC "
+                "LIMIT 10"
+            ),
+            {"uid": user_id},
+        ).fetchall()
+    except Exception:
+        logger.debug("pi_reports fetch skipped for user=%s", user_id)
+        return []
+
+    out: list[PiVersionEntry] = []
+    for row in rows or []:
+        try:
+            out.append(PiVersionEntry(
+                report_id=str(getattr(row, "report_id", "")),
+                version=int(getattr(row, "version", 1) or 1),
+                is_current=bool(getattr(row, "is_current", False)),
+                created_at=getattr(row, "created_at", None),
+                unlocked_at=getattr(row, "unlocked_at", None),
+            ))
+        except Exception:
+            logger.debug("pi_reports row parse failed for user=%s", user_id)
+    return out
+
+
+def _fetch_monthly_reports(db, user_id: str) -> list[MonthlyReportEntry]:
+    """monthly_reports 전수 (최신 year_month 순). 테이블/컬럼 없으면 []."""
+    try:
+        rows = db.execute(
+            text(
+                "SELECT report_id, year_month, status, scheduled_for, generated_at "
+                "FROM monthly_reports WHERE user_id = :uid "
+                "ORDER BY year_month DESC "
+                "LIMIT 10"
+            ),
+            {"uid": user_id},
+        ).fetchall()
+    except Exception:
+        logger.debug("monthly_reports fetch skipped for user=%s", user_id)
+        return []
+
+    out: list[MonthlyReportEntry] = []
+    for row in rows or []:
+        try:
+            out.append(MonthlyReportEntry(
+                report_id=str(getattr(row, "report_id", "")),
+                year_month=str(getattr(row, "year_month", "") or ""),
+                status=str(getattr(row, "status", "") or ""),
+                scheduled_for=getattr(row, "scheduled_for", None),
+                generated_at=getattr(row, "generated_at", None),
+            ))
+        except Exception:
+            logger.debug("monthly_reports row parse failed for user=%s", user_id)
+    return out
 
 
 def _fetch_user_name(db, user_id: str) -> Optional[str]:

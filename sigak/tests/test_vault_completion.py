@@ -45,10 +45,14 @@ class _FakeDb:
         name: str | None = None,
         user_history: dict | None = None,
         aspiration_result: dict | None = None,
+        pi_rows: list | None = None,
+        monthly_rows: list | None = None,
     ):
         self._name = name
         self._user_history = user_history
         self._aspiration_result = aspiration_result
+        self._pi_rows = pi_rows or []
+        self._monthly_rows = monthly_rows or []
         self._last_query = None
 
     def execute(self, stmt, params=None):
@@ -68,6 +72,14 @@ class _FakeDb:
                 return None
             return _Row(result_data=self._aspiration_result)
         return None
+
+    def fetchall(self):
+        q = (self._last_query or "").lower()
+        if "from pi_reports" in q:
+            return self._pi_rows
+        if "from monthly_reports" in q:
+            return self._monthly_rows
+        return []
 
     def scalar(self):
         return 0
@@ -457,3 +469,99 @@ def test_empty_vault_still_builds(monkeypatch):
     assert tp.aspiration_vector is None
     assert tp.preference_evidence == []
     assert tp.strength_score == 0.0
+    assert vault.pi_versions == []
+    assert vault.monthly_reports == []
+
+
+# ─────────────────────────────────────────────
+#  pi_versions / monthly_reports exposure
+# ─────────────────────────────────────────────
+
+def test_pi_versions_populated_from_table(monkeypatch):
+    now = datetime.now(timezone.utc)
+    pi_rows = [
+        _Row(
+            report_id="pi_v2",
+            version=2,
+            is_current=True,
+            created_at=now,
+            unlocked_at=now,
+        ),
+        _Row(
+            report_id="pi_v1",
+            version=1,
+            is_current=False,
+            created_at=now,
+            unlocked_at=None,
+        ),
+    ]
+    profile = _profile()
+    db = _FakeDb(pi_rows=pi_rows)
+    monkeypatch.setattr(vault_mod, "get_profile", lambda d, u: profile)
+    monkeypatch.setattr(vault_mod, "_fetch_product_counts", lambda d, u: {})
+
+    vault = vault_mod.load_vault(db, "u1")
+    assert len(vault.pi_versions) == 2
+    assert vault.pi_versions[0].report_id == "pi_v2"
+    assert vault.pi_versions[0].version == 2
+    assert vault.pi_versions[0].is_current is True
+    assert vault.pi_versions[1].version == 1
+
+
+def test_pi_versions_empty_when_table_missing(monkeypatch):
+    class _DbNoPiTable:
+        def __init__(self):
+            self._last = None
+
+        def execute(self, stmt, params=None):
+            self._last = str(stmt).lower()
+            if "from pi_reports" in self._last:
+                raise Exception("relation 'pi_reports' does not exist")
+            return self
+
+        def first(self):
+            return None
+
+        def fetchall(self):
+            return []
+
+        def scalar(self):
+            return 0
+
+    profile = _profile()
+    monkeypatch.setattr(vault_mod, "get_profile", lambda d, u: profile)
+    monkeypatch.setattr(vault_mod, "_fetch_product_counts", lambda d, u: {})
+
+    vault = vault_mod.load_vault(_DbNoPiTable(), "u1")
+    assert vault is not None
+    assert vault.pi_versions == []
+
+
+def test_monthly_reports_populated(monkeypatch):
+    now = datetime.now(timezone.utc)
+    rows = [
+        _Row(
+            report_id="mr_apr",
+            year_month="2026-04",
+            status="ready",
+            scheduled_for=now,
+            generated_at=now,
+        ),
+        _Row(
+            report_id="mr_mar",
+            year_month="2026-03",
+            status="placeholder",
+            scheduled_for=None,
+            generated_at=None,
+        ),
+    ]
+    profile = _profile()
+    db = _FakeDb(monthly_rows=rows)
+    monkeypatch.setattr(vault_mod, "get_profile", lambda d, u: profile)
+    monkeypatch.setattr(vault_mod, "_fetch_product_counts", lambda d, u: {})
+
+    vault = vault_mod.load_vault(db, "u1")
+    assert len(vault.monthly_reports) == 2
+    assert vault.monthly_reports[0].year_month == "2026-04"
+    assert vault.monthly_reports[0].status == "ready"
+    assert vault.monthly_reports[1].status == "placeholder"

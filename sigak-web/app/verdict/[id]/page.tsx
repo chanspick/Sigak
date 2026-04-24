@@ -1,26 +1,38 @@
-// SIGAK MVP v1.2 — /verdict/[id]
+// SIGAK — /verdict/[id]
 //
-// GET /api/v1/verdicts/{id} 로 verdict 조회 후 ResultScreen 렌더.
-// 공유 링크 지원: 비로그인/타유저도 열람 가능. 백엔드가 is_owner=false 시
-// GOLD + reading 만 내려주고, 프론트는 ResultScreen 내부에서 owner 전용 UI
-// (kebab 삭제/진단 CTA 등)를 숨김.
+// v2 우선, v1 fallback 라우팅:
+//   1. GET /api/v2/verdict/{id} 시도
+//   2. 409 (v1 verdict) → GET /api/v1/verdicts/{id} 로 v1 ResultScreen 렌더
+//   3. 404 / 403 → 에러 화면
+//
+// v2 ↔ v1 판별은 백엔드 응답으로. 프론트는 version 미고려.
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
-import { deleteVerdict, getVerdict } from "@/lib/api/verdicts";
+import {
+  deleteVerdict,
+  getVerdict,
+  getVerdictV2,
+} from "@/lib/api/verdicts";
 import { ResultScreen } from "@/components/sigak/result-screen";
+import { VerdictV2Screen } from "@/components/sigak/verdict-v2-screen";
 import type { VerdictResponse } from "@/lib/types/mvp";
+import type { VerdictV2GetResponse } from "@/lib/types/verdict_v2";
+
+type Loaded =
+  | { kind: "v2"; data: VerdictV2GetResponse }
+  | { kind: "v1"; data: VerdictResponse };
 
 export default function VerdictPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const verdictId = params.id;
 
-  const [verdict, setVerdict] = useState<VerdictResponse | null>(null);
-  const [goldReading, setGoldReading] = useState<string>("");
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -61,23 +73,41 @@ export default function VerdictPage() {
 
   useEffect(() => {
     if (!verdictId) return;
-
-    // sessionStorage에서 create 시점 gold_reading 읽기 (20260425 이전 레거시 fallback).
-    // 신규 verdict는 백엔드 응답에 포함되므로 override 불필요.
-    try {
-      const cached = sessionStorage.getItem(`sigak_gold_reading:${verdictId}`);
-      if (cached) setGoldReading(cached);
-    } catch {
-      // ignore
-    }
-
     let cancelled = false;
+
     (async () => {
+      // 1. v2 시도
       try {
-        const data = await getVerdict(verdictId);
-        if (!cancelled) setVerdict(data);
+        const v2 = await getVerdictV2(verdictId);
+        if (!cancelled) setLoaded({ kind: "v2", data: v2 });
+        return;
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 409) {
+          // v1 레거시 verdict — v1 fallback
+        } else if (e instanceof ApiError && e.status === 404) {
+          if (!cancelled) setError("판정을 찾을 수 없습니다.");
+          return;
+        } else if (e instanceof ApiError && e.status === 403) {
+          if (!cancelled) setError("본인의 판정만 열람할 수 있습니다.");
+          return;
+        } else if (e instanceof ApiError && e.status === 401) {
+          router.replace("/auth/login");
+          return;
+        } else {
+          // 네트워크 / 기타 오류는 v1 fallback 시도
+        }
+      }
+
+      // 2. v1 fallback
+      try {
+        const v1 = await getVerdict(verdictId);
+        if (!cancelled) setLoaded({ kind: "v1", data: v1 });
       } catch (e) {
         if (cancelled) return;
+        if (e instanceof ApiError && e.status === 401) {
+          router.replace("/auth/login");
+          return;
+        }
         if (e instanceof ApiError && e.status === 404) {
           setError("판정을 찾을 수 없습니다.");
           return;
@@ -125,17 +155,27 @@ export default function VerdictPage() {
     );
   }
 
-  if (!verdict) {
-    return (
-      <div className="min-h-screen bg-paper" aria-busy aria-label="로딩 중" />
-    );
+  if (!loaded) {
+    return <div className="min-h-screen bg-paper" aria-busy aria-label="로딩 중" />;
   }
 
+  if (loaded.kind === "v2") {
+    return <VerdictV2Screen initial={loaded.data} />;
+  }
+
+  // v1 레거시
+  let cachedReading = "";
+  try {
+    cachedReading =
+      sessionStorage.getItem(`sigak_gold_reading:${verdictId}`) ?? "";
+  } catch {
+    // ignore
+  }
   return (
     <ResultScreen
-      verdict={verdict}
-      goldReadingOverride={goldReading}
-      onDelete={verdict.is_owner ? handleDelete : undefined}
+      verdict={loaded.data}
+      goldReadingOverride={cachedReading}
+      onDelete={loaded.data.is_owner ? handleDelete : undefined}
       deleting={deleting}
     />
   );

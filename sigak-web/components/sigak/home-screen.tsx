@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
-import { createVerdict, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
+import { createVerdictV2, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import { AnalyzingScreen } from "./analyzing-screen";
 
@@ -72,15 +72,9 @@ export function HomeScreen() {
     setError(null);
 
     try {
-      const response = await createVerdict(items.map((it) => it.file));
-      try {
-        sessionStorage.setItem(
-          `sigak_gold_reading:${response.verdict_id}`,
-          response.gold_reading ?? "",
-        );
-      } catch {
-        // ignore
-      }
+      // v2 cross-analysis 로 전환 — 응답에 preview(hook_line+reason_summary) 포함.
+      // full_content 는 /verdict/[id] 에서 10 토큰 unlock.
+      const response = await createVerdictV2(items.map((it) => it.file));
       verdictIdRef.current = response.verdict_id;
       setAnalysisDone(true); // AnalyzingScreen이 90→100%로 snap 후 onFinish 호출
     } catch (e) {

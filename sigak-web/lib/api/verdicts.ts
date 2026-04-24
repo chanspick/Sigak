@@ -1,5 +1,6 @@
 // SIGAK MVP v1.2 — Verdict API 클라이언트.
-// Phase C 백엔드 엔드포인트: sigak/routes/verdicts.py
+// v1 (Phase C): sigak/routes/verdicts.py — MediaPipe tier + placeholder reason
+// v2 (D5 Phase 2-3): sigak/routes/verdict_v2.py — Sonnet 4.6 cross-analysis
 
 import { authFetch } from "@/lib/api/fetch";
 import type {
@@ -9,6 +10,11 @@ import type {
   VerdictListResponse,
   VerdictResponse,
 } from "@/lib/types/mvp";
+import type {
+  VerdictV2CreateResponse,
+  VerdictV2GetResponse,
+  VerdictV2UnlockResponse,
+} from "@/lib/types/verdict_v2";
 
 /** 업로드 파일 개수 제약 (백엔드와 동일) */
 export const MIN_PHOTOS = 2;
@@ -101,4 +107,45 @@ export function resolvePhotoUrl(url: string | null): string {
   if (url.startsWith("http")) return url;
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   return `${base}${url}`;
+}
+
+// ─────────────────────────────────────────────
+//  v2 — Sonnet 4.6 cross-analysis
+// ─────────────────────────────────────────────
+
+/** 사진 N장 업로드 → Sonnet 4.6 교차 분석 → verdict v2 row 생성.
+ * preview 는 즉시 응답, full_content 는 /unlock 후 공개.
+ * 비용: 생성 무료 (full unlock 시 10 토큰).
+ */
+export async function createVerdictV2(
+  files: File[],
+): Promise<VerdictV2CreateResponse> {
+  if (files.length < MIN_PHOTOS || files.length > MAX_PHOTOS) {
+    throw new Error(`사진은 ${MIN_PHOTOS}~${MAX_PHOTOS}장까지 올릴 수 있어요`);
+  }
+  const form = new FormData();
+  for (const f of files) {
+    form.append("photos", f, f.name);
+  }
+  return authFetch<VerdictV2CreateResponse>("/api/v2/verdict/create", {
+    method: "POST",
+    rawBody: form,
+  });
+}
+
+/** v2 verdict 재조회. preview 는 항상, full_content 는 unlock 된 경우만 포함. */
+export function getVerdictV2(verdictId: string): Promise<VerdictV2GetResponse> {
+  return authFetch<VerdictV2GetResponse>(
+    `/api/v2/verdict/${encodeURIComponent(verdictId)}`,
+  );
+}
+
+/** 10 토큰 차감 + full_content 공개. idempotency_key = verdict_id (중복 unlock 안전). */
+export function unlockVerdictV2(
+  verdictId: string,
+): Promise<VerdictV2UnlockResponse> {
+  return authFetch<VerdictV2UnlockResponse>(
+    `/api/v2/verdict/${encodeURIComponent(verdictId)}/unlock`,
+    { method: "POST" },
+  );
 }

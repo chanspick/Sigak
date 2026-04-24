@@ -484,8 +484,11 @@ def build_verdict_v2(
             parsed = json.loads(clean)
             result = VerdictV2Result.model_validate(parsed)
             _validate_hard_rules(result)
+            # PI 엔진(Phase I) 완성 전까지 cta_pi 목적지가 없으므로 응답에서 제거.
+            # 프롬프트는 유지(지시 제거 시 출력 품질 하락 위험) — 생성은 하되 사후 None.
+            result.full_content.cta_pi = None
             logger.info(
-                "verdict_v2 success: attempt=%d photos=%d",
+                "verdict_v2 success: attempt=%d photos=%d (cta_pi suppressed)",
                 attempt + 1, len(photos),
             )
             return result

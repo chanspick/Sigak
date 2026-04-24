@@ -238,12 +238,24 @@ def merge_structured_fields(
 
 
 def mark_onboarding_completed(db, user_id: str) -> None:
-    """extraction 성공 + 필수 필드 확보 시 호출. onboarding_completed=TRUE."""
+    """extraction 성공 + 필수 필드 확보 시 호출. onboarding_completed=TRUE.
+
+    users 와 user_profiles 양쪽 동기화 — 게이트 체크(routes/auth.py::/me,
+    routes/verdicts.py, routes/sigak_report.py)가 users 테이블을 읽으므로
+    둘 다 업데이트하지 않으면 Sia 완료 후에도 프론트 useOnboardingGuard 가
+    모든 라우트를 /sia 로 redirect 하는 데드락이 발생한다.
+    """
     db.execute(
         text(
             "UPDATE user_profiles SET "
             "  onboarding_completed = TRUE, updated_at = NOW() "
             "WHERE user_id = :uid"
+        ),
+        {"uid": user_id},
+    )
+    db.execute(
+        text(
+            "UPDATE users SET onboarding_completed = TRUE WHERE id = :uid"
         ),
         {"uid": user_id},
     )
@@ -257,6 +269,7 @@ def restart_conversation(db, user_id: str) -> None:
     """유저가 설정 페이지에서 "Sia와 다시 대화하기" 누를 때.
 
     structured_fields 를 {} 로 초기화 + onboarding_completed=FALSE.
+    mark_onboarding_completed 와 대칭 — users/user_profiles 양쪽 동기화.
     기존 conversations row 는 archive (status 유지, 지우지 않음 — 조회 가능).
     새 conversation 생성은 route 레이어에서 sia/chat/start 호출로 수행.
     """
@@ -267,6 +280,12 @@ def restart_conversation(db, user_id: str) -> None:
             "  onboarding_completed = FALSE, "
             "  updated_at = NOW() "
             "WHERE user_id = :uid"
+        ),
+        {"uid": user_id},
+    )
+    db.execute(
+        text(
+            "UPDATE users SET onboarding_completed = FALSE WHERE id = :uid"
         ),
         {"uid": user_id},
     )

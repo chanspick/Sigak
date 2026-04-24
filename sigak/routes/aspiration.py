@@ -86,7 +86,30 @@ def create_aspiration_ig(
     vault = load_vault(db, user["id"])
     if vault is None:
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
+
+    # STEP 5g — 본인 IG 핸들 차단 (자기 자신 분석 방지)
+    _own_handle = (vault.basic_info.ig_handle or "").strip().lstrip("@").lower()
+    if _own_handle and handle == _own_handle:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error_code": "self_handle_rejected",
+                "message": "본인 IG 는 추구미 분석 대상이 아니에요. 추구하는 다른 분의 IG 를 입력해주세요.",
+            },
+        )
+
     user_profile = vault.get_user_taste_profile()
+
+    # STEP 5g — Sia 대화 미완 (current_position None) 차단
+    if user_profile.current_position is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "sia_required",
+                "message": "먼저 Sia 와 대화하면서 본인 결을 잡아둘게요. 그 다음 추구미와 비교해보면 정확해요.",
+                "cta": {"label": "Sia 와 대화 시작", "href": "/sia"},
+            },
+        )
 
     # 본인 IG posts — photo_pairs 좌측 채움 (vault.ig_feed_cache.latest_posts)
     user_posts = extract_user_posts_from_vault(vault)
@@ -174,6 +197,17 @@ def create_aspiration_pinterest(
     if vault is None:
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
     user_profile = vault.get_user_taste_profile()
+
+    # STEP 5g — Sia 대화 미완 (current_position None) 차단
+    if user_profile.current_position is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "sia_required",
+                "message": "먼저 Sia 와 대화하면서 본인 결을 잡아둘게요. 그 다음 추구미와 비교해보면 정확해요.",
+                "cta": {"label": "Sia 와 대화 시작", "href": "/sia"},
+            },
+        )
 
     # 본인 IG posts — photo_pairs 좌측 채움
     user_posts = extract_user_posts_from_vault(vault)

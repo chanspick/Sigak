@@ -185,6 +185,22 @@ async def create_verdict_v2(
             user["id"],
         )
 
+    # STEP 5i — cross-session history 주입 (Sia / BS / Aspiration 이전분)
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=[
+                "conversations", "best_shot_sessions", "aspiration_analyses",
+            ],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception(
+            "verdict v2 create: history_injector failed user=%s", user["id"]
+        )
+
     # 5. Sonnet 4.6 cross-analysis
     try:
         result = build_verdict_v2(
@@ -193,6 +209,7 @@ async def create_verdict_v2(
             trend_data=None,       # Phase 1 에선 trend_data (legacy 벡터) 미주입
             matched_trends=matched_trends,   # Phase L 확장
             taste_profile=taste_profile,     # Phase L 확장
+            history_context=history_context,
         )
     except VerdictV2Error as e:
         logger.exception("verdict v2 build failed: user_id=%s", user["id"])

@@ -309,6 +309,18 @@ def run_selection(
     # 업로드된 key 목록 (prefix list — R2 get_bytes 은 key 필요)
     uploaded_keys = _list_uploaded_keys(user["id"], session_id, session.uploaded_count)
 
+    # STEP 5i — 이전 Sia 대화 / 추구미 맥락 주입
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=["conversations", "aspiration_analyses"],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception("best_shot run: history_injector failed user=%s", user["id"])
+
     try:
         result = run_best_shot(
             user_id=user["id"],
@@ -317,6 +329,7 @@ def run_selection(
             profile=profile,
             gender=(vault.basic_info.gender if vault else None),
             user_name=user_name,
+            history_context=history_context,
         )
     except cost_monitor.CostLimitExceeded as e:
         _mark_failed_and_refund(

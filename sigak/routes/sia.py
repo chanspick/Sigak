@@ -322,6 +322,8 @@ def _update_counters_for_assistant(
 def _render_assistant_message(
     composition: Composition,
     state: ConversationState,
+    *,
+    history_context: str = "",
 ) -> str:
     """Composition → assistant 메시지 텍스트.
 
@@ -330,6 +332,9 @@ def _render_assistant_message(
 
     M1 결합 출력 (OPENING + OBSERVATION) 은 OPENING 하드코딩 + OBSERVATION Haiku
     두 호출의 결과를 한 문자열로 합쳐서 반환.
+
+    history_context: STEP 5i — chat_start 에서만 non-empty (이전 대화 맥락).
+      first turn Haiku prompt 앞에 prepend.
     """
     msg_type = composition.primary_type
 
@@ -342,7 +347,8 @@ def _render_assistant_message(
     if is_m1_combined:
         opening_text = render_hardcoded(MsgType.OPENING_DECLARATION, state)
         obs_text = _call_haiku(
-            MsgType.OBSERVATION, state, composition, is_first_turn=True,
+            MsgType.OBSERVATION, state, composition,
+            is_first_turn=True, history_context=history_context,
         )
         # M1 호명/행위 중복 방지 — Haiku 가 observation.md HARD 지시 무시 시 후처리
         obs_text = _strip_m1_meta_preamble(obs_text, state.user_name)
@@ -359,7 +365,10 @@ def _render_assistant_message(
         )
 
     # HAIKU 단독 or EMPATHY 결합
-    return _call_haiku(msg_type, state, composition, is_first_turn=False)
+    return _call_haiku(
+        msg_type, state, composition,
+        is_first_turn=False, history_context=history_context,
+    )
 
 
 # M1 결합 시 OBSERVATION 앞부분이 OPENING 의 meta 선언과 중복되는 경우 제거.
@@ -409,12 +418,16 @@ def _call_haiku(
     *,
     is_first_turn: bool,
     max_reject_retries: int = 1,
+    history_context: str = "",
 ) -> str:
     """load_haiku_prompt 조립 + Haiku 호출 + validator hard error 시 재시도.
 
     Hard reject 발생 시 (A-17 영업어휘 / A-20 추상칭찬 / A-18 300자+ / markdown) :
       1회 재시도 후에도 violate 하면 fallback 카피로 대체. Haiku 가 또 영업/추상
       찬사 뱉는 경우 유저에게 그걸 보여주는 것보다 짧은 fallback 이 안전.
+
+    history_context: STEP 5i — 첫 턴 (is_first_turn=True) + non-empty 시
+      prompt 앞에 이전 대화/분석 맥락 prepend.
     """
     last_user = state.last_user()
     user_flags = last_user.flags if last_user else None
@@ -433,6 +446,9 @@ def _call_haiku(
         apply_self_pr_prefix=composition.apply_self_pr_prefix,
         range_mode=composition.range_mode,
     )
+    # STEP 5i — 첫 턴에만 history 맥락 prepend (cross-session)
+    if is_first_turn and history_context:
+        prompt = history_context + "---\n\n" + prompt
     history = _history_for_haiku(state)
 
     last_text = ""
@@ -548,7 +564,21 @@ def chat_start(
             composition.primary_type,
         )
 
-    opening_message = _render_assistant_message(composition, state)
+    # STEP 5i — 이전 대화/분석 맥락 주입 (cross-session)
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=["conversations", "aspiration_analyses", "best_shot_sessions"],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception("chat_start: history_injector failed user=%s", user["id"])
+
+    opening_message = _render_assistant_message(
+        composition, state, history_context=history_context,
+    )
     _record_assistant_turn(state, opening_message, composition)
     sia_session_v4.save_conversation_state(state)
 

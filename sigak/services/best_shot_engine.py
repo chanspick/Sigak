@@ -67,6 +67,7 @@ def run_best_shot(
     profile: UserTasteProfile,
     gender: Optional[str],
     user_name: Optional[str] = None,
+    history_context: str = "",
 ) -> BestShotResult:
     """Best Shot 선별 파이프라인 (heuristic → Sonnet).
 
@@ -135,6 +136,7 @@ def run_best_shot(
         profile=profile,
         matched_trends=matched_trends,
         strength_score=strength,
+        history_context=history_context,
     )
 
     # 6. 선별 사진 R2 selected/ 로 복사 이동 + 결과 조립
@@ -218,6 +220,7 @@ def _call_sonnet_select(
     profile: UserTasteProfile,
     matched_trends: list[MatchedTrend],
     strength_score: float,
+    history_context: str = "",
 ) -> list[dict]:
     """Sonnet Vision 호출 → selections dict list.
 
@@ -270,6 +273,9 @@ def _call_sonnet_select(
         "photo_index 는 위 이미지 순서 0-based. target~max 범위 엄수.\n"
         "정말 좋은 사진만. 억지로 상한 채우지 말 것."
     )
+    # STEP 5i — 이전 Sia/추구미 맥락 주입 (cross-session 연결성)
+    if history_context:
+        text_prompt = history_context + "---\n\n" + text_prompt
 
     user_content = image_blocks + [{"type": "text", "text": text_prompt}]
 

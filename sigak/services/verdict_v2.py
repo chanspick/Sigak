@@ -338,6 +338,7 @@ def _build_user_message(
     trend_data: dict,
     matched_trends: Optional[list] = None,
     taste_profile: Optional[Any] = None,
+    history_context: str = "",
 ) -> list[dict]:
     """Claude API `messages[0]["content"]` 용 블록 리스트.
 
@@ -354,7 +355,7 @@ def _build_user_message(
         blocks.append(_photo_to_content_block(pcopy))
 
     # 텍스트 블록 (analysis instruction)
-    text = (
+    text_body = (
         "아래 user_profile 과 위 사진들을 교차 분석해 피드 분석 결과를 "
         "JSON 으로 반환하십시오.\n\n"
         f"[user_profile]\n{_render_profile_for_prompt(user_profile)}\n\n"
@@ -368,7 +369,10 @@ def _build_user_message(
         "녹여 주십시오. system prompt 의 Hard Rules + 출력 JSON 스키마를 "
         "엄격 준수하십시오."
     )
-    blocks.append({"type": "text", "text": text})
+    # STEP 5i — cross-session 맥락 주입 (Sia/추구미/BestShot 이전 세션)
+    if history_context:
+        text_body = history_context + "---\n\n" + text_body
+    blocks.append({"type": "text", "text": text_body})
     return blocks
 
 
@@ -383,6 +387,7 @@ def _call_sonnet(
     matched_trends: Optional[list] = None,
     taste_profile: Optional[Any] = None,
     max_tokens: int = 3000,
+    history_context: str = "",
 ) -> str:
     settings = get_settings()
     client = _get_client()
@@ -391,6 +396,7 @@ def _call_sonnet(
         user_profile, photos, trend_data,
         matched_trends=matched_trends,
         taste_profile=taste_profile,
+        history_context=history_context,
     )
 
     response = client.messages.create(
@@ -493,6 +499,7 @@ def build_verdict_v2(
     matched_trends: Optional[list] = None,
     taste_profile: Optional[Any] = None,
     max_retries: int = 1,
+    history_context: str = "",
 ) -> VerdictV2Result:
     """Verdict 2.0 build — Sonnet 4.6 cross-analysis.
 
@@ -526,6 +533,7 @@ def build_verdict_v2(
                 user_profile, photos, trend_data,
                 matched_trends=matched_trends,
                 taste_profile=taste_profile,
+                history_context=history_context,
             )
             clean = _strip_json_fence(raw)
             parsed = json.loads(clean)

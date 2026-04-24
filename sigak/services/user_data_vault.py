@@ -281,7 +281,43 @@ def _fetch_product_counts(db, user_id: str) -> dict[str, int]:
     except Exception:
         logger.debug("pi_reports count skipped for user=%s", user_id)
 
-    # aspiration / best_shot / monthly_reports — 테이블 미생성. Phase J/K/M 에서 확장.
+    # Phase J/K/M 완료 — 상품 누적 수행 횟수를 strength_score 에 반영.
+    try:
+        row = db.execute(
+            text(
+                "SELECT COUNT(*) FROM aspiration_analyses "
+                "WHERE user_id = :uid"
+            ),
+            {"uid": user_id},
+        ).scalar()
+        counts["aspiration_count"] = int(row or 0)
+    except Exception:
+        logger.debug("aspiration_analyses count skipped for user=%s", user_id)
+
+    try:
+        # 완료된 세션만 집계 — failed/aborted 제외.
+        row = db.execute(
+            text(
+                "SELECT COUNT(*) FROM best_shot_sessions "
+                "WHERE user_id = :uid AND status = 'ready'"
+            ),
+            {"uid": user_id},
+        ).scalar()
+        counts["best_shot_count"] = int(row or 0)
+    except Exception:
+        logger.debug("best_shot_sessions count skipped for user=%s", user_id)
+
+    try:
+        row = db.execute(
+            text(
+                "SELECT COUNT(*) FROM monthly_reports WHERE user_id = :uid"
+            ),
+            {"uid": user_id},
+        ).scalar()
+        counts["monthly_report_count"] = int(row or 0)
+    except Exception:
+        logger.debug("monthly_reports count skipped for user=%s", user_id)
+
     return counts
 
 

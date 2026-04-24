@@ -115,7 +115,11 @@ export default function BestShotPage() {
 
     for (const file of list) {
       if (!ALLOWED_TYPES.has(file.type)) {
-        skipped.push(`${file.name} (지원 형식 아님)`);
+        const isHeic =
+          /\.hei[cf]$/i.test(file.name) || file.type.includes("heic") || file.type.includes("heif");
+        skipped.push(
+          `${file.name} (${isHeic ? "HEIC/HEIF 미지원 — JPG 로 저장 후 올려주세요" : "지원 형식 아님"})`,
+        );
         continue;
       }
       if (file.size > MAX_FILE_BYTES) {
@@ -395,7 +399,7 @@ function Header({ balance, fileCount }: { balance: number | null; fileCount: num
           letterSpacing: "-0.005em",
         }}
       >
-        올리실 사진들 안에서, 한 장만 정성껏 골라드릴게요.
+        올리신 사진들 안에서, 한 장만 정성껏 골라요.
       </p>
       <div
         className="font-sans tabular-nums"
@@ -457,6 +461,10 @@ function FilePickerCard({
         <span style={{ fontWeight: 600 }}>사진 고르기</span>
         <span style={{ fontSize: 12, color: "var(--color-mute)" }}>
           한 번에 50~500장. JPG · PNG · WEBP
+        </span>
+        <span style={{ fontSize: 11, color: "var(--color-mute-2)" }}>
+          iPhone HEIC 은 지원 안 돼요. 아이폰 설정 → 카메라 →
+          포맷 → 호환성 우선 으로 바꿔 주세요.
         </span>
       </button>
     );
@@ -525,7 +533,7 @@ function FilePickerCard({
             color: "var(--color-mute)",
           }}
         >
-          썸네일은 60장까지만 보여드려요. 전체 {files.length}장이 분석됩니다.
+          썸네일은 60장까지만 보여요. 전체 {files.length}장이 분석됩니다.
         </p>
       )}
       <div style={{ display: "flex", gap: 10 }}>
@@ -587,6 +595,7 @@ function FootnoteBlock({ fileCount }: { fileCount: number }) {
       }}
     >
       <div>Best Shot은 50장부터 가능해요. 30 토큰이 차감됩니다.</div>
+      <div>JPG · PNG · WEBP 만 돼요. iPhone 기본 HEIC 은 안 됩니다.</div>
       <div>업로드된 원본은 24시간 후 자동으로 정리돼요.</div>
       {fewerThanMin && (
         <div style={{ marginTop: 8, color: "var(--color-danger)" }}>
@@ -845,7 +854,7 @@ function StrengthWarningModal({
             letterSpacing: "-0.01em",
           }}
         >
-          잠깐 알려드릴게요
+          잠깐만요
         </h2>
         <p
           className="font-sans"

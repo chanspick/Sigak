@@ -66,6 +66,7 @@ def run_best_shot(
     uploaded_photo_keys: list[str],
     profile: UserTasteProfile,
     gender: Optional[str],
+    user_name: Optional[str] = None,
 ) -> BestShotResult:
     """Best Shot 선별 파이프라인 (heuristic → Sonnet).
 
@@ -144,6 +145,7 @@ def run_best_shot(
         heuristic_survived=heuristic_survived,
         matched_trends=matched_trends,
         profile=profile,
+        user_name=user_name,
     )
 
     writer = get_sia_writer()
@@ -154,6 +156,7 @@ def run_best_shot(
             "selected_count": len(selected_photos),
             "uploaded_count": uploaded_count,
         },
+        user_name=user_name,
     )
 
     return BestShotResult(
@@ -322,15 +325,17 @@ def _materialize_selection(
     heuristic_survived: list[tuple[str, bytes, QualityResult]],
     matched_trends: list[MatchedTrend],
     profile: UserTasteProfile,
+    user_name: Optional[str] = None,
 ) -> list[SelectedPhoto]:
     """Sonnet 선별 결과 → SelectedPhoto list + R2 이동.
 
     각 선별 사진:
       - best_shot/uploads/{session_id}/{photo_id} → best_shot/selected/{session_id}/{photo_id}
-      - SiaWriter stub 으로 개별 comment 생성
+      - SiaWriter 으로 개별 comment 생성 (user_name 주입 + 다양성 전달)
     """
     writer = get_sia_writer()
     out: list[SelectedPhoto] = []
+    sibling_comments: list[str] = []
 
     for entry in selection_plan:
         try:
@@ -364,7 +369,10 @@ def _materialize_selection(
                 "rationale": entry.get("rationale"),
             },
             profile=profile,
+            user_name=user_name,
+            sibling_comments=list(sibling_comments),
         )
+        sibling_comments.append(sia_comment)
 
         out.append(SelectedPhoto(
             photo_id=photo_id,

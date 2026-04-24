@@ -276,6 +276,15 @@ async def lifespan(app: FastAPI):
     # 항상 인메모리 복원 (dual-write 호환 위해)
     _migrate_legacy_data()
     _restore_stores()
+
+    # SiaWriter 운영 모드 — Haiku 실 호출 + validator wrap (stub 제거).
+    try:
+        from services.sia_writer import use_haiku_writer
+        use_haiku_writer()
+        print("[STARTUP] SiaWriter: Haiku mode (live)")
+    except Exception as e:
+        print(f"[STARTUP] SiaWriter: stub fallback ({type(e).__name__})")
+
     yield
     # shutdown: 필요 시 정리 로직 추가
 

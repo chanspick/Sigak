@@ -303,6 +303,9 @@ def run_selection(
     vault = load_vault(db, user["id"])
     profile = vault.get_user_taste_profile() if vault else None
 
+    # 유저 호명용 이름 — users.name 우선, 없으면 onboarding_data.name, 최종 빈 문자열
+    user_name = _resolve_user_name(db, user)
+
     # 업로드된 key 목록 (prefix list — R2 get_bytes 은 key 필요)
     uploaded_keys = _list_uploaded_keys(user["id"], session_id, session.uploaded_count)
 
@@ -313,6 +316,7 @@ def run_selection(
             uploaded_photo_keys=uploaded_keys,
             profile=profile,
             gender=(vault.basic_info.gender if vault else None),
+            user_name=user_name,
         )
     except cost_monitor.CostLimitExceeded as e:
         _mark_failed_and_refund(
@@ -438,6 +442,25 @@ def abort_session(
 # ─────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────
+
+def _resolve_user_name(db, user: dict) -> str:
+    """SiaWriter 호명용 이름 — users.name 우선, 없으면 onboarding_data.name, 최종 빈 문자열."""
+    name = (user.get("name") or "").strip()
+    if name:
+        return name
+    try:
+        row = db.execute(
+            text("SELECT onboarding_data FROM users WHERE id = :uid"),
+            {"uid": user["id"]},
+        ).first()
+        if row and row.onboarding_data:
+            raw = row.onboarding_data.get("name") if isinstance(row.onboarding_data, dict) else None
+            if raw and isinstance(raw, str):
+                return raw.strip()
+    except Exception:
+        logger.debug("user name lookup skipped for user=%s", user["id"])
+    return ""
+
 
 def _load_session(db, session_id: str, user_id: str) -> BestShotSession:
     row = db.execute(

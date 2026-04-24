@@ -100,7 +100,7 @@ export default function BestShotResultPage() {
     return (
       <SimpleStatePage
         title="고르는 중이에요"
-        message="잠시만 기다려주세요. 분석이 끝나면 자동으로 보여드릴게요."
+        message="잠시만 기다려주세요. 분석이 끝나면 자동으로 넘어가요."
         busy
       />
     );
@@ -120,7 +120,7 @@ export default function BestShotResultPage() {
     return (
       <SimpleStatePage
         title="취소된 세션이에요"
-        message="새로 시작하시면 다른 사진들로 다시 골라드릴게요."
+        message="새로 시작하시면 다른 사진들로 다시 골라요."
         primary={{ label: "Best Shot 새로 시작", href: "/best-shot" }}
       />
     );

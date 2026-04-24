@@ -2,9 +2,10 @@
  * Sia chat API 클라이언트 — `/api/v1/sia/chat/{start,message,end}`.
  *
  * 계약 adapter 레이어:
- *   백엔드 D6 실 계약 (conversation_id / opening_message / response_mode / choices)
- *   → 프론트 friendly shape (sessionId / openingMessage / isComplete)
+ *   백엔드 실 계약 (conversation_id / opening_message / assistant_message / status)
+ *   → 프론트 friendly shape (sessionId / openingMessage / assistantMessage / isComplete)
  *
+ * STEP 2-G v4 cutover: response_mode / choices 필드 전면 제거 (페르소나 B 100% 주관식).
  * Phase H5 완료 시 어댑터만 제거. useSiaSession 등 호출부는 무변경.
  *
  * 에러 분류 (SiaApiError):
@@ -82,17 +83,14 @@ function classifySiaError(err: unknown): SiaApiError {
 }
 
 // ─────────────────────────────────────────────
-//  Backend D6 raw shapes (internal)
+//  Backend raw shapes (internal) — STEP 2-G v4 cutover
+//  페르소나 B 100% 주관식 확정 (세션 #4 v2). response_mode / choices 제거.
 // ─────────────────────────────────────────────
-
-type BackendResponseMode = "choices" | "freetext" | "name_fallback";
 
 interface BackendStartResponse {
   conversation_id: string;
   opening_message: string;
   turn_count: 0;
-  response_mode: BackendResponseMode;
-  choices: string[];
 }
 
 interface BackendMessageResponse {
@@ -100,8 +98,6 @@ interface BackendMessageResponse {
   assistant_message: string;
   turn_count: number;
   status: "active" | "ending_soon" | "closed";
-  response_mode: BackendResponseMode;
-  choices: string[];
 }
 
 interface BackendEndResponse {

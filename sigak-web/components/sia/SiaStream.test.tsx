@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 
 import { SiaStream, parseSiaMessage } from "./SiaStream";
 import type { SiaTurn } from "@/lib/types/sia.legacy";
@@ -88,5 +88,97 @@ describe("SiaStream", () => {
   it("does not render SiaDots when pending is false (default)", () => {
     render(<SiaStream messages={[{ role: "sia", content: "Hi." }]} />);
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────
+  //  Stagger reveal — 새 turn 도착 시 순차 공개
+  // ─────────────────────────────────────────────
+
+  it("initial mount reveals all bubbles of existing assistant turn immediately", () => {
+    const messages: SiaTurn[] = [
+      { role: "sia", content: "첫 문장. 두 문장. 세 문장." },
+    ];
+    render(<SiaStream messages={messages} />);
+    // 마운트 직후 세 버블 모두 보여야 함 (재진입 시 재애니메이션 금지)
+    expect(screen.getByText("첫 문장.")).toBeInTheDocument();
+    expect(screen.getByText("두 문장.")).toBeInTheDocument();
+    expect(screen.getByText("세 문장.")).toBeInTheDocument();
+    // stagger dots 없음
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("new assistant turn after mount triggers staggered reveal", () => {
+    vi.useFakeTimers();
+    const initial: SiaTurn[] = [{ role: "user", content: "안녕" }];
+    const { rerender } = render(<SiaStream messages={initial} />);
+
+    // 새 assistant 턴 3 문장 도착
+    const next: SiaTurn[] = [
+      { role: "user", content: "안녕" },
+      { role: "sia", content: "첫째. 둘째. 셋째." },
+    ];
+    rerender(<SiaStream messages={next} />);
+
+    // 직후: 아직 버블 0개 + SiaDots 표시 중
+    expect(screen.queryByText("첫째.")).toBeNull();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+
+    // DOTS_DURATION_MS=250 경과 → 첫 버블 공개
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(screen.getByText("첫째.")).toBeInTheDocument();
+    expect(screen.queryByText("둘째.")).toBeNull();
+
+    // BUBBLE_INTERVAL_MS=500 경과 → 다시 dots 표시
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByRole("status")).toBeInTheDocument();
+
+    // 250ms 더 → 둘째 공개
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(screen.getByText("둘째.")).toBeInTheDocument();
+
+    // 500ms 경과 → 다시 dots
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByRole("status")).toBeInTheDocument();
+
+    // 250ms 더 → 셋째 공개 + stagger 완료
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(screen.getByText("셋째.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it("pending dots do not duplicate with stagger dots during reveal", () => {
+    vi.useFakeTimers();
+    const initial: SiaTurn[] = [{ role: "user", content: "hi" }];
+    const { rerender } = render(<SiaStream messages={initial} pending />);
+
+    // pending=true 이지만 staggerInProgress 아님 → pending dots 1개 표시
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    // 새 sia 턴 도착 (pending 유지) — stagger 시작
+    rerender(
+      <SiaStream
+        messages={[
+          ...initial,
+          { role: "sia", content: "첫. 둘." },
+        ]}
+        pending
+      />,
+    );
+    // stagger 진행 중엔 pending dots 숨김, stagger dots 만 1개
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    vi.useRealTimers();
   });
 });

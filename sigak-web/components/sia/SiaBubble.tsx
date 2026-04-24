@@ -19,6 +19,8 @@ export type SiaBubbleVariant = "sia" | "user" | "list";
 export interface SiaBubbleProps {
   variant: SiaBubbleVariant;
   children: ReactNode;
+  /** 새로 공개된 버블에 진입 애니메이션 적용. stagger reveal 에서만 true. */
+  animateIn?: boolean;
 }
 
 const BASE =
@@ -40,10 +42,11 @@ const VARIANT_CLASS: Record<SiaBubbleVariant, string> = {
     "max-w-[75%]",
 };
 
-export function SiaBubble({ variant, children }: SiaBubbleProps) {
+export function SiaBubble({ variant, children, animateIn = false }: SiaBubbleProps) {
+  const anim = animateIn ? " animate-bubble-in" : "";
   return (
     <div
-      className={`${BASE} ${VARIANT_CLASS[variant]}`}
+      className={`${BASE} ${VARIANT_CLASS[variant]}${anim}`}
       style={{ letterSpacing: "-0.005em" }}
       data-variant={variant}
     >

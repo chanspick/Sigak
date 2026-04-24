@@ -146,6 +146,52 @@ export interface EssentialsResponse {
   gender: Gender;
   birth_date: string;
   ig_handle: string | null;
+  /**
+   * IG 비동기 fetch 트리거 시그널.
+   *   pending  — ig_handle 있음, BackgroundTask 예약. 프론트는 /onboarding/ig-loading 으로 이동해 폴링.
+   *   skipped  — ig_handle 없음. 프론트는 /sia 직행.
+   */
+  ig_fetch_status: "pending" | "skipped";
+}
+
+/**
+ * GET /api/v1/onboarding/ig-status — 대기 화면 폴링용.
+ *
+ * 상태 흐름:
+ *   pending        → BackgroundTask 시작 전/중. preview_urls 아직 없음.
+ *   pending_vision → Apify 성공 + preview DB flush 완료. preview_urls 렌더 가능. Vision 진행.
+ *   success        → 최종 완료. analyzed=true. Sia 진입 OK.
+ *   private        → 비공개 계정. Sia 진입 OK (제한된 컨텍스트).
+ *   failed         → Apify 오류. Sia 진입 OK (Vision 폴백).
+ *   skipped        → 핸들 비어있거나 flag off. Sia 진입 OK.
+ */
+export type IgFetchStatus =
+  | "pending"
+  | "pending_vision"
+  | "success"
+  | "private"
+  | "failed"
+  | "skipped";
+
+export interface IgStatusResponse {
+  status: IgFetchStatus;
+  /** 프로필 CDN URL. pending_vision 부터 채워짐. 최대 6장. */
+  preview_urls: string[];
+  username: string | null;
+  /** Vision 분석 완료 여부. success + analyzed=true = 풀 컨텍스트. */
+  analyzed: boolean;
+}
+
+/** Sia 진입 허용 상태 (최종 상태). pending / pending_vision 이 아님. */
+export const IG_TERMINAL_STATUSES: readonly IgFetchStatus[] = [
+  "success",
+  "private",
+  "failed",
+  "skipped",
+];
+
+export function isIgTerminal(status: IgFetchStatus): boolean {
+  return (IG_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
 // ─────────────────────────────────────────────

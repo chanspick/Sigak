@@ -1,21 +1,18 @@
 /**
  * Sia conversation API types — LEGACY (v2 Priority 1 D6).
  *
- * ⚠ LEGACY: Phase A-F 시점 스키마. 4지선다 (response_mode: "choices") + turn_count
- *  기반. Phase H 전환 완료 전까지 실 API 호출부 유지용.
+ * ⚠ LEGACY / DEPRECATED: Phase A-F 시점 스키마.
+ *   STEP 2-G v4 cutover 로 백엔드의 response_mode / choices / name_fallback 는 제거됨.
+ *   본 파일은 SiaStream 등 기존 컴포넌트의 SiaTurn shape 만 import 되는 상태로 남겨둠.
+ *   Phase H5 완료 시 컴포넌트 import 경로를 @/lib/types/sia 로 전환하면서 본 파일 폐기.
  *
  *  신규 Phase H 버전은 @/lib/types/sia 참조 (MsgType + progress_percent 기반).
- *  H5 백엔드 라우트 재작성 완료 시 import 경로 전환 예정.
  *
  * Backend: sigak/routes/sia.py (FastAPI).
  * Session TTL: Redis 3600s. 410 on expiry → flush backup + redirect.
- *
- * Usage (legacy):
- *   POST /api/sia/start     → SiaStartResponse
- *   POST /api/sia/message   → SiaMessageResponse | 410 SiaSessionExpiredResponse
- *   POST /api/sia/end       → SiaEndResponse
  */
 
+/** @deprecated STEP 2-G 이후 백엔드 미제공. 참조 금지. */
 export type SiaResponseMode = "choices" | "freetext" | "name_fallback";
 
 // ─── /api/sia/start ────────────────────────────

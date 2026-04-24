@@ -139,7 +139,7 @@ export function SiaChatView() {
         </div>
       </div>
 
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden min-h-0">
         <SiaStream messages={turns} pending={pending} />
       </main>
 

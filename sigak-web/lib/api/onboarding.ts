@@ -7,6 +7,7 @@ import type {
   ConsentResponse,
   EssentialsRequest,
   EssentialsResponse,
+  IgStatusResponse,
   OnboardingData,
   OnboardingStateResponse,
   ResetOnboardingResponse,
@@ -48,6 +49,9 @@ export function resetOnboarding(): Promise<ResetOnboardingResponse> {
 /**
  * Step 0 구조화 입력 저장. gender + birth_date 필수, ig_handle 선택.
  * Sia 대화(/sia/new) 진입 전에 반드시 호출되어야 함.
+ *
+ * ig_handle 있으면 서버가 BackgroundTask 로 Apify + Vision 비동기 시작.
+ * 응답의 `ig_fetch_status==="pending"` 이면 프론트는 /onboarding/ig-loading 폴링 필요.
  */
 export function saveEssentials(
   body: EssentialsRequest,
@@ -56,6 +60,16 @@ export function saveEssentials(
     method: "POST",
     json: body,
   });
+}
+
+/**
+ * IG fetch 진행 상태 폴링. 2-3초 간격 권장.
+ *
+ * 상태 전환: pending → pending_vision → success | private | failed | skipped
+ * 최종 상태 도달 시 프론트는 /sia 로 이동.
+ */
+export function getIgStatus(): Promise<IgStatusResponse> {
+  return authFetch<IgStatusResponse>("/api/v1/onboarding/ig-status");
 }
 
 // ─────────────────────────────────────────────

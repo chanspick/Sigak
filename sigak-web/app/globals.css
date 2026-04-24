@@ -150,6 +150,16 @@ body {
 .sia-dot-3 { animation-delay: 0.36s; }
 
 /* ──────────────────────────────────────────────
+ * Sia 버블 진입 (stagger reveal)
+ * 새로 공개되는 버블이 살짝 올라오며 페이드인. 기존 버블은 재애니메이션 없음.
+ * ────────────────────────────────────────────── */
+@keyframes sia-bubble-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-bubble-in { animation: sia-bubble-enter 240ms ease-out both; }
+
+/* ──────────────────────────────────────────────
  * Sia countdown pulse (0:30 이하 경고 — Phase H ⑤)
  * 1.5s cycle, 0.7 ↔ 1.0 opacity. ease-in-out, infinite.
  * 디자인 토큰: var(--color-danger) 와 조합해서 "warning + pulse".

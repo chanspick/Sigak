@@ -106,12 +106,18 @@ export default function OnboardingEssentialsPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await saveEssentials({
+      const resp = await saveEssentials({
         gender,
         birth_date: birthDateIso,
         ig_handle: normalizedIgHandle ?? null,
       });
-      router.replace("/sia");
+      // ig_handle 있으면 분석 대기 페이지로 — 폴링 후 자동 /sia 이동.
+      // 없으면 Vision 없는 Sia 폴백 경로 (페르소나 B placeholder) — 바로 /sia.
+      if (resp.ig_fetch_status === "pending") {
+        router.replace("/onboarding/ig-loading");
+      } else {
+        router.replace("/sia");
+      }
     } catch (e) {
       setSubmitting(false);
       if (e instanceof ApiError) {

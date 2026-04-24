@@ -102,8 +102,15 @@ export function useOnboardingGuard(): UseOnboardingGuardResult {
           return;
         }
 
-        // 3-c. Sia 대화 미완료 → /sia/new
+        // 3-c. Sia 대화 미완료 → /sia
+        //   이미 /sia(및 하위 /sia/done 등)에 있으면 자기 자신으로 redirect 하면서 "redirecting"
+        //   상태에 영구 고착되는 데드락이 발생하므로 즉시 ready 로 통과시킨다.
         if (!meData.onboarding_completed) {
+          if (pathname === "/sia" || pathname.startsWith("/sia/")) {
+            setMe(meData);
+            setStatus("ready");
+            return;
+          }
           setStatus("redirecting");
           router.replace("/sia");
           return;

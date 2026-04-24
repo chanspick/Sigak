@@ -1,5 +1,21 @@
-# Knowledge Base 초기 seed — 2026 봄 남성 트렌드 샘플 2건.
+# SIGAK Knowledge Base — Male Trends, 2026 Spring/Summer
+# Source: pipeline/trend_data_men.py (SSOT). 수동 큐레이션 기반.
+# Phase G seed 2건 + Track C 확장 20건 = 총 22건.
+# 좌표: 0~1 외부 스케일 (VisualCoordinate 와 동일. CLAUDE.md §4.4/12.1).
+# 변환 공식: external = (internal_trend_data + 1) / 2
+#
+# Category 매핑:
+#   - hair cut / hair perm → styling_method
+#   - mood (3축)           → mood
+#   - silhouette           → silhouette
+#
+# 핵심 테제: 소프트맥싱 (Softmaxing).
+# detailed_guide 앞에 [score: X / label] 프리픽스로 트렌드 방향 보존.
+
 items:
+  # ═══════════════════════════════════════════════════════════════
+  # Phase G seed (기존) — 보존
+  # ═══════════════════════════════════════════════════════════════
   - trend_id: male_2026_spring_001
     season: "2026_spring"
     gender: male
@@ -32,3 +48,364 @@ items:
       - 스니커즈 대신 로우 부츠
     detailed_guide: |
       샤프 쪽이 아닌 소프트/성숙 인상 유저에게 어울리는 루즈핏 실루엣.
+
+  # ═══════════════════════════════════════════════════════════════
+  # HAIR CUT TRENDS (9종) — trend_data_men.MEN_HAIR_CUT_TRENDS
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: male_2026_spring_010
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "세미 리프컷"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.4, 0.8]
+      age: [0.2, 0.6]
+    action_hints:
+      - 귀 주변 짧게 정돈
+      - 탑에는 자연 볼륨 살리기
+      - 얼굴형 보정 + 성장 편의 동시 충족
+    detailed_guide: |
+      [score: +1.0 / 🔥 강한 상승]
+      2026 서울 살롱 요청 1위 (Creatrip 집계). 과한 언더컷을 대체하는 '소프트맥싱' 대표 커트.
+
+  - trend_id: male_2026_spring_011
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "소프트 투블럭"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.2, 0.6]
+      age: [0.2, 0.6]
+    action_hints:
+      - 옆·뒷면 경계를 그라데이션 페이드로 뭉개기
+      - 명확한 라인 대신 흐름
+      - 자연스러운 떨어짐
+    detailed_guide: |
+      [score: +0.8 / 🔥 상승]
+      '티 안 나게, 자연스럽게' 떨어뜨리는 버전.
+      비주얼살롱: '명확한 라인 대신 흐름으로 자르는 것이 2026 기본.'
+
+  - trend_id: male_2026_spring_012
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "텍스처 크롭"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.2, 0.6]
+    action_hints:
+      - 숏컷 베이스 + 끝 레이어
+      - 왁스 소량 마무리
+      - 세팅 흔적 없이 자연스럽게
+    detailed_guide: |
+      [score: +0.8 / 🔥 상승]
+      숏컷이지만 질감이 관건. 끝을 레이어로 깨놓고 왁스 소량으로 마무리.
+      세팅 흔적 없이 '원래 이런 머리'처럼 보여야 함.
+
+  - trend_id: male_2026_spring_013
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "댄디컷 (시스루)"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.7]
+    action_hints:
+      - 앞머리 얇고 가볍게
+      - 이마 노출 여부 유저 선택
+      - 얼굴형 대부분 호환
+    detailed_guide: |
+      [score: +0.7 / ▲ 상승]
+      정통 댄디컷의 시스루 버전. 2026 K드라마 남자 주연 기본값.
+
+  - trend_id: male_2026_spring_014
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "미디움 + 세미 웨이브"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.3, 0.7]
+      age: [0.2, 0.5]
+    action_hints:
+      - 귀를 살짝 덮는 길이
+      - 끝만 세미 웨이브
+      - 꾸안꾸 무드
+    detailed_guide: |
+      [score: +0.6 / ▲ 상승]
+      남자 미디움~장발이 대중화되며 꾸안꾸 무드와 결합.
+      GQ Korea: '과하지 않게, 하지만 확실하게 달라지게.'
+
+  - trend_id: male_2026_spring_015
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "콤마헤어 (루즈)"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.4, 0.8]
+      age: [0.1, 0.5]
+    action_hints:
+      - 정석 콤마 아닌 루즈 버전
+      - 앞머리 곡선 포인트 유지
+      - 전체 볼륨은 낮춤
+    detailed_guide: |
+      [score: +0.5 / ▲ 유지~상승]
+      아이돌 팬덤 니치에서 일반 Z세대로 확산.
+
+  - trend_id: male_2026_spring_016
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "레전트"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.2, 0.6]
+      age: [0.5, 0.9]
+    action_hints:
+      - 정수리 볼륨
+      - 사이드 차분
+      - 블루블랙·다크브라운과 세트
+    detailed_guide: |
+      [score: +0.3 / → 유지]
+      30대+ 포멀 씬의 기본값. 안정적 유지.
+
+  - trend_id: male_2026_spring_017
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "극단 언더컷 / 스킨페이드"
+    compatible_coordinates:
+      shape: [0.7, 1.0]
+      volume: [0.1, 0.5]
+      age: [0.4, 0.8]
+    action_hints:
+      - 크리에이티브/퍼포먼스 씬 한정
+      - 명확한 경계 피하기 권장
+      - 소프트 투블럭으로 대안 제시
+    detailed_guide: |
+      [score: -0.7 / ↘ 하락]
+      2024 피크 후 퇴조. GQ Korea 2026 남성 헤어 리포트 미언급.
+      '소프트맥싱' 방향과 정면 충돌.
+
+  - trend_id: male_2026_spring_018
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "과한 울프컷"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.5, 0.9]
+      age: [0.3, 0.7]
+    action_hints:
+      - 강한 샤기/레이어 회피
+      - 세미 리프컷 계열로 흡수
+      - 개성 니치용만
+    detailed_guide: |
+      [score: -0.5 / ↘ 하락]
+      소프트 레이어드 형태(세미 리프컷 계열)로 흡수됨. 강한 울프컷은 개성 니치용.
+
+  # ═══════════════════════════════════════════════════════════════
+  # HAIR PERM TRENDS (6종) — trend_data_men.MEN_HAIR_PERM_TRENDS
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: male_2026_spring_030
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "섀도펌 (Shadow Perm)"
+    compatible_coordinates:
+      shape: [0.3, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.2, 0.6]
+    action_hints:
+      - 앞머리와 탑에만 소프트 웨이브
+      - 펌했지만 안 한 것 같은 마감
+      - 세미 리프컷/텍스처 크롭과 세트
+    detailed_guide: |
+      [score: +1.0 / 🔥 강한 상승]
+      2026 서울 살롱 요청 펌 1위 (Creatrip).
+
+  - trend_id: male_2026_spring_031
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "다운펌 (Down Perm)"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.1, 0.5]
+      age: [0.3, 0.7]
+    action_hints:
+      - 두상 정리 기초 펌
+      - 뻗치는 뒷머리·옆머리 눌러 라인 매끈
+      - 단독 또는 다른 펌과 병용
+    detailed_guide: |
+      [score: +0.8 / 🔥 상승]
+      서울 직장인 남성 80%가 경험했을 정도로 대중화.
+
+  - trend_id: male_2026_spring_032
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "빈티지 웨이브 펌"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.8]
+      age: [0.3, 0.7]
+    action_hints:
+      - 1970s 루즈 S-웨이브
+      - 미디움~장발과 결합
+      - 솔트 스프레이 마무리 필수
+    detailed_guide: |
+      [score: +0.7 / ▲ 상승]
+      GQ Korea: '의도가 있는 선택.' '자다 일어난 듯 풀어진 결.'
+
+  - trend_id: male_2026_spring_033
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "아스펌"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.7]
+    action_hints:
+      - 센터파트 소프트 커브
+      - 전 연령대 호환
+      - 레전트·댄디컷 계열과 세트
+    detailed_guide: |
+      [score: +0.6 / ▲ 상승]
+      직장인 기본 선택지.
+
+  - trend_id: male_2026_spring_034
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "그레인펌"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.8]
+      age: [0.3, 0.7]
+    action_hints:
+      - 작고 촘촘한 컬 자연스럽게
+      - 강한 히피펌 대체
+      - 피로도 낮춤
+    detailed_guide: |
+      [score: +0.5 / → 유지~▲]
+      스핀스왈로의 소프트 버전 포지션.
+
+  - trend_id: male_2026_spring_035
+    season: "2026_spring"
+    gender: male
+    category: styling_method
+    title: "강한 스핀스왈로 / 히피펌"
+    compatible_coordinates:
+      shape: [0.2, 0.5]
+      volume: [0.7, 1.0]
+      age: [0.2, 0.5]
+    action_hints:
+      - 강펌 회피
+      - 소프트 계열(그레인·아스)로 대안
+      - 관리 피로·손상 주의
+    detailed_guide: |
+      [score: -0.5 / ↘ 하락]
+      비주얼살롱: '타이트 컬의 시대는 지났다.'
+
+  # ═══════════════════════════════════════════════════════════════
+  # TREND MOODS (5종) — trend_data_men.MEN_TREND_MOODS (좌표 0~1 변환)
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: male_2026_spring_040
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "클린컷 프로 (Clean Cut Pro)"
+    compatible_coordinates:
+      shape: [0.50, 0.80]
+      volume: [0.15, 0.45]
+      age: [0.50, 0.80]
+    action_hints:
+      - 소프트 투블럭/레전트
+      - 블루블랙/다크브라운
+      - 세미매트 베이스 + 클린 쉐이브
+    detailed_guide: |
+      [mood / trend_score: +0.9]
+      직장인 기본값. 정돈됐지만 과하지 않은 신뢰 인상.
+      2026 S/S 남성 메인 투톱 중 하나.
+      출처: GQ Korea 2026, 비주얼살롱, 화해 비즈니스.
+
+  - trend_id: male_2026_spring_041
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "소프트 마스큘린 (Soft Masculine)"
+    compatible_coordinates:
+      shape: [0.35, 0.65]
+      volume: [0.35, 0.65]
+      age: [0.25, 0.55]
+    action_hints:
+      - 세미 리프컷/섀도펌
+      - 다크브라운
+      - BB크림 + 혈색 립밤 + 소프트 스텁
+    detailed_guide: |
+      [mood / trend_score: +0.9]
+      K드라마 남자 주연 기본 무드. 동안 + 남성미 + 꾸안꾸.
+      2026 S/S 남성 메인 투톱 중 하나.
+      출처: Creatrip 2026, GQ Korea, 오픈서베이 남성 그루밍.
+
+  - trend_id: male_2026_spring_042
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "헬시 액티브 (Healthy Active)"
+    compatible_coordinates:
+      shape: [0.25, 0.55]
+      volume: [0.25, 0.55]
+      age: [0.20, 0.50]
+    action_hints:
+      - 텍스처 크롭
+      - 애쉬브라운/내추럴 톤
+      - 리얼스킨 세미매트 + 클린 쉐이브
+    detailed_guide: |
+      [mood / trend_score: +0.7]
+      운동하는 듯한 건강한 혈색과 정돈된 베이스. 스포티 + 단정.
+      출처: knok 2026, 화해 비즈니스, KTNews Z세대 뷰티.
+
+  - trend_id: male_2026_spring_043
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "K아이돌 글로우 (K-Idol Glow)"
+    compatible_coordinates:
+      shape: [0.55, 0.85]
+      volume: [0.55, 0.85]
+      age: [0.10, 0.40]
+    action_hints:
+      - 댄디 시스루/콤마헤어
+      - 밀크브라운 컬러
+      - BB크림 + 혈색 립 + 국소 세미 글로우
+    detailed_guide: |
+      [mood / trend_score: +0.6]
+      K팝 아이돌 무대 메이크업의 데일리 버전.
+      남성판 글로우는 얼굴 전체가 아닌 국소(광대·입술) 한정.
+      출처: Creatrip, 네이버 뷰티 종합, 화해 글로벌 K-뷰티.
+
+  - trend_id: male_2026_spring_044
+    season: "2026_spring"
+    gender: male
+    category: mood
+    title: "스트리트 크리에이티브 (Street Creative)"
+    compatible_coordinates:
+      shape: [0.40, 0.70]
+      volume: [0.60, 0.90]
+      age: [0.20, 0.50]
+    action_hints:
+      - 빈티지 웨이브 펌 / 미디움+세미 웨이브
+      - 플래티넘/컬러멜팅
+      - 메탈릭 포인트
+    detailed_guide: |
+      [mood / trend_score: +0.5]
+      패션·크리에이티브 씬. 젠더리스·빈티지·개성 표현.
+      출처: GQ Korea 2026, WGSN 브로뷰티 2026-27.

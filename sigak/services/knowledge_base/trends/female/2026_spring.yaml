@@ -1,6 +1,22 @@
-# Knowledge Base 초기 seed — 2026 봄 여성 트렌드 샘플 2건.
-# 본인/마케터가 Phase P 에서 확장.
+# SIGAK Knowledge Base — Female Trends, 2026 Spring/Summer
+# Source: pipeline/trend_data.py (SSOT). 수동 큐레이션 기반.
+# Phase G seed 2건 + Track C 확장 27건 = 총 29건.
+# 좌표: 0~1 외부 스케일 (VisualCoordinate 와 동일. CLAUDE.md §4.4/12.1).
+# 변환 공식: external = (internal_trend_data + 1) / 2
+#
+# Category 매핑:
+#   - hair front/back  → styling_method
+#   - mood (3축)       → mood
+#   - color palette    → color_palette
+#   - silhouette       → silhouette
+#
+# detailed_guide 앞에 [score: X / label] 프리픽스로 트렌드 방향 보존.
+# score < 0 (하락) 아이템도 포함. compatible_coordinates 를 좁게 설정해 과매칭 방지.
+
 items:
+  # ═══════════════════════════════════════════════════════════════
+  # Phase G seed (기존) — 보존
+  # ═══════════════════════════════════════════════════════════════
   - trend_id: female_2026_spring_001
     season: "2026_spring"
     gender: female
@@ -33,3 +49,473 @@ items:
       - 미들 힐보다 플랫폼 로퍼
     detailed_guide: |
       샤프 쪽 좌표 유저에게 실루엣 강화. 성숙 인상일수록 효과 증폭.
+
+  # ═══════════════════════════════════════════════════════════════
+  # HAIR FRONT TRENDS (8종) — trend_data.HAIR_FRONT_TRENDS
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: female_2026_spring_010
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "풀뱅 (앞머리 일자 풀커버)"
+    compatible_coordinates:
+      shape: [0.6, 0.9]
+      volume: [0.4, 0.7]
+      age: [0.4, 0.8]
+    action_hints:
+      - 레트로/뮤즈 콘셉트에 한정 활용
+      - 무거운 풀뱅 대신 레이어 살린 변형 권장
+      - 이마 노출 거부 시 시스루/커튼뱅으로 대체
+    detailed_guide: |
+      [score: -0.8 / ↘ 하락]
+      네이버·매거진에서 '아직도 풀뱅 고집해?'라는 제목을 쓸 정도로 무거운 풀뱅은
+      '예전 유행' 취급. 전체 무드가 '여백·개방감·얼굴형 살리기'라서 더 밀림.
+
+  - trend_id: female_2026_spring_011
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "시스루뱅"
+    compatible_coordinates:
+      shape: [0.3, 0.8]
+      volume: [0.3, 0.6]
+      age: [0.2, 0.6]
+    action_hints:
+      - 얇게 비치는 두께 유지
+      - 커튼뱅으로 확장 시 트렌드 적합도 향상
+      - 트렌디 포인트는 컬러·컷 쪽에서 가져갈 것
+    detailed_guide: |
+      [score: 0.0 / → 유지]
+      Allure '이번 시즌엔 시스루뱅 대신 버킨뱅·커튼뱅이 유행'.
+      완전 아웃은 아니고 클래식/무난 포지션. '안전한 기본' 태그.
+
+  - trend_id: female_2026_spring_012
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "커튼뱅"
+    compatible_coordinates:
+      shape: [0.3, 0.9]
+      volume: [0.3, 0.7]
+      age: [0.1, 0.6]
+    action_hints:
+      - 센터/사이드파트 레이어드와 세트
+      - 묶었을 때 잔머리처럼 자연스럽게
+      - 2026 버전은 더 길고 페이스 프레이밍 레이어와 이어짐
+    detailed_guide: |
+      [score: +1.0 / 🔥 강한 상승]
+      2026 대표 앞머리. 광대·턱선 보정, 자라나도 지저분해 보이지 않아 유지 편함.
+      2026 버전은 더 길고 얼굴 프레이밍 레이어와 자연스럽게 이어지는 형태로 진화.
+
+  - trend_id: female_2026_spring_013
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "비대칭 사이드뱅"
+    compatible_coordinates:
+      shape: [0.4, 0.9]
+      volume: [0.3, 0.7]
+      age: [0.2, 0.7]
+    action_hints:
+      - 얼굴형 보정 효과 극대
+      - 커튼뱅과 선택지 제공
+      - 사이드파트 무게감 있는 쪽으로 배치
+    detailed_guide: |
+      [score: +0.5 / ▲ 상승]
+      커튼뱅의 비대칭 변형. 얼굴형 보정 효과 강하고 트렌드와 정합.
+
+  - trend_id: female_2026_spring_014
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "컬리뱅"
+    compatible_coordinates:
+      shape: [0.2, 0.6]
+      volume: [0.4, 0.8]
+      age: [0.1, 0.5]
+    action_hints:
+      - 러블리/개성 콘셉트 한정
+      - 전체 머리는 레이어드 정돈
+      - 컬 크기 중간 사이즈 권장
+    detailed_guide: |
+      [score: 0.0 / → 유지]
+      러블리/개성 콘셉트 니치. 메인 트렌드는 아님.
+
+  - trend_id: female_2026_spring_015
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "허쉬뱅 (세미)"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.8]
+      age: [0.2, 0.6]
+    action_hints:
+      - 허쉬컷과 세트 구성
+      - 세미 버전(과하지 않게)만 채택
+      - 끝부분만 가볍게 정리
+    detailed_guide: |
+      [score: +0.3 / → 유지~▲]
+      허쉬컷과 세트. 세미 버전만 생존.
+
+  - trend_id: female_2026_spring_016
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "노뱅 센터파트"
+    compatible_coordinates:
+      shape: [0.4, 0.9]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.8]
+    action_hints:
+      - 페이스 프레이밍 레이어 필수
+      - 커튼뱅과 자연스럽게 연결
+      - 이마 노출 부담 없는 얼굴형 권장
+    detailed_guide: |
+      [score: +0.5 / ▲ 상승]
+      센터파트 + 페이스 프레이밍 레이어. 커튼뱅과 자연스럽게 연결.
+
+  - trend_id: female_2026_spring_017
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "노뱅 사이드파트"
+    compatible_coordinates:
+      shape: [0.4, 0.9]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.8]
+    action_hints:
+      - 사이드파트 + 레이어드
+      - 얼굴형 따라 커튼뱅 대안
+      - 무게감 쪽 머리 볼륨 유지
+    detailed_guide: |
+      [score: +0.5 / ▲ 상승]
+      사이드파트 + 레이어드. 얼굴형 따라 커튼뱅 대안.
+
+  # ═══════════════════════════════════════════════════════════════
+  # HAIR BACK TRENDS (14종) — trend_data.HAIR_BACK_TRENDS
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: female_2026_spring_020
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "턱선 일자 단발"
+    compatible_coordinates:
+      shape: [0.6, 0.9]
+      volume: [0.2, 0.5]
+      age: [0.4, 0.8]
+    action_hints:
+      - 레이어드 단발로 대체 권장
+      - 무게감은 유지하되 끝만 가볍게
+      - 과한 일자 선은 회피
+    detailed_guide: |
+      [score: -0.5 / ↘ 하락]
+      무거운 일자 단발은 지는 분위기. 레이어드 단발만 상승.
+
+  - trend_id: female_2026_spring_021
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "레이어드 보브 (에어리 보브)"
+    compatible_coordinates:
+      shape: [0.3, 0.8]
+      volume: [0.4, 0.8]
+      age: [0.2, 0.6]
+    action_hints:
+      - 에어리·미디 보브 기장
+      - 레이어드 + 볼륨 조합
+      - C컬 드라이로 마무리
+    detailed_guide: |
+      [score: +0.8 / 🔥 상승]
+      에어리 보브, 미디 보브. 레이어드 + 볼륨 조합이 2026 핵심.
+
+  - trend_id: female_2026_spring_022
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "중단발 스트레이트 (무게감)"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.2, 0.5]
+      age: [0.4, 0.8]
+    action_hints:
+      - 레이어드 롭으로 업데이트
+      - 일자 대신 끝 층 살짝
+      - 무게감 유지하되 정돈
+    detailed_guide: |
+      [score: -0.3 / ↘ 완만 하락]
+      무게감 있는 일자 중단발은 레이어드/롭으로 대체 중.
+
+  - trend_id: female_2026_spring_023
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "레이어드 롭 (2026 메인)"
+    compatible_coordinates:
+      shape: [0.3, 0.9]
+      volume: [0.3, 0.7]
+      age: [0.2, 0.7]
+    action_hints:
+      - 귀 아래~쇄골 기장
+      - 겉은 차분·안쪽은 가볍게
+      - C컬 드라이 or 큰 S 웨이브
+    detailed_guide: |
+      [score: +1.0 / 🔥 강한 상승]
+      2026 메인 키워드 '롭'. W Korea '거지존이 유행'이라는 제목으로 핵심 트렌드 지목.
+      광대·턱선 감싸 얼굴형 보정. C컬 드라이로 발랄, 큰 S 웨이브로 러블리 모두 가능.
+
+  - trend_id: female_2026_spring_024
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "소프트 중단발 펌 (C/S컬)"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.8]
+      age: [0.2, 0.6]
+    action_hints:
+      - 소프트 C컬 또는 S컬
+      - 강한 펌은 회피
+      - 롭/미디움과 세트
+    detailed_guide: |
+      [score: +0.3 / → 유지~▲]
+      소프트 C컬/S컬 중단발펌은 유지. 강한 펌은 하락.
+
+  - trend_id: female_2026_spring_025
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "롱 스트레이트 (슬릭)"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.2, 0.5]
+      age: [0.3, 0.7]
+    action_hints:
+      - 기장은 유지
+      - 레이어드/웨이브로 변화 권장
+      - 슬릭 마감
+    detailed_guide: |
+      [score: 0.0 / → 유지]
+      슬릭 스트레이트. 기장 자체는 유지, 레이어드/웨이브로 변화 권장.
+
+  - trend_id: female_2026_spring_026
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "롱 레이어드 (하이 레이어드)"
+    compatible_coordinates:
+      shape: [0.4, 0.9]
+      volume: [0.4, 0.8]
+      age: [0.3, 0.7]
+    action_hints:
+      - 자르지 않고 레이어만
+      - 얼굴 주변 무게감 분산
+      - 긴 머리 유지파에게 해답
+    detailed_guide: |
+      [score: +0.8 / 🔥 상승]
+      하이 레이어드. W Korea '긴머리 포기 못 하지만 분위기는 확 바꾸고 싶을 땐'.
+      자르지 않고도 충분히 달라질 수 있는 2026 롱헤어 해답.
+
+  - trend_id: female_2026_spring_027
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "롱 레이어드 + 빈티지 웨이브 펌"
+    compatible_coordinates:
+      shape: [0.3, 0.8]
+      volume: [0.5, 0.9]
+      age: [0.3, 0.7]
+    action_hints:
+      - 하이 레이어드와 빈티지 S 웨이브 결합
+      - 자다 일어난 듯 풀어진 결
+      - 메시걸/타이어드걸 무드
+    detailed_guide: |
+      [score: +0.7 / ▲ 상승]
+      빈티지 웨이브 펌 + 하이 레이어드. Allure '자다 일어난 듯 풀어진 웨이브,
+      메시걸·타이어드걸 트렌드와 맞물린 빈티지 웨이브 펌'.
+
+  - trend_id: female_2026_spring_028
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "히피펌 (강한)"
+    compatible_coordinates:
+      shape: [0.2, 0.5]
+      volume: [0.7, 1.0]
+      age: [0.2, 0.5]
+    action_hints:
+      - 소프트 히피(잔컬)만 니치 유지
+      - 강한 히피는 회피
+      - 관리 피로 주의
+    detailed_guide: |
+      [score: -0.5 / ↘ 하락]
+      강한 히피펌은 머리 상함·관리 피로·유행 피곤.
+      소프트 히피(중단발·롱에 살짝 잔컬)만 니치 유지, 강한 히피는 확실히 하락.
+
+  - trend_id: female_2026_spring_029
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "롱 C컬"
+    compatible_coordinates:
+      shape: [0.4, 0.8]
+      volume: [0.3, 0.7]
+      age: [0.3, 0.7]
+    action_hints:
+      - 직장인·데일리 기본값
+      - 깔끔하고 안전
+      - 중단발/롭과 세트
+    detailed_guide: |
+      [score: +0.3 / → 유지~▲]
+      직장인·데일리 기본값. 깔끔하고 안전. 중단발/롭과 세트.
+
+  - trend_id: female_2026_spring_030
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "롱 S컬 (빈티지 웨이브)"
+    compatible_coordinates:
+      shape: [0.3, 0.8]
+      volume: [0.4, 0.8]
+      age: [0.3, 0.7]
+    action_hints:
+      - 자연스럽게 흩날리는 결
+      - 은은한 볼륨
+      - 롱/롭 불문 메인
+    detailed_guide: |
+      [score: +0.7 / ▲ 상승]
+      2026 메인 펌. 빈티지 웨이브로 롱/롭 불문 메인.
+
+  - trend_id: female_2026_spring_031
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "울프컷"
+    compatible_coordinates:
+      shape: [0.5, 0.9]
+      volume: [0.5, 0.9]
+      age: [0.3, 0.7]
+    action_hints:
+      - 레트로/강한 개성용 한정
+      - 과한 층은 관리 피로
+      - 허쉬컷 세미 버전으로 대안 검토
+    detailed_guide: |
+      [score: -0.7 / ↘ 하락]
+      과한 샤기 + 층. 관리 피로. 2024 피크 후 하락. 레트로/강한 개성용만.
+
+  - trend_id: female_2026_spring_032
+    season: "2026_spring"
+    gender: female
+    category: styling_method
+    title: "허쉬컷 (세미)"
+    compatible_coordinates:
+      shape: [0.3, 0.7]
+      volume: [0.4, 0.8]
+      age: [0.2, 0.6]
+    action_hints:
+      - 중단발 베이스
+      - 무게감 유지하되 끝만 가볍게
+      - 레이어드와 중간지점
+    detailed_guide: |
+      [score: +0.3 / → 유지~▲]
+      세미 허쉬(중단발). 레이어드와 중간지점.
+      과거 샤기처럼 날리는 게 아니라 무게감 유지하되 끝만 가볍게 정리.
+
+  # ═══════════════════════════════════════════════════════════════
+  # TREND MOODS (5종) — trend_data.TREND_MOODS (좌표 0~1 변환)
+  # ═══════════════════════════════════════════════════════════════
+  - trend_id: female_2026_spring_040
+    season: "2026_spring"
+    gender: female
+    category: mood
+    title: "헬시 글로우 (Healthy Glow)"
+    compatible_coordinates:
+      shape: [0.25, 0.55]
+      volume: [0.20, 0.50]
+      age: [0.20, 0.50]
+    action_hints:
+      - 글로우 베이스 + 피지컬 치크
+      - 립밤/시럽 립으로 촉촉한 혈색
+      - MLBB 베이스 팔레트
+    detailed_guide: |
+      [mood / trend_score: +0.8]
+      글로우 베이스 + 피지컬 치크 + 립밤/시럽 립. 운동하고 난 것 같은 건강한 혈색.
+      키워드: 리얼스킨 / 속광 / 건강한 혈색 / MLBB / 피지컬 글로우.
+      출처: 화해 2026 (BB/CC 267%↑, 립케어 113%↑), Allure, 헬스조선.
+
+  - trend_id: female_2026_spring_041
+    season: "2026_spring"
+    gender: female
+    category: mood
+    title: "도도한 동안 (Dodo Dongan)"
+    compatible_coordinates:
+      shape: [0.45, 0.75]
+      volume: [0.50, 0.80]
+      age: [0.10, 0.40]
+    action_hints:
+      - 밝고 깨끗한 피부
+      - 짧고 또렷한 눈매
+      - 맑은 로즈/핑크 립
+    detailed_guide: |
+      [mood / trend_score: +0.9]
+      밝고 깨끗한 피부 + 짧고 또렷한 눈매 + 맑은 로즈/핑크 립.
+      어려 보이면서 선명한 인상. 2026 S/S 여성 메인 투톱 중 하나.
+      출처: W Korea, Marie Claire '말랑쫀득한 이것', 유튜브 한국 메이크업.
+
+  - trend_id: female_2026_spring_042
+    season: "2026_spring"
+    gender: female
+    category: mood
+    title: "쿨 페미닌 (Cool Feminine)"
+    compatible_coordinates:
+      shape: [0.50, 0.80]
+      volume: [0.45, 0.75]
+      age: [0.45, 0.75]
+    action_hints:
+      - 시어한 베이스
+      - 쿨 컬러 포인트 (블루/퍼플/실버)
+      - 균형형 텍스처
+    detailed_guide: |
+      [mood / trend_score: +0.7]
+      시어한 베이스 + 쿨 컬러 포인트 + 균형형 텍스처. 지적이고 도시적인 무드.
+      키워드: 지적인 뷰티 / 모던 / 글래스 아이즈 / 실버 포인트 / 메탈릭.
+      출처: 코스모폴리탄 '지적인 뷰티', 마리끌레르 '글리치 글램'.
+
+  - trend_id: female_2026_spring_043
+    season: "2026_spring"
+    gender: female
+    category: mood
+    title: "이지 시크 (Easy Chic)"
+    compatible_coordinates:
+      shape: [0.35, 0.65]
+      volume: [0.25, 0.55]
+      age: [0.40, 0.70]
+    action_hints:
+      - 리얼 베이스 (커버 최소)
+      - 톤인톤 아이/치크/립
+      - 한 포인트만 — 나머지 힘 빼기
+    detailed_guide: |
+      [mood / trend_score: +0.8]
+      리얼 베이스 + 톤인톤 아이·치크·립 + 한 포인트만.
+      공들이지 않은 것 같은 균형. 2026 S/S 여성 메인 투톱 중 하나.
+      키워드: Effortless Luxury / 톤인톤 / 힘 뺀 고급 / 여유.
+      출처: 네이버 트렌드 블로그, W Korea, 마리끌레르.
+
+  - trend_id: female_2026_spring_044
+    season: "2026_spring"
+    gender: female
+    category: mood
+    title: "글리치 글램 (Glitch Glam)"
+    compatible_coordinates:
+      shape: [0.40, 0.70]
+      volume: [0.75, 1.00]
+      age: [0.50, 0.80]
+    action_hints:
+      - 메탈릭/글리터 포인트
+      - 비대칭 요소
+      - 일부러 어긋난 디테일
+    detailed_guide: |
+      [mood / trend_score: +0.4]
+      메탈릭/글리터 포인트 + 비대칭 + 일부러 어긋난 요소. 실험적 개성.
+      키워드: 퓨처 글로우 / 홀로그램 / 오팔 광채 / 불완전함 / 엑스트라 셀레스티얼.
+      출처: 마리끌레르 '글리치 글램·엑스트라 셀레스티얼', 화해 글로벌 K-뷰티.

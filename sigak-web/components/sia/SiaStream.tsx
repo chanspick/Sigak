@@ -27,7 +27,14 @@
  *   - 메시지 길이 변화 + pending 변화 + stagger 진행 변화에 모두 반응.
  *   - SSR 안전: useEffect 내부에서만 scrollTo 접근.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { SiaTurn } from "@/lib/types/sia.legacy";
 
@@ -38,6 +45,11 @@ export interface SiaStreamProps {
   messages: SiaTurn[];
   /** true 이면 마지막 턴 아래 SiaDots 표시 (assistant 응답 대기 중) */
   pending?: boolean;
+}
+
+export interface SiaStreamHandle {
+  /** 스크롤 컨테이너를 하단으로 보정. 키보드 올라올 때 외부에서 호출. */
+  scrollToBottom: (opts?: { smooth?: boolean }) => void;
 }
 
 interface ParsedBubble {
@@ -116,8 +128,42 @@ function turnSignature(idx: number, content: string): string {
   return `${idx}|${content}`;
 }
 
-export function SiaStream({ messages, pending = false }: SiaStreamProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+export const SiaStream = forwardRef<SiaStreamHandle, SiaStreamProps>(
+  function SiaStream({ messages, pending = false }, handleRef) {
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+
+    // 하단 스크롤 헬퍼 — 여러 effect 에서 재사용.
+    const scrollToBottom = (smooth = true) => {
+      const node = scrollRef.current;
+      if (!node) return;
+      node.scrollTo({
+        top: node.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    };
+
+    // 외부 (SiaChatView) 가 input focus 시 호출할 수 있도록 expose.
+    useImperativeHandle(
+      handleRef,
+      () => ({
+        scrollToBottom: (opts) => scrollToBottom(opts?.smooth !== false),
+      }),
+      [],
+    );
+
+    // visualViewport resize — 모바일 키보드 open/close 시 자동 재정렬.
+    // iOS/Android 공통 지원. 일부 데스크톱 브라우저는 visualViewport=null 이라
+    // 조건부 리스너만 등록. 120ms 지연 = 키보드 애니메이션 완료 대기.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const onResize = () => {
+        window.setTimeout(() => scrollToBottom(true), 120);
+      };
+      vv.addEventListener("resize", onResize);
+      return () => vv.removeEventListener("resize", onResize);
+    }, []);
 
   // ── 마지막 assistant 턴 식별 + 버블 파싱 ──
   const lastSiaIdx = useMemo(() => findLastAssistantIdx(messages), [messages]);
@@ -263,4 +309,5 @@ export function SiaStream({ messages, pending = false }: SiaStreamProps) {
       )}
     </div>
   );
-}
+  },
+);

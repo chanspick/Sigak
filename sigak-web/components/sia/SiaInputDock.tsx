@@ -25,6 +25,8 @@ export interface SiaInputDockProps {
   placeholder?: string;
   /** 최대 문자 수 — native maxLength 로 clipping. 기본 500. */
   maxLength?: number;
+  /** textarea focus 시 호출. 상위가 스크롤 컨테이너를 하단으로 보정하도록. */
+  onFocus?: () => void;
 }
 
 const DEFAULT_PLACEHOLDER = "Sia에게 답하기";
@@ -42,6 +44,7 @@ export function SiaInputDock({
   disabled = false,
   placeholder = DEFAULT_PLACEHOLDER,
   maxLength = DEFAULT_MAX_LENGTH,
+  onFocus,
 }: SiaInputDockProps) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
   const [value, setValue] = useState("");
@@ -100,6 +103,7 @@ export function SiaInputDock({
         onKeyDown={handleKeyDown}
         onCompositionStart={() => setIsComposing(true)}
         onCompositionEnd={() => setIsComposing(false)}
+        onFocus={onFocus}
         disabled={busy}
         maxLength={maxLength}
         rows={1}

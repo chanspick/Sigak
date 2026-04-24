@@ -21,10 +21,10 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiaTopBar } from "./SiaTopBar";
-import { SiaStream } from "./SiaStream";
+import { SiaStream, type SiaStreamHandle } from "./SiaStream";
 import { SiaInputDock } from "./SiaInputDock";
 import { SiaErrorBanner } from "./SiaErrorBanner";
 import { useSiaSession } from "@/hooks/useSiaSession";
@@ -44,6 +44,17 @@ export function SiaChatView() {
     resetError,
   } = useSiaSession();
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const streamRef = useRef<SiaStreamHandle | null>(null);
+
+  // textarea focus 시 스크롤 컨테이너를 하단으로 보정.
+  // visualViewport resize 가 자동으로도 작동하지만, iOS Safari 에서 focus
+  // 타이밍이 visualViewport 변화보다 먼저 일어나는 케이스가 있어 이중 보장.
+  // 300ms 지연 = 키보드 애니메이션 완료 대기.
+  const handleInputFocus = () => {
+    window.setTimeout(() => {
+      streamRef.current?.scrollToBottom();
+    }, 300);
+  };
 
   // SiaMessage[] → SiaTurn[] (SiaStream 의 legacy prop shape)
   const turns: SiaTurn[] = useMemo(
@@ -84,8 +95,14 @@ export function SiaChatView() {
 
   return (
     <div
-      className="flex min-h-screen flex-col"
-      style={{ background: "var(--color-paper)" }}
+      className="flex flex-col"
+      style={{
+        // 100dvh = dynamic viewport height. 키보드 올라올 때 축소되어
+        // 스크롤 영역이 정상 계산됨. 100vh 는 모바일에서 주소창 포함 고정치라
+        // 키보드가 화면을 덮어도 그대로라 가려지는 문제 발생.
+        minHeight: "100dvh",
+        background: "var(--color-paper)",
+      }}
     >
       {/* TopBar + 끝내기 버튼 overlay — SiaTopBar 자체는 수정 금지 */}
       <div
@@ -140,7 +157,7 @@ export function SiaChatView() {
       </div>
 
       <main className="flex-1 overflow-hidden min-h-0">
-        <SiaStream messages={turns} pending={pending} />
+        <SiaStream ref={streamRef} messages={turns} pending={pending} />
       </main>
 
       {errorCode && (
@@ -150,6 +167,7 @@ export function SiaChatView() {
       <SiaInputDock
         onSend={handleSend}
         disabled={inputDisabled}
+        onFocus={handleInputFocus}
         placeholder={
           status === "booting"
             ? "Sia가 준비하는 중이에요"

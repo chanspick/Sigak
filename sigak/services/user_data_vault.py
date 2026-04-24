@@ -21,6 +21,14 @@ from typing import Any, Optional
 from sqlalchemy import text
 from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.user_history import (
+    AspirationHistoryEntry,
+    BestShotHistoryEntry,
+    ConversationHistoryEntry,
+    HistoryIgSnapshot,
+    UserHistory,
+    VerdictHistoryEntry,
+)
 from schemas.user_taste import (
     ConversationSignals,
     PhotoReference,
@@ -28,6 +36,7 @@ from schemas.user_taste import (
     compute_strength_score,
 )
 from services.coordinate_system import (
+    GapVector,
     VisualCoordinate,
     neutral_coordinate,
 )
@@ -73,7 +82,44 @@ class UserDataVault(BaseModel):
     pi_version_count: int = 0
     monthly_report_count: int = 0
 
+    # CLAUDE.md §4.2 spec 이행 — users.user_history JSONB hydrated view.
+    # STEP 4 hook 이 여기에 append 하고, vault 는 읽기 전용으로 노출.
+    user_history: UserHistory = Field(default_factory=UserHistory)
+
+    # 최신 aspiration 의 GapVector — UserTasteProfile.aspiration_vector 연결용.
+    # load_vault 에서 aspiration_analyses.result_data 에서 파싱.
+    latest_aspiration_gap: Optional[GapVector] = None
+
     snapshot_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # ─────────────────────────────────────────────
+    #  History list access — CLAUDE.md §4.2 spec shapes
+    # ─────────────────────────────────────────────
+
+    @property
+    def feed_snapshots(self) -> list[HistoryIgSnapshot]:
+        """conversations[].ig_snapshot 을 평탄화 — 시계열 IG 피드 히스토리."""
+        out: list[HistoryIgSnapshot] = []
+        for c in self.user_history.conversations:
+            if c.ig_snapshot is not None:
+                out.append(c.ig_snapshot)
+        return out
+
+    @property
+    def aspiration_history(self) -> list[AspirationHistoryEntry]:
+        return list(self.user_history.aspiration_analyses)
+
+    @property
+    def best_shot_history(self) -> list[BestShotHistoryEntry]:
+        return list(self.user_history.best_shot_sessions)
+
+    @property
+    def verdict_history(self) -> list[VerdictHistoryEntry]:
+        return list(self.user_history.verdict_sessions)
+
+    @property
+    def conversation_history(self) -> list[ConversationHistoryEntry]:
+        return list(self.user_history.conversations)
 
     # ─────────────────────────────────────────────
     #  UserTasteProfile composition
@@ -116,7 +162,7 @@ class UserDataVault(BaseModel):
             user_id=self.basic_info.user_id,
             snapshot_at=self.snapshot_at,
             current_position=position,
-            aspiration_vector=None,   # Phase J 에서 추구미 분석 결과로 채움
+            aspiration_vector=self.latest_aspiration_gap,
             preference_evidence=evidence,
             conversation_signals=signals,
             trajectory=[],             # Phase M (이달의 시각) 에서 채움
@@ -172,25 +218,43 @@ class UserDataVault(BaseModel):
     def _compose_preference_evidence(self) -> list[PhotoReference]:
         """현 vault 상태에서 확보 가능한 사진 레퍼런스.
 
-        MVP: latest_posts 의 display_url 보존분만 얇게 참조.
-        Phase I 이후 R2 stored_url 로 전환.
+        MVP 소스:
+          1. ig_feed_cache.latest_posts (IG 피드 최신)
+          2. user_history.best_shot_sessions[*].selected (Best Shot 선별 A컷)
+
+        R2 업로드 완료된 URL 우선 (latest_posts 는 STEP 2 후 R2 URL 로 교체됨,
+        Best Shot selected 는 저장 시점부터 R2).
         """
-        if not self.ig_feed_cache:
-            return []
-        posts = self.ig_feed_cache.get("latest_posts") or []
         refs: list[PhotoReference] = []
-        for p in posts[:10]:
-            url = p.get("display_url") if isinstance(p, dict) else None
-            if not url:
-                continue
-            refs.append(PhotoReference(
-                photo_id=_photo_id_from_caption(p),
-                stored_url=url,
-                source="ig_feed",
-                captured_at=_parse_iso(p.get("timestamp")),
-                sia_comment=None,
-                coordinate=None,
-            ))
+
+        # 1. IG feed
+        if self.ig_feed_cache:
+            posts = self.ig_feed_cache.get("latest_posts") or []
+            for p in posts[:10]:
+                url = p.get("display_url") if isinstance(p, dict) else None
+                if not url:
+                    continue
+                refs.append(PhotoReference(
+                    photo_id=_photo_id_from_caption(p),
+                    stored_url=url,
+                    source="ig_feed",
+                    captured_at=_parse_iso(p.get("timestamp")),
+                    sia_comment=None,
+                    coordinate=None,
+                ))
+
+        # 2. Best Shot selected — 최신 세션부터 5장까지
+        for bs_idx, session in enumerate(self.user_history.best_shot_sessions[:1]):
+            for sel_idx, sel in enumerate(session.selected[:5]):
+                refs.append(PhotoReference(
+                    photo_id=f"bs_{session.session_id}_{sel_idx}",
+                    stored_url=sel.r2_url,
+                    source="best_shot_upload",
+                    captured_at=session.created_at,
+                    sia_comment=sel.sia_comment,
+                    coordinate=None,
+                ))
+
         return refs
 
     def _compose_user_original_phrases(self) -> list[str]:
@@ -234,7 +298,7 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
         gender=profile.get("gender"),
         birth_date=_date_to_str(profile.get("birth_date")),
         ig_handle=profile.get("ig_handle"),
-        name=None,   # users 테이블 별도 조회 필요 — Phase H/I 에서 확장
+        name=_fetch_user_name(db, user_id),
     )
 
     # 상품별 카운트 — MVP 는 0. Phase I/J/K/M 진행 시 각 테이블 COUNT(*) 연결.
@@ -247,6 +311,12 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
     # 로 fallback 좌표를 주입. Phase H Sia 직접 산출물이 생기면 그쪽이 우선.
     _inject_coordinate_fallback(structured_fields, ig_feed_cache)
 
+    # users.user_history JSONB → UserHistory 객체. STEP 4 append hook 의 누적본.
+    user_history = _fetch_user_history(db, user_id)
+
+    # 최신 aspiration GapVector — UserTasteProfile.aspiration_vector 연결용.
+    latest_gap = _fetch_latest_aspiration_gap(db, user_id)
+
     return UserDataVault(
         basic_info=basic,
         ig_feed_cache=ig_feed_cache,
@@ -256,7 +326,96 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
         best_shot_count=counts.get("best_shot_count", 0),
         pi_version_count=counts.get("pi_version_count", 0),
         monthly_report_count=counts.get("monthly_report_count", 0),
+        user_history=user_history,
+        latest_aspiration_gap=latest_gap,
     )
+
+
+def _fetch_user_name(db, user_id: str) -> Optional[str]:
+    """users.name 조회. 컬럼 / row 없으면 None (예외 흡수)."""
+    try:
+        row = db.execute(
+            text("SELECT name FROM users WHERE id = :uid"),
+            {"uid": user_id},
+        ).first()
+        if row is None:
+            return None
+        name = row.name
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+        return None
+    except Exception:
+        logger.debug("users.name fetch failed for user=%s", user_id)
+        return None
+
+
+def _fetch_user_history(db, user_id: str) -> UserHistory:
+    """users.user_history JSONB → UserHistory 파싱.
+
+    컬럼 없음 (migration 미적용) / row 없음 / 파싱 실패 = 빈 UserHistory.
+    """
+    try:
+        row = db.execute(
+            text("SELECT user_history FROM users WHERE id = :uid"),
+            {"uid": user_id},
+        ).first()
+    except Exception:
+        # 컬럼 없음 (migration 미적용) — MVP 환경에서 흔함
+        logger.debug("users.user_history column absent for user=%s", user_id)
+        return UserHistory()
+
+    if row is None:
+        return UserHistory()
+
+    raw = row.user_history
+    if not isinstance(raw, dict):
+        return UserHistory()
+
+    try:
+        return UserHistory.model_validate(raw)
+    except Exception:
+        logger.warning(
+            "user_history JSONB validation failed user=%s — returning empty",
+            user_id,
+        )
+        return UserHistory()
+
+
+def _fetch_latest_aspiration_gap(db, user_id: str) -> Optional[GapVector]:
+    """최신 aspiration_analyses.result_data.gap_vector 파싱.
+
+    테이블 없음 / 데이터 없음 / 파싱 실패 = None.
+    """
+    try:
+        row = db.execute(
+            text(
+                "SELECT result_data FROM aspiration_analyses "
+                "WHERE user_id = :uid "
+                "ORDER BY created_at DESC "
+                "LIMIT 1"
+            ),
+            {"uid": user_id},
+        ).first()
+    except Exception:
+        logger.debug("aspiration_analyses fetch skipped for user=%s", user_id)
+        return None
+
+    if row is None or not row.result_data:
+        return None
+
+    result_raw = row.result_data
+    if not isinstance(result_raw, dict):
+        return None
+
+    gap_raw = result_raw.get("gap_vector")
+    if not isinstance(gap_raw, dict):
+        return None
+
+    try:
+        return GapVector.model_validate(gap_raw)
+    except Exception:
+        logger.debug("GapVector parse failed for user=%s", user_id)
+        return None
 
 
 def _inject_coordinate_fallback(

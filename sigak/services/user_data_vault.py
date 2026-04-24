@@ -240,16 +240,60 @@ def load_vault(db, user_id: str) -> Optional[UserDataVault]:
     # 상품별 카운트 — MVP 는 0. Phase I/J/K/M 진행 시 각 테이블 COUNT(*) 연결.
     counts = _fetch_product_counts(db, user_id)
 
+    structured_fields = dict(profile.get("structured_fields") or {})
+    ig_feed_cache = profile.get("ig_feed_cache")
+    # Phase H-lite: Sia 가 structured_fields["coordinate"] 를 아직 산출하지 않는
+    # MVP 단계에서, IG Vision analysis 가 있으면 derive_coordinate_from_analysis
+    # 로 fallback 좌표를 주입. Phase H Sia 직접 산출물이 생기면 그쪽이 우선.
+    _inject_coordinate_fallback(structured_fields, ig_feed_cache)
+
     return UserDataVault(
         basic_info=basic,
-        ig_feed_cache=profile.get("ig_feed_cache"),
-        structured_fields=profile.get("structured_fields") or {},
+        ig_feed_cache=ig_feed_cache,
+        structured_fields=structured_fields,
         conversation_count=counts.get("conversation_count", 0),
         aspiration_count=counts.get("aspiration_count", 0),
         best_shot_count=counts.get("best_shot_count", 0),
         pi_version_count=counts.get("pi_version_count", 0),
         monthly_report_count=counts.get("monthly_report_count", 0),
     )
+
+
+def _inject_coordinate_fallback(
+    structured_fields: dict[str, Any],
+    ig_feed_cache: Optional[dict],
+) -> None:
+    """structured_fields["coordinate"] 가 비어있고 IG analysis 가 있으면 fallback 주입.
+
+    CLAUDE.md 좌표 불가침 규칙 준수 — 기존 함수 바디는 손대지 않고,
+    vault 조립 시점에 structured_fields 복사본에만 추가.
+
+    우선순위:
+      1. structured_fields["coordinate"] (Sia Phase H 직접 산출, 미래) — 건드리지 않음
+      2. ig_feed_cache.analysis → derive_coordinate_from_analysis (MVP fallback)
+      3. 둘 다 없으면 주입 안 함 → _compose_current_position 이 None 반환
+    """
+    if structured_fields.get("coordinate") or structured_fields.get("current_position"):
+        return
+    if not isinstance(ig_feed_cache, dict):
+        return
+    analysis_raw = ig_feed_cache.get("analysis")
+    if not isinstance(analysis_raw, dict):
+        return
+    try:
+        from schemas.user_profile import IgFeedAnalysis
+        from services.aspiration_common import derive_coordinate_from_analysis
+        analysis = IgFeedAnalysis.model_validate(analysis_raw)
+        coord = derive_coordinate_from_analysis(analysis)
+    except Exception:
+        logger.debug("coordinate fallback derivation failed", exc_info=True)
+        return
+    structured_fields["coordinate"] = {
+        "shape": coord.shape,
+        "volume": coord.volume,
+        "age": coord.age,
+        "source": "ig_analysis_fallback",
+    }
 
 
 def _fetch_product_counts(db, user_id: str) -> dict[str, int]:

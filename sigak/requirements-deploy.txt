@@ -34,3 +34,6 @@ alembic==1.13.0
 
 # Cache / Session Store (v2 Priority 1 D3)
 redis==5.0.8        # Sia conversation session, sliding TTL 5min
+
+# R2 / S3-compatible object storage (verdict v2 / best_shot / aspiration 사진 저장)
+boto3==1.35.0       # Cloudflare R2 via boto3 S3 client

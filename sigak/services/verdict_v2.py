@@ -22,11 +22,13 @@ preview 작성 원칙 (REQ-VERDICT-002):
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
 from typing import Any, Literal, Optional, TypedDict
 
 import anthropic
+from PIL import Image, ImageOps
 from pydantic import ValidationError
 
 from config import get_settings
@@ -39,6 +41,51 @@ logger = logging.getLogger(__name__)
 
 class VerdictV2Error(Exception):
     """Verdict 2.0 생성 재시도 후에도 실패."""
+
+
+# ─────────────────────────────────────────────
+#  Image downscale — 413 Request Too Large 방어
+# ─────────────────────────────────────────────
+
+# Anthropic 서버 측 resize 기준과 맞춤 — 1568px 초과 시 서버가 어차피 축소.
+# 긴 변 1568px + JPEG q=85 면 ~200-400KB/장 수준 → 10장도 5MB 이하.
+MAX_LONGEST_SIDE_PX = 1568
+JPEG_QUALITY = 85
+
+
+def downscale_image(data: bytes) -> tuple[bytes, str]:
+    """원본 이미지 bytes → (downscaled JPEG bytes, "image/jpeg").
+
+    규칙:
+      - EXIF orientation 적용 (rotated 이미지 정방향화)
+      - RGB 변환 (JPEG 호환 — PNG alpha / CMYK 등 대응)
+      - 긴 변 1568px 초과 시 LANCZOS 비율 유지 resize
+      - JPEG quality=85 encode
+
+    실패 시 원본 그대로 반환 (best effort). 호출자는 항상 jpeg 로 처리 가능.
+    """
+    try:
+        img = Image.open(io.BytesIO(data))
+        img = ImageOps.exif_transpose(img)
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        w, h = img.size
+        longest = max(w, h)
+        if longest > MAX_LONGEST_SIDE_PX:
+            ratio = MAX_LONGEST_SIDE_PX / longest
+            img = img.resize(
+                (max(1, int(w * ratio)), max(1, int(h * ratio))),
+                Image.Resampling.LANCZOS,
+            )
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+        return buf.getvalue(), "image/jpeg"
+    except Exception:
+        logger.exception(
+            "downscale_image failed (original_bytes=%d) — using original",
+            len(data),
+        )
+        return data, "image/jpeg"
 
 
 # ─────────────────────────────────────────────

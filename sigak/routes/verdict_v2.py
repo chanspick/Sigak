@@ -41,7 +41,12 @@ from services import r2_client, tokens as tokens_service
 from services.knowledge_matcher import match_trends_for_user
 from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
-from services.verdict_v2 import PhotoInput, VerdictV2Error, build_verdict_v2
+from services.verdict_v2 import (
+    PhotoInput,
+    VerdictV2Error,
+    build_verdict_v2,
+    downscale_image,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -118,7 +123,12 @@ async def create_verdict_v2(
             400, f"사진은 최대 {MAX_PHOTOS}장까지 업로드 가능합니다 (현재 {len(photos)}장).",
         )
 
-    # 2. Photo read + content_type validation + base64 encode + raw bytes 보관 (R2 저장용)
+    # 2. Photo read + content_type validation + 다운스케일 (Sonnet + R2 공통)
+    #
+    #    Anthropic API 413 방어: 원본 그대로 보내면 10장 × 10MB = 100MB → base64
+    #    133MB 로 요청 한계(~32MB) 초과. 1568px / JPEG q=85 로 축소하면 장당
+    #    ~300KB, 10장 총 ~3MB 수준으로 안정. R2 저장도 같은 downscaled bytes
+    #    사용 (썸네일/카드 용도라 충분한 해상도).
     photo_inputs: list[PhotoInput] = []
     raw_photo_blobs: list[tuple[bytes, str]] = []   # (data, content_type) photo_index 순
     for idx, pf in enumerate(photos):
@@ -136,13 +146,14 @@ async def create_verdict_v2(
             )
         if not data:
             raise HTTPException(400, f"사진 {idx+1}번 비어있음.")
-        b64 = base64.b64encode(data).decode("ascii")
+        downscaled, ct_out = downscale_image(data)
+        b64 = base64.b64encode(downscaled).decode("ascii")
         photo_inputs.append({
             "base64": b64,
-            "media_type": ct,
+            "media_type": ct_out,
             "index": idx,
         })
-        raw_photo_blobs.append((data, ct))
+        raw_photo_blobs.append((downscaled, ct_out))
 
     # 3. Fetch user_profile (onboarding 완료된 유저만 verdict 가능)
     profile = get_profile(db, user["id"])
@@ -357,6 +368,14 @@ def unlock_verdict_v2(
             ),
             {"id": verdict_id},
         )
+        # STEP 4 — user_history.verdict_sessions append
+        _append_verdict_history(
+            db,
+            user_id=user["id"],
+            verdict_id=verdict_id,
+            full_content=row.full_content,
+            photo_urls=photo_urls,
+        )
         db.commit()
     except IntegrityError as e:
         # Race condition: 동일 verdict_id 로 동시 unlock 요청 2개
@@ -387,6 +406,41 @@ def unlock_verdict_v2(
         balance=new_balance,
         photo_urls=photo_urls,
     )
+
+
+def _append_verdict_history(
+    db,
+    *,
+    user_id: str,
+    verdict_id: str,
+    full_content,
+    photo_urls: list,
+) -> None:
+    """STEP 4 — user_history.verdict_sessions 에 head prepend.
+
+    예외 전부 흡수 — unlock 메인 플로우 영향 금지.
+    """
+    try:
+        from datetime import datetime, timezone
+        from services import user_history
+        from schemas.user_history import VerdictHistoryEntry
+
+        fc = full_content if isinstance(full_content, dict) else {}
+        photo_insights = fc.get("photo_insights") if isinstance(fc, dict) else None
+        recommendation = fc.get("recommendation") if isinstance(fc, dict) else None
+
+        entry = VerdictHistoryEntry(
+            session_id=verdict_id,
+            created_at=datetime.now(timezone.utc),
+            photos_r2_urls=list(photo_urls or []),
+            photo_insights=(photo_insights or []),
+            recommendation=(recommendation or None),
+        )
+        user_history.append_history(
+            db, user_id=user_id, category="verdict_sessions", entry=entry,
+        )
+    except Exception:
+        logger.exception("append_verdict_history failed user=%s", user_id)
 
 
 # ─────────────────────────────────────────────

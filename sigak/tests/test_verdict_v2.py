@@ -226,6 +226,71 @@ def test_photo_to_content_block_missing_data():
 
 
 # ─────────────────────────────────────────────
+#  Image downscale (413 defense)
+# ─────────────────────────────────────────────
+
+def _make_png_bytes(width: int, height: int) -> bytes:
+    """Pillow 로 테스트용 단색 PNG 바이트 생성."""
+    import io as _io
+
+    from PIL import Image as _Image
+
+    img = _Image.new("RGB", (width, height), color=(100, 120, 140))
+    buf = _io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_downscale_image_resizes_oversized_to_1568():
+    """긴 변 4000px 이미지 → 1568px 로 축소 + JPEG 반환."""
+    original = _make_png_bytes(4000, 3000)
+    downscaled, media_type = verdict_v2.downscale_image(original)
+    assert media_type == "image/jpeg"
+
+    # 결과 이미지 검증
+    import io as _io
+
+    from PIL import Image as _Image
+
+    out = _Image.open(_io.BytesIO(downscaled))
+    w, h = out.size
+    assert max(w, h) == 1568
+    # 비율 보존 확인 (4:3)
+    assert abs((w / h) - (4 / 3)) < 0.01
+
+
+def test_downscale_image_keeps_small_image_as_jpeg():
+    """1568px 이하 이미지 → 크기 유지 + JPEG 변환."""
+    original = _make_png_bytes(800, 600)
+    downscaled, media_type = verdict_v2.downscale_image(original)
+    assert media_type == "image/jpeg"
+
+    import io as _io
+
+    from PIL import Image as _Image
+
+    out = _Image.open(_io.BytesIO(downscaled))
+    assert out.size == (800, 600)
+
+
+def test_downscale_image_handles_invalid_bytes():
+    """손상된 bytes → 원본 반환 (best effort, logger 경고)."""
+    garbage = b"not-an-image-at-all"
+    result, media_type = verdict_v2.downscale_image(garbage)
+    # 원본 그대로 반환 + content_type 은 보수적으로 jpeg
+    assert result == garbage
+    assert media_type == "image/jpeg"
+
+
+def test_downscale_image_significantly_reduces_size():
+    """4000x3000 PNG (~수MB) → 1568 JPEG (<500KB) 수준 축소 효과 확인."""
+    original = _make_png_bytes(4000, 3000)
+    downscaled, _ = verdict_v2.downscale_image(original)
+    # 단색이라 JPEG 로 최소 수십KB 수준. PNG 대비 1/10 이하 축소 예상.
+    assert len(downscaled) < len(original) / 3
+
+
+# ─────────────────────────────────────────────
 #  Hard Rules enforcement (user-facing text)
 # ─────────────────────────────────────────────
 

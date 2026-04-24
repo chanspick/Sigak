@@ -271,7 +271,14 @@ def find_violations_v4(
     # Haiku naturalness 전 타입 공통
     m_errors.extend(check_haiku_naturalness(text))
 
+    # A-17/A-20/A-18/Markdown hard reject (유저 실측 피드백)
+    m_errors.extend(check_a17_commerce(text))
+    m_errors.extend(check_a20_abstract_praise(text))
+    m_errors.extend(check_a18_length(text))
+    m_errors.extend(check_markdown_markup(text))
+
     m_warnings: list[str] = []
+    m_warnings.extend(check_a18_length_warning(text))
     if state is not None:
         ce, cw = check_cross_turn_rules(text, msg_type, state)
         m_errors.extend(ce)
@@ -620,6 +627,154 @@ def check_haiku_naturalness(draft: str) -> list[str]:
     return errors
 
 
+# ─────────────────────────────────────────────
+#  A-17 가격/결제/상품 응대 hard reject (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+_COMMERCE_PATTERNS = [
+    # 영업 어휘 (실 유저 대화에서 검출됨)
+    re.compile(r"다음\s*단계"),
+    re.compile(r"풀어드릴"),
+    re.compile(r"정리해드릴"),
+    re.compile(r"추천해드릴"),
+    re.compile(r"핵심\s*포인트"),
+    # 상품명 직접 호명
+    re.compile(r"리포트"),
+    re.compile(r"컨설팅"),
+    re.compile(r"구독"),
+    re.compile(r"티어"),
+    re.compile(r"프리미엄"),
+    re.compile(r"Premium", re.IGNORECASE),
+    # 진단 상품화 어휘
+    re.compile(r"진단에서"),
+    re.compile(r"진단을\s"),
+    re.compile(r"진단으로"),
+    # 가격 수치
+    re.compile(r"₩\s*\d"),
+    re.compile(r"\d[\d,]*\s*원"),   # "49,000원", "49,000원에" 모두 매칭 (가격 전수 차단)
+    re.compile(r"\d+\s*토큰"),
+    re.compile(r"\d+\s*만원"),
+]
+
+
+def check_a17_commerce(draft: str) -> list[str]:
+    """A-17 — 가격/결제/상품 응대 hard reject.
+
+    유저 실측 대화에서 Sia 가 "피드 진단 리포트(₩49,000)", "구독 상품", "다음 단계"
+    류 영업 어휘 사용 → 페르소나 B 친구 포지션 정면 위반. 전수 hard block.
+    """
+    errors: list[str] = []
+    for pat in _COMMERCE_PATTERNS:
+        m = pat.search(draft)
+        if m:
+            errors.append(f"A-17: 영업/상품 어휘 금지 — '{m.group(0)}'")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  A-20 추상 칭찬어 hard reject (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+_ABSTRACT_PRAISE_PATTERNS = [
+    re.compile(r"매력적"),
+    re.compile(r"매력(이|을|은|있|이에|이세|있으|있는)"),
+    re.compile(r"독특(한|해|하|이)"),
+    re.compile(r"특별(한|해|하|이)"),
+    re.compile(r"흥미로(운|워|우)"),
+    re.compile(r"인상적(인|이)"),
+    re.compile(r"센스\s*(있|있는|있으세|이\s*있)"),
+    re.compile(r"안목\s*(이|을|있)"),
+    re.compile(r"감각\s*이\s*있"),
+]
+
+
+def check_a20_abstract_praise(draft: str) -> list[str]:
+    """A-20 — 추상 칭찬어 hard reject.
+
+    "매력 / 독특 / 특별 / 흥미로운 / 인상적 / 센스 / 안목" 류 AI 티 나는 추상
+    찬사 전수 금지. 대체는 구체 관찰 / 유저다움 표현 / 행동 짚기 (base.md 참조).
+    """
+    errors: list[str] = []
+    for pat in _ABSTRACT_PRAISE_PATTERNS:
+        m = pat.search(draft)
+        if m:
+            errors.append(f"A-20: 추상 칭찬어 금지 — '{m.group(0)}'")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  A-18 발화 길이 원칙 (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+A18_MAX_CHARS_HARD = 300          # 이 이상 hard reject
+A18_MAX_CHARS_WARNING = 200       # 이 이상 warning
+A18_MAX_SENTENCES = 3             # 초과 시 warning (hard reject 까지는 아님)
+
+_SENTENCE_SPLIT_RE = re.compile(r"[.!?]+[\s\n]+|[.!?]+$")
+
+
+def _count_sentences(draft: str) -> int:
+    text = draft.strip()
+    if not text:
+        return 0
+    parts = [p for p in _SENTENCE_SPLIT_RE.split(text) if p.strip()]
+    return len(parts)
+
+
+def check_a18_length(draft: str) -> list[str]:
+    """A-18 — 발화 길이 원칙. 300자 초과 hard reject. 4문장 이상 warning-only 는
+    check_a18_length_warning 별도."""
+    errors: list[str] = []
+    total = len(draft)
+    if total > A18_MAX_CHARS_HARD:
+        errors.append(
+            f"A-18: 발화 길이 {total}자 > {A18_MAX_CHARS_HARD}자 hard reject"
+        )
+    return errors
+
+
+def check_a18_length_warning(draft: str) -> list[str]:
+    """A-18 warning — 200자 초과 또는 4문장 이상 경고 (hard reject 아님)."""
+    warnings: list[str] = []
+    total = len(draft)
+    if A18_MAX_CHARS_WARNING < total <= A18_MAX_CHARS_HARD:
+        warnings.append(
+            f"A-18: 발화 길이 {total}자 > {A18_MAX_CHARS_WARNING}자 (권장 초과)"
+        )
+    sents = _count_sentences(draft)
+    if sents > A18_MAX_SENTENCES:
+        warnings.append(
+            f"A-18: 문장 수 {sents} > {A18_MAX_SENTENCES} (연설 회피 권장)"
+        )
+    return warnings
+
+
+# ─────────────────────────────────────────────
+#  마크다운 강조 hard reject (유저 실측 피드백 — 프론트 별 하나도 X)
+# ─────────────────────────────────────────────
+
+_MARKDOWN_PATTERNS = [
+    re.compile(r"\*\*[^*\n]+\*\*"),             # **text**
+    re.compile(r"(?<![*\w])\*(?!\s)[^*\n]+?\*(?!\w)"),  # *text* (소개 bullet 제외)
+    re.compile(r"^#{1,6}\s", re.MULTILINE),     # heading
+    re.compile(r"^>\s", re.MULTILINE),          # blockquote
+    re.compile(r"```"),                          # code block
+]
+
+
+def check_markdown_markup(draft: str) -> list[str]:
+    """마크다운 강조 hard reject.
+
+    프론트는 순수 텍스트 렌더 전제. `*`, `**`, `##`, `>`, ``` 는 AI 티 내며
+    조판 깨짐. base.md 에서 이미 금지했지만 Haiku 가 어기는 경우 validator 차단.
+    """
+    errors: list[str] = []
+    for pat in _MARKDOWN_PATTERNS:
+        if pat.search(draft):
+            errors.append(f"마크다운 강조 금지 ({pat.pattern})")
+    return errors
+
+
 def check_cross_turn_rules(
     draft: str, msg_type: MsgType, state: ConversationState,
 ) -> tuple[list[str], list[str]]:
@@ -716,6 +871,16 @@ def validate(
 
     # Haiku 어휘 자연스러움 (세션 #7 §8.3) — 전 타입 공통
     result.errors.extend(check_haiku_naturalness(draft))
+
+    # A-17/A-20 hard reject — 전 타입 공통 (유저 실측 피드백)
+    result.errors.extend(check_a17_commerce(draft))
+    result.errors.extend(check_a20_abstract_praise(draft))
+    # A-18 발화 길이 — hard reject (300자+)
+    result.errors.extend(check_a18_length(draft))
+    # A-18 길이 warning (200-300자, 4+ 문장)
+    result.warnings.extend(check_a18_length_warning(draft))
+    # 마크다운 강조 hard reject (프론트 별 하나도 X)
+    result.errors.extend(check_markdown_markup(draft))
 
     if state is not None:
         ce, cw = check_cross_turn_rules(draft, msg_type, state)

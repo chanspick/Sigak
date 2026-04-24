@@ -24,9 +24,14 @@ from schemas.sia_state import (
 )
 from services.sia_validators_v4 import (
     ValidationResult,
+    check_a17_commerce,
+    check_a18_length,
+    check_a18_length_warning,
+    check_a20_abstract_praise,
     check_cross_turn_rules,
     check_global_forbidden,
     check_haiku_naturalness,
+    check_markdown_markup,
     check_type_conditional,
     find_violations_v4,
     validate,
@@ -799,3 +804,290 @@ class TestHardcodedSeventypesClean:
             assert not block_errors, (
                 f"RANGE reaffirm fail (block checks): {block_errors}\n  text={text}"
             )
+
+
+# ─────────────────────────────────────────────
+#  A-17 영업/상품 어휘 hard reject (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+class TestA17Commerce:
+    """A-17 — 영업 / 상품 / 가격 어휘 hard reject.
+
+    유저 실측 대화 2026-04-24: Sia 가 "피드 진단 리포트 (₩49,000)", "PI 컨설팅",
+    "구독 상품", "다음 단계" 류 영업 톤 출력 → 페르소나 B 정면 위반. 전수 hard block.
+    """
+
+    def test_blocks_daum_dangye(self):
+        errs = check_a17_commerce("다음 단계로 넘어갈게요")
+        assert any("A-17" in e and "다음" in e for e in errs)
+
+    def test_blocks_purodeuri(self):
+        errs = check_a17_commerce("제가 풀어드릴 수 있어요")
+        assert any("A-17" in e and "풀어드릴" in e for e in errs)
+
+    def test_blocks_jungrihaedeuri(self):
+        errs = check_a17_commerce("제가 정리해드릴게요")
+        assert any("A-17" in e and "정리해드릴" in e for e in errs)
+
+    def test_blocks_chucheonhaedeuri(self):
+        errs = check_a17_commerce("이 각도 추천해드릴 수 있어요")
+        assert any("A-17" in e and "추천해드릴" in e for e in errs)
+
+    def test_blocks_haeksim_point(self):
+        errs = check_a17_commerce("만재님의 핵심 포인트는")
+        assert any("A-17" in e and "핵심" in e for e in errs)
+
+    def test_blocks_report(self):
+        errs = check_a17_commerce("자세한 건 리포트에서")
+        assert any("A-17" in e and "리포트" in e for e in errs)
+
+    def test_blocks_consulting(self):
+        errs = check_a17_commerce("컨설팅 받아보시면")
+        assert any("A-17" in e and "컨설팅" in e for e in errs)
+
+    def test_blocks_subscription(self):
+        errs = check_a17_commerce("구독 상품으로 이어집니다")
+        assert any("A-17" in e and "구독" in e for e in errs)
+
+    def test_blocks_tier(self):
+        errs = check_a17_commerce("프리미엄 티어에서만")
+        assert any("A-17" in e and "티어" in e for e in errs)
+
+    def test_blocks_premium_korean(self):
+        errs = check_a17_commerce("프리미엄 기능")
+        assert any("A-17" in e and "프리미엄" in e for e in errs)
+
+    def test_blocks_premium_english(self):
+        errs = check_a17_commerce("Premium plan 으로")
+        assert any("A-17" in e for e in errs)
+
+    def test_blocks_jindanesseo(self):
+        errs = check_a17_commerce("진단에서 자세히 보여드릴게요")
+        assert any("A-17" in e and "진단에서" in e for e in errs)
+
+    def test_blocks_jindaneul(self):
+        errs = check_a17_commerce("진단을 받아보시면")
+        assert any("A-17" in e and "진단을" in e for e in errs)
+
+    def test_blocks_jindaneuro(self):
+        errs = check_a17_commerce("진단으로 이어집니다")
+        assert any("A-17" in e and "진단으로" in e for e in errs)
+
+    def test_blocks_price_won_symbol(self):
+        errs = check_a17_commerce("₩49,000 에 이용 가능")
+        assert any("A-17" in e for e in errs)
+
+    def test_blocks_price_won_korean(self):
+        errs = check_a17_commerce("49,000원에 이용")
+        assert any("A-17" in e for e in errs)
+
+    def test_blocks_price_tokens(self):
+        errs = check_a17_commerce("10 토큰 결제")
+        assert any("A-17" in e for e in errs)
+
+    def test_blocks_price_manwon(self):
+        errs = check_a17_commerce("5만원 결제 후")
+        assert any("A-17" in e for e in errs)
+
+    def test_allows_diagnosis_word_standalone(self):
+        """'진단' 단독 (뒤에 에서/을/으로 없음) 은 허용. DIAGNOSIS msg_type 과 충돌 회피."""
+        errs = check_a17_commerce("그게 만재님 쪽이라고 보여요")
+        assert not errs
+
+    def test_allows_wonrae(self):
+        """'원래' 는 가격 '원' 과 다름. lookahead 로 구분."""
+        errs = check_a17_commerce("원래 좋아하시던 거잖아요")
+        price_errs = [e for e in errs if "원" in e and "다음" not in e]
+        assert not price_errs
+
+    def test_integrated_in_validate(self):
+        """validate() 파이프라인에서도 A-17 걸러짐."""
+        r = validate("구독 상품으로 넘어가셔야 해요", MsgType.OBSERVATION)
+        assert not r.ok
+        assert any("A-17" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  A-20 추상 칭찬어 hard reject (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+class TestA20AbstractPraise:
+    """A-20 — 추상 칭찬어 hard reject.
+
+    "매력 / 독특 / 특별 / 흥미로운 / 인상적 / 센스 / 안목 / 감각이 있" AI 티 나는
+    추상 찬사 전수 금지. 대체는 구체 관찰.
+    """
+
+    def test_blocks_maelyeok_jeok(self):
+        errs = check_a20_abstract_praise("만재님 매력적이세요")
+        assert any("A-20" in e and "매력적" in e for e in errs)
+
+    def test_blocks_maelyeok_i(self):
+        errs = check_a20_abstract_praise("매력이 있으세요")
+        assert any("A-20" in e and "매력" in e for e in errs)
+
+    def test_blocks_dokteughan(self):
+        errs = check_a20_abstract_praise("독특한 느낌이에요")
+        assert any("A-20" in e and "독특" in e for e in errs)
+
+    def test_blocks_teukbyeolhan(self):
+        errs = check_a20_abstract_praise("특별한 분이세요")
+        assert any("A-20" in e and "특별" in e for e in errs)
+
+    def test_blocks_heungmiroun(self):
+        errs = check_a20_abstract_praise("흥미로운 조합이네요")
+        assert any("A-20" in e and "흥미로" in e for e in errs)
+
+    def test_blocks_insangjeok(self):
+        errs = check_a20_abstract_praise("인상적인 피드")
+        assert any("A-20" in e and "인상적" in e for e in errs)
+
+    def test_blocks_sense(self):
+        errs = check_a20_abstract_praise("센스 있으세요")
+        assert any("A-20" in e and "센스" in e for e in errs)
+
+    def test_blocks_anmok(self):
+        errs = check_a20_abstract_praise("안목이 있으세요")
+        assert any("A-20" in e and "안목" in e for e in errs)
+
+    def test_blocks_gamgak_iisseu(self):
+        errs = check_a20_abstract_praise("감각이 있으신 분")
+        assert any("A-20" in e and "감각" in e for e in errs)
+
+    def test_allows_concrete_observation(self):
+        """구체 관찰은 허용."""
+        errs = check_a20_abstract_praise("만재님 피드는 베이지랑 그린이 반복되더라구요")
+        assert not errs
+
+    def test_allows_gamgak_in_other_context(self):
+        """'감각' 단독 (이 있 없음) 은 허용 — '미적 감각' 등 다른 용법."""
+        errs = check_a20_abstract_praise("그 감각 어디서 오는 거예요?")
+        # "감각\s*이\s*있" 패턴이라 단독 "감각" 은 안 걸림
+        assert not errs
+
+    def test_integrated_in_validate(self):
+        r = validate("매력적이세요 정말", MsgType.OBSERVATION)
+        assert not r.ok
+        assert any("A-20" in e for e in r.errors)
+
+
+# ─────────────────────────────────────────────
+#  A-18 발화 길이 원칙 (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+class TestA18Length:
+    """A-18 — 발화 길이 원칙. 300자 hard reject, 200자 / 4문장 warning."""
+
+    def test_allows_short_utterance(self):
+        errs = check_a18_length("간단히 짚고 갈게요")
+        assert not errs
+
+    def test_allows_200_chars(self):
+        text = "가" * 200
+        errs = check_a18_length(text)
+        assert not errs
+
+    def test_allows_exactly_300_chars(self):
+        text = "가" * 300
+        errs = check_a18_length(text)
+        assert not errs
+
+    def test_blocks_301_chars(self):
+        text = "가" * 301
+        errs = check_a18_length(text)
+        assert any("A-18" in e and "hard reject" in e for e in errs)
+
+    def test_blocks_500_chars(self):
+        text = "가" * 500
+        errs = check_a18_length(text)
+        assert any("A-18" in e and "500자" in e for e in errs)
+
+
+class TestA18LengthWarning:
+    """A-18 warning — 200자 < x ≤ 300자 and 문장 수 > 3."""
+
+    def test_no_warning_for_short(self):
+        warns = check_a18_length_warning("짧은 문장이에요")
+        assert not warns
+
+    def test_no_warning_at_200(self):
+        text = "가" * 200
+        warns = check_a18_length_warning(text)
+        assert not any("권장 초과" in w for w in warns)
+
+    def test_warning_at_201_chars(self):
+        text = "가" * 201
+        warns = check_a18_length_warning(text)
+        assert any("A-18" in w and "권장 초과" in w for w in warns)
+
+    def test_warning_at_300_chars(self):
+        text = "가" * 300
+        warns = check_a18_length_warning(text)
+        assert any("A-18" in w and "300자" in w for w in warns)
+
+    def test_no_length_warning_beyond_hard_cap(self):
+        """301자 이상은 hard reject 라서 length 경고 이중 발생 없음."""
+        text = "가" * 350
+        warns = check_a18_length_warning(text)
+        length_warns = [w for w in warns if "권장 초과" in w]
+        assert not length_warns
+
+    def test_warning_for_4_sentences(self):
+        text = "한 문장이에요. 두 문장이에요. 세 문장이에요. 네 문장이에요."
+        warns = check_a18_length_warning(text)
+        assert any("A-18" in w and "문장 수" in w for w in warns)
+
+    def test_no_warning_for_3_sentences(self):
+        text = "한 문장. 두 문장. 세 문장."
+        warns = check_a18_length_warning(text)
+        assert not any("문장 수" in w for w in warns)
+
+
+# ─────────────────────────────────────────────
+#  마크다운 강조 hard reject (유저 실측 피드백)
+# ─────────────────────────────────────────────
+
+class TestMarkdownMarkup:
+    """마크다운 강조 전수 hard reject.
+
+    유저 직접 피드백 2026-04-24: "프론트에 별 하나라도 나오면 ai티 확 나고 짜게 식어"
+    """
+
+    def test_blocks_double_star(self):
+        errs = check_markdown_markup("**중요** 한 부분")
+        assert any("마크다운" in e for e in errs)
+
+    def test_blocks_single_star_emphasis(self):
+        errs = check_markdown_markup("*강조* 하고 싶은데")
+        assert any("마크다운" in e for e in errs)
+
+    def test_blocks_heading(self):
+        errs = check_markdown_markup("## 섹션 제목\n본문")
+        assert any("마크다운" in e for e in errs)
+
+    def test_blocks_blockquote(self):
+        errs = check_markdown_markup("> 인용구\n본문")
+        assert any("마크다운" in e for e in errs)
+
+    def test_blocks_codeblock(self):
+        errs = check_markdown_markup("```python\ncode\n```")
+        assert any("마크다운" in e for e in errs)
+
+    def test_allows_clean_text(self):
+        errs = check_markdown_markup("만재님 피드 보다 보니 꽤 또렷하시더라구요")
+        assert not errs
+
+    def test_allows_parens(self):
+        """괄호는 마크다운 아님."""
+        errs = check_markdown_markup("(실루엣 관점에서)")
+        assert not errs
+
+    def test_allows_dash(self):
+        """하이픈 — 은 마크다운 아님."""
+        errs = check_markdown_markup("만재님 — 그런 느낌이에요")
+        assert not errs
+
+    def test_integrated_in_validate(self):
+        r = validate("**중요** 한 부분이에요", MsgType.OBSERVATION)
+        assert not r.ok
+        assert any("마크다운" in e for e in r.errors)

@@ -308,14 +308,26 @@ def _strip_m1_meta_preamble(obs_text: str, user_name: str) -> str:
     return stripped or obs_text   # 전부 지워지면 원본 반환 (안전망)
 
 
+# Hard reject 시 fallback 카피 — A-17/A-20 금지 어휘 회피 + 친구 톤.
+_HARD_REJECT_FALLBACK = (
+    "잠깐, 제가 생각을 다시 정리해봐야겠어요. 한 마디만 더 해주실래요?"
+)
+
+
 def _call_haiku(
     msg_type: MsgType,
     state: ConversationState,
     composition: Composition,
     *,
     is_first_turn: bool,
+    max_reject_retries: int = 1,
 ) -> str:
-    """load_haiku_prompt 조립 + call_sia_turn_with_retry."""
+    """load_haiku_prompt 조립 + Haiku 호출 + validator hard error 시 재시도.
+
+    Hard reject 발생 시 (A-17 영업어휘 / A-20 추상칭찬 / A-18 300자+ / markdown) :
+      1회 재시도 후에도 violate 하면 fallback 카피로 대체. Haiku 가 또 영업/추상
+      찬사 뱉는 경우 유저에게 그걸 보여주는 것보다 짧은 fallback 이 안전.
+    """
     last_user = state.last_user()
     user_flags = last_user.flags if last_user else None
 
@@ -334,10 +346,49 @@ def _call_haiku(
         range_mode=composition.range_mode,
     )
     history = _history_for_haiku(state)
-    return sia_llm.call_sia_turn_with_retry(
-        system_prompt=prompt,
-        messages_history=history,
+
+    last_text = ""
+    for attempt in range(max_reject_retries + 1):
+        text = sia_llm.call_sia_turn_with_retry(
+            system_prompt=prompt,
+            messages_history=history,
+        )
+        last_text = text
+        v = validate(
+            text, msg_type, state=state,
+            range_mode=composition.range_mode,
+            confrontation_block=composition.confrontation_block,
+            is_combined=composition.is_combined,
+            exit_confirmed=composition.exit_confirmed,
+        )
+        # Hard reject 대상만 검사 (rhythm warning 등 soft 는 통과)
+        hard_rejects = _filter_hard_rejects(v.errors)
+        if not hard_rejects:
+            return text
+        logger.warning(
+            "Haiku hard-reject attempt %d msg_type=%s errors=%s",
+            attempt + 1, msg_type.value, hard_rejects,
+        )
+
+    # 재시도 전부 실패 → fallback
+    logger.error(
+        "Haiku hard-reject exhausted retries — fallback. last=%r",
+        last_text[:120],
     )
+    return _HARD_REJECT_FALLBACK
+
+
+# Hard reject 대상 prefix. rhythm / A-2 cross-turn 등 soft warning 은 제외.
+_HARD_REJECT_PREFIXES = (
+    "A-17:", "A-18:", "A-20:", "마크다운",
+)
+
+
+def _filter_hard_rejects(errors: list[str]) -> list[str]:
+    return [
+        e for e in errors
+        if any(e.startswith(p) for p in _HARD_REJECT_PREFIXES)
+    ]
 
 
 def _record_assistant_turn(

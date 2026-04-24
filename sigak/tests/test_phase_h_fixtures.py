@@ -46,10 +46,15 @@ from tests.fixtures.sia_phase_h.schema import AssistantSpec, Fixture, UserSpec
 #  Helpers
 # ─────────────────────────────────────────────
 
-# 구조 오류로 취급하지 않는 rhythm 계열 에러 키워드 (cross-turn 영역).
-# A-2 = 잖아요 3창 초과 / ~예요 연타. 스펙 fixture 는 이 rhythm 제한을 의도 반영 안 함
-# (대화 흐름 우선). pipeline 레벨 (routes) 에서 살아있는 check 이므로 fixture 검증에선 pass.
-_RHYTHM_ERROR_PREFIXES = ("A-2:", "A-3:")
+# 구조 오류로 취급하지 않는 에러 키워드.
+#   A-2/A-3: rhythm (cross-turn) — 스펙 fixture 가 대화 흐름 우선으로 의도 반영 안 함
+#   A-17:    영업/상품 어휘 — 스펙 verbatim 일부 ("컨설팅", "다음 단계", "풀어드릴",
+#            "진단에서", "핵심 포인트") 포함. 스펙 작성 시점과 현 BM (토큰 단일제) 불일치.
+#            유저 실측 피드백 후 validator hard reject 추가. fixture 는 스펙 기록 유지,
+#            프로덕션에는 pipeline validator 로 차단.
+#   A-20:    추상 칭찬어 — 스펙 fixture 의 "감각이 있", "매력적" 등. 동일 배경.
+# 모두 pipeline 레벨 (routes/sia.py `_call_haiku`) 에서 hard reject 로 살아있음.
+_RHYTHM_ERROR_PREFIXES = ("A-2:", "A-3:", "A-17:", "A-20:")
 
 
 def _is_rhythm_error(err: str) -> bool:
@@ -57,7 +62,7 @@ def _is_rhythm_error(err: str) -> bool:
 
 
 def _structural_errors(errors: list[str]) -> list[str]:
-    """rhythm (A-2/A-3 cross-turn) 제외 구조 오류만 반환."""
+    """fixture 스펙 verbatim 충돌 회피 — rhythm + 영업/칭찬 어휘 제외."""
     return [e for e in errors if not _is_rhythm_error(e)]
 
 

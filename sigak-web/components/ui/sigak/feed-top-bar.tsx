@@ -1,9 +1,11 @@
 // SIGAK MVP v1.2 — FeedTopBar
 //
 // 검정 바 52px.
-//   - backTarget/onBack 없으면 (/feed 루트): 좌 SIGAK, 우 [balance / profile / +]
+//   - backTarget/onBack 없으면 (/feed 루트): 좌 SIGAK, 우 [balance / profile]
 //   - backTarget/onBack 있으면 (/profile 등 서브): 좌 back chevron, 중앙 SIGAK,
-//     우 [balance / profile / +]
+//     우 [balance / profile]
+//
+// "+" (새 판정) 버튼은 홈 피드 그리드의 + 카드와 중복이라 2026-04-24 제거.
 "use client";
 
 import { useMemo } from "react";
@@ -126,7 +128,7 @@ export function FeedTopBar({ backTarget, onBack }: FeedTopBarProps = {}) {
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Right — balance + profile + plus */}
+      {/* Right — balance + profile (최우측) */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <span
           className="font-sans tabular-nums"
@@ -186,32 +188,6 @@ export function FeedTopBar({ backTarget, onBack }: FeedTopBarProps = {}) {
               •
             </span>
           )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/verdict/new")}
-          aria-label="새 판정"
-          style={{
-            width: 28,
-            height: 28,
-            padding: 0,
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
-            <path
-              d="M10 2v16M2 10h16"
-              stroke="var(--color-paper)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
         </button>
       </div>
     </nav>

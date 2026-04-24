@@ -122,7 +122,8 @@ def test_essentials_happy_path(client):
     sqls = [s.upper() for s, _ in fake_db.executes]
     assert any("UPDATE USERS SET" in s for s in sqls)
     assert any("INSERT INTO USER_PROFILES" in s and "ON CONFLICT" in s for s in sqls)
-    assert fake_db.committed == 1
+    # 2 commits: (1) essentials 저장, (2) 30 토큰 grant 지급
+    assert fake_db.committed == 2
 
 
 def test_essentials_without_ig_handle_stores_null(client):
@@ -284,3 +285,122 @@ def test_me_reports_essentials_incomplete_when_birth_date_null(client):
     r = c.get("/api/v1/auth/me")
     assert r.status_code == 200
     assert r.json()["essentials_completed"] is False
+
+
+# ─────────────────────────────────────────────
+#  신규 가입자 30 토큰 지급 (essentials 완료 시 1회)
+#  idempotency_key 로 race / 재제출 방어.
+# ─────────────────────────────────────────────
+
+def test_essentials_grants_30_tokens_to_new_user(client, monkeypatch):
+    """essentials 정상 완료 시 credit_tokens 이 정확한 args 로 1회 호출돼야 한다."""
+    from routes import onboarding as onb_route
+
+    calls: list[dict] = []
+
+    def spy(db, **kwargs):
+        calls.append(kwargs)
+        return 30  # balance_after
+
+    monkeypatch.setattr(
+        onb_route.tokens_service, "credit_tokens", spy,
+    )
+
+    c, _, _ = client
+    r = c.post(
+        "/api/v1/onboarding/essentials",
+        json={
+            "gender": "female",
+            "birth_date": "1999-03-15",
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    assert len(calls) == 1
+    kw = calls[0]
+    assert kw["user_id"] == "u1"
+    assert kw["amount"] == 30
+    assert kw["kind"] == "grant_essentials"
+    assert kw["idempotency_key"] == "essentials_grant:u1"
+    assert kw["reference_id"] == "u1"
+    assert kw["reference_type"] == "user"
+
+
+def test_essentials_grant_idempotent_on_resubmit(client, monkeypatch):
+    """동일 유저 essentials 재제출 → credit_tokens 은 같은 idempotency_key 로 호출되고,
+    서비스가 기존 balance 반환 (추가 지급 X). route 는 양쪽 모두 200 응답."""
+    from routes import onboarding as onb_route
+
+    calls: list[dict] = []
+
+    def spy(db, **kwargs):
+        calls.append(kwargs)
+        # 실제 credit_tokens: 첫 번째는 INSERT 성공, 두 번째는 SELECT 로 기존값 반환.
+        # 여기선 둘 다 30 반환 — idempotency 는 infra 책임.
+        return 30
+
+    monkeypatch.setattr(
+        onb_route.tokens_service, "credit_tokens", spy,
+    )
+
+    c, _, _ = client
+    payload = {"gender": "female", "birth_date": "1999-03-15"}
+    r1 = c.post("/api/v1/onboarding/essentials", json=payload)
+    r2 = c.post("/api/v1/onboarding/essentials", json=payload)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    # 두 번 호출되지만 같은 idempotency_key — 실 infra 에서 두 번째는 no-op.
+    assert len(calls) == 2
+    assert calls[0]["idempotency_key"] == calls[1]["idempotency_key"]
+    assert calls[0]["idempotency_key"] == "essentials_grant:u1"
+
+
+def test_essentials_grant_race_condition_silently_handled(client, monkeypatch):
+    """동시 요청 race → IntegrityError 발생 시 rollback + 200 응답 유지."""
+    from sqlalchemy.exc import IntegrityError
+
+    from routes import onboarding as onb_route
+
+    def raising(db, **kwargs):
+        raise IntegrityError("insert", {}, Exception("duplicate idempotency_key"))
+
+    monkeypatch.setattr(
+        onb_route.tokens_service, "credit_tokens", raising,
+    )
+
+    c, _, _ = client
+    r = c.post(
+        "/api/v1/onboarding/essentials",
+        json={"gender": "female", "birth_date": "1999-03-15"},
+    )
+    # 지급 실패해도 essentials 저장은 이미 commit 됐으므로 200.
+    assert r.status_code == 200
+    assert r.json()["essentials_completed"] is True
+
+
+def test_essentials_grant_not_called_when_validation_fails(client, monkeypatch):
+    """age/birth_date 등 검증 실패로 400 리턴 시 credit_tokens 호출 없음."""
+    from routes import onboarding as onb_route
+
+    calls: list[dict] = []
+
+    def spy(db, **kwargs):
+        calls.append(kwargs)
+        return 30
+
+    monkeypatch.setattr(
+        onb_route.tokens_service, "credit_tokens", spy,
+    )
+
+    c, _, _ = client
+    # 만 13세 — _ensure_min_age 에서 400
+    today = date.today()
+    too_young = (today.replace(year=today.year - 13) + timedelta(days=30)).isoformat()
+    r = c.post(
+        "/api/v1/onboarding/essentials",
+        json={"gender": "female", "birth_date": too_young},
+    )
+    assert r.status_code == 400
+    # 검증 실패라 지급 로직 도달하지 않음
+    assert len(calls) == 0

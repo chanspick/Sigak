@@ -59,6 +59,9 @@ COST_ASPIRATION_PINTEREST = 20    # /api/v2/aspiration/pinterest
 COST_BEST_SHOT            = 30    # /api/v2/best-shot
 # MONTHLY_REPORT 는 기존 COST_MONTHLY_REPORT(30) 재사용.
 
+# 신규 가입자 지급 — essentials 완료 시 1회 (idempotency_key 로 중복 방지)
+GRANT_ESSENTIALS_AMOUNT = 30
+
 
 # ─────────────────────────────────────────────
 #  DB ops
@@ -81,6 +84,7 @@ KIND_CONSUME_BEST_SHOT            = "consume_best_shot"
 
 KIND_REFUND = "refund"
 KIND_ADMIN_GRANT = "admin_grant"
+KIND_GRANT_ESSENTIALS = "grant_essentials"   # 신규 가입자 onboarding 완료 지급
 
 
 def get_balance(db, user_id: str) -> int:

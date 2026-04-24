@@ -22,8 +22,10 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from deps import db_session, get_current_user
+from services import tokens as tokens_service
 
 
 logger = logging.getLogger(__name__)
@@ -347,6 +349,14 @@ def save_essentials(
 
     db.commit()
 
+    # 2.5. 신규 가입자 30 토큰 지급 — essentials 완료 시 1회.
+    #
+    #   idempotency_key = "essentials_grant:{user_id}" 로 중복 방지:
+    #     - 같은 유저 essentials 재제출 → 기존 balance 반환 (no-op)
+    #     - 동시 요청 2개 → IntegrityError 로 두 번째는 조용히 통과
+    #   지급 시점 = essentials 확정 시점 (카카오 가입 봇 방어 + IG 없는 유저도 포함)
+    _grant_essentials_tokens(db, user_id=user["id"])
+
     # 3. IG 비동기 fetch — handle 있을 때만
     ig_fetch_signal: Literal["pending", "skipped"] = "skipped"
     if ig_handle:
@@ -364,6 +374,38 @@ def save_essentials(
         ig_handle=ig_handle,
         ig_fetch_status=ig_fetch_signal,
     )
+
+
+def _grant_essentials_tokens(db, *, user_id: str) -> None:
+    """essentials 완료 시 신규 가입자 지급. Idempotent (UNIQUE idempotency_key).
+
+    지급 성공 시 INFO 로그. 재지급 요청/race 는 조용히 통과 (기존 balance 유지).
+    """
+    idem = f"essentials_grant:{user_id}"
+    try:
+        balance_after = tokens_service.credit_tokens(
+            db,
+            user_id=user_id,
+            amount=tokens_service.GRANT_ESSENTIALS_AMOUNT,
+            kind=tokens_service.KIND_GRANT_ESSENTIALS,
+            idempotency_key=idem,
+            reference_id=user_id,
+            reference_type="user",
+        )
+        db.commit()
+        logger.info(
+            "granted %d tokens to user_id=%s on essentials completion (balance_after=%d)",
+            tokens_service.GRANT_ESSENTIALS_AMOUNT,
+            user_id,
+            balance_after,
+        )
+    except IntegrityError:
+        # Race: 동시 요청에서 한쪽이 먼저 INSERT 성공. 이쪽은 rollback 후 무시.
+        db.rollback()
+        logger.debug(
+            "essentials grant race: user_id=%s already granted (idem=%s)",
+            user_id, idem,
+        )
 
 
 # ─────────────────────────────────────────────

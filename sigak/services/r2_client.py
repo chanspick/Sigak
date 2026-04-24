@@ -115,6 +115,43 @@ def best_shot_selected_key(user_id: str, session_id: str, photo_id: str) -> str:
 
 
 # ─────────────────────────────────────────────
+#  user_media prefix — STEP 1 전수 R2 저장 (v1 연료)
+#  user_media/{user_id}/
+#    ├── ig_snapshots/{timestamp}/photo_NN.jpg
+#    └── aspiration_targets/{analysis_id}/photo_NN.jpg
+#  본인 IG 사진 (페어링) 은 aspiration_users/ 별도 복사 대신 기존
+#  ig_snapshots R2 URL 참조 (비용 절감).
+# ─────────────────────────────────────────────
+
+def user_media_key(user_id: str, sub_path: str) -> str:
+    """user_media 네임스페이스. 신규 전수 저장 대상."""
+    sub = sub_path.lstrip("/")
+    return f"user_media/{user_id}/{sub}"
+
+
+def ig_snapshot_dir(user_id: str, snapshot_ts: str) -> str:
+    """Sia 진입 시점 IG 피드 스냅샷 디렉토리 prefix. 10장 단위."""
+    return user_media_key(user_id, f"ig_snapshots/{snapshot_ts}/")
+
+
+def ig_snapshot_photo_key(user_id: str, snapshot_ts: str, index: int) -> str:
+    return user_media_key(
+        user_id, f"ig_snapshots/{snapshot_ts}/photo_{index:02d}.jpg"
+    )
+
+
+def aspiration_target_dir(user_id: str, analysis_id: str) -> str:
+    """추구미 타겟 IG/Pinterest 사진 디렉토리 prefix."""
+    return user_media_key(user_id, f"aspiration_targets/{analysis_id}/")
+
+
+def aspiration_target_photo_key(user_id: str, analysis_id: str, index: int) -> str:
+    return user_media_key(
+        user_id, f"aspiration_targets/{analysis_id}/photo_{index:02d}.jpg"
+    )
+
+
+# ─────────────────────────────────────────────
 #  Public API
 # ─────────────────────────────────────────────
 

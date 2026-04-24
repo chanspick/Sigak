@@ -146,13 +146,29 @@ def credit_tokens(
     if existing is not None:
         return int(existing[0])
 
-    new_balance = db.execute(
+    # 2-단계 upsert:
+    #   1) row 존재 보장 (balance=0 INSERT; 이미 있으면 no-op)
+    #   2) UPDATE 로 delta 적용 + RETURNING
+    #
+    # 이유: 단일 INSERT..ON CONFLICT DO UPDATE 는 CHECK 제약을 INSERT VALUES
+    # 단계에서 먼저 검증. debit (amount < 0) 이면 VALUES(uid, -N) 이
+    # balance>=0 제약을 INSERT 행 기준으로 평가해 즉시 raise → ON CONFLICT
+    # UPDATE 분기에 도달하지 못함. 2-단계로 분리하면 UPDATE 가 최종 상태
+    # (기존 balance + amount) 에 CHECK 적용 → 잔액 부족 시에만 raise,
+    # 충분하면 정상 처리.
+    db.execute(
         text(
             "INSERT INTO token_balances (user_id, balance, updated_at) "
-            "VALUES (:uid, :amt, NOW()) "
-            "ON CONFLICT (user_id) DO UPDATE "
-            "  SET balance = token_balances.balance + EXCLUDED.balance, "
-            "      updated_at = NOW() "
+            "VALUES (:uid, 0, NOW()) "
+            "ON CONFLICT (user_id) DO NOTHING"
+        ),
+        {"uid": user_id},
+    )
+    new_balance = db.execute(
+        text(
+            "UPDATE token_balances "
+            "SET balance = balance + :amt, updated_at = NOW() "
+            "WHERE user_id = :uid "
             "RETURNING balance"
         ),
         {"uid": user_id, "amt": amount},

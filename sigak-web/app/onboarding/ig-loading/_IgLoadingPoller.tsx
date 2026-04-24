@@ -32,14 +32,16 @@ export function IgLoadingPoller({ onRetry }: IgLoadingPollerProps) {
     }
   }, [result.error, router]);
 
-  // 최종 상태 도달 시 짧은 딜레이 후 /sia 자동 이동
+  // 최종 상태 or timeout 도달 시 짧은 딜레이 후 /sia 자동 이동.
+  // timeout 은 사양상 "유저 액션 없이 자동 폴백" — ErrorBanner 0.6s 인지 후 넘어감.
   useEffect(() => {
-    if (!result.isTerminal) return;
+    const shouldNavigate = result.isTerminal || result.error === "timeout";
+    if (!shouldNavigate) return;
     // success 는 "다 봤어요" 1.2초 표시 후 이동. 그 외는 0.6초.
     const delay = result.status === "success" ? 1200 : 600;
     const timer = setTimeout(goToSia, delay);
     return () => clearTimeout(timer);
-  }, [result.isTerminal, result.status, goToSia]);
+  }, [result.isTerminal, result.status, result.error, goToSia]);
 
   return (
     <IgLoadingView

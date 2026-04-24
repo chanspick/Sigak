@@ -375,7 +375,8 @@ function _errorMessage(error: IgPollError): string {
     case "network":
       return "인터넷 연결을 확인해 주세요.";
     case "timeout":
-      return "피드 분석이 평소보다 오래 걸리고 있어요.";
+      // 자동 폴백 예정 — 유저는 Sia 로 넘어가는 걸 인지만 하면 됨.
+      return "잠깐 연결이 늦어지네요. Sia 로 넘어갈게요.";
     case "server":
     default:
       return "분석 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.";

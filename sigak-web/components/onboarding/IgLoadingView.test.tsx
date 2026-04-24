@@ -165,6 +165,30 @@ describe("IgLoadingView", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it("G3 — timeout banner shows auto-fallback copy", () => {
+    // 사양: "잠깐 연결이 늦어지네요. Sia 로 넘어갈게요" — 유저가 자동 진입 인지.
+    render(
+      <IgLoadingView
+        result={makeResult({ status: "pending", error: "timeout" })}
+        onRetry={vi.fn()}
+      />,
+    );
+    const banner = screen.getByTestId("ig-error-banner");
+    expect(banner.textContent).toContain("Sia 로 넘어갈게요");
+  });
+
+  it("G3 — non-timeout errors still show generic retry copy (unchanged)", () => {
+    render(
+      <IgLoadingView
+        result={makeResult({ status: "pending", error: "network" })}
+        onRetry={vi.fn()}
+      />,
+    );
+    const banner = screen.getByTestId("ig-error-banner");
+    expect(banner.textContent).toContain("인터넷 연결을 확인");
+    expect(banner.textContent).not.toContain("Sia 로 넘어갈게요");
+  });
+
   it("calls onContinue when CTA clicked on terminal status", () => {
     const onContinue = vi.fn();
     render(

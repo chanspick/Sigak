@@ -37,7 +37,7 @@ from sqlalchemy.exc import IntegrityError
 
 from deps import db_session, get_current_user
 from schemas.verdict_v2 import FullContent, PreviewContent, VerdictV2Result
-from services import tokens as tokens_service
+from services import r2_client, tokens as tokens_service
 from services.knowledge_matcher import match_trends_for_user
 from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
@@ -69,6 +69,8 @@ class CreateResponse(BaseModel):
     preview: PreviewContent
     full_unlocked: bool
     photo_count: int
+    # R2 public URLs — photo_index 0-based 순서. None 항목 = 저장 실패(로컬 fallback 또는 public_url 미설정).
+    photo_urls: list[Optional[str]] = []
 
 
 class UnlockResponse(BaseModel):
@@ -76,6 +78,7 @@ class UnlockResponse(BaseModel):
     full_unlocked: bool
     full_content: FullContent
     balance: int
+    photo_urls: list[Optional[str]] = []
 
 
 class GetResponse(BaseModel):
@@ -84,6 +87,7 @@ class GetResponse(BaseModel):
     full_unlocked: bool
     preview: PreviewContent
     full_content: Optional[FullContent] = None
+    photo_urls: list[Optional[str]] = []
 
 
 # ─────────────────────────────────────────────
@@ -114,8 +118,9 @@ async def create_verdict_v2(
             400, f"사진은 최대 {MAX_PHOTOS}장까지 업로드 가능합니다 (현재 {len(photos)}장).",
         )
 
-    # 2. Photo read + content_type validation + base64 encode
+    # 2. Photo read + content_type validation + base64 encode + raw bytes 보관 (R2 저장용)
     photo_inputs: list[PhotoInput] = []
+    raw_photo_blobs: list[tuple[bytes, str]] = []   # (data, content_type) photo_index 순
     for idx, pf in enumerate(photos):
         ct = pf.content_type or "image/jpeg"
         if ct not in ALLOWED_CONTENT_TYPES:
@@ -137,6 +142,7 @@ async def create_verdict_v2(
             "media_type": ct,
             "index": idx,
         })
+        raw_photo_blobs.append((data, ct))
 
     # 3. Fetch user_profile (onboarding 완료된 유저만 verdict 가능)
     profile = get_profile(db, user["id"])
@@ -184,8 +190,34 @@ async def create_verdict_v2(
         # photo count mismatch 등 input validation
         raise HTTPException(400, str(e))
 
-    # 5. DB insert (v1 legacy columns + v2 columns, version='v2')
+    # 5. R2 업로드 — 영구 보관. ranked_photo_ids 컬럼에 photo_index + r2_key 기록.
     verdict_id = f"vrd_{uuid.uuid4().hex[:24]}"
+    photo_records: list[dict] = []       # DB 저장용: {photo_index, r2_key, content_type}
+    photo_urls: list[Optional[str]] = [] # 응답용
+    for idx, (data, ct) in enumerate(raw_photo_blobs):
+        ext = _ext_from_content_type(ct)
+        key = r2_client.user_photo_key(
+            user["id"], f"verdicts/{verdict_id}/photo_{idx}{ext}",
+        )
+        try:
+            r2_client.put_bytes(key, data, content_type=ct)
+            photo_records.append({
+                "photo_index": idx,
+                "r2_key": key,
+                "content_type": ct,
+            })
+            photo_urls.append(r2_client.public_url(key))
+        except Exception:
+            logger.exception(
+                "verdict v2 R2 upload failed: verdict_id=%s idx=%d", verdict_id, idx,
+            )
+            # 저장 실패해도 verdict 생성 계속 — 응답에선 해당 slot None.
+            photo_records.append({
+                "photo_index": idx,
+                "r2_key": None,
+                "content_type": ct,
+            })
+            photo_urls.append(None)
 
     # v1 NOT NULL columns 에 v2 sensible defaults
     synthetic_photo_ids = [f"p_{verdict_id}_{i}" for i in range(len(photos))]
@@ -208,7 +240,9 @@ async def create_verdict_v2(
             "uid": user["id"],
             "cc": len(photos),
             "wp": synthetic_photo_ids[0],
-            "ranked": json.dumps(synthetic_photo_ids),
+            # v2: ranked_photo_ids 컬럼에 R2 key 기록한 리스트. (v1 과는 shape 다름 —
+            # version='v2' 필드로 구분. GET 시 version 분기로 파싱.)
+            "ranked": json.dumps(photo_records, ensure_ascii=False),
             "pc": json.dumps(result.preview.model_dump(mode="json"), ensure_ascii=False),
             "fc": json.dumps(result.full_content.model_dump(mode="json"), ensure_ascii=False),
             "ps": json.dumps(
@@ -229,6 +263,7 @@ async def create_verdict_v2(
         preview=result.preview,
         full_unlocked=False,
         photo_count=len(photos),
+        photo_urls=photo_urls,
     )
 
 
@@ -260,7 +295,7 @@ def unlock_verdict_v2(
     row = db.execute(
         text(
             "SELECT id, user_id, version, full_unlocked, preview_content, "
-            "       full_content "
+            "       full_content, ranked_photo_ids "
             "FROM verdicts WHERE id = :id"
         ),
         {"id": verdict_id},
@@ -278,6 +313,8 @@ def unlock_verdict_v2(
         # 생성 오류로 full_content 빠진 edge case
         raise HTTPException(500, "피드 분석 내용이 손상되어 해제 불가합니다.")
 
+    photo_urls = _photo_urls_from_ranked(row.ranked_photo_ids)
+
     # 2. Already unlocked — idempotent return (추가 과금 없음)
     if row.full_unlocked:
         balance = tokens_service.get_balance(db, user["id"])
@@ -287,6 +324,7 @@ def unlock_verdict_v2(
             full_unlocked=True,
             full_content=full,
             balance=balance,
+            photo_urls=photo_urls,
         )
 
     # 3. Balance check
@@ -347,6 +385,7 @@ def unlock_verdict_v2(
         full_unlocked=True,
         full_content=full,
         balance=new_balance,
+        photo_urls=photo_urls,
     )
 
 
@@ -367,7 +406,7 @@ def get_verdict_v2(
     row = db.execute(
         text(
             "SELECT id, user_id, version, full_unlocked, preview_content, "
-            "       full_content "
+            "       full_content, ranked_photo_ids "
             "FROM verdicts WHERE id = :id"
         ),
         {"id": verdict_id},
@@ -396,6 +435,7 @@ def get_verdict_v2(
         full_unlocked=bool(row.full_unlocked),
         preview=preview,
         full_content=full,
+        photo_urls=_photo_urls_from_ranked(row.ranked_photo_ids),
     )
 
 
@@ -416,3 +456,43 @@ def _sanitize_profile_snapshot(profile: dict) -> dict:
         "ig_feed_cache": profile.get("ig_feed_cache"),
         "ig_fetch_status": profile.get("ig_fetch_status"),
     }
+
+
+_EXT_BY_CT = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+
+def _ext_from_content_type(ct: str) -> str:
+    return _EXT_BY_CT.get(ct, ".jpg")
+
+
+def _photo_urls_from_ranked(ranked) -> list[Optional[str]]:
+    """verdicts.ranked_photo_ids JSONB (v2 shape) → public URL list.
+
+    v2 shape: [{photo_index, r2_key, content_type}, ...]
+    v1 shape (fallback): [{photo_id, filename, score}, ...] — photo_urls 비움.
+    저장 실패 slot / public_url 미설정 → None.
+    """
+    if not isinstance(ranked, list):
+        return []
+    # v1 레거시 shape 감지 — r2_key 키가 전혀 없으면 빈 리스트 반환.
+    has_r2_key = any(isinstance(e, dict) and "r2_key" in e for e in ranked)
+    if not has_r2_key:
+        return []
+
+    urls: list[Optional[str]] = []
+    # photo_index 순서 정렬
+    sorted_entries = sorted(
+        (e for e in ranked if isinstance(e, dict)),
+        key=lambda e: e.get("photo_index", 0),
+    )
+    for entry in sorted_entries:
+        key = entry.get("r2_key")
+        if not key:
+            urls.append(None)
+            continue
+        urls.append(r2_client.public_url(key))
+    return urls

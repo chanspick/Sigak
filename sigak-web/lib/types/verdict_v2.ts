@@ -47,12 +47,17 @@ export interface FullContent {
   cta_pi: null;
 }
 
+/** R2 에 저장된 업로드 사진 public URL.
+ *  photo_index 0-based 순서. null = 저장 실패 / r2_public_base_url 미설정. */
+export type PhotoUrl = string | null;
+
 export interface VerdictV2CreateResponse {
   verdict_id: string;
   version: "v2";
   preview: PreviewContent;
   full_unlocked: boolean;
   photo_count: number;
+  photo_urls: PhotoUrl[];
 }
 
 export interface VerdictV2GetResponse {
@@ -62,6 +67,7 @@ export interface VerdictV2GetResponse {
   preview: PreviewContent;
   /** full_unlocked=true 일 때만 채워짐. */
   full_content: FullContent | null;
+  photo_urls: PhotoUrl[];
 }
 
 export interface VerdictV2UnlockResponse {
@@ -69,4 +75,5 @@ export interface VerdictV2UnlockResponse {
   full_unlocked: boolean;
   full_content: FullContent;
   balance: number;
+  photo_urls: PhotoUrl[];
 }

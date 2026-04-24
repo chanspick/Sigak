@@ -26,6 +26,7 @@ import { FeedTopBar } from "@/components/ui/sigak";
 import type {
   FullContent,
   PhotoInsight,
+  PhotoUrl,
   PreviewContent,
   Recommendation,
   VerdictNumbers,
@@ -81,6 +82,7 @@ export function VerdictV2Screen({ initial }: VerdictV2ScreenProps) {
         ...data,
         full_unlocked: true,
         full_content: res.full_content,
+        photo_urls: res.photo_urls ?? data.photo_urls,
       });
       await refetchBalance();
     } catch (e) {
@@ -134,11 +136,19 @@ export function VerdictV2Screen({ initial }: VerdictV2ScreenProps) {
       {/* Preview (항상 공개) */}
       <PreviewSection preview={data.preview} />
 
+      {/* 업로드 사진 썸네일 — 본인 사진이므로 unlock 무관 항상 공개 */}
+      {data.photo_urls.length > 0 && (
+        <PhotosGrid urls={data.photo_urls} />
+      )}
+
       <Rule />
 
       {/* Full content (unlock 후) 또는 unlock CTA */}
       {unlocked && data.full_content ? (
-        <FullSection content={data.full_content} />
+        <FullSection
+          content={data.full_content}
+          photoUrls={data.photo_urls}
+        />
       ) : (
         <UnlockSection
           balance={balance}
@@ -327,10 +337,86 @@ function UnlockSection({
 }
 
 // ─────────────────────────────────────────────
+//  Photos grid (업로드 사진 썸네일 — preview 영역 아래)
+// ─────────────────────────────────────────────
+
+function PhotosGrid({ urls }: { urls: PhotoUrl[] }) {
+  // 모든 URL 이 null 이면 렌더 생략 (저장 실패 케이스).
+  if (urls.every((u) => !u)) return null;
+  return (
+    <section style={{ padding: "0 28px 32px" }}>
+      <Label>업로드 사진</Label>
+      <div
+        style={{
+          marginTop: 12,
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 4,
+        }}
+      >
+        {urls.map((url, idx) => (
+          <ThumbnailTile key={idx} url={url} index={idx} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ThumbnailTile({ url, index }: { url: PhotoUrl; index: number }) {
+  return (
+    <div
+      style={{
+        aspectRatio: "1 / 1",
+        overflow: "hidden",
+        background: "rgba(0, 0, 0, 0.06)",
+        position: "relative",
+      }}
+    >
+      {url ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt={`업로드 사진 ${index + 1}`}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : (
+        <div
+          className="font-sans"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            letterSpacing: "0.05em",
+            color: "var(--color-ink)",
+            opacity: 0.4,
+          }}
+        >
+          #{index + 1}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 //  Full content (10토큰 해제 후)
 // ─────────────────────────────────────────────
 
-function FullSection({ content }: { content: FullContent }) {
+function FullSection({
+  content,
+  photoUrls,
+}: {
+  content: FullContent;
+  photoUrls: PhotoUrl[];
+}) {
   const bestFit = detectBestFitIndex(content.photo_insights);
 
   return (
@@ -391,6 +477,7 @@ function FullSection({ content }: { content: FullContent }) {
               key={pi.photo_index}
               insight={pi}
               isBestFit={pi.photo_index === bestFit}
+              photoUrl={photoUrls[pi.photo_index] ?? null}
             />
           ))}
         </div>
@@ -415,97 +502,124 @@ function FullSection({ content }: { content: FullContent }) {
 function PhotoInsightCard({
   insight,
   isBestFit,
+  photoUrl,
 }: {
   insight: PhotoInsight;
   isBestFit: boolean;
+  photoUrl: PhotoUrl;
 }) {
   return (
     <div
       style={{
         border: "1px solid rgba(0, 0, 0, 0.1)",
-        padding: "18px 18px",
+        padding: 0,
         background: isBestFit ? "rgba(0, 0, 0, 0.03)" : "transparent",
+        overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          marginBottom: 12,
-        }}
-      >
-        <span
-          className="font-sans tabular-nums uppercase"
+      {photoUrl && (
+        <div
           style={{
-            fontSize: 10,
-            letterSpacing: "1.5px",
-            opacity: 0.45,
-            color: "var(--color-ink)",
+            width: "100%",
+            aspectRatio: "4 / 5",
+            overflow: "hidden",
+            background: "rgba(0, 0, 0, 0.06)",
           }}
         >
-          #{String(insight.photo_index + 1).padStart(2, "0")}
-        </span>
-        {isBestFit && (
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photoUrl}
+            alt={`업로드 사진 ${insight.photo_index + 1}`}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        </div>
+      )}
+      <div style={{ padding: "18px 18px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
           <span
-            className="font-sans"
+            className="font-sans tabular-nums uppercase"
             style={{
               fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              padding: "3px 10px",
-              background: "var(--color-ink)",
-              color: "var(--color-paper)",
+              letterSpacing: "1.5px",
+              opacity: 0.45,
+              color: "var(--color-ink)",
             }}
           >
-            추구미와 가장 가까운 결
+            #{String(insight.photo_index + 1).padStart(2, "0")}
           </span>
-        )}
-      </div>
-      <p
-        className="font-serif"
-        style={{
-          margin: 0,
-          fontSize: 15,
-          lineHeight: 1.7,
-          letterSpacing: "-0.005em",
-          color: "var(--color-ink)",
-        }}
-      >
-        {insight.insight}
-      </p>
-      <div
-        style={{
-          marginTop: 12,
-          paddingTop: 12,
-          borderTop: "1px dashed rgba(0, 0, 0, 0.12)",
-        }}
-      >
-        <span
-          className="font-sans uppercase"
-          style={{
-            fontSize: 10,
-            letterSpacing: "1.5px",
-            opacity: 0.45,
-            color: "var(--color-ink)",
-          }}
-        >
-          개선
-        </span>
+          {isBestFit && (
+            <span
+              className="font-sans"
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                padding: "3px 10px",
+                background: "var(--color-ink)",
+                color: "var(--color-paper)",
+              }}
+            >
+              추구미와 가장 가까운 결
+            </span>
+          )}
+        </div>
         <p
-          className="font-sans"
+          className="font-serif"
           style={{
-            margin: "6px 0 0",
-            fontSize: 13,
+            margin: 0,
+            fontSize: 15,
             lineHeight: 1.7,
             letterSpacing: "-0.005em",
-            opacity: 0.75,
             color: "var(--color-ink)",
           }}
         >
-          {insight.improvement}
+          {insight.insight}
         </p>
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: "1px dashed rgba(0, 0, 0, 0.12)",
+          }}
+        >
+          <span
+            className="font-sans uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "1.5px",
+              opacity: 0.45,
+              color: "var(--color-ink)",
+            }}
+          >
+            개선
+          </span>
+          <p
+            className="font-sans"
+            style={{
+              margin: "6px 0 0",
+              fontSize: 13,
+              lineHeight: 1.7,
+              letterSpacing: "-0.005em",
+              opacity: 0.75,
+              color: "var(--color-ink)",
+            }}
+          >
+            {insight.improvement}
+          </p>
+        </div>
       </div>
     </div>
   );

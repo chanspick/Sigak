@@ -339,6 +339,10 @@ function Header({ balance }: { balance: number | null }) {
   );
 }
 
+// STEP 8 — Pinterest 탭 disabled. 백엔드 pinterest_enabled=false 라 결제 전
+// 클릭 자체 차단 + 시각화. TRACK 3 Pinterest 살리기 완료 시 disabled 제거.
+const PINTEREST_ENABLED = false;
+
 function TabSwitcher({
   tab,
   onChange,
@@ -346,9 +350,9 @@ function TabSwitcher({
   tab: Tab;
   onChange: (t: Tab) => void;
 }) {
-  const items: { key: Tab; label: string }[] = [
-    { key: "ig", label: "Instagram" },
-    { key: "pinterest", label: "Pinterest" },
+  const items: { key: Tab; label: string; disabled: boolean }[] = [
+    { key: "ig", label: "Instagram", disabled: false },
+    { key: "pinterest", label: "Pinterest", disabled: !PINTEREST_ENABLED },
   ];
   return (
     <div
@@ -361,13 +365,20 @@ function TabSwitcher({
     >
       {items.map((it) => {
         const active = it.key === tab;
+        const disabled = it.disabled;
         return (
           <button
             key={it.key}
             type="button"
             role="tab"
             aria-selected={active}
-            onClick={() => onChange(it.key)}
+            aria-disabled={disabled}
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              onChange(it.key);
+            }}
+            title={disabled ? "Pinterest 곧 만나요" : undefined}
             className="font-sans"
             style={{
               flex: 1,
@@ -380,12 +391,31 @@ function TabSwitcher({
               fontSize: 13,
               fontWeight: active ? 600 : 500,
               letterSpacing: "0.3px",
-              color: active ? "var(--color-ink)" : "var(--color-mute)",
-              cursor: "pointer",
+              color: disabled
+                ? "var(--color-mute-2)"
+                : active
+                  ? "var(--color-ink)"
+                  : "var(--color-mute)",
+              cursor: disabled ? "not-allowed" : "pointer",
               marginBottom: -1,
+              opacity: disabled ? 0.55 : 1,
             }}
           >
             {it.label}
+            {disabled && (
+              <span
+                className="font-sans"
+                style={{
+                  marginLeft: 6,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: "var(--color-mute-2)",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                곧 만나요
+              </span>
+            )}
           </button>
         );
       })}

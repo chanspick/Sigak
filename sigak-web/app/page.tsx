@@ -58,8 +58,8 @@ function LoggedInFeed() {
       }}
     >
       <FeedShell verdictCount={verdictCount}>
-        <FeatureCards />
         <VerdictGrid onTotalChange={setVerdictCount} />
+        <FeatureCards />
       </FeedShell>
       <SiteFooter />
     </div>

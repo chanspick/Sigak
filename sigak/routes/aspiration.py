@@ -34,6 +34,7 @@ from schemas.aspiration import (
 )
 from services import tokens as tokens_service
 from services.aspiration_common import (
+    extract_user_posts_from_vault,
     is_blocked,
     persist_analysis,
 )
@@ -86,6 +87,9 @@ def create_aspiration_ig(
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
     user_profile = vault.get_user_taste_profile()
 
+    # 본인 IG posts — photo_pairs 좌측 채움 (vault.ig_feed_cache.latest_posts)
+    user_posts = extract_user_posts_from_vault(vault)
+
     # 토큰 차감 (반복 구매 가능 → idempotency 는 timestamp 포함)
     cost = tokens_service.COST_ASPIRATION_IG
     ts = int(time.time())
@@ -117,6 +121,7 @@ def create_aspiration_ig(
         user_gender=vault.basic_info.gender,
         user_coordinate=user_profile.current_position,
         target_handle_raw=handle,
+        user_posts=user_posts,
     )
 
     # 실패 정책 — 수집 실패면 환불
@@ -168,6 +173,9 @@ def create_aspiration_pinterest(
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
     user_profile = vault.get_user_taste_profile()
 
+    # 본인 IG posts — photo_pairs 좌측 채움
+    user_posts = extract_user_posts_from_vault(vault)
+
     cost = tokens_service.COST_ASPIRATION_PINTEREST
     ts = int(time.time())
     idem = f"aspiration_pinterest:{user['id']}:{body.board_url}:{ts}"
@@ -195,6 +203,7 @@ def create_aspiration_pinterest(
         user_gender=vault.basic_info.gender,
         user_coordinate=user_profile.current_position,
         board_url=body.board_url,
+        user_posts=user_posts,
     )
 
     if result.status != "completed" or result.analysis is None:

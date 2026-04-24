@@ -21,6 +21,7 @@ from services.aspiration_common import (
     generate_analysis_id,
     is_blocked,
     match_trends_for_aspiration_direction,
+    materialize_pairs_to_r2,
     select_photo_pairs,
 )
 from services.coordinate_system import VisualCoordinate, neutral_coordinate
@@ -70,6 +71,7 @@ def run_aspiration_ig(
     user_gender: Optional[str],
     user_coordinate: Optional[VisualCoordinate],
     target_handle_raw: str,
+    user_posts: Optional[list[IgLatestPost]] = None,
 ) -> AspirationRunResult:
     """제3자 IG 핸들 → AspirationAnalysis.
 
@@ -79,6 +81,8 @@ def run_aspiration_ig(
       user_gender: KnowledgeBase 매칭에 필요
       user_coordinate: 본인 current_position (None 이면 neutral 사용)
       target_handle_raw: "@yuni" / "yuni" 등
+      user_posts: 본인 IG posts (vault.ig_feed_cache.latest_posts).
+                  photo_pairs 좌측 채움. None/[] 면 페어 생성 불가.
 
     Returns:
       AspirationRunResult — 상태별로 analysis 유무 다름.
@@ -134,10 +138,10 @@ def run_aspiration_ig(
     user_coord = user_coordinate or neutral_coordinate()
     gap = user_coord.gap_vector(target_coord)
 
-    # 6. Photo pairs (MVP: 앞 N장 1:1)
-    user_posts: list[IgLatestPost] = []   # 라우트가 현 유저 vault 에서 채움 (MVP)
+    # 6. Photo pairs (vault 본인 IG 사진 + 추구미 사진 1:1 인덱스 매칭)
+    user_posts_effective: list[IgLatestPost] = list(user_posts or [])
     pairs = select_photo_pairs(
-        user_posts=user_posts,
+        user_posts=user_posts_effective,
         target_posts=target_cache.latest_posts or [],
         gap=gap,
         max_pairs=5,
@@ -157,9 +161,15 @@ def run_aspiration_ig(
         matched_trend_count=len(matched_trend_ids),
     )
 
-    # 9. AspirationAnalysis 조립
+    # 9. R2 materialization — IG CDN TTL 대비 영구 저장 (analysis_id 먼저 발급)
+    analysis_id = generate_analysis_id()
+    pairs_persisted, r2_target_dir = materialize_pairs_to_r2(
+        pairs, user_id=user_id, analysis_id=analysis_id,
+    )
+
+    # 10. AspirationAnalysis 조립
     analysis = AspirationAnalysis(
-        analysis_id=generate_analysis_id(),
+        analysis_id=analysis_id,
         user_id=user_id,
         target_type="ig",
         target_identifier=handle,
@@ -169,36 +179,13 @@ def run_aspiration_ig(
         target_coordinate=target_coord,
         gap_vector=gap,
         gap_narrative=gap.narrative(),
-        photo_pairs=pairs,
+        photo_pairs=pairs_persisted,
         sia_overall_message=overall,
         matched_trend_ids=matched_trend_ids,
         target_analysis_snapshot=target_analysis.model_dump(mode="json"),
         images_captured_count=sum(
             1 for p in (target_cache.latest_posts or []) if p.display_url
         ),
-        r2_target_dir=None,   # Phase I+ R2 파이프 연결 시점에 채움
+        r2_target_dir=r2_target_dir,
     )
     return AspirationRunResult("completed", analysis=analysis)
-
-
-def attach_user_photos(
-    analysis: AspirationAnalysis,
-    user_posts: list[IgLatestPost],
-) -> AspirationAnalysis:
-    """라우트가 본인 IG posts 를 넘겨 photo_pairs 채워 넣는 post-process helper.
-
-    run_aspiration_ig 는 engine 레벨이라 본인 데이터를 모름. 라우트 layer 에서
-    UserDataVault 로드 후 이 함수로 photo_pairs 완성.
-    """
-    from services.aspiration_common import select_photo_pairs as _select
-    target_posts = []   # target 은 run_aspiration_ig 시점에 이미 소비됨.
-    # 간단: user_posts 만 덧붙여서 기존 pair 의 user_photo 를 보강.
-    new_pairs = []
-    for i, pair in enumerate(analysis.photo_pairs):
-        if i < len(user_posts) and user_posts[i].display_url:
-            pair = pair.model_copy(update={
-                "user_photo_url": user_posts[i].display_url or pair.user_photo_url,
-            })
-        new_pairs.append(pair)
-    analysis.photo_pairs = new_pairs
-    return analysis

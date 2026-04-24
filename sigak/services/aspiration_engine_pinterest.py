@@ -32,6 +32,7 @@ from services.aspiration_common import (
     generate_analysis_id,
     is_blocked,
     match_trends_for_aspiration_direction,
+    materialize_pairs_to_r2,
     select_photo_pairs,
 )
 from services.aspiration_engine_ig import AspirationRunResult
@@ -59,6 +60,7 @@ def run_aspiration_pinterest(
     user_gender: Optional[str],
     user_coordinate: Optional[VisualCoordinate],
     board_url: str,
+    user_posts: Optional[list[IgLatestPost]] = None,
 ) -> AspirationRunResult:
     """Pinterest 보드 URL → AspirationAnalysis.
 
@@ -66,6 +68,8 @@ def run_aspiration_pinterest(
       db: blocklist 체크용
       user_id / user_gender / user_coordinate: 본인 맥락
       board_url: https://www.pinterest.com/{user}/{board}/ 형식 기대
+      user_posts: 본인 IG posts (vault.ig_feed_cache.latest_posts).
+                  photo_pairs 좌측 채움. None/[] 면 페어 없음.
     """
     normalized_url = _normalize_board_url(board_url)
     if not normalized_url:
@@ -118,10 +122,10 @@ def run_aspiration_pinterest(
     user_coord = user_coordinate or neutral_coordinate()
     gap = user_coord.gap_vector(target_coord)
 
-    # 6. Photo pairs — 본인 IG posts 는 engine 에 없음, 라우트 layer 주입
-    user_posts: list[IgLatestPost] = []
+    # 6. Photo pairs (vault 본인 IG 사진 + Pinterest 타깃 1:1 인덱스)
+    user_posts_effective: list[IgLatestPost] = list(user_posts or [])
     pairs = select_photo_pairs(
-        user_posts=user_posts,
+        user_posts=user_posts_effective,
         target_posts=synthetic_posts,
         gap=gap,
         max_pairs=5,
@@ -141,9 +145,15 @@ def run_aspiration_pinterest(
         matched_trend_count=len(matched_trend_ids),
     )
 
-    # 9. 조립
+    # 9. R2 materialization — Pinterest 이미지 영구 저장 (analysis_id 선행 발급)
+    analysis_id = generate_analysis_id()
+    pairs_persisted, r2_target_dir = materialize_pairs_to_r2(
+        pairs, user_id=user_id, analysis_id=analysis_id,
+    )
+
+    # 10. 조립
     analysis = AspirationAnalysis(
-        analysis_id=generate_analysis_id(),
+        analysis_id=analysis_id,
         user_id=user_id,
         target_type="pinterest",
         target_identifier=board_id,
@@ -153,12 +163,12 @@ def run_aspiration_pinterest(
         target_coordinate=target_coord,
         gap_vector=gap,
         gap_narrative=gap.narrative(),
-        photo_pairs=pairs,
+        photo_pairs=pairs_persisted,
         sia_overall_message=overall,
         matched_trend_ids=matched_trend_ids,
         target_analysis_snapshot=target_analysis.model_dump(mode="json"),
         images_captured_count=len(image_urls),
-        r2_target_dir=None,
+        r2_target_dir=r2_target_dir,
     )
     return AspirationRunResult("completed", analysis=analysis)
 

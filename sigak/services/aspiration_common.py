@@ -157,6 +157,119 @@ def _empty_profile() -> UserTasteProfile:
 
 
 # ─────────────────────────────────────────────
+#  R2 materialization — 추구미 타깃 사진 영구 보존 (Track Aspiration STEP 3)
+# ─────────────────────────────────────────────
+
+def materialize_pairs_to_r2(
+    pairs: list[PhotoPair],
+    *,
+    user_id: str,
+    analysis_id: str,
+) -> tuple[list[PhotoPair], Optional[str]]:
+    """PhotoPair 의 target_photo_url 을 R2 에 영구 저장 + URL 교체.
+
+    user_photo_url 은 vault.ig_feed_cache 의 기존 URL 그대로 유지 — STEP 2
+    완료 후엔 이미 R2 URL, 미완이면 IG CDN URL (최종 전환 시 자동 정합).
+    별도 aspiration_users/ 복사 없음 (비용 절감, 플랜 3.2 권장안).
+
+    R2 key: user_media/{user_id}/aspiration_targets/{analysis_id}/photo_NN.jpg
+    (r2_client.aspiration_target_photo_key 헬퍼 사용)
+
+    Args:
+      pairs: select_photo_pairs 결과.
+      user_id: R2 key prefix 소유자.
+      analysis_id: 분석 식별자.
+
+    Returns:
+      (업데이트된 pairs, r2_target_dir prefix 또는 None)
+      개별 업로드 실패 시 해당 target URL 은 원본 유지. 전체 실패 시 None prefix.
+    """
+    if not pairs:
+        return pairs, None
+
+    import httpx
+    from services import r2_client
+
+    r2_dir_key = r2_client.aspiration_target_dir(user_id, analysis_id)
+
+    updated: list[PhotoPair] = []
+    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+        for idx, pair in enumerate(pairs):
+            target_url_new = _upload_target_to_r2(
+                client, pair.target_photo_url,
+                user_id=user_id, analysis_id=analysis_id, index=idx,
+            )
+            updated.append(pair.model_copy(update={
+                # user_photo_url 유지 (vault 에서 온 R2 또는 CDN URL)
+                "target_photo_url": target_url_new or pair.target_photo_url,
+            }))
+
+    return updated, r2_dir_key
+
+
+def _upload_target_to_r2(
+    http_client,
+    src_url: str,
+    *,
+    user_id: str,
+    analysis_id: str,
+    index: int,
+) -> Optional[str]:
+    """단일 추구미 타깃 이미지 다운로드 → R2 저장 → public URL 반환.
+
+    실패 시 None — caller 는 원본 URL 유지.
+    """
+    if not src_url:
+        return None
+    from services import r2_client
+
+    key = r2_client.aspiration_target_photo_key(user_id, analysis_id, index)
+    try:
+        resp = http_client.get(src_url)
+        resp.raise_for_status()
+        content_type = (
+            resp.headers.get("content-type", "image/jpeg")
+            .split(";")[0]
+            .strip()
+            .lower()
+        )
+        if not content_type.startswith("image/"):
+            content_type = "image/jpeg"
+        r2_client.put_bytes(key, resp.content, content_type=content_type)
+    except Exception:
+        logger.exception("aspiration target R2 put failed: key=%s", key)
+        return None
+
+    return r2_client.public_url(key) or f"r2://{key}"
+
+
+def extract_user_posts_from_vault(vault) -> list[IgLatestPost]:
+    """vault.ig_feed_cache.latest_posts → IgLatestPost 리스트.
+
+    essentials 단계 (ig_scraper.fetch_ig_profile) 에서 저장된 본인 IG 사진 메타.
+    photo_pairs 좌측 채우는 데 사용. display_url 없는 항목은 제외.
+    """
+    if vault is None or not vault.ig_feed_cache:
+        return []
+    raw = vault.ig_feed_cache.get("latest_posts") or []
+    out: list[IgLatestPost] = []
+    for p in raw:
+        if not isinstance(p, dict):
+            continue
+        url = p.get("display_url")
+        if not url:
+            continue
+        try:
+            out.append(IgLatestPost(
+                caption=p.get("caption") or "",
+                display_url=url,
+            ))
+        except Exception:
+            continue
+    return out
+
+
+# ─────────────────────────────────────────────
 #  Blocklist (DB)
 # ─────────────────────────────────────────────
 

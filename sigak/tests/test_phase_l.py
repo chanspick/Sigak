@@ -140,6 +140,7 @@ def test_build_verdict_v2_accepts_new_kwargs(monkeypatch):
 
     def _fake_call_sonnet(user_profile, photos, trend_data,
                           matched_trends=None, taste_profile=None,
+                          history_context=None,
                           max_tokens=3000):
         captured["matched_trends"] = matched_trends
         captured["taste_profile"] = taste_profile
@@ -212,7 +213,9 @@ def test_build_verdict_v2_backward_compat(monkeypatch):
     called = {"n": 0}
 
     def _fake(user_profile, photos, trend_data,
-             matched_trends=None, taste_profile=None, max_tokens=3000):
+             matched_trends=None, taste_profile=None,
+             history_context=None,
+             max_tokens=3000):
         called["n"] += 1
         # None 전달 확인
         assert matched_trends is None

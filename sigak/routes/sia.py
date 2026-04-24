@@ -40,6 +40,7 @@ from schemas.sia_state import (
 from schemas.user_profile import ConversationMessage
 from services import conversations as conv_service
 from services import sia_llm, sia_session_v4
+from services import user_history
 from services.sia_decision import (
     Composition,
     decide,
@@ -173,6 +174,81 @@ def _history_for_haiku(state: ConversationState) -> list[dict]:
     if not out:
         out = [{"role": "user", "content": "(대화 시작)"}]
     return out
+
+
+def _append_sia_history(
+    db,
+    *,
+    user_id: str,
+    conversation_id: str,
+    state: "ConversationState",
+    messages: list,
+) -> None:
+    """STEP 4 — user_history.conversations 에 head prepend.
+
+    IG 스냅샷은 vault.ig_feed_cache 의 현재 스냅샷을 연결 (R2 URL + analysis).
+    예외 전부 흡수 — 메인 persist 플로우 영향 금지.
+    """
+    try:
+        from schemas.user_history import (
+            ConversationHistoryEntry,
+            HistoryIgSnapshot,
+            HistoryMessage,
+        )
+        from services import user_profiles
+
+        # 메시지 변환 — ConversationMessage → HistoryMessage
+        hist_msgs: list[HistoryMessage] = []
+        for m in (messages or []):
+            role = getattr(m, "role", None) or (m.get("role") if isinstance(m, dict) else None)
+            content = getattr(m, "content", None) or (m.get("content") if isinstance(m, dict) else None)
+            if not role or content is None:
+                continue
+            if role not in ("user", "assistant", "system"):
+                continue
+            hist_msgs.append(HistoryMessage(
+                role=role, content=str(content), msg_type=None,
+            ))
+
+        # IG 스냅샷 — vault.ig_feed_cache 에서 참조 (R2 URL 이면 영구, CDN 이면 TTL 있음)
+        ig_snapshot = None
+        try:
+            profile = user_profiles.get_profile(db, user_id)
+            cache = profile.get("ig_feed_cache") if profile else None
+            if cache and cache.get("latest_posts"):
+                posts = cache.get("latest_posts") or []
+                photo_urls = [
+                    p.get("display_url") for p in posts
+                    if isinstance(p, dict) and p.get("display_url")
+                ]
+                ig_snapshot = HistoryIgSnapshot(
+                    r2_dir=cache.get("r2_snapshot_dir") or "",
+                    photo_r2_urls=photo_urls,
+                    analysis=cache.get("analysis"),
+                )
+        except Exception:
+            logger.exception("sia history: IG snapshot attach failed user=%s", user_id)
+
+        # started_at 파싱
+        try:
+            started_at = datetime.fromisoformat(
+                (state.created_at or "").replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError, AttributeError):
+            started_at = None
+
+        entry = ConversationHistoryEntry(
+            session_id=conversation_id,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc),
+            messages=hist_msgs,
+            ig_snapshot=ig_snapshot,
+        )
+        user_history.append_history(
+            db, user_id=user_id, category="conversations", entry=entry,
+        )
+    except Exception:
+        logger.exception("append_sia_history failed user=%s", user_id)
 
 
 def _state_to_persist_messages(state: ConversationState) -> list[ConversationMessage]:
@@ -608,6 +684,14 @@ def chat_end(
         turn_count=len(state.turns),
         started_at_iso=state.created_at,
     )
+    # STEP 4 — user_history.conversations append (IG 스냅샷 snapshot 연결)
+    _append_sia_history(
+        db,
+        user_id=user["id"],
+        conversation_id=body.conversation_id,
+        state=state,
+        messages=messages,
+    )
     db.commit()
 
     sia_session_v4.delete_conversation_state(body.conversation_id)
@@ -653,6 +737,13 @@ def _flush_expired_conversation(
         turn_count=len(state.turns),
         started_at_iso=state.created_at,
         status="ended_by_timeout",
+    )
+    _append_sia_history(
+        db,
+        user_id=state.user_id,
+        conversation_id=state.session_id,
+        state=state,
+        messages=messages,
     )
     db.commit()
     background_tasks.add_task(

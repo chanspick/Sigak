@@ -368,6 +368,14 @@ def run_selection(
             "rd": json.dumps(result.model_dump(mode="json"), ensure_ascii=False),
         },
     )
+    # STEP 4 — user_history.best_shot_sessions append
+    _append_best_shot_history(
+        db,
+        user_id=user["id"],
+        session_id=session_id,
+        session=session,
+        result=result,
+    )
     db.commit()
 
     return RunResponse(
@@ -376,6 +384,51 @@ def run_selection(
         result=result,
         token_balance=balance_after,
     )
+
+
+def _append_best_shot_history(
+    db,
+    *,
+    user_id: str,
+    session_id: str,
+    session,
+    result,
+) -> None:
+    """STEP 4 — user_history.best_shot_sessions 에 head prepend.
+
+    예외 전부 흡수.
+    """
+    try:
+        from services import user_history
+        from services import r2_client
+        from schemas.user_history import (
+            BestShotHistoryEntry,
+            HistorySelectedPhoto,
+        )
+
+        selected = [
+            HistorySelectedPhoto(
+                r2_url=sp.stored_url,
+                sonnet_rationale=None,
+                sia_comment=sp.sia_comment or None,
+            )
+            for sp in (result.selected_photos or [])
+        ]
+        entry = BestShotHistoryEntry(
+            session_id=session_id,
+            created_at=getattr(session, "created_at", None),
+            uploaded_count=int(getattr(session, "uploaded_count", 0) or 0),
+            uploaded_r2_dir=r2_client.user_photo_key(
+                user_id, f"best_shot/uploads/{session_id}/"
+            ),
+            selected=selected,
+            overall_message=(result.sia_overall_message or None),
+        )
+        user_history.append_history(
+            db, user_id=user_id, category="best_shot_sessions", entry=entry,
+        )
+    except Exception:
+        logger.exception("append_best_shot_history failed user=%s", user_id)
 
 
 # ─────────────────────────────────────────────

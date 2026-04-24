@@ -33,6 +33,7 @@ from schemas.aspiration import (
     TargetType,
 )
 from services import tokens as tokens_service
+from services import user_history
 from services.aspiration_common import (
     extract_user_posts_from_vault,
     is_blocked,
@@ -139,8 +140,9 @@ def create_aspiration_ig(
             token_balance=tokens_service.get_balance(db, user["id"]),
         )
 
-    # 저장
+    # 저장 + user_history append (STEP 4)
     persist_analysis(db, result.analysis)
+    _append_aspiration_history(db, user_id=user["id"], analysis=result.analysis)
     db.commit()
 
     return AspirationStartResponse(
@@ -263,6 +265,43 @@ def get_aspiration(
 # ─────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────
+
+def _append_aspiration_history(db, *, user_id: str, analysis) -> None:
+    """STEP 4 — user_history.aspiration_analyses 에 head prepend.
+
+    예외 삼킴 — 메인 persist 플로우 영향 금지.
+    """
+    try:
+        from schemas.user_history import (
+            AspirationHistoryEntry,
+            HistoryPhotoPair,
+        )
+        pairs = [
+            HistoryPhotoPair(
+                user_photo_r2_url=p.user_photo_url,
+                target_photo_r2_url=p.target_photo_url,
+                pair_comment=p.target_sia_comment or p.user_sia_comment or None,
+            )
+            for p in (analysis.photo_pairs or [])
+        ]
+        entry = AspirationHistoryEntry(
+            analysis_id=analysis.analysis_id,
+            created_at=analysis.created_at,
+            source=(
+                "pinterest" if analysis.target_type == "pinterest" else "instagram"
+            ),
+            target_handle=analysis.target_identifier,
+            photo_pairs=pairs,
+            gap_narrative=analysis.gap_narrative,
+            sia_overall_message=analysis.sia_overall_message,
+            target_analysis_snapshot=analysis.target_analysis_snapshot,
+        )
+        user_history.append_history(
+            db, user_id=user_id, category="aspiration_analyses", entry=entry,
+        )
+    except Exception:
+        logger.exception("append_aspiration_history failed user=%s", user_id)
+
 
 def _refund_aspiration(
     db,

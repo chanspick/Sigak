@@ -128,22 +128,51 @@ export function FeedTopBar({ backTarget, onBack }: FeedTopBarProps = {}) {
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Right — balance + profile (최우측) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <span
-          className="font-sans tabular-nums"
+      {/* Right — balance chip + profile (최우측) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button
+          type="button"
+          onClick={() => router.push("/tokens/purchase")}
+          aria-label={`토큰 ${balance ?? 0}개 — 충전하기`}
+          className="font-sans"
           style={{
-            fontSize: 13,
-            fontWeight: 400,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            height: 28,
+            padding: "0 12px",
+            borderRadius: 14,
+            border: "1px solid rgba(243, 240, 235, 0.28)",
+            background: "rgba(243, 240, 235, 0.08)",
             color: "var(--color-paper)",
-            opacity: 0.85,
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 500,
             letterSpacing: "0.02em",
-            minWidth: 18,
-            textAlign: "right",
+            transition: "background 120ms ease-out",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(243, 240, 235, 0.16)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(243, 240, 235, 0.08)";
           }}
         >
-          {balance ?? 0}
-        </span>
+          {/* 토큰 심볼 */}
+          <span
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--color-paper)",
+              opacity: 0.75,
+            }}
+          />
+          <span className="tabular-nums" style={{ lineHeight: 1 }}>
+            {balance ?? 0}
+          </span>
+        </button>
 
         <button
           type="button"

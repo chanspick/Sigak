@@ -109,43 +109,75 @@ function ChangeEmpty({ count }: { count: number }) {
   return (
     <section
       style={{
-        minHeight: "50vh",
+        minHeight: "60vh",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         padding: "40px 28px",
-        gap: 10,
+        gap: 18,
+        maxWidth: 420,
+        margin: "0 auto",
       }}
     >
+      <span
+        className="font-sans uppercase"
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "1.6px",
+          opacity: 0.4,
+          color: "var(--color-ink)",
+        }}
+      >
+        MONTHLY
+      </span>
       <p
         className="font-serif"
         style={{
           margin: 0,
-          fontSize: 20,
-          lineHeight: 1.4,
+          fontSize: 22,
+          lineHeight: 1.5,
           letterSpacing: "-0.01em",
           color: "var(--color-ink)",
-          opacity: 0.7,
+          opacity: 0.85,
           textAlign: "center",
         }}
       >
-        3건 이상의 판정이 쌓이면
+        매달 15일,
         <br />
-        변화의 궤적이 보입니다.
+        당신의 결을 정리해드려요
       </p>
       <p
         className="font-sans"
         style={{
           margin: 0,
-          fontSize: 12,
-          opacity: 0.4,
+          fontSize: 13,
+          lineHeight: 1.75,
+          opacity: 0.6,
           letterSpacing: "-0.005em",
           color: "var(--color-ink)",
+          textAlign: "center",
+          maxWidth: 360,
         }}
       >
-        지금까지: {count}건
+        변화는 각 월 15일에 여러분의 SIGAK 서비스 경험과 트렌드 변화를
+        기반으로 만들어집니다.
       </p>
+      {count > 0 && (
+        <p
+          className="font-sans tabular-nums"
+          style={{
+            margin: 0,
+            fontSize: 11,
+            opacity: 0.35,
+            letterSpacing: "-0.005em",
+            color: "var(--color-ink)",
+          }}
+        >
+          지금까지 쌓인 기록 · {count}건
+        </p>
+      )}
     </section>
   );
 }

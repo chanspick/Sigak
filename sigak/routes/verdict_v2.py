@@ -198,6 +198,7 @@ async def create_verdict_v2(
             db, user["id"],
             include=[
                 "conversations", "best_shot_sessions", "aspiration_analyses",
+                "pi_history",
             ],
             max_per_type=1,
         )

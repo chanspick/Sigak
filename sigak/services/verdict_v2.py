@@ -356,6 +356,51 @@ def _render_taste_profile(taste_profile: Optional[dict]) -> str:
     return json.dumps(slim, ensure_ascii=False, indent=2)
 
 
+def _render_latest_pi_for_verdict(taste_profile: Optional[Any]) -> str:
+    """taste_profile.latest_pi → Verdict v2 prompt 우회 block.
+
+    Phase I Backward echo: 본인 본질 좌표 (coord_3axis) + 닮은꼴 셀럽 (top_celeb)
+    을 Verdict v2 가 IG 추구미 좌표 vs 본질 좌표 비교 시 활용. 상품명 직접 호명
+    금지 — "지난번 정밀 분석" 우회 표현. None / 빈 latest_pi → "" (회귀 0).
+    """
+    if taste_profile is None:
+        return ""
+    latest_pi = getattr(taste_profile, "latest_pi", None)
+    if latest_pi is None:
+        return ""
+
+    lines: list[str] = []
+    coord = getattr(latest_pi, "coord_3axis", None)
+    if isinstance(coord, dict):
+        try:
+            lines.append(
+                f"  본질 좌표: shape {float(coord.get('shape', 0.5)):.2f} / "
+                f"volume {float(coord.get('volume', 0.5)):.2f} / "
+                f"age {float(coord.get('age', 0.5)):.2f}"
+            )
+        except (TypeError, ValueError):
+            pass
+    top_celeb = getattr(latest_pi, "top_celeb_name", None)
+    if top_celeb:
+        sim = getattr(latest_pi, "top_celeb_similarity", None)
+        if isinstance(sim, (int, float)):
+            lines.append(
+                f"  닮은꼴 셀럽: {top_celeb} (유사도 {float(sim):.2f})"
+            )
+        else:
+            lines.append(f"  닮은꼴 셀럽: {top_celeb}")
+
+    if not lines:
+        return ""
+
+    return (
+        "[본질 분석 — 본인 정합 좌표]\n"
+        "지난번 정밀 분석에서:\n"
+        + "\n".join(lines)
+        + "\n\n"
+    )
+
+
 def _build_user_message(
     user_profile: dict,
     photos: list[PhotoInput],
@@ -369,6 +414,9 @@ def _build_user_message(
     Phase L 확장:
       - matched_trends: KnowledgeMatcher 결과 (유저 좌표에 맞춘 KB 트렌드)
       - taste_profile: UserTasteProfile snapshot (대화+IG 기반 누적 취향)
+
+    Phase I Backward echo:
+      - taste_profile.latest_pi → 본질 좌표 + 닮은꼴 셀럽 우회 inject (직접)
     """
     blocks: list[dict] = []
 
@@ -378,12 +426,16 @@ def _build_user_message(
         pcopy.setdefault("index", i)
         blocks.append(_photo_to_content_block(pcopy))
 
+    # Phase I — Backward echo block (None / 빈 latest_pi 시 "")
+    pi_block = _render_latest_pi_for_verdict(taste_profile)
+
     # 텍스트 블록 (analysis instruction)
     text_body = (
         "아래 user_profile 과 위 사진들을 교차 분석해 피드 분석 결과를 "
         "JSON 으로 반환하십시오.\n\n"
         f"[user_profile]\n{_render_profile_for_prompt(user_profile)}\n\n"
-        f"[taste_profile — 누적 취향 스냅샷]\n{_render_taste_profile(taste_profile)}\n\n"
+        + pi_block
+        + f"[taste_profile — 누적 취향 스냅샷]\n{_render_taste_profile(taste_profile)}\n\n"
         f"[matched_trends — KB 매칭 (최신 시즌, 유저 좌표 호환)]\n"
         f"{_render_matched_trends(matched_trends)}\n\n"
         f"[trend_data — 시즌 베이스라인]\n{_render_trend_for_prompt(trend_data)}\n\n"

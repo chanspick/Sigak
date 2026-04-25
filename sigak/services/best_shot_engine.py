@@ -266,10 +266,24 @@ def _call_sonnet_select(
         for m in matched_trends
     ]
 
+    # Phase I — Backward echo: latest_pi.top_hair_name 우회 inject
+    # 상품명 직접 호명 금지 — "지난번 정밀 분석" 표현. None / 빈 latest_pi → "" (회귀 0).
+    pi_hair_block = ""
+    latest_pi = getattr(profile, "latest_pi", None)
+    if latest_pi is not None:
+        top_hair = getattr(latest_pi, "top_hair_name", None)
+        if top_hair:
+            pi_hair_block = (
+                "[본질 분석 — 선호 헤어 힌트]\n"
+                f"  지난번 정밀 분석 추천 헤어: {top_hair}\n"
+                "  → 정합 사진 우선 (강제 X, 자연스러운 가이드).\n\n"
+            )
+
     text_prompt = (
         f"사진 {len(candidates)} 장 중 {target_count}~{max_count} 장 선별.\n\n"
         f"[profile]\n{json.dumps(profile_dump, ensure_ascii=False, indent=2)}\n\n"
-        f"[matched_trends]\n{json.dumps(trends_dump, ensure_ascii=False, indent=2)}\n\n"
+        + pi_hair_block
+        + f"[matched_trends]\n{json.dumps(trends_dump, ensure_ascii=False, indent=2)}\n\n"
         "photo_index 는 위 이미지 순서 0-based. target~max 범위 엄수.\n"
         "정말 좋은 사진만. 억지로 상한 채우지 말 것."
     )

@@ -6,6 +6,8 @@ users.user_history JSONB 구조:
     "best_shot_sessions":    [BestShotHistoryEntry, ...],
     "aspiration_analyses":   [AspirationHistoryEntry, ...],
     "verdict_sessions":      [VerdictHistoryEntry, ...],
+    "pi_history":            [PiHistoryEntry, ...],            # Phase I (Backward echo)
+    "trajectory_events":     [TrajectoryEvent, ...],
   }
 
 각 리스트: head 가 최신. append_history 는 head 에 prepend + tail pop
@@ -18,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel
@@ -34,6 +37,7 @@ HistoryCategory = Literal[
     "best_shot_sessions",
     "aspiration_analyses",
     "verdict_sessions",
+    "pi_history",
 ]
 
 
@@ -96,6 +100,16 @@ def append_history(
     new_list = [entry_dict, *current_list][:max_entries]
     history[category] = new_list
 
+    # CLAUDE.md trajectory[] populate — 5 카테고리 통합 시계열 자동 누적.
+    # 좌표/점수 미산출 카테고리(verdict/best_shot/conversation)도 timestamp+id 기록.
+    # aspiration / pi 는 coord_3axis 추출 가능. Tail truncate: max_entries * 5.
+    traj_event = _build_trajectory_event(category, entry_dict)
+    if traj_event is not None:
+        traj_list = history.get("trajectory_events")
+        if not isinstance(traj_list, list):
+            traj_list = []
+        history["trajectory_events"] = [traj_event, *traj_list][: max_entries * 5]
+
     try:
         db.execute(
             text(
@@ -118,6 +132,86 @@ def append_history(
         user_id, category, len(new_list), max_entries,
     )
     return True
+
+
+def _build_trajectory_event(
+    category: str, entry: dict[str, Any]
+) -> Optional[dict[str, Any]]:
+    """5 카테고리 entry → trajectory_events 항목 dict.
+
+    Args:
+      category: append_history 의 category ("conversations" / "best_shot_sessions" /
+        "aspiration_analyses" / "verdict_sessions" / "pi_history")
+      entry: model_dump 결과 dict
+
+    Returns:
+      trajectory event dict — captured_at(iso) / event_type / reference_id +
+      coordinate_snapshot (aspiration: aspiration_vector_snapshot.from_coord /
+      pi: coord_3axis 직접) + score_at_time (None, vault 조립 시 fallback).
+      reference_id 추출 실패 시 None.
+    """
+    type_map = {
+        "conversations": ("conversation", "session_id", "started_at"),
+        "verdict_sessions": ("verdict", "session_id", "created_at"),
+        "best_shot_sessions": ("best_shot", "session_id", "created_at"),
+        "aspiration_analyses": ("aspiration", "analysis_id", "created_at"),
+        "pi_history": ("pi", "report_id", "created_at"),
+    }
+    if category not in type_map:
+        return None
+    event_type, id_key, ts_key = type_map[category]
+
+    reference_id = entry.get(id_key)
+    if not reference_id:
+        return None
+    reference_id = str(reference_id)
+
+    captured_at_raw = entry.get(ts_key)
+    if isinstance(captured_at_raw, datetime):
+        captured_at_str = captured_at_raw.isoformat()
+    elif isinstance(captured_at_raw, str) and captured_at_raw.strip():
+        captured_at_str = captured_at_raw.strip()
+    else:
+        captured_at_str = datetime.now(timezone.utc).isoformat()
+
+    coordinate_snapshot: Optional[dict[str, float]] = None
+    if event_type == "aspiration":
+        gap = entry.get("aspiration_vector_snapshot")
+        if isinstance(gap, dict):
+            from_c = (
+                gap.get("from_coord")
+                or gap.get("from")
+                or gap.get("user_coord")
+            )
+            if isinstance(from_c, dict):
+                try:
+                    coordinate_snapshot = {
+                        "shape": float(from_c.get("shape", 0.5)),
+                        "volume": float(from_c.get("volume", 0.5)),
+                        "age": float(from_c.get("age", 0.5)),
+                    }
+                except (TypeError, ValueError):
+                    coordinate_snapshot = None
+    elif event_type == "pi":
+        # PI 는 coord_3axis 를 직접 entry 에 보유 (PiHistoryEntry.coord_3axis)
+        coord_raw = entry.get("coord_3axis")
+        if isinstance(coord_raw, dict):
+            try:
+                coordinate_snapshot = {
+                    "shape": float(coord_raw.get("shape", 0.5)),
+                    "volume": float(coord_raw.get("volume", 0.5)),
+                    "age": float(coord_raw.get("age", 0.5)),
+                }
+            except (TypeError, ValueError):
+                coordinate_snapshot = None
+
+    return {
+        "captured_at": captured_at_str,
+        "event_type": event_type,
+        "reference_id": reference_id,
+        "coordinate_snapshot": coordinate_snapshot,
+        "score_at_time": None,
+    }
 
 
 def _to_dict(entry: Union[BaseModel, dict[str, Any]]) -> Optional[dict[str, Any]]:

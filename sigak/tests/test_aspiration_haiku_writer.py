@@ -108,18 +108,21 @@ class TestProfileFullCase:
 
     def test_taste_profile_slim_5_fields(self):
         slim = _render_taste_profile_slim(_profile_full())
+        # Phase I — Backward echo: latest_pi 키 추가 (5 → 6 fields)
         assert set(slim.keys()) == {
             "current_position",
             "aspiration_vector",
             "conversation_signals",
             "user_original_phrases",
+            "latest_pi",
             "strength_score",
         }
-        # 풀 데이터 — 5 필드 모두 비어있지 않음
+        # 풀 데이터 — 5 필드 비어있지 않음 + latest_pi 는 fixture 기본 None
         assert slim["current_position"] is not None
         assert slim["aspiration_vector"] is not None
         assert slim["conversation_signals"] is not None
         assert slim["user_original_phrases"]
+        assert slim["latest_pi"] is None    # _profile_full fixture 기본 latest_pi 미설정
         assert slim["strength_score"] == 0.85
 
 
@@ -149,6 +152,8 @@ class TestDay1Fallback:
         # conversation_signals default factory → dict (empty fields)
         assert slim["conversation_signals"] is not None
         assert slim["user_original_phrases"] == []
+        # Phase I — Day 1 = PI 미체험 → latest_pi None
+        assert slim["latest_pi"] is None
         assert slim["strength_score"] == 0.0
 
 

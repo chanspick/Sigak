@@ -24,6 +24,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from schemas.user_history import PiHistoryEntry
 from services.coordinate_system import GapVector, VisualCoordinate
 
 
@@ -67,13 +68,19 @@ class ConversationSignals(BaseModel):
 
 
 class TrajectoryPoint(BaseModel):
-    """시계열 좌표 포인트 — 이달의 시각 변화 추적용."""
+    """시계열 좌표 포인트 — 이달의 시각 변화 추적용.
+
+    coordinate 는 산출 가능 시점만 채워짐. verdict / best_shot / conversation 은
+    당장 좌표를 산출하지 않으므로 None — "이벤트 시점" 자체로 시계열 의미 보존.
+    score_at_time 은 해당 시점 strength_score 스냅샷 (있으면).
+    """
     model_config = ConfigDict(extra="ignore")
 
     captured_at: datetime
-    coordinate: VisualCoordinate
-    source: Literal["conversation", "ig_feed", "aspiration", "best_shot", "pi"]
+    coordinate: Optional[VisualCoordinate] = None
+    source: Literal["conversation", "ig_feed", "verdict", "aspiration", "best_shot", "pi"]
     reference_id: Optional[str] = None         # 해당 이벤트 id (재조회용)
+    score_at_time: Optional[float] = None      # strength_score snapshot (있을 때만)
 
 
 class UserTasteProfile(BaseModel):
@@ -100,6 +107,12 @@ class UserTasteProfile(BaseModel):
 
     # ── 리포트 재활용 (아이작 R2 원칙)
     user_original_phrases: list[str] = Field(default_factory=list)
+
+    # ── Phase I — 최신 PI 결과 narrative carry (Backward echo).
+    # UserDataVault.get_user_taste_profile() 가 user_history.pi_history[0] 변환.
+    # sia_writer._render_taste_profile_slim 에서 dump → Aspiration / Verdict v2 /
+    # Best Shot / Sia 모두 자동 echo.
+    latest_pi: Optional[PiHistoryEntry] = None
 
     # ── 데이터 풍부도 (0.0~1.0). 상품별 UX 분기 (예: Best Shot 경고 < 0.3)
     strength_score: float = Field(ge=0.0, le=1.0, default=0.0)

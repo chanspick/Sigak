@@ -22,6 +22,7 @@ HistoryType = Literal[
     "best_shot_sessions",
     "aspiration_analyses",
     "verdict_sessions",
+    "pi_history",
 ]
 
 
@@ -114,6 +115,8 @@ def _compose_context(
             block = _render_aspiration(recent, mode=mode)
         elif cat == "verdict_sessions":
             block = _render_verdict(recent, mode=mode)
+        elif cat == "pi_history":
+            block = _render_pi(recent, mode=mode)
         else:
             continue
 
@@ -182,6 +185,15 @@ def _render_best_shot(items: list[dict], *, mode: str) -> str:
         overall = entry.get("overall_message")
         if overall:
             lines.append(f"  종합: {_truncate(overall, 100)}")
+        # mode=full: 선별 상위 3장 Sia 코멘트 — 강화 루프 갭 2 echo
+        if mode == "full":
+            selected = entry.get("selected") or []
+            for j, sel in enumerate(selected[:3]):
+                if not isinstance(sel, dict):
+                    continue
+                comment = sel.get("sia_comment") or ""
+                if comment:
+                    lines.append(f"  선별#{j + 1}: {_truncate(str(comment), 80)}")
         parts.append("\n".join(lines))
     return "\n".join(parts)
 
@@ -212,6 +224,76 @@ def _render_verdict(items: list[dict], *, mode: str) -> str:
             top = rec.get("top_action") or rec.get("summary")
             if top:
                 lines.append(f"  추천: {_truncate(str(top), 120)}")
+        # mode=full: photo_insights 상위 2장 dominant_tone + alignment — 강화 루프 갭 1 echo
+        if mode == "full":
+            insights = entry.get("photo_insights") or []
+            for j, ins in enumerate(insights[:2]):
+                if not isinstance(ins, dict):
+                    continue
+                tone = ins.get("dominant_tone")
+                align = ins.get("alignment_with_profile")
+                bits: list[str] = []
+                if tone:
+                    bits.append(f"톤 {_truncate(str(tone), 40)}")
+                if align:
+                    bits.append(f"매칭 {_truncate(str(align), 60)}")
+                if bits:
+                    lines.append(f"  사진#{j + 1}: {' / '.join(bits)}")
+        parts.append("\n".join(lines))
+    return "\n".join(parts)
+
+
+def _render_pi(items: list[dict], *, mode: str) -> str:
+    """Phase I — PI 결과 narrative summary 마크다운 (Backward echo).
+
+    상품명 직접 호명 금지 — "정밀 분석" 우회 표현. matched_type / cluster_label /
+    coord_3axis / top_celeb / top_hair / top_action 을 4 기능 prompt 에 carry.
+    빈 필드는 줄 자체 스킵. mode=summary 시 matched_type + cluster_label 만.
+    """
+    parts = ["### 본인 정밀 분석 이력"]
+    for i, entry in enumerate(items):
+        # 상품명 직접 호명 금지 — "최근 진단" 우회 (version 정보는 내부 추적용)
+        lines = [f"- 최근 진단 #{i + 1}"]
+
+        matched_type = entry.get("matched_type")
+        cluster_label = entry.get("cluster_label")
+        if matched_type or cluster_label:
+            bits: list[str] = []
+            if matched_type:
+                bits.append(f"본질 유형: {_truncate(str(matched_type), 40)}")
+            if cluster_label:
+                bits.append(f"클러스터: {_truncate(str(cluster_label), 30)}")
+            lines.append(f"  {' / '.join(bits)}")
+
+        # mode=full 일 때만 detail (좌표 / 셀럽 / 헤어 / 액션) echo
+        if mode == "full":
+            coord = entry.get("coord_3axis")
+            if isinstance(coord, dict):
+                try:
+                    lines.append(
+                        f"  본질 좌표: shape {float(coord.get('shape', 0.5)):.2f} / "
+                        f"volume {float(coord.get('volume', 0.5)):.2f} / "
+                        f"age {float(coord.get('age', 0.5)):.2f}"
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+            top_celeb = entry.get("top_celeb_name")
+            if top_celeb:
+                sim = entry.get("top_celeb_similarity")
+                if isinstance(sim, (int, float)):
+                    lines.append(f"  닮은꼴 셀럽: {_truncate(str(top_celeb), 30)} ({float(sim):.2f})")
+                else:
+                    lines.append(f"  닮은꼴 셀럽: {_truncate(str(top_celeb), 30)}")
+
+            top_hair = entry.get("top_hair_name")
+            if top_hair:
+                lines.append(f"  추천 헤어: {_truncate(str(top_hair), 40)}")
+
+            top_action = entry.get("top_action_text")
+            if top_action:
+                lines.append(f"  핵심 액션: {_truncate(str(top_action), 100)}")
+
         parts.append("\n".join(lines))
     return "\n".join(parts)
 

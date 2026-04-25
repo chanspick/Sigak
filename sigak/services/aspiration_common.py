@@ -532,14 +532,28 @@ def _axis_delta(gap: GapVector, axis: str) -> float:
 # ─────────────────────────────────────────────
 
 def _render_taste_profile_for_aspiration(profile: UserTasteProfile) -> dict:
-    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 dump.
+    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 dump + Phase I PI hint.
 
     sia_writer._render_taste_profile_slim 에 위임 (단일 진실 원천).
     Phase J5 — Aspiration narrative 가 vault 5 필드 (current_position /
     aspiration_vector / conversation_signals / user_original_phrases /
     strength_score) 풀 활용하기 위한 slim dump.
+
+    Phase I Backward echo:
+      - latest_pi.top_action_text → "pi_action_hint" 키로 명시 추가.
+      - 상품명 직접 호명 금지 — "지난번 정밀 분석" 우회 표현.
+      - None / 빈 latest_pi → 키 미추가 (첫 진입 회귀 0).
     """
-    return _render_taste_profile_slim(profile)
+    out = _render_taste_profile_slim(profile)
+    if profile.latest_pi is not None:
+        top_action = getattr(profile.latest_pi, "top_action_text", None)
+        if top_action:
+            out["pi_action_hint"] = (
+                "지난번 정밀 분석에서 권장한 핵심 액션: "
+                f"{top_action} — 추구미 갭 narrative 작성 시 이전 액션과의 "
+                "정합/차이 자연스럽게 carry."
+            )
+    return out
 
 
 # ─────────────────────────────────────────────

@@ -178,32 +178,77 @@ def _format_vault_history_block(
     bs_count = len(vault_history.best_shot_sessions) if vault_history else 0
     vd_count = len(vault_history.verdict_sessions) if vault_history else 0
     asp_count = len(vault_history.aspiration_analyses) if vault_history else 0
+    pi_count = len(vault_history.pi_history) if vault_history else 0
     phrases = user_phrases or []
 
-    if bs_count == 0 and vd_count == 0 and asp_count == 0 and not phrases:
+    if (
+        bs_count == 0 and vd_count == 0 and asp_count == 0
+        and pi_count == 0 and not phrases
+    ):
         return ""
 
     lines: list[str] = []
 
-    # 카운트 한 줄 — 0 인 카테고리는 스킵하지 않고 일관 표기 (유저가 이력 인지)
+    # 카운트 한 줄 — 0 인 카테고리는 스킵하지 않고 일관 표기 (유저가 이력 인지).
+    # PI 는 상품명 직접 호명 금지 — "정밀 분석" 우회 표현 사용.
     lines.append(
         f"- 본인 사용 이력: Best Shot {bs_count}회 / 피드 추천 {vd_count}회 / "
-        f"추구미 분석 {asp_count}회"
+        f"추구미 분석 {asp_count}회 / 정밀 분석 {pi_count}회"
     )
+
+    # Phase I — Backward echo: pi_history[0].matched_type + cluster_label
+    # Sia 재대화 시 "지난번 정밀 분석에서 ㅇㅇ님은 'Soft Fresh' 인상이세요" 자연 발화 carry.
+    if pi_count > 0 and vault_history is not None:
+        pi0 = vault_history.pi_history[0]
+        pi_bits: list[str] = []
+        if pi0.matched_type:
+            pi_bits.append(f"본질 유형 '{_truncate_phrase(str(pi0.matched_type), 40)}'")
+        if pi0.cluster_label:
+            pi_bits.append(f"클러스터 {_truncate_phrase(str(pi0.cluster_label), 30)}")
+        if pi_bits:
+            lines.append(f"- 지난 정밀 분석: {' · '.join(pi_bits)}")
+        # 닮은꼴 셀럽 1명 (있으면)
+        if pi0.top_celeb_name:
+            lines.append(f"- 닮은꼴 셀럽: {_truncate_phrase(str(pi0.top_celeb_name), 30)}")
 
     # 최신 피드 추천 방향 — verdict_sessions[0].recommendation.get("style_direction", "")
     if vd_count > 0 and vault_history is not None:
-        rec = vault_history.verdict_sessions[0].recommendation or {}
+        vd0 = vault_history.verdict_sessions[0]
+        rec = vd0.recommendation or {}
         style_dir = rec.get("style_direction", "") if isinstance(rec, dict) else ""
         head = _first_sentence(style_dir)
         if head:
             lines.append(f"- 최신 피드 추천 방향: {head}")
+        # 최신 추천 사진 핵심 — photo_insights[0] dominant_tone + alignment
+        # (강화 루프 갭 1 echo — Verdict v2 detail 이 Sia 재대화에 흘러감)
+        insights = vd0.photo_insights or []
+        if insights and isinstance(insights[0], dict):
+            first = insights[0]
+            tone = first.get("dominant_tone")
+            align = first.get("alignment_with_profile")
+            bits: list[str] = []
+            if tone:
+                bits.append(f"톤 {_truncate_phrase(str(tone), 30)}")
+            if align:
+                bits.append(f"매칭 {_truncate_phrase(str(align), 40)}")
+            if bits:
+                lines.append(f"- 최신 추천 사진#1: {' / '.join(bits)}")
 
     # 최신 Best Shot 종합 — best_shot_sessions[0].overall_message
     if bs_count > 0 and vault_history is not None:
-        head = _first_sentence(vault_history.best_shot_sessions[0].overall_message or "")
+        bs0 = vault_history.best_shot_sessions[0]
+        head = _first_sentence(bs0.overall_message or "")
         if head:
             lines.append(f"- 최신 Best Shot 종합: {head}")
+        # 최신 Best Shot 1등 — selected[0].sia_comment
+        # (강화 루프 갭 2 echo — Best Shot 선택 사진 narrative 가 Sia 재대화에 흘러감)
+        selected = bs0.selected or []
+        if selected:
+            first_sel = selected[0]
+            comment = getattr(first_sel, "sia_comment", None) or ""
+            head_c = _first_sentence(str(comment))
+            if head_c:
+                lines.append(f"- 최신 Best Shot 1등: {head_c}")
 
     # 최신 추구미 갭 — aspiration_analyses[0].gap_narrative
     if asp_count > 0 and vault_history is not None:

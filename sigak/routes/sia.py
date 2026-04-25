@@ -617,7 +617,10 @@ def chat_start(
         from services.history_injector import build_history_context
         history_context = build_history_context(
             db, user["id"],
-            include=["conversations", "aspiration_analyses", "best_shot_sessions"],
+            include=[
+                "conversations", "aspiration_analyses", "best_shot_sessions",
+                "verdict_sessions", "pi_history",
+            ],
             max_per_type=1,
         )
     except Exception:

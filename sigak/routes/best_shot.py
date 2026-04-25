@@ -315,7 +315,7 @@ def run_selection(
         from services.history_injector import build_history_context
         history_context = build_history_context(
             db, user["id"],
-            include=["conversations", "aspiration_analyses"],
+            include=["conversations", "aspiration_analyses", "pi_history"],
             max_per_type=1,
         )
     except Exception:

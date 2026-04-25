@@ -115,15 +115,62 @@ class VerdictHistoryEntry(BaseModel):
     recommendation: Optional[dict[str, Any]] = None
 
 
+class PiHistoryEntry(BaseModel):
+    """PI 1 리포트 unlock 시점 narrative 요약 — Phase I Backward echo 소스.
+
+    Phase I PI 엔진이 unlock 후 vault append (services.user_history.append_history
+    category="pi_history"). 4 기능 prompt 에서 read 해서 PI → Sia / Verdict v2 /
+    Best Shot / Aspiration narrative 흘림.
+
+    필드 = LLM 노출용 narrative summary. report_id 로 pi_reports 테이블 재조회 가능.
+    raw 영역 (sonnet_raw / haiku_raw / clip_embedding) 은 R2 영구 보존, 본 entry 미포함.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    report_id: str
+    version: int = 1
+    created_at: Optional[datetime] = None
+
+    # Phase I 진단 결과 — Backward echo 핵심 필드
+    matched_type: Optional[str] = None              # "Soft Fresh" 등 8 type 중 1
+    cluster_label: Optional[str] = None             # 4 클러스터 keyword
+    coord_3axis: Optional[dict[str, float]] = None  # {shape, volume, age}
+    top_celeb_name: Optional[str] = None            # matched_celebs[0].name
+    top_celeb_similarity: Optional[float] = None    # matched_celebs[0].similarity
+    top_hair_name: Optional[str] = None             # hair_recommendation.top_hairs[0]
+    top_action_text: Optional[str] = None           # action_plan.actions[0]
+
+
+class TrajectoryEvent(BaseModel):
+    """5 기능 진입 시점 시계열 이벤트 1건.
+
+    append_history() 가 5 카테고리 추가 시 자동으로 동시 누적.
+    UserDataVault.get_user_taste_profile() 의 trajectory[] 소스.
+    coordinate_snapshot 은 좌표 산출 가능 시점만 채움 (현재는 aspiration / pi).
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    captured_at: datetime
+    event_type: Literal["conversation", "verdict", "best_shot", "aspiration", "pi"]
+    reference_id: str
+    coordinate_snapshot: Optional[dict[str, float]] = None  # {shape, volume, age}
+    score_at_time: Optional[float] = None
+
+
 # ─────────────────────────────────────────────
 #  Top-level container
 # ─────────────────────────────────────────────
 
 class UserHistory(BaseModel):
-    """users.user_history JSONB 전체 구조. MVP 4 리스트."""
+    """users.user_history JSONB 전체 구조. 5 카테고리 + trajectory_events."""
     model_config = ConfigDict(extra="ignore")
 
     conversations: list[ConversationHistoryEntry] = Field(default_factory=list)
     best_shot_sessions: list[BestShotHistoryEntry] = Field(default_factory=list)
     aspiration_analyses: list[AspirationHistoryEntry] = Field(default_factory=list)
     verdict_sessions: list[VerdictHistoryEntry] = Field(default_factory=list)
+    # Phase I — PI 결과 narrative 누적 (Backward echo 소스). routes/pi.py:unlock 후 append.
+    pi_history: list[PiHistoryEntry] = Field(default_factory=list)
+    # trajectory[] populate — append_history() 가 5 카테고리 추가 시 동시 누적.
+    # 통합 시계열 (모든 5 기능). max = HISTORY_MAX_ENTRIES * 5 (50 기본).
+    trajectory_events: list[TrajectoryEvent] = Field(default_factory=list)

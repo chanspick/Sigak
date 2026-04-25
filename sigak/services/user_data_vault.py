@@ -26,12 +26,14 @@ from schemas.user_history import (
     BestShotHistoryEntry,
     ConversationHistoryEntry,
     HistoryIgSnapshot,
+    PiHistoryEntry,
     UserHistory,
     VerdictHistoryEntry,
 )
 from schemas.user_taste import (
     ConversationSignals,
     PhotoReference,
+    TrajectoryPoint,
     UserTasteProfile,
     compute_strength_score,
 )
@@ -147,6 +149,11 @@ class UserDataVault(BaseModel):
     def conversation_history(self) -> list[ConversationHistoryEntry]:
         return list(self.user_history.conversations)
 
+    @property
+    def pi_history(self) -> list[PiHistoryEntry]:
+        """Phase I — PI 결과 narrative summaries (Backward echo source)."""
+        return list(self.user_history.pi_history)
+
     # ─────────────────────────────────────────────
     #  UserTasteProfile composition
     # ─────────────────────────────────────────────
@@ -184,6 +191,13 @@ class UserDataVault(BaseModel):
             monthly_report_count=self.monthly_report_count,
         )
 
+        # Phase I — Backward echo: 최신 PI 결과를 latest_pi 로 carry
+        # → sia_writer._render_taste_profile_slim 에서 dump → 4 기능 모두 자동 echo
+        latest_pi: Optional[PiHistoryEntry] = None
+        pi_list = self.user_history.pi_history
+        if pi_list:
+            latest_pi = pi_list[0]
+
         return UserTasteProfile(
             user_id=self.basic_info.user_id,
             snapshot_at=self.snapshot_at,
@@ -191,10 +205,56 @@ class UserDataVault(BaseModel):
             aspiration_vector=self.latest_aspiration_gap,
             preference_evidence=evidence,
             conversation_signals=signals,
-            trajectory=[],             # Phase M (이달의 시각) 에서 채움
+            trajectory=self._compose_trajectory(strength),
             user_original_phrases=phrases,
+            latest_pi=latest_pi,
             strength_score=strength,
         )
+
+    def _compose_trajectory(self, current_strength: float) -> list[TrajectoryPoint]:
+        """user_history.trajectory_events → TrajectoryPoint 리스트.
+
+        append_history() 가 4 기능 진입 시 자동 누적. 좌표 산출 가능 시점만
+        coordinate 채워짐 (현재는 aspiration 만). score_at_time 은 기록 시점에
+        산출 불가하므로 vault 조립 시 가장 최근 이벤트에 한해 현재 strength 로
+        fallback.
+        """
+        events = getattr(self.user_history, "trajectory_events", None) or []
+        if not events:
+            return []
+
+        out: list[TrajectoryPoint] = []
+        for idx, ev in enumerate(events):
+            if ev is None:
+                continue
+            try:
+                coord: Optional[VisualCoordinate] = None
+                snap = getattr(ev, "coordinate_snapshot", None)
+                if isinstance(snap, dict):
+                    try:
+                        coord = VisualCoordinate(
+                            shape=float(snap.get("shape", 0.5)),
+                            volume=float(snap.get("volume", 0.5)),
+                            age=float(snap.get("age", 0.5)),
+                        )
+                    except (TypeError, ValueError):
+                        coord = None
+                # 가장 최신 이벤트(idx=0) 만 현재 strength fallback —
+                # 과거 이벤트는 당시 strength 알 수 없음.
+                score = ev.score_at_time
+                if score is None and idx == 0:
+                    score = current_strength
+                out.append(TrajectoryPoint(
+                    captured_at=ev.captured_at,
+                    coordinate=coord,
+                    source=ev.event_type,
+                    reference_id=ev.reference_id,
+                    score_at_time=score,
+                ))
+            except Exception:
+                logger.debug("trajectory event parse failed idx=%d", idx)
+                continue
+        return out
 
     # ─────────────────────────────────────────────
     #  Internal composers — structured_fields 에서 추출

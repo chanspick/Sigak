@@ -538,7 +538,15 @@ def _load_current_report(db, user_id: str) -> Optional[PIReport]:
     if row is None or not row.report_data:
         return None
     try:
-        return PIReport.model_validate(row.report_data)
+        report = PIReport.model_validate(row.report_data)
+        # PI v1 components 복원 — pi_v1_spec 플래그 또는 components 키 존재 시
+        # report_data JSONB 안 components dict 를 attribute 로 attach.
+        # 이미 DB 에 저장된 리포트도 v3 sections 풀 노출 가능 (PI-D 정합).
+        if isinstance(row.report_data, dict):
+            components = row.report_data.get("components")
+            if isinstance(components, dict) and components:
+                setattr(report, "_pi_v1_components", components)
+        return report
     except Exception:
         logger.exception("legacy pi_reports row parse failed: user=%s", user_id)
         return None

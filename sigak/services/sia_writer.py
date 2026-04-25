@@ -100,6 +100,20 @@ class SiaWriter(Protocol):
         """
         ...
 
+    def generate_pi_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        components: dict,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """PI 9 컴포넌트 조립 결과 → 종합 메시지 한 단락 (Phase I STEP 8).
+
+        톤: 리포트체 (~있어요/~세요). Sia 친밀체와 Verdict 정중체와 분리.
+        Hard Rules: A-17 / A-20 / markdown / 톤 어미 / 길이 350자.
+        """
+        ...
+
 
 # ─────────────────────────────────────────────
 #  Helpers
@@ -145,13 +159,19 @@ def _load_aspiration_system_prompt() -> str:
 
 
 def _render_taste_profile_slim(profile: UserTasteProfile) -> dict:
-    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 dump."""
+    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 + Phase I latest_pi dump.
+
+    Phase I — Backward echo: latest_pi 키 추가. Aspiration / Sia / 다른 sia_writer
+    호출 path 모두 자동 carry. 첫 진입 (latest_pi=None) 회귀 0 — None dump.
+    상품명 직접 호명 금지는 caller (prompt build) 책임 — 본 dump 는 raw.
+    """
     dump = profile.model_dump(mode="json")
     return {
         "current_position": dump.get("current_position"),
         "aspiration_vector": dump.get("aspiration_vector"),
         "conversation_signals": dump.get("conversation_signals"),
         "user_original_phrases": dump.get("user_original_phrases"),
+        "latest_pi": dump.get("latest_pi"),
         "strength_score": dump.get("strength_score"),
     }
 
@@ -302,6 +322,97 @@ def _collect_violations_aspiration(text: str) -> list[str]:
 
 
 # ─────────────────────────────────────────────
+#  PI 리포트 전용 헬퍼 (Phase I — STEP 8)
+# ─────────────────────────────────────────────
+
+_HAIKU_PI_OVERALL_SYSTEM = """당신은 SIGAK PI (시각이 본 당신) 리포트 종합 메시지 생성기.
+
+역할:
+  PI 9 컴포넌트 조립 결과를 짧게 종합한 한 단락 (3-4 문장, 200-300자) 을 생성합니다.
+
+톤 (리포트체) — Sia 친밀체와 분리, Verdict 정중체와도 분리:
+  허용 어미: ~있어요 / ~세요 / ~예요 / ~보여요 / ~인 편이에요
+  금지 (Sia 친밀체): ~잖아요 / ~더라구요 / ~이시잖아요 / ~인가봐요?
+  금지 (Verdict 정중체): ~합니다 / ~할 수 있습니다
+  금지 (흐림/감탄): ~네요 / ~군요 / ~같아요 / ~것 같
+
+Hard Rules (validator hard reject):
+  - 영업 어휘 0건 (가격 / 토큰 / 결제 / 상품명 / "추천해드릴" / "구독" / "리포트로" / "컨설팅")
+  - 추상 칭찬어 0건 (매력 / 독특 / 특별 / 흥미 / 인상적 / 센스 / 안목 / 감각이 있)
+  - 마크다운 0건 (* / ** / ## / > / 코드블록 / bullet / list / 이모지)
+
+호명: user_name 1-2회. 이름 다음 쉼표(',') 뒤 문장 시작 X.
+
+객관 뷰티 어휘 PI 한정 허용 (얼굴형 / 광대 / 비율 / 피부 톤 / 분석).
+
+다른 기능 직접 호명 금지 — "Verdict v2" / "Best Shot" / "추구미 분석" 어휘 그대로 X.
+대신 "지난번" / "이미 보셨던" / "전에 짚어드린" 자연 우회.
+
+출력: 한 단락 텍스트만. JSON / 따옴표 / 설명 / 마크다운 wrapper 없음."""
+
+
+def _collect_violations_pi_report(text: str) -> list[str]:
+    """PI 리포트체 전용 검증 — A-17/A-20/markdown + 톤 어미 + 길이 (350자 hard).
+
+    Sia 친밀체 어미 (~잖아요/~더라구요) + Verdict 정중체 (~합니다) 차단.
+    PI 한정 허용 어휘 (분석 / 얼굴형 / 비율) 허용.
+    """
+    out: list[str] = []
+    out.extend(check_a17_commerce(text))
+    out.extend(check_a20_abstract_praise(text))
+    out.extend(check_markdown_markup(text))
+
+    bad_endings = (
+        "잖아요", "더라구요", "이시잖아요", "인가봐요",
+        "합니다", "할 수 있습니다", "할 수 있어요",
+        "네요.", "네요!", "네요?", "군요", "같아요", "같습니다", "것 같",
+    )
+    for ending in bad_endings:
+        if ending in text:
+            out.append(f"PI 톤 위반: '{ending}' 발견")
+            break
+
+    if len(text) > 350:
+        out.append(f"PI 길이 초과: {len(text)}자 (max 350)")
+
+    return out
+
+
+def _build_pi_overall_fallback(
+    *,
+    honor: str,
+    components: dict,
+) -> str:
+    """PI overall Haiku 실패 시 deterministic fallback. 톤 + Hard Rules 통과."""
+    cover_content = (
+        components.get("cover", {}).get("content", {})
+        if isinstance(components.get("cover"), dict) else {}
+    )
+    type_ref_content = (
+        components.get("type_reference", {}).get("content", {})
+        if isinstance(components.get("type_reference"), dict) else {}
+    )
+    gap_content = (
+        components.get("gap_analysis", {}).get("content", {})
+        if isinstance(components.get("gap_analysis"), dict) else {}
+    )
+
+    matched_label = (type_ref_content.get("matched_label") or "").strip()
+    primary_direction = (gap_content.get("primary_direction") or "").strip()
+
+    parts: list[str] = []
+    honor_part = f"{honor} " if honor else ""
+    parts.append(f"{honor_part}정면 분석과 vault 데이터로 정리해드린 결과예요.")
+    if matched_label:
+        parts.append(f"매칭 결과는 {matched_label} 쪽이 가장 가까웠어요.")
+    if primary_direction:
+        parts.append(f"방향은 {primary_direction} 쪽으로 또렷하게 보여요.")
+    parts.append("조금 더 쓰시면 더 또렷해져요.")
+
+    return " ".join(parts).strip()
+
+
+# ─────────────────────────────────────────────
 #  Stub 구현 — 테스트/오프라인 전용 (Haiku 호출 없음)
 # ─────────────────────────────────────────────
 
@@ -379,6 +490,17 @@ class StubSiaWriter:
             "raw_haiku_response": "",   # stub: Haiku 미호출
             "matched_trends_used": list(matched_trends or []),
         }
+
+    def generate_pi_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        components: dict,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """Stub — PI overall fallback (Haiku 미호출). 톤 + Hard Rules 통과."""
+        honor = _name_honorific(user_name)
+        return _build_pi_overall_fallback(honor=honor, components=components)
 
 
 # ─────────────────────────────────────────────
@@ -600,6 +722,89 @@ class HaikuSiaWriter:
         parsed["raw_haiku_response"] = raw   # 휘발 방지
         parsed["matched_trends_used"] = list(matched_trends or [])
         return parsed
+
+    def generate_pi_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        components: dict,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """PI overall — Haiku 4.5 + 페르소나 리포트체 + validator 검증 wrap.
+
+        실패 시 deterministic fallback (Stub 동일 결과). raw text R2 영구 보존은
+        caller (pi_engine.generate_pi_report_v1) 영역. 본 메서드는 final text 반환.
+        """
+        honor = _name_honorific(user_name)
+
+        cover_c = (
+            components.get("cover", {}).get("content", {})
+            if isinstance(components.get("cover"), dict) else {}
+        )
+        type_c = (
+            components.get("type_reference", {}).get("content", {})
+            if isinstance(components.get("type_reference"), dict) else {}
+        )
+        gap_c = (
+            components.get("gap_analysis", {}).get("content", {})
+            if isinstance(components.get("gap_analysis"), dict) else {}
+        )
+        action_c = (
+            components.get("action_plan", {}).get("content", {})
+            if isinstance(components.get("action_plan"), dict) else {}
+        )
+
+        user_phrases = profile.user_original_phrases or []
+        signals = getattr(profile, "conversation_signals", None)
+        signals_dump: Optional[dict] = None
+        if signals is not None:
+            try:
+                signals_dump = (
+                    signals.model_dump(mode="json")
+                    if hasattr(signals, "model_dump") else dict(signals)
+                )
+            except Exception:
+                signals_dump = None
+
+        prompt_lines = [
+            f"[유저 호명] {honor}",
+            f"[cover headline] {cover_c.get('headline', '')}",
+            f"[cover subhead] {cover_c.get('subhead', '')}",
+            f"[matched type] {type_c.get('matched_label', '')} | "
+            f"{type_c.get('matched_one_liner', '')}",
+            f"[primary axis] {gap_c.get('primary_axis', '')}",
+            f"[primary direction] {gap_c.get('primary_direction', '')}",
+            f"[primary action] {action_c.get('primary_action', '')}",
+            f"[strength_score] {profile.strength_score:.2f}",
+        ]
+        if user_phrases:
+            prompt_lines.append(
+                f"[vault user_phrases] "
+                f"{json.dumps(user_phrases[:5], ensure_ascii=False)}"
+            )
+        if signals_dump:
+            prompt_lines.append(
+                f"[signals 요약] "
+                f"{json.dumps(signals_dump, ensure_ascii=False)[:300]}"
+            )
+        prompt_lines.append(
+            "\n위 9 컴포넌트 정리 결과를 PI 리포트 종합 한 단락 "
+            "(3-4 문장, 200-300자) 으로 정리합니다. "
+            "리포트체 (~있어요/~세요). 호명 1-2회. JSON 아닌 순수 텍스트."
+        )
+
+        user_prompt = "\n".join(prompt_lines)
+        fallback_text = _build_pi_overall_fallback(
+            honor=honor, components=components,
+        )
+
+        return self._call_with_retry(
+            system=_HAIKU_PI_OVERALL_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=500,
+            fallback_text=fallback_text,
+            validator=_collect_violations_pi_report,
+        )
 
     # ─────────────────────────────────────────────
     #  internal — Haiku 호출 + validator wrap

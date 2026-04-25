@@ -768,10 +768,15 @@ def _sonnet_pi_face_analysis(
     if not photo_bytes:
         raise PIEngineError("baseline photo is empty")
 
-    b64 = base64.b64encode(photo_bytes).decode("ascii")
+    # Anthropic API 5MB base64 제한 — verdict_v2.downscale_image 재활용
+    # (긴 변 1568px LANCZOS + JPEG q=85, EXIF orientation, RGB 변환).
+    # R2 원본은 raw 영구 보존됨 — 본 다운스케일은 LLM 호출 시점 메모리만.
+    from services.verdict_v2 import downscale_image
+    downscaled_bytes, content_type = downscale_image(photo_bytes)
+    b64 = base64.b64encode(downscaled_bytes).decode("ascii")
     image_block = {
         "type": "image",
-        "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+        "source": {"type": "base64", "media_type": content_type, "data": b64},
     }
 
     text_payload = (

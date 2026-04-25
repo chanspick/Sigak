@@ -1,0 +1,87 @@
+[
+  {
+    "id": "placeholder_pin_001",
+    "url": "https://www.pinterest.com/pin/placeholder_001/",
+    "title": "PLACEHOLDER — replace with real DEBUG_PINTEREST_RAW_DUMP capture",
+    "description": "본 픽스처는 v1.5 어댑터 작성 시 placeholder. 본인 (창업자) E2E 검증 시 DEBUG_PINTEREST_RAW_DUMP=1 환경변수 켜고 1번 호출하면 실 응답으로 자동 교체됨.",
+    "saves": 0,
+    "repin_count": 0,
+    "is_product_pin": false,
+    "images": {
+      "orig": {
+        "url": "https://i.pinimg.com/originals/placeholder_001.jpg",
+        "width": 736,
+        "height": 1104
+      },
+      "736x": {
+        "url": "https://i.pinimg.com/736x/placeholder_001.jpg",
+        "width": 736,
+        "height": 1104
+      },
+      "474x": {
+        "url": "https://i.pinimg.com/474x/placeholder_001.jpg",
+        "width": 474,
+        "height": 711
+      },
+      "236x": {
+        "url": "https://i.pinimg.com/236x/placeholder_001.jpg",
+        "width": 236,
+        "height": 354
+      }
+    },
+    "board": {
+      "id": "placeholder_board_id",
+      "name": "Aesthetic Reference"
+    },
+    "pinner": {
+      "username": "placeholder_user",
+      "full_name": "Placeholder User"
+    },
+    "instagram_data": null,
+    "created_at": "2026-04-25T00:00:00Z"
+  },
+  {
+    "id": "placeholder_pin_002",
+    "url": "https://www.pinterest.com/pin/placeholder_002/",
+    "title": "Product pin (filtered out)",
+    "description": "is_product_pin=true 케이스 — 어댑터에서 skip 되어야 함",
+    "is_product_pin": true,
+    "images": {
+      "orig": {"url": "https://i.pinimg.com/originals/placeholder_002.jpg"}
+    },
+    "board": {"id": "placeholder_board_id", "name": "Aesthetic Reference"}
+  },
+  {
+    "id": "placeholder_pin_003",
+    "url": "https://www.pinterest.com/pin/placeholder_003/",
+    "title": "Video pin (filtered out)",
+    "description": "videos 필드 있는 케이스 — 어댑터에서 skip 되어야 함",
+    "is_product_pin": false,
+    "videos": {"V_720P": {"url": "https://v.pinimg.com/videos/placeholder.mp4"}},
+    "images": {
+      "orig": {"url": "https://i.pinimg.com/originals/placeholder_003.jpg"}
+    },
+    "board": {"id": "placeholder_board_id", "name": "Aesthetic Reference"}
+  },
+  {
+    "id": "placeholder_pin_004",
+    "url": "https://www.pinterest.com/pin/placeholder_004/",
+    "title": "No image pin (filtered out)",
+    "description": "images dict 없거나 모든 size_key 가 비어있는 케이스 — skip + logger.warning",
+    "is_product_pin": false,
+    "images": null,
+    "board": {"id": "placeholder_board_id", "name": "Aesthetic Reference"}
+  },
+  {
+    "id": "placeholder_pin_005",
+    "url": "https://www.pinterest.com/pin/placeholder_005/",
+    "title": "Fallback to 474x (orig + 736x missing)",
+    "description": "size_keys fallback 검증용 — orig/736x 없고 474x 부터 있음",
+    "is_product_pin": false,
+    "images": {
+      "474x": {"url": "https://i.pinimg.com/474x/placeholder_005.jpg"},
+      "236x": {"url": "https://i.pinimg.com/236x/placeholder_005.jpg"}
+    },
+    "board": {"id": "placeholder_board_id", "name": "Aesthetic Reference"}
+  }
+]

@@ -243,7 +243,8 @@ def test_run_aspiration_ig_with_user_posts_produces_pairs(monkeypatch):
     from services import ig_feed_analyzer
     monkeypatch.setattr(
         ig_feed_analyzer, "analyze_ig_feed",
-        lambda posts, biography: _sample_analysis(),
+        # v1.5: 시그니처 (analysis, raw_text) tuple. raw_text 는 R2 mock 안 거치니 임의 str.
+        lambda posts, biography: (_sample_analysis(), "{\"mock\": true}"),
     )
 
     # materialize_pairs_to_r2 단순 통과 스텁 — 실 업로드 X
@@ -298,7 +299,8 @@ def test_run_aspiration_ig_without_user_posts_still_completes(monkeypatch):
     from services import ig_feed_analyzer
     monkeypatch.setattr(
         ig_feed_analyzer, "analyze_ig_feed",
-        lambda posts, biography: _sample_analysis(),
+        # v1.5: 시그니처 (analysis, raw_text) tuple. raw_text 는 R2 mock 안 거치니 임의 str.
+        lambda posts, biography: (_sample_analysis(), "{\"mock\": true}"),
     )
     monkeypatch.setattr(
         ig_engine, "materialize_pairs_to_r2",

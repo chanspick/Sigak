@@ -507,7 +507,8 @@ def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
         )
 
         # 3. Vision 분석 — 실패 시 analysis=None 인 채 success 처리
-        analyzed_cache = ig_scraper.attach_vision_analysis(preview_cache)
+        # v1.5 변경: vision_raw 함께 반환받아 R2 분리 저장 (LLM 격리).
+        analyzed_cache, vision_raw = ig_scraper.attach_vision_analysis(preview_cache)
 
         # 3.5. STEP 2 — R2 영구 저장 + latest_posts display_url 교체
         try:
@@ -519,6 +520,28 @@ def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
                 "ig_fetch job: R2 materialize failed user=%s — keeping CDN URLs",
                 user_id,
             )
+
+        # 3.6. v1.5 — 본인 IG Vision Sonnet raw R2 분리 저장 (LLM 격리)
+        # PII 위험으로 DB 직접 저장 금지. R2 키 참조만 cache.r2_vision_raw_key.
+        # 메타분석 시 R2 fetch 로만 활용 (Sia / 다른 prompt 에 절대 안 들어감).
+        if vision_raw:
+            try:
+                from services.aspiration_common import (
+                    materialize_ig_vision_raw_to_r2,
+                )
+                ts = analyzed_cache.fetched_at.strftime("%Y%m%dT%H%M%SZ")
+                r2_vision_key = materialize_ig_vision_raw_to_r2(
+                    vision_raw, user_id=user_id, snapshot_ts=ts,
+                )
+                if r2_vision_key:
+                    analyzed_cache = analyzed_cache.model_copy(update={
+                        "r2_vision_raw_key": r2_vision_key,
+                    })
+            except Exception:
+                logger.exception(
+                    "ig_fetch job: vision_raw R2 persist failed user=%s "
+                    "(분석은 정상 진행)", user_id,
+                )
 
         # 4. 최종 flush (success) — Vision 성공/실패 무관 scope=full 이면 success
         user_profiles.upsert_ig_feed_cache(

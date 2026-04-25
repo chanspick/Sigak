@@ -82,7 +82,7 @@ def main() -> int:
     # ── Step 4b: attach_vision_analysis 실 Sonnet
     _divider("Step 4b — attach_vision_analysis — Sonnet Vision")
     t1 = time.time()
-    analyzed = ig_scraper.attach_vision_analysis(preview)
+    analyzed, _vision_raw = ig_scraper.attach_vision_analysis(preview)
     t_vision = time.time() - t1
     print(f"elapsed: {t_vision:.2f}s")
     print(f"analysis populated: {analyzed.analysis is not None}")

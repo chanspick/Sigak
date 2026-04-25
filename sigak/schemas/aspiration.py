@@ -81,9 +81,20 @@ class AspirationAnalysis(BaseModel):
     matched_trends: list["MatchedTrendView"] = Field(default_factory=list)
 
     # ── 디버그/추적용 raw
-    target_analysis_snapshot: Optional[dict] = None   # IgFeedAnalysis dump
+    target_analysis_snapshot: Optional[dict] = None   # IgFeedAnalysis dump (정제, LLM 노출 OK)
     images_captured_count: int = 0
     r2_target_dir: Optional[str] = None               # R2 저장 prefix
+
+    # ── v1.5 raw 영구 보존 (R2 분리, LLM 100% 격리)
+    # CLAUDE.md 카피 "쓸수록 정교해지는 / 시계열 보존" 실현용.
+    # PII 위험 (pinner.username / latest_comments[].text 등) 으로 DB 직접 저장 금지.
+    # R2 키 참조만 보존, 메타분석 시 R2 fetch.
+    r2_apify_raw_key: Optional[str] = None            # R2 apify_raw.json public URL
+    r2_vision_raw_key: Optional[str] = None           # R2 vision_raw.json public URL
+
+    # ── matched_trends 분석 시점 스냅샷 (KB 변경 시 과거 리포트 행동지침 보존)
+    # 응답 hydrate 우선순위: snapshot 있으면 그것, 없으면 KB hydrate fallback.
+    matched_trends_snapshot: Optional[list[dict]] = None
 
 
 class MatchedTrendView(BaseModel):

@@ -176,6 +176,9 @@ class IgFeedCache(_BaseSchema):
     fetched_at: datetime
     # STEP 2 — R2 영구 저장 전환. display_url 이 R2 public URL (또는 업로드 실패 시 CDN URL).
     r2_snapshot_dir: Optional[str] = None   # "user_media/{user_id}/ig_snapshots/{ts}/" — None 이면 R2 미업로드
+    # v1.5 — Vision Sonnet raw 응답 R2 보존. PII 격리 위해 DB 직접 저장 X, R2 키 참조만.
+    # 메타분석 시 R2 fetch. None 이면 Vision raw 미보존 (구 row 또는 Vision 실패).
+    r2_vision_raw_key: Optional[str] = None   # "user_media/{user_id}/ig_snapshots/{ts}/vision_raw.json"
 
 
 # ─────────────────────────────────────────────

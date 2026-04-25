@@ -78,8 +78,13 @@ def analyze_ig_feed(
     biography: Optional[str],
     *,
     max_retries: int = 1,
-) -> Optional[IgFeedAnalysis]:
-    """피드 이미지 + 메타 → Sonnet Vision 분석 → IgFeedAnalysis.
+) -> tuple[Optional[IgFeedAnalysis], Optional[str]]:
+    """피드 이미지 + 메타 → Sonnet Vision 분석 → (IgFeedAnalysis, raw_text).
+
+    v1.5 변경 (raw 보존):
+      - 시그니처 (Optional[IgFeedAnalysis]) → (Optional[IgFeedAnalysis], Optional[str])
+      - raw_text = Sonnet response 의 원본 텍스트. caller 가 R2 분리 저장 결정.
+      - 정제 IgFeedAnalysis 만 LLM 노출 OK, raw_text 는 LLM 주입 금지.
 
     Args:
         posts: latest_posts. display_url 누락 항목은 자동 제외.
@@ -87,13 +92,14 @@ def analyze_ig_feed(
         max_retries: 파싱/검증 실패 시 재시도. default 1.
 
     Returns:
-        IgFeedAnalysis on success, None on failure (any exception path).
+        (IgFeedAnalysis, raw_text) on success.
+        (None, None) on failure (any exception path).
         caller 는 cache.analysis=None 으로 저장하고 Sia 폴백에 맡긴다.
     """
     images = [p for p in posts if p.display_url]
     if not images:
         logger.info("analyze_ig_feed skipped: no images with display_url")
-        return None
+        return None, None
 
     comment_agg = _aggregate_comments(posts)
     bio = (biography or "").strip()
@@ -114,7 +120,7 @@ def analyze_ig_feed(
                 **parsed,
                 analyzed_at=datetime.now(timezone.utc),
             )
-            return analysis
+            return analysis, raw
         except (json.JSONDecodeError, ValidationError) as e:
             last_error = e
             logger.warning(
@@ -137,7 +143,7 @@ def analyze_ig_feed(
             continue
 
     logger.error("ig_feed_analyzer all retries failed: %s", last_error)
-    return None
+    return None, None
 
 
 # ─────────────────────────────────────────────

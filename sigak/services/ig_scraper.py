@@ -125,7 +125,10 @@ def fetch_ig_profile(
         return ("private", cache)
 
     # 공개 계정: items 전체를 posts 로 사용 (첫 포스트 손실 금지).
-    cache = _build_full_cache(
+    # 본 흐름은 단발 fetch_ig_profile 호출 — vision_raw 보존 X (호출처 user_id 모름).
+    # 본인 IG vision_raw 보존은 분리 흐름 (fetch_ig_raw → attach_vision_analysis)
+    # 의 onboarding 라우트가 처리.
+    cache, _vision_raw = _build_full_cache(
         profile_raw,
         posts_raw=raw_items,
         posts_limit=results_limit,
@@ -255,36 +258,43 @@ def _build_preview_cache(
     )
 
 
-def attach_vision_analysis(cache: IgFeedCache) -> IgFeedCache:
-    """Preview cache 에 Sonnet Vision 분석을 덧붙인 새 IgFeedCache 반환.
+def attach_vision_analysis(cache: IgFeedCache) -> tuple[IgFeedCache, Optional[str]]:
+    """Preview cache 에 Sonnet Vision 분석을 덧붙인 (new_cache, vision_raw_text) 반환.
+
+    v1.5 변경 (raw 보존):
+      - 시그니처 IgFeedCache → tuple[IgFeedCache, Optional[str]]
+      - 두 번째 반환값 = Sonnet response raw text. caller (onboarding 라우트)
+        가 R2 분리 저장하고 cache.r2_vision_raw_key 채움.
+      - LLM 격리 — vision_raw 는 prompt 에 절대 들어가지 말 것.
 
     - scope == "full" + latest_posts 유효한 경우에만 Vision 호출
-    - Vision 실패 / None 시 원본 cache 그대로 반환 (degrade)
+    - Vision 실패 / None 시 원본 cache + None 반환 (degrade)
     - display_url TTL (24-48h) 이슈: preview flush 직후 호출 전제 — 지연 시 이미지
       다운로드 실패할 수 있음
     """
     if cache.scope != "full":
-        return cache
+        return cache, None
     if not cache.latest_posts:
-        return cache
+        return cache, None
 
     try:
         from services.ig_feed_analyzer import analyze_ig_feed  # lazy
-        analysis = analyze_ig_feed(
+        analysis, vision_raw = analyze_ig_feed(
             posts=cache.latest_posts,
             biography=cache.profile_basics.bio,
         )
     except Exception:
         logger.exception("attach_vision_analysis failed")
-        return cache
+        return cache, None
 
     if analysis is None:
-        return cache
+        return cache, None
 
-    return cache.model_copy(update={
+    new_cache = cache.model_copy(update={
         "analysis": analysis,
         "last_analyzed_post_count": cache.profile_basics.post_count,
     })
+    return new_cache, vision_raw
 
 
 def is_stale(ig_fetched_at: Optional[datetime]) -> bool:
@@ -510,8 +520,13 @@ def _build_full_cache(
     posts_raw: list[dict],
     *,
     posts_limit: int = 10,
-) -> IgFeedCache:
-    """공개 계정: profile + posts 로부터 feed_highlights / latest_posts / analysis 추출.
+) -> tuple[IgFeedCache, Optional[str]]:
+    """공개 계정: profile + posts 로부터 cache + Vision raw 반환.
+
+    v1.5 변경 (raw 보존):
+      - 시그니처 IgFeedCache → tuple[IgFeedCache, Optional[str]]
+      - 두 번째 반환값 = Sonnet Vision raw text. caller 가 R2 저장 결정
+        (본인 IG = ig_snapshots/{ts}/, 추구미 IG = aspiration_targets/{analysis_id}/).
 
     current_style_mood (DEPRECATED D6): 이제 analysis.observed_adjectives 로 대체.
     style_trajectory: Phase B 시계열 예약, 현재 None 유지.
@@ -521,6 +536,7 @@ def _build_full_cache(
       - latest_posts 의 comments 는 본문만 보존. 댓글 작성자(타인) username /
         profile pic / user id 는 전부 제거.
       - raw 에서도 동일하게 scrub — 제3자 개인정보 DB 영구저장 방지.
+      - vision_raw 는 LLM 격리 — DB / prompt 에 절대 노출 X. R2 만.
 
     Vision 호출 타이밍 (CRITICAL):
       - display_url 은 Instagram CDN URL 로 TTL 24-48h.
@@ -532,12 +548,12 @@ def _build_full_cache(
     latest_posts = _extract_latest_posts(scrubbed_posts, limit=posts_limit)
 
     # Sonnet Vision — 동일 트랜잭션. 실패는 삼키고 analysis=None 으로 degrade.
-    analysis = _run_vision_analysis(
+    analysis, vision_raw = _run_vision_analysis(
         posts=latest_posts,
         biography=profile_basics.bio,
     )
 
-    return IgFeedCache(
+    cache = IgFeedCache(
         scope="full",
         profile_basics=profile_basics,
         current_style_mood=None,           # DEPRECATED (D6)
@@ -551,22 +567,24 @@ def _build_full_cache(
         raw={"profile": profile_raw, "posts": scrubbed_posts},
         fetched_at=datetime.now(timezone.utc),
     )
+    return cache, vision_raw
 
 
 def _run_vision_analysis(
     posts: list[IgLatestPost],
     biography: Optional[str],
-):
-    """Sonnet Vision 호출 래퍼. 임포트 순환 회피 위해 지연 임포트.
+) -> tuple[Optional[IgFeedAnalysis], Optional[str]]:
+    """Sonnet Vision 호출 래퍼. (analysis, raw_text) 반환. 임포트 순환 회피 위해 지연 임포트.
 
-    실패는 전부 흡수. caller 는 None 으로 degrade.
+    v1.5 변경: 시그니처 (analysis,) → (analysis, raw_text).
+    실패는 전부 흡수. caller 는 (None, None) 으로 degrade.
     """
     try:
         from services.ig_feed_analyzer import analyze_ig_feed  # lazy
         return analyze_ig_feed(posts=posts, biography=biography)
     except Exception:
-        logger.exception("Vision analysis wrapper failed — degrading to analysis=None")
-        return None
+        logger.exception("Vision analysis wrapper failed — degrading to (None, None)")
+        return None, None
 
 
 def _extract_profile_basics(profile_raw: dict) -> IgFeedProfileBasics:

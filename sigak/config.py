@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     apify_api_key: str = ""                                     # Apify Instagram Profile Scraper Actor 키
     ig_fetch_timeout: float = 45.0                              # 초. 대형 계정 대응 여유. MCP 실측: 30 results ≈ 20s
     apify_actor_id: str = "apify~instagram-scraper"             # Actor slug (tilde URL-safe)
-    apify_pinterest_actor_id: str = "apify~pinterest-scraper"   # Pinterest 보드 scraper (Phase J)
-    pinterest_enabled: bool = False                              # MVP 초기 False. 추구미 Pinterest 스케폴드만.
+    apify_pinterest_actor_id: str = "devcake~pinterest-data-scraper"   # Pinterest 보드 scraper (v1.5 raw 보존 어댑터)
+    pinterest_enabled: bool = True                               # v1.5 — 추구미 Pinterest 정식 활성화. devcake actor 어댑터 + raw R2 보존.
     ig_refresh_days: int = 14                                   # 2주 stale 기준 (user_profiles.ig_fetched_at)
 
     # ── Cloudflare R2 (Phase K) ──

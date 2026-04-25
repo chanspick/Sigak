@@ -152,6 +152,32 @@ def aspiration_target_photo_key(user_id: str, analysis_id: str, index: int) -> s
 
 
 # ─────────────────────────────────────────────
+#  v1.5 raw 영구 보존 (Apify raw + Vision Sonnet raw)
+#  PII 격리 위해 R2 분리 저장. DB / LLM 주입 금지.
+# ─────────────────────────────────────────────
+
+def aspiration_apify_raw_key(user_id: str, analysis_id: str) -> str:
+    """추구미 분석 시 Apify scraper 응답 raw JSON 저장 키."""
+    return user_media_key(
+        user_id, f"aspiration_targets/{analysis_id}/apify_raw.json"
+    )
+
+
+def aspiration_vision_raw_key(user_id: str, analysis_id: str) -> str:
+    """추구미 분석 시 Sonnet Vision response raw text 저장 키."""
+    return user_media_key(
+        user_id, f"aspiration_targets/{analysis_id}/vision_raw.json"
+    )
+
+
+def ig_snapshot_vision_raw_key(user_id: str, snapshot_ts: str) -> str:
+    """본인 IG essentials 의 Sonnet Vision response raw text 저장 키."""
+    return user_media_key(
+        user_id, f"ig_snapshots/{snapshot_ts}/vision_raw.json"
+    )
+
+
+# ─────────────────────────────────────────────
 #  Public API
 # ─────────────────────────────────────────────
 

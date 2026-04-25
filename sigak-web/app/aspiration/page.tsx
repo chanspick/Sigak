@@ -3,7 +3,7 @@
  *
  * 두 가지 입력 채널:
  *   - Instagram: @핸들 또는 URL (백엔드가 "@" prefix / URL 정규화)
- *   - Pinterest: 보드 URL (MVP 기간엔 pinterest_enabled=false → failed_skipped)
+ *   - Pinterest: 보드 URL (v1.5 정식 활성화. devcake actor + raw R2 보존)
  *
  * 백엔드 동기 호출:
  *   POST /api/v2/aspiration/ig         → response.status 즉시 반환
@@ -60,11 +60,11 @@ const FAILURE_COPY: Record<
   },
   failed_scrape: {
     title: "수집을 끝내지 못했어요",
-    body: "잠시 후 다시 시도해 주세요. 토큰은 환불됐어요.",
+    body: "보드가 비공개거나 핀이 부족할 수 있어요. 다른 대상으로 다시 시도해 주세요. 토큰은 환불됐어요.",
   },
   failed_skipped: {
-    title: "지금은 열어두지 않은 채널이에요",
-    body: "Pinterest 분석은 곧 열릴 예정이에요. 지금은 Instagram으로 먼저 둘러봐 주세요.",
+    title: "입력 형식을 확인해 주세요",
+    body: "공개 Pinterest 보드 URL 형식이어야 해요 (https://www.pinterest.com/유저/보드/). Instagram 은 핸들만 입력하시면 돼요.",
   },
 };
 
@@ -339,9 +339,9 @@ function Header({ balance }: { balance: number | null }) {
   );
 }
 
-// STEP 8 — Pinterest 탭 disabled. 백엔드 pinterest_enabled=false 라 결제 전
-// 클릭 자체 차단 + 시각화. TRACK 3 Pinterest 살리기 완료 시 disabled 제거.
-const PINTEREST_ENABLED = false;
+// v1.5 — Pinterest 정식 활성화. devcake~pinterest-data-scraper 어댑터 +
+// raw R2 보존 + matched_trends 스냅샷 패턴 적용 완료.
+const PINTEREST_ENABLED = true;
 
 function TabSwitcher({
   tab,

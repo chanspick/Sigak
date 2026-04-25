@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-04-25",
+  "dimension": 768,
+  "note": "PI-B v1 셀럽 매칭 메타 — data/embeddings/{gender}/{key}.npy 와 1:1 매핑. v1 = female only (male 셀럽 .npy 미수집).",
+  "similarity_threshold": 0.3,
+  "celebs": {
+    "an_yujin": {"name_kr": "안유진", "name_en": "An Yujin", "group": "IVE", "gender": "female"},
+    "haerin": {"name_kr": "해린", "name_en": "Haerin", "group": "NewJeans", "gender": "female"},
+    "han_sohee": {"name_kr": "한소희", "name_en": "Han Sohee", "group": null, "gender": "female"},
+    "hwasa": {"name_kr": "화사", "name_en": "Hwasa", "group": "MAMAMOO", "gender": "female"},
+    "iu": {"name_kr": "아이유", "name_en": "IU", "group": null, "gender": "female"},
+    "jang_wonyoung": {"name_kr": "장원영", "name_en": "Jang Wonyoung", "group": "IVE", "gender": "female"},
+    "jennie": {"name_kr": "제니", "name_en": "Jennie", "group": "BLACKPINK", "gender": "female"},
+    "jisoo": {"name_kr": "지수", "name_en": "Jisoo", "group": "BLACKPINK", "gender": "female"},
+    "karina": {"name_kr": "카리나", "name_en": "Karina", "group": "aespa", "gender": "female"},
+    "kim_taeri": {"name_kr": "김태리", "name_en": "Kim Taeri", "group": null, "gender": "female"},
+    "kim_yoojung": {"name_kr": "김유정", "name_en": "Kim Yoojung", "group": null, "gender": "female"},
+    "minji": {"name_kr": "민지", "name_en": "Minji", "group": "NewJeans", "gender": "female"},
+    "sullyoon": {"name_kr": "설윤", "name_en": "Sullyoon", "group": "NMIXX", "gender": "female"},
+    "suzy": {"name_kr": "수지", "name_en": "Suzy", "group": null, "gender": "female"},
+    "winter": {"name_kr": "윈터", "name_en": "Winter", "group": "aespa", "gender": "female"},
+    "유나": {"name_kr": "유나", "name_en": "Yuna", "group": "ITZY", "gender": "female"}
+  }
+}

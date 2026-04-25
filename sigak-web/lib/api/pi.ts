@@ -106,8 +106,9 @@ export async function uploadPIv3Baseline(file: File): Promise<PIv3UploadResponse
   form.append("image", file, file.name);
   return authFetch<PIv3UploadResponse>("/api/v3/pi/upload", {
     method: "POST",
-    body: form,
+    rawBody: form,
     // Content-Type 은 fetch 가 boundary 포함해서 자동 설정 — 직접 지정 X
+    // AuthFetchOptions 가 body 를 Omit 하므로 multipart 는 rawBody (best_shot.ts 정합)
   });
 }
 

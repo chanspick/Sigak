@@ -1188,5 +1188,12 @@ def get_pi_v3_report(
         logger.exception("PIReport parse failed report_id=%s", report_id)
         raise HTTPException(500, "리포트 파싱 실패")
 
+    # PI v1 components 복원 — JSONB 안 components dict 를 attribute attach.
+    # _compose_v3_sections 가 우선 사용해서 9 컴포넌트 풀 노출.
+    # _load_current_report 와 동일 패턴 (pi_engine.py 정합).
+    components = data.get("components")
+    if isinstance(components, dict) and components:
+        setattr(report, "_pi_v1_components", components)
+
     balance = tokens_service.get_balance(db, user_id)
     return _build_v3_response(report, mode="full", token_balance=balance)

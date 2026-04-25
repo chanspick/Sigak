@@ -175,7 +175,7 @@ def test_run_aspiration_ig_happy_path(monkeypatch):
     from services import ig_feed_analyzer
     monkeypatch.setattr(
         ig_feed_analyzer, "analyze_ig_feed",
-        lambda posts, biography: _sample_target_analysis(),
+        lambda posts, biography: (_sample_target_analysis(), None),
     )
 
     class _FakeDB:
@@ -269,7 +269,7 @@ def test_run_aspiration_ig_vision_failure_degrades(monkeypatch):
     from services import ig_feed_analyzer
     monkeypatch.setattr(
         ig_feed_analyzer, "analyze_ig_feed",
-        lambda posts, biography: None,   # Vision 실패
+        lambda posts, biography: (None, None),   # Vision 실패 (v1.5 tuple)
     )
 
     class _DB:
@@ -340,12 +340,15 @@ def test_run_aspiration_pinterest_happy_path(monkeypatch):
     )
     monkeypatch.setattr(
         pin_engine, "_call_pinterest_actor",
-        lambda **kw: [f"https://i.pinimg.com/{i}.jpg" for i in range(6)],
+        lambda **kw: (
+            [f"https://i.pinimg.com/{i}.jpg" for i in range(6)],
+            {"board_name": None, "raw_items": [], "total_pins_raw": 6, "pins_after_filter": 6},
+        ),
     )
     # pin_engine 이 import 해서 보유한 reference 를 교체해야 monkey-patch 먹힘
     monkeypatch.setattr(
         pin_engine, "analyze_ig_feed",
-        lambda posts, biography: _sample_target_analysis(),
+        lambda posts, biography: (_sample_target_analysis(), None),
     )
 
     class _DB:

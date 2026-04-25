@@ -25,7 +25,7 @@ import { ApiError } from "@/lib/api/fetch";
 import { api } from "@/lib/api/fetch";
 import { releaseBlur, unlockDiagnosis } from "@/lib/api/verdicts";
 import { releaseSigakReport } from "@/lib/api/sigak-report";
-import { unlockPI } from "@/lib/api/pi";
+import { unlockPIv3 } from "@/lib/api/pi";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
@@ -49,6 +49,7 @@ function ConfirmedContent() {
   const [phase, setPhase] = useState<Phase>("confirming");
   const [balance, setBalance] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [piReportId, setPiReportId] = useState<string | null>(null);   // v3 unlock 결과
   const executedRef = useRef(false);
 
   // Toss 쿼리
@@ -164,11 +165,12 @@ function ConfirmedContent() {
         return;
       }
 
-      // 2-d. v2 BM: intent=unlock_pi — 50토큰 PI 해제
+      // 2-d. v3 PI: intent=unlock_pi — 50토큰 unlock + 풀 PI 생성 (Phase I PI-D)
       if (intent === "unlock_pi") {
         try {
-          const rel = await unlockPI();
-          setBalance(rel.token_balance);
+          const rel = await unlockPIv3();
+          if (rel.token_balance != null) setBalance(rel.token_balance);
+          setPiReportId(rel.report_id);
           setPhase("pi_unlocked");
         } catch (e) {
           setPhase("pi_unlock_failed");
@@ -521,7 +523,15 @@ function ConfirmedContent() {
           </PrimaryButton>
         )}
         {phase === "pi_unlocked" && (
-          <PrimaryButton onClick={() => router.replace("/vision")}>
+          <PrimaryButton
+            onClick={() =>
+              router.replace(
+                piReportId
+                  ? `/pi/${encodeURIComponent(piReportId)}`
+                  : "/vision",
+              )
+            }
+          >
             PI 보러 가기
           </PrimaryButton>
         )}

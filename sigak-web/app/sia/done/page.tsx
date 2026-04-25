@@ -42,10 +42,12 @@ function DoneContent() {
     return <LoadingSlides onComplete={() => setSlidesDone(true)} />;
   }
 
-  return <CompletionScreen />;
+  return <CompletionScreen reportId={reportId} />;
 }
 
-function CompletionScreen() {
+function CompletionScreen({ reportId }: { reportId: string }) {
+  // Phase I PI-D: LoadingSlides 끝나면 Sia → PI transition 으로 직진.
+  // 정면 사진 한 컷 안내 + 나중에 / 둘러보기 분기.
   return (
     <main
       className="animate-fade-in"
@@ -76,32 +78,34 @@ function CompletionScreen() {
             opacity: 0.4,
           }}
         >
-          DONE
+          NEXT
         </span>
         <h1
           className="font-serif"
           style={{
             marginTop: 16,
-            fontSize: 34,
+            fontSize: 28,
             fontWeight: 400,
-            lineHeight: 1.3,
+            lineHeight: 1.4,
             letterSpacing: "-0.01em",
           }}
         >
-          대화 고마워요.
+          대화 고마워요.<br />
+          시각이 본 나, 완성하려면<br />
+          정면 사진 한 장이 필요해요.
         </h1>
         <p
           className="font-sans"
           style={{
             marginTop: 16,
-            fontSize: 14,
+            fontSize: 13,
             lineHeight: 1.7,
             letterSpacing: "-0.005em",
             opacity: 0.6,
           }}
         >
-          오늘 나눈 얘기는 잘 정리해뒀어요.
-          <br />그 사이에 다른 기능도 둘러봐요.
+          얼굴이 또렷하게 잡히는 정면 한 컷이면 돼요.
+          <br />화장은 안 하셔도 분석 가능해요.
         </p>
       </section>
 
@@ -112,6 +116,51 @@ function CompletionScreen() {
           gap: 8,
         }}
       >
+        <Link
+          href={`/pi/upload?next=preview&from_session=${encodeURIComponent(reportId)}`}
+          className="font-sans"
+          style={{
+            display: "block",
+            padding: "18px 22px",
+            background: "var(--color-ink)",
+            color: "var(--color-paper)",
+            textDecoration: "none",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  letterSpacing: "-0.005em",
+                }}
+              >
+                📷 사진 한 장 보여드리기
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  opacity: 0.7,
+                }}
+              >
+                갤러리 또는 카메라
+              </div>
+            </div>
+            <span aria-hidden style={{ fontSize: 18, opacity: 0.85 }}>
+              →
+            </span>
+          </div>
+        </Link>
         <CtaLink href="/best-shot" label="Best Shot" subtitle="사진 여러 장에서 한 장" />
         <CtaLink href="/aspiration" label="추구미 분석" subtitle="따라가는 이미지, 실제로 뭐가 다른지" />
         <Link
@@ -131,7 +180,7 @@ function CompletionScreen() {
             marginTop: 4,
           }}
         >
-          홈으로
+          나중에 (홈으로)
         </Link>
       </div>
     </main>

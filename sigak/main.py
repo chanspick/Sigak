@@ -323,6 +323,7 @@ from routes.verdicts import router as verdicts_router
 from routes.sigak_report import router as sigak_report_router
 from routes.pi import router as pi_router
 from routes.pi import router_v2 as pi_v2_router             # v2 Priority 1 D5 Phase 3
+from routes.pi import router_v3 as pi_v3_router             # SIGAK v2.0 Phase I PI-D
 from routes.change import router as change_router
 from routes.sia import router as sia_router                 # v2 Priority 1 D3
 from routes.verdict_v2 import router as verdict_v2_router   # v2 Priority 1 D5 Phase 2
@@ -339,6 +340,7 @@ app.include_router(verdicts_router)
 app.include_router(sigak_report_router)
 app.include_router(pi_router)
 app.include_router(pi_v2_router)          # /api/v2/pi, /api/v2/pi/unlock
+app.include_router(pi_v3_router)          # /api/v3/pi/{status,upload,preview,unlock,list,{id}}
 app.include_router(change_router)
 app.include_router(sia_router)            # /api/v1/sia/chat/{start,message,end}
 app.include_router(verdict_v2_router)     # /api/v2/verdict/{create,{id}/unlock,{id}}

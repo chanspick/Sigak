@@ -129,3 +129,331 @@ class PIStatusV2Response(BaseModel):
     public_photo_count: int = 0
     locked_photo_count: int = 0
     unlocked_at: Optional[str] = None
+
+
+# ─────────────────────────────────────────────
+#  PI v3 — 9 컴포넌트 3-3-3 구조 (Phase I PI-D)
+#
+#  본인 결정 (2026-04-25):
+#    가입 30 + 추가 20 = 50 토큰 (첫 1회 무료 폐기)
+#    preview 무료 (혼합 iii) → 결제 → 풀 PI
+#
+#  9 컴포넌트:
+#    raw 3:   cover / celeb_reference / face_structure
+#    vault 3: type_reference / gap_analysis / skin_analysis
+#    trend 3: coordinate_map / hair_recommendation / action_plan
+#
+#  preview visibility:
+#    full  : cover / celeb_reference
+#    teaser: face_structure / type_reference / gap_analysis / skin_analysis
+#    locked: coordinate_map / hair_recommendation / action_plan
+# ─────────────────────────────────────────────
+
+PISectionId = Literal[
+    "cover",
+    "celeb_reference",
+    "face_structure",
+    "type_reference",
+    "gap_analysis",
+    "skin_analysis",
+    "coordinate_map",
+    "hair_recommendation",
+    "action_plan",
+]
+
+# preview 분기 — 컴포넌트별 가시성 (혼합 iii 패턴)
+PI_V3_PREVIEW_VISIBILITY: dict[str, str] = {
+    "cover":               "full",
+    "celeb_reference":     "full",
+    "face_structure":      "teaser",
+    "type_reference":      "teaser",
+    "gap_analysis":        "teaser",
+    "skin_analysis":       "teaser",
+    "coordinate_map":      "locked",
+    "hair_recommendation": "locked",
+    "action_plan":         "locked",
+}
+
+PI_V3_SECTION_ORDER: list[str] = [
+    "cover", "celeb_reference", "face_structure",
+    "type_reference", "gap_analysis", "skin_analysis",
+    "coordinate_map", "hair_recommendation", "action_plan",
+]
+
+PI_V3_UNLOCK_COST_TOKENS = 50
+
+
+class PIv3Section(BaseModel):
+    """PI v3 단일 컴포넌트. content 는 PI-C 가 채울 component-specific dict."""
+    model_config = ConfigDict(extra="ignore")
+
+    section_id: PISectionId
+    visibility: Literal["full", "teaser", "locked"]
+    content: dict = Field(default_factory=dict)
+
+
+class PIv3Status(BaseModel):
+    """GET /api/v3/pi/status 응답."""
+    model_config = ConfigDict(extra="ignore")
+
+    has_baseline: bool                      # users.pi_baseline_r2_key 존재 여부
+    baseline_uploaded_at: Optional[str] = None
+    has_current_report: bool = False        # is_current=TRUE row 존재
+    current_report_id: Optional[str] = None
+    current_version: Optional[int] = None
+    unlocked_at: Optional[str] = None
+    unlock_cost_tokens: int = PI_V3_UNLOCK_COST_TOKENS
+    token_balance: int = 0
+    needs_payment_tokens: int = 0           # 부족 토큰 (UI paywall)
+    pi_pending: bool = False                # baseline 업로드 후 preview 미생성
+
+
+class PIv3UploadResponse(BaseModel):
+    """POST /api/v3/pi/upload 응답 — baseline 정면 사진 업로드."""
+    model_config = ConfigDict(extra="ignore")
+
+    uploaded: bool
+    baseline_r2_key: Optional[str] = None
+    uploaded_at: str
+    makeup_warning: Optional[str] = None    # 화장 검증 soft warning
+
+
+class PIv3Report(BaseModel):
+    """POST /api/v3/pi/preview & /unlock & GET /{report_id} 공용 응답.
+
+    preview = visibility 가 "full"/"teaser"/"locked" 혼합
+    unlock  = 모든 sections.visibility = "full"
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    report_id: str
+    version: int
+    is_current: bool = True
+    generated_at: str
+    is_preview: bool                        # True = preview (토큰 차감 X), False = unlocked
+    sections: list[PIv3Section] = Field(default_factory=list)
+
+    # 페이월 안내 — preview 응답에서만 채움
+    unlock_cost_tokens: int = PI_V3_UNLOCK_COST_TOKENS
+    token_balance: Optional[int] = None
+    needs_payment_tokens: Optional[int] = None
+
+
+class PIv3VersionEntry(BaseModel):
+    """GET /api/v3/pi/list 응답 행."""
+    model_config = ConfigDict(extra="ignore")
+
+    report_id: str
+    version: int
+    is_current: bool
+    generated_at: str
+    is_preview: bool = False
+
+
+class PIv3VersionsList(BaseModel):
+    """GET /api/v3/pi/list 응답."""
+    model_config = ConfigDict(extra="ignore")
+
+    versions: list[PIv3VersionEntry] = Field(default_factory=list)
+    current_report_id: Optional[str] = None
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Phase I PI v1 — 9 컴포넌트 typed content schemas (PI-C 영역)
+# ═══════════════════════════════════════════════════════════════
+#
+#  CLAUDE.md §0 / §5.1 / §7 — 풀 분량 = raw 3 + vault 3 + trend 3.
+#
+#  본 schema 는 PI-C 어댑터들이 산출하는 컨테이너.
+#  PI-A 가 PiContent → PIv3Section.content (dict) 직렬화. PI-D 는 PiPreview 로
+#  혼합 iii 노출. extra="ignore" 로 BC 보장 (기존 PIv3Section.content dict
+#  타입과 양립 — 어댑터가 model_dump() 해서 dict 로 변환 가능).
+
+class CoverContent(BaseModel):
+    """Cover — 풀 노출 컴포넌트.
+
+    vault user_phrases echo + IG taste 종합 narrative. 첫인상.
+    Day 1: matched_type_name 만으로 generic narrative.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    narrative: str = ""          # 3-4 문장
+    key_phrases: list[str] = Field(default_factory=list)   # vault user_phrases echo
+    headline: str = ""           # 한 줄 헤드라인
+
+
+class CelebReferenceMatch(BaseModel):
+    """단일 셀럽 매칭 — PI-B Vision 결과를 어댑트한 형태."""
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    photo_url: str
+    similarity: float = Field(ge=0.0, le=1.0)
+    reason: str = ""             # ~80자
+
+
+class CelebReferenceContent(BaseModel):
+    """Celeb Reference — 풀 노출 (top 3 닮은꼴)."""
+    model_config = ConfigDict(extra="ignore")
+
+    top_celebs: list[CelebReferenceMatch] = Field(default_factory=list)
+
+
+class FaceStructureMetric(BaseModel):
+    """Face structure 단일 메트릭 (한국어 descriptor 포함)."""
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    value: float | str
+    descriptor: str              # 한국어 — "둥근 얼굴형" 등
+
+
+class FaceStructureContent(BaseModel):
+    """Face Structure — 풀 노출 (5-7 메트릭 + harmony + distinctive)."""
+    model_config = ConfigDict(extra="ignore")
+
+    metrics: list[FaceStructureMetric] = Field(default_factory=list)
+    harmony_note: str = ""
+    distinctive_points: list[str] = Field(default_factory=list)
+
+
+class TypeReferenceContent(BaseModel):
+    """Type Reference — vault 매칭 type + cluster + features bullet."""
+    model_config = ConfigDict(extra="ignore")
+
+    matched_type_id: str = ""           # "type_1" 등
+    matched_type_name: str = ""         # "따뜻한 첫사랑"
+    reason: str = ""                    # vault 매칭 근거 ~120자
+    features_bullet: list[str] = Field(default_factory=list)
+    cluster_label: str = ""             # 4 클러스터 한 단어
+
+
+class AxisCoord(BaseModel):
+    """3축 좌표 — VisualCoordinate 와 동일 0~1 외부 스케일."""
+    model_config = ConfigDict(extra="ignore")
+
+    shape: float = Field(ge=0.0, le=1.0)
+    volume: float = Field(ge=0.0, le=1.0)
+    age: float = Field(ge=0.0, le=1.0)
+
+
+class GapAnalysisContent(BaseModel):
+    """Gap Analysis — essence ↔ aspiration narrative."""
+    model_config = ConfigDict(extra="ignore")
+
+    essence_coord: AxisCoord
+    aspiration_coord: Optional[AxisCoord] = None
+    gap_narrative: str = ""             # ~150자
+    vault_phrase_echo: list[str] = Field(default_factory=list)
+
+
+class SkinAnalysisContent(BaseModel):
+    """Skin Analysis — BEST/OK/AVOID 5개씩 + foundation + 부위별 가이드."""
+    model_config = ConfigDict(extra="ignore")
+
+    best_colors: list[str] = Field(default_factory=list)   # hex 5
+    ok_colors: list[str] = Field(default_factory=list)
+    avoid_colors: list[str] = Field(default_factory=list)
+    foundation_guide: str = ""
+    lip_cheek_eye: dict[str, str] = Field(default_factory=dict)   # {lip, cheek, eye}
+    trend_palette_match: list[str] = Field(default_factory=list)  # trend_id list
+
+
+class HairRecommendation(BaseModel):
+    """단일 헤어 추천 — hair_rules 근거."""
+    model_config = ConfigDict(extra="ignore")
+
+    hair_id: str
+    hair_name: str
+    reason: str = ""
+    trend_match: list[str] = Field(default_factory=list)   # trend_id list
+    score: float = 0.0
+
+
+class HairRecommendationContent(BaseModel):
+    """Hair Recommendation — top 3-5."""
+    model_config = ConfigDict(extra="ignore")
+
+    top_hairs: list[HairRecommendation] = Field(default_factory=list)
+
+
+class CoordinateMapContent(BaseModel):
+    """Coordinate Map — 유저 좌표 + 8 type 앵커 + trend overlay."""
+    model_config = ConfigDict(extra="ignore")
+
+    user_coord: AxisCoord
+    type_anchors: dict[str, AxisCoord] = Field(default_factory=dict)
+    trend_overlay: list[dict] = Field(default_factory=list)   # [{trend_id, coord_center}]
+
+
+class ActionItem(BaseModel):
+    """Action plan 단일 아이템."""
+    model_config = ConfigDict(extra="ignore")
+
+    title: str
+    description: str = ""               # ~120자
+    source: str = ""                    # KB 출처 또는 axis rule
+    vault_echo: Optional[str] = None    # 매칭된 user phrase 1개
+
+
+class ActionPlanContent(BaseModel):
+    """Action Plan — top 3-5 actions."""
+    model_config = ConfigDict(extra="ignore")
+
+    actions: list[ActionItem] = Field(default_factory=list)
+
+
+# ─────────────────────────────────────────────
+#  PiContent (9 컴포넌트 풀)
+# ─────────────────────────────────────────────
+
+class PiContent(BaseModel):
+    """PI v1 풀 분량 컨테이너 — 9 컴포넌트 (raw 3 + vault 3 + trend 3).
+
+    PI-A 가 LLM payload 구성 시 인풋. PI-D 가 PiPreview 로 분배.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    # raw 3
+    coordinate_map: CoordinateMapContent
+    face_structure: FaceStructureContent
+    celeb_reference: CelebReferenceContent
+
+    # vault 3
+    cover: CoverContent
+    type_reference: TypeReferenceContent
+    gap_analysis: GapAnalysisContent
+
+    # trend 3
+    skin_analysis: SkinAnalysisContent
+    hair_recommendation: HairRecommendationContent
+    action_plan: ActionPlanContent
+
+
+# ─────────────────────────────────────────────
+#  PiPreview (혼합 iii — 공개/잠금 분배)
+# ─────────────────────────────────────────────
+
+class PiPreview(BaseModel):
+    """PI 리포트 미리보기 — 혼합 iii 패턴.
+
+    - cover 풀 노출
+    - celeb_reference top1 풀 노출
+    - face/type/gap/skin teaser 한 줄
+    - coordinate_map / hair_recommendation / action_plan 잠금
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    cover: CoverContent
+    celeb_reference_top1: Optional[CelebReferenceMatch] = None
+    face_structure_teaser: str = "—"
+    type_reference_teaser: str = "—"
+    gap_analysis_teaser: str = "—"
+    skin_analysis_teaser: str = "—"
+    locked_components: list[str] = Field(
+        default_factory=lambda: [
+            "coordinate_map",
+            "hair_recommendation",
+            "action_plan",
+        ]
+    )

@@ -1,9 +1,16 @@
-// 섹션 렌더러 - 섹션 ID에 따라 적절한 섹션 컴포넌트 렌더링
+// 섹션 렌더러 — 섹션 ID에 따라 적절한 섹션 컴포넌트 렌더링.
+//
+// PI v3 9 컴포넌트 (본인 결정 2026-04-25):
+//   raw 3   : cover / celeb_reference / face_structure
+//   vault 3 : type_reference / gap_analysis / skin_analysis
+//   trend 3 : coordinate_map / hair_recommendation / action_plan
+//
+// PI v3 풀 화면은 components/pi-v3/PIv3Screen 이 inline 렌더.
+// 이 파일은 v1/v2 legacy 리포트 흐름 유지 + executive_summary / trend_context 폐기.
 
 import type { AccessLevel, ReportSection } from "@/lib/types/report";
 import { isSectionLocked } from "@/lib/utils/report";
 import { Cover } from "./sections/cover";
-import { ExecutiveSummary } from "./sections/executive-summary";
 import { FaceStructure } from "./sections/face-structure";
 import { SkinAnalysis } from "./sections/skin-analysis";
 import { CoordinateMap } from "./sections/coordinate-map";
@@ -13,7 +20,6 @@ import { HairRecommendation } from "./sections/hair-recommendation";
 import { ActionPlan } from "./sections/action-plan";
 import { CelebReference } from "./sections/celeb-reference";
 import { TypeReference } from "./sections/type-reference";
-import { TrendContext } from "./sections/trend-context";
 
 interface OverlayData {
   before_url: string;
@@ -51,13 +57,7 @@ export function SectionRenderer({ section, accessLevel, overlay, hairSimulation 
           locked={locked}
         />
       );
-    case "executive_summary":
-      return (
-        <ExecutiveSummary
-          content={content as Parameters<typeof ExecutiveSummary>[0]["content"]}
-          locked={locked}
-        />
-      );
+    // PI v3 폐기 — executive_summary 는 cover 가 흡수 (user_summary + needs_statement)
     case "face_structure":
       return (
         <FaceStructure
@@ -116,13 +116,7 @@ export function SectionRenderer({ section, accessLevel, overlay, hairSimulation 
           locked={locked}
         />
       );
-    case "trend_context":
-      return (
-        <TrendContext
-          content={content as Parameters<typeof TrendContext>[0]["content"]}
-          locked={locked}
-        />
-      );
+    // PI v3 폐기 — trend_context 는 hair_recommendation / action_plan 의 matched_trend_ids 로 흡수
     default:
       return null;
   }

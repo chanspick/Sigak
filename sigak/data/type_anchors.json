@@ -124,7 +124,8 @@
         "작은 입"
       ],
       "image_files": [
-        "3 (1).jpg"
+        "3-1.png",
+        "3-2.png"
       ],
       "embedding_path": "sigak/data/embeddings/female/type_3.npy"
     },

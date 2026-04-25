@@ -498,3 +498,276 @@ def test_get_verdict_not_found_404(client):
     c, _ = client
     r = c.get("/api/v2/verdict/vrd_ghost")
     assert r.status_code == 404
+
+
+# ─────────────────────────────────────────────
+#  WTP 가설 — best_fit_photo_url mapping (helper unit tests)
+# ─────────────────────────────────────────────
+
+
+def test_best_fit_url_helper_returns_url_at_index():
+    """photo_urls[best_fit_index] 정상 매핑."""
+    from routes.verdict_v2 import _best_fit_url
+    urls = ["https://x.com/0.jpg", "https://x.com/1.jpg", "https://x.com/2.jpg"]
+    assert _best_fit_url(urls, 1) == "https://x.com/1.jpg"
+    assert _best_fit_url(urls, 0) == "https://x.com/0.jpg"
+
+
+def test_best_fit_url_helper_none_index():
+    """best_fit_index None → None."""
+    from routes.verdict_v2 import _best_fit_url
+    urls = ["https://x.com/0.jpg"]
+    assert _best_fit_url(urls, None) is None
+
+
+def test_best_fit_url_helper_out_of_range():
+    """인덱스 범위 밖 → None (안전)."""
+    from routes.verdict_v2 import _best_fit_url
+    urls = ["https://x.com/0.jpg"]
+    assert _best_fit_url(urls, 5) is None
+    assert _best_fit_url(urls, -1) is None
+
+
+def test_best_fit_url_helper_url_is_none():
+    """photo_urls[idx] 자체가 None (R2 실패) → None."""
+    from routes.verdict_v2 import _best_fit_url
+    urls = ["https://x.com/0.jpg", None, "https://x.com/2.jpg"]
+    assert _best_fit_url(urls, 1) is None
+
+
+def test_resolve_best_fit_index_full_priority():
+    """full.best_fit_photo_index 가 source of truth (preview 와 다르면 full 채택)."""
+    from routes.verdict_v2 import _resolve_best_fit_index
+    from schemas.verdict_v2 import FullContent, PreviewContent, Recommendation
+    pv = PreviewContent(
+        hook_line="훅", reason_summary="근거", best_fit_photo_index=0,
+    )
+    fc = FullContent(
+        verdict="x",
+        photo_insights=[],
+        recommendation=Recommendation(style_direction="x", next_action="y", why="z"),
+        best_fit_photo_index=2,
+    )
+    assert _resolve_best_fit_index(pv, fc) == 2
+
+
+def test_resolve_best_fit_index_preview_fallback():
+    """full 없으면 preview 사용."""
+    from routes.verdict_v2 import _resolve_best_fit_index
+    from schemas.verdict_v2 import PreviewContent
+    pv = PreviewContent(
+        hook_line="훅", reason_summary="근거", best_fit_photo_index=1,
+    )
+    assert _resolve_best_fit_index(pv, None) == 1
+
+
+def test_resolve_best_fit_index_none_when_both_missing():
+    """둘 다 부재 → None."""
+    from routes.verdict_v2 import _resolve_best_fit_index
+    from schemas.verdict_v2 import PreviewContent
+    pv = PreviewContent(hook_line="훅", reason_summary="근거")
+    assert _resolve_best_fit_index(pv, None) is None
+    assert _resolve_best_fit_index(None, None) is None
+
+
+# ─────────────────────────────────────────────
+#  WTP 가설 — best_fit_photo_url in HTTP responses
+# ─────────────────────────────────────────────
+
+
+def _fake_verdict_result_with_best_fit(idx: int = 1) -> VerdictV2Result:
+    """best_fit_photo_index 명시 포함 verdict result."""
+    return VerdictV2Result.model_validate({
+        "preview": {
+            "hook_line": "추구미와 일치합니다",
+            "reason_summary": "쿨뮤트 톤이 유지됩니다.",
+            "best_fit_photo_index": idx,
+            "best_fit_insight": f"{idx+1}번 사진이 가장 부합합니다.",
+            "best_fit_improvement": f"{idx+1}번은 측광 활용 시 자연스럽습니다.",
+        },
+        "full_content": {
+            "verdict": "분석 결과입니다.",
+            "photo_insights": [
+                {
+                    "photo_index": i,
+                    "insight": f"{i+1}번 insight",
+                    "improvement": f"{i+1}번 improvement",
+                }
+                for i in range(3)
+            ],
+            "recommendation": {
+                "style_direction": "유지",
+                "next_action": "측광 시도",
+                "why": "일치 강화",
+            },
+            "numbers": {"photo_count": 3},
+            "best_fit_photo_index": idx,
+        },
+    })
+
+
+def test_unlock_response_includes_best_fit_photo_url(client, monkeypatch):
+    """unlock 응답에 best_fit_photo_url 포함."""
+    c, fake_db = client
+    full = _fake_verdict_result_with_best_fit(1)
+    fake_db.queue_result(
+        "SELECT id, user_id, version, full_unlocked",
+        _make_result_row(
+            id="vrd_xyz",
+            user_id="u1",
+            version="v2",
+            full_unlocked=True,
+            preview_content=full.preview.model_dump(mode="json"),
+            full_content=full.full_content.model_dump(mode="json"),
+            ranked_photo_ids=[
+                {
+                    "photo_index": 0,
+                    "r2_key": "users/u1/verdicts/vrd_xyz/photo_0.jpg",
+                    "content_type": "image/jpeg",
+                },
+                {
+                    "photo_index": 1,
+                    "r2_key": "users/u1/verdicts/vrd_xyz/photo_1.jpg",
+                    "content_type": "image/jpeg",
+                },
+                {
+                    "photo_index": 2,
+                    "r2_key": "users/u1/verdicts/vrd_xyz/photo_2.jpg",
+                    "content_type": "image/jpeg",
+                },
+            ],
+        ),
+    )
+    monkeypatch.setattr(tokens_service, "get_balance", lambda db, uid: 30)
+    monkeypatch.setattr(
+        "routes.verdict_v2.r2_client.public_url",
+        lambda key: f"https://r2.example.com/{key}",
+    )
+
+    r = c.post("/api/v2/verdict/vrd_xyz/unlock")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # idempotent 경로 (이미 unlocked) — best_fit_photo_url 매핑 확인
+    assert body["best_fit_photo_url"] == (
+        "https://r2.example.com/users/u1/verdicts/vrd_xyz/photo_1.jpg"
+    )
+
+
+def test_get_response_includes_best_fit_photo_url_on_unlocked(client, monkeypatch):
+    """GET 응답 (unlocked) 에 best_fit_photo_url 포함."""
+    c, fake_db = client
+    full = _fake_verdict_result_with_best_fit(2)
+    fake_db.queue_result(
+        "SELECT id, user_id, version, full_unlocked",
+        _make_result_row(
+            id="vrd_xyz",
+            user_id="u1",
+            version="v2",
+            full_unlocked=True,
+            preview_content=full.preview.model_dump(mode="json"),
+            full_content=full.full_content.model_dump(mode="json"),
+            ranked_photo_ids=[
+                {
+                    "photo_index": i,
+                    "r2_key": f"users/u1/verdicts/vrd_xyz/photo_{i}.jpg",
+                    "content_type": "image/jpeg",
+                }
+                for i in range(3)
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "routes.verdict_v2.r2_client.public_url",
+        lambda key: f"https://r2.example.com/{key}",
+    )
+
+    r = c.get("/api/v2/verdict/vrd_xyz")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["best_fit_photo_url"] == (
+        "https://r2.example.com/users/u1/verdicts/vrd_xyz/photo_2.jpg"
+    )
+
+
+def test_get_response_best_fit_url_none_when_no_index(client, monkeypatch):
+    """preview / full 둘 다 best_fit_photo_index 없으면 best_fit_photo_url None."""
+    c, fake_db = client
+    legacy = _fake_verdict_result()  # 기존 fixture, best_fit 미포함
+    fake_db.queue_result(
+        "SELECT id, user_id, version, full_unlocked",
+        _make_result_row(
+            id="vrd_xyz",
+            user_id="u1",
+            version="v2",
+            full_unlocked=True,
+            preview_content=legacy.preview.model_dump(mode="json"),
+            full_content=legacy.full_content.model_dump(mode="json"),
+            ranked_photo_ids=[
+                {
+                    "photo_index": i,
+                    "r2_key": f"users/u1/verdicts/vrd_xyz/photo_{i}.jpg",
+                    "content_type": "image/jpeg",
+                }
+                for i in range(3)
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "routes.verdict_v2.r2_client.public_url",
+        lambda key: f"https://r2.example.com/{key}",
+    )
+
+    r = c.get("/api/v2/verdict/vrd_xyz")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["best_fit_photo_url"] is None
+
+
+def test_get_response_legacy_preview_no_best_fit_field(client, monkeypatch):
+    """기존 v2 row (preview 에 best_fit_* 컬럼 자체 없음) backward compat."""
+    c, fake_db = client
+    # 의도적으로 best_fit_* 필드 누락한 레거시 preview / full
+    legacy_preview = {
+        "hook_line": "기존 훅",
+        "reason_summary": "기존 근거",
+    }
+    legacy_full = {
+        "verdict": "기존 분석.",
+        "photo_insights": [
+            {"photo_index": 0, "insight": "x", "improvement": "y"},
+        ],
+        "recommendation": {
+            "style_direction": "방향", "next_action": "행동", "why": "이유",
+        },
+        "numbers": {},
+    }
+    fake_db.queue_result(
+        "SELECT id, user_id, version, full_unlocked",
+        _make_result_row(
+            id="vrd_xyz",
+            user_id="u1",
+            version="v2",
+            full_unlocked=True,
+            preview_content=legacy_preview,
+            full_content=legacy_full,
+            ranked_photo_ids=[
+                {
+                    "photo_index": 0,
+                    "r2_key": "users/u1/verdicts/vrd_xyz/photo_0.jpg",
+                    "content_type": "image/jpeg",
+                },
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "routes.verdict_v2.r2_client.public_url",
+        lambda key: f"https://r2.example.com/{key}",
+    )
+
+    r = c.get("/api/v2/verdict/vrd_xyz")
+    assert r.status_code == 200
+    body = r.json()
+    # 기존 동작 100% 보존: best_fit_photo_url None, preview/full 정상
+    assert body["best_fit_photo_url"] is None
+    assert body["preview"]["hook_line"] == "기존 훅"
+    assert body["full_content"]["verdict"] == "기존 분석."

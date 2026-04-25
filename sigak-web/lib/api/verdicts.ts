@@ -16,11 +16,13 @@ import type {
   VerdictV2UnlockResponse,
 } from "@/lib/types/verdict_v2";
 
-/** 업로드 파일 개수 제약 (백엔드와 동일) */
-export const MIN_PHOTOS = 2;
+/** 업로드 파일 개수 제약 (백엔드 verdict_v2 와 통일).
+ *  v2 엔드포인트는 MIN_PHOTOS=3 (sigak/routes/verdict_v2.py:61).
+ *  v1 은 MIN=2 였으나 v2 결합 후 일관성을 위해 3 으로 통일. */
+export const MIN_PHOTOS = 3;
 export const MAX_PHOTOS = 10;
 
-/** MVP Home은 3장부터 CTA 활성 — 백엔드 MIN(2)과 별개 UX 규칙. */
+/** MVP Home은 3장부터 CTA 활성. MIN_PHOTOS 와 일치. */
 export const UX_MIN_PHOTOS = 3;
 
 /** 사진 N장 업로드 → verdict 생성. multipart/form-data.

@@ -76,6 +76,9 @@ class CreateResponse(BaseModel):
     photo_count: int
     # R2 public URLs — photo_index 0-based 순서. None 항목 = 저장 실패(로컬 fallback 또는 public_url 미설정).
     photo_urls: list[Optional[str]] = []
+    # WTP 가설 — best_fit 1 장 풀 노출용 URL. preview.best_fit_photo_index 매핑.
+    # None = best_fit 미선정 또는 R2 저장 실패.
+    best_fit_photo_url: Optional[str] = None
 
 
 class UnlockResponse(BaseModel):
@@ -84,6 +87,7 @@ class UnlockResponse(BaseModel):
     full_content: FullContent
     balance: int
     photo_urls: list[Optional[str]] = []
+    best_fit_photo_url: Optional[str] = None
 
 
 class GetResponse(BaseModel):
@@ -93,6 +97,7 @@ class GetResponse(BaseModel):
     preview: PreviewContent
     full_content: Optional[FullContent] = None
     photo_urls: list[Optional[str]] = []
+    best_fit_photo_url: Optional[str] = None
 
 
 # ─────────────────────────────────────────────
@@ -285,6 +290,7 @@ async def create_verdict_v2(
         verdict_id, user["id"], len(photos),
     )
 
+    best_fit_idx = _resolve_best_fit_index(result.preview, result.full_content)
     return CreateResponse(
         verdict_id=verdict_id,
         version="v2",
@@ -292,6 +298,7 @@ async def create_verdict_v2(
         full_unlocked=False,
         photo_count=len(photos),
         photo_urls=photo_urls,
+        best_fit_photo_url=_best_fit_url(photo_urls, best_fit_idx),
     )
 
 
@@ -347,12 +354,21 @@ def unlock_verdict_v2(
     if row.full_unlocked:
         balance = tokens_service.get_balance(db, user["id"])
         full = FullContent.model_validate(row.full_content)
+        preview_existing = (
+            PreviewContent.model_validate(row.preview_content)
+            if row.preview_content is not None
+            else None
+        )
         return UnlockResponse(
             verdict_id=verdict_id,
             full_unlocked=True,
             full_content=full,
             balance=balance,
             photo_urls=photo_urls,
+            best_fit_photo_url=_best_fit_url(
+                photo_urls,
+                _resolve_best_fit_index(preview_existing, full),
+            ),
         )
 
     # 3. Balance check
@@ -406,22 +422,41 @@ def unlock_verdict_v2(
         if recheck and recheck.full_unlocked:
             # 다른 thread 가 unlock 완료 — idempotent 응답
             full = FullContent.model_validate(row.full_content)
+            preview_existing = (
+                PreviewContent.model_validate(row.preview_content)
+                if row.preview_content is not None
+                else None
+            )
             return UnlockResponse(
                 verdict_id=verdict_id,
                 full_unlocked=True,
                 full_content=full,
                 balance=balance,
+                photo_urls=photo_urls,
+                best_fit_photo_url=_best_fit_url(
+                    photo_urls,
+                    _resolve_best_fit_index(preview_existing, full),
+                ),
             )
         raise HTTPException(500, f"해제 처리 중 race condition 발생: {e}")
 
     # 5. 응답
     full = FullContent.model_validate(row.full_content)
+    preview_existing = (
+        PreviewContent.model_validate(row.preview_content)
+        if row.preview_content is not None
+        else None
+    )
     return UnlockResponse(
         verdict_id=verdict_id,
         full_unlocked=True,
         full_content=full,
         balance=new_balance,
         photo_urls=photo_urls,
+        best_fit_photo_url=_best_fit_url(
+            photo_urls,
+            _resolve_best_fit_index(preview_existing, full),
+        ),
     )
 
 
@@ -500,13 +535,16 @@ def get_verdict_v2(
     if row.full_unlocked and row.full_content is not None:
         full = FullContent.model_validate(row.full_content)
 
+    photo_urls = _photo_urls_from_ranked(row.ranked_photo_ids)
+    best_fit_idx = _resolve_best_fit_index(preview, full)
     return GetResponse(
         verdict_id=verdict_id,
         version="v2",
         full_unlocked=bool(row.full_unlocked),
         preview=preview,
         full_content=full,
-        photo_urls=_photo_urls_from_ranked(row.ranked_photo_ids),
+        photo_urls=photo_urls,
+        best_fit_photo_url=_best_fit_url(photo_urls, best_fit_idx),
     )
 
 
@@ -538,6 +576,42 @@ _EXT_BY_CT = {
 
 def _ext_from_content_type(ct: str) -> str:
     return _EXT_BY_CT.get(ct, ".jpg")
+
+
+def _best_fit_url(
+    photo_urls: list[Optional[str]],
+    best_fit_index: Optional[int],
+) -> Optional[str]:
+    """photo_urls[best_fit_index] 안전 접근.
+
+    None 처리:
+      - best_fit_index 가 None → None 반환
+      - 인덱스 범위 밖 → None 반환
+      - photo_urls[idx] 자체가 None (R2 저장 실패) → None 반환
+    """
+    if best_fit_index is None:
+        return None
+    if 0 <= best_fit_index < len(photo_urls):
+        return photo_urls[best_fit_index]
+    return None
+
+
+def _resolve_best_fit_index(
+    preview: Optional[PreviewContent],
+    full: Optional[FullContent],
+) -> Optional[int]:
+    """best_fit_photo_index source of truth 결정.
+
+    우선순위:
+      1. full_content.best_fit_photo_index (있으면 정답)
+      2. preview.best_fit_photo_index (full 누락 시 fallback)
+      3. None
+    """
+    if full is not None and full.best_fit_photo_index is not None:
+        return full.best_fit_photo_index
+    if preview is not None and preview.best_fit_photo_index is not None:
+        return preview.best_fit_photo_index
+    return None
 
 
 def _photo_urls_from_ranked(ranked) -> list[Optional[str]]:

@@ -155,7 +155,10 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
 {
   "preview": {
     "hook_line": "30자 이내 1문장, 결론 힌트만",
-    "reason_summary": "2-3 문장, 판정 근거 30% 공개. 개별 사진 상세 금지."
+    "reason_summary": "2-3 문장, 판정 근거 30% 공개. 개별 사진 상세 금지.",
+    "best_fit_photo_index": 0,
+    "best_fit_insight": "best_fit 사진의 insight 와 동일 (full_content.photo_insights[best_fit_photo_index].insight 복사)",
+    "best_fit_improvement": "best_fit 사진의 improvement 와 동일 (full_content.photo_insights[best_fit_photo_index].improvement 복사)"
   },
   "full_content": {
     "verdict": "4-5 문장 종합 분석 결과. 유저 추구미와 사진 분위기 일치/갭 명시.",
@@ -179,6 +182,7 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
       "chroma_multiplier": 0.0-2.0,
       "alignment_with_profile": "일치 | 부분 일치 | 상충"
     },
+    "best_fit_photo_index": 0,
     "cta_pi": {
       "headline": "30자 이내 훅. '시각이 본 나' 를 자연 연결",
       "body": "1-2 문장. 피드 분석에서 드러난 갭을 '시각이 본 나' 가 얼굴·비율·컬러 레벨로 한 단계 더 드러낸다는 교차 설명.",
@@ -186,6 +190,18 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
     }
   }
 }
+
+[best_fit 선정 규칙 — WTP 가설 핵심]
+- photo_insights 중 taste_profile (current_position / aspiration_vector) 와
+  가장 부합하는 사진의 photo_index 를 best_fit_photo_index 에 명시.
+- 동률이면 photo_index 가 작은 쪽.
+- 어떤 사진도 부합하지 않으면 best_fit_photo_index 는 null.
+- best_fit_photo_index 가 명시되면 해당 photo_insight 의 insight + improvement 를
+  preview.best_fit_insight / preview.best_fit_improvement 에도 동일 내용 복사.
+- best_fit insight / improvement 는 풀 노출 예외 (개별 사진 상세 금지 룰 면제).
+- best_fit insight / improvement 는 photo_insights[best_fit_photo_index] 와
+  완전 동일해야 함 (재서술 금지 — 일관성 보장).
+- preview.best_fit_photo_index 와 full_content.best_fit_photo_index 는 동일 값.
 
 [cta_pi 작성 규칙 — Sia 톤 + 용어 안전]
 - "시각이 본 나" 라는 고유 명사로 노출 (유저에겐 우리 제품 이름).
@@ -223,6 +239,14 @@ VERDICT_V2_SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
 ❌ reason_summary 금지:
   - "photo 2 의 역광 때문에..." (개별 사진 상세)
   - "측광에서 찍으세요" (구체 recommendation 유출)
+
+[best_fit 풀 노출 — 위 reason_summary 룰의 명시 예외]
+- best_fit_insight / best_fit_improvement 는 1 장만 (best_fit_photo_index)
+  결제 전 풀 공개. 위 "개별 사진 상세 금지" 룰의 단일 예외.
+- best_fit_insight 는 photo_insights[best_fit_photo_index].insight 와 완전 동일.
+- best_fit_improvement 는 photo_insights[best_fit_photo_index].improvement 와
+  완전 동일. 풀 공개 영역의 톤 / 길이 / 표현 모두 photo_insights 항목과 동일.
+- 위 텍스트도 상위 Hard Rules (HR1~HR5, eval_language, confirmation) 동일 적용.
 
 [출력 형식]
 - 반드시 유효한 JSON 1개만. 마크다운 wrapper / 주석 / 설명 텍스트 금지.
@@ -445,10 +469,16 @@ def _collect_user_facing_text(result: VerdictV2Result) -> str:
     """Hard Rules 검증 대상 — 유저 노출 텍스트 전량 합체.
 
     D5 Phase 3: cta_pi (headline/body/action_label) 포함.
+    WTP 가설: preview.best_fit_insight / best_fit_improvement 도 포함
+              (결제 전 풀 노출이므로 동일 검증 대상).
     """
     parts: list[str] = []
     parts.append(result.preview.hook_line)
     parts.append(result.preview.reason_summary)
+    if result.preview.best_fit_insight is not None:
+        parts.append(result.preview.best_fit_insight)
+    if result.preview.best_fit_improvement is not None:
+        parts.append(result.preview.best_fit_improvement)
     parts.append(result.full_content.verdict)
     for pi in result.full_content.photo_insights:
         parts.append(pi.insight)
@@ -463,6 +493,55 @@ def _collect_user_facing_text(result: VerdictV2Result) -> str:
         parts.append(cta.body)
         parts.append(cta.action_label)
     return "\n".join(parts)
+
+
+def _sync_best_fit_fields(result: VerdictV2Result) -> None:
+    """preview.best_fit_* 와 full_content.best_fit_photo_index 일관성 보장.
+
+    LLM 산출이 일관성 부족할 때 안전망:
+      1. full_content.best_fit_photo_index 가 valid (photo_insights 범위 안) 이면
+         그 값을 source of truth 로 채택.
+      2. preview.best_fit_photo_index 도 동일 값으로 sync.
+      3. preview.best_fit_insight / best_fit_improvement 를 photo_insights 의
+         실제 insight / improvement 로 덮어쓰기 (풀 노출 정합성).
+      4. full_content.best_fit_photo_index 가 None / 범위 밖이면 best_fit_*
+         3 필드 모두 None 으로 정리 (preview 슬롯 비활성).
+      5. full_content.best_fit_photo_index 가 None 인데 preview 만 명시된 경우
+         preview 값을 source of truth 로 (대칭).
+
+    이 함수는 in-place 수정. 반환값 없음.
+    """
+    fc = result.full_content
+    pv = result.preview
+
+    fc_idx = fc.best_fit_photo_index
+    pv_idx = pv.best_fit_photo_index
+    insights = fc.photo_insights
+
+    def _valid(idx: Optional[int]) -> bool:
+        return idx is not None and 0 <= idx < len(insights)
+
+    # 우선순위 1: full_content.best_fit_photo_index 유효
+    if _valid(fc_idx):
+        target = insights[fc_idx]   # type: ignore[index]
+        pv.best_fit_photo_index = fc_idx
+        pv.best_fit_insight = target.insight
+        pv.best_fit_improvement = target.improvement
+        return
+
+    # 우선순위 2: preview.best_fit_photo_index 만 유효 (full 누락 시 sync)
+    if _valid(pv_idx):
+        target = insights[pv_idx]   # type: ignore[index]
+        fc.best_fit_photo_index = pv_idx
+        pv.best_fit_insight = target.insight
+        pv.best_fit_improvement = target.improvement
+        return
+
+    # 우선순위 3: 둘 다 무효 → 슬롯 정리
+    fc.best_fit_photo_index = None
+    pv.best_fit_photo_index = None
+    pv.best_fit_insight = None
+    pv.best_fit_improvement = None
 
 
 def _validate_hard_rules(result: VerdictV2Result) -> None:
@@ -538,13 +617,17 @@ def build_verdict_v2(
             clean = _strip_json_fence(raw)
             parsed = json.loads(clean)
             result = VerdictV2Result.model_validate(parsed)
+            # WTP 가설 — best_fit 일관성 보장 (HR 검증 이전).
+            # full_content.best_fit_photo_index 를 source of truth 로 preview.best_fit_*
+            # 동기화. photo_insights[idx].insight/improvement 그대로 복사.
+            _sync_best_fit_fields(result)
             _validate_hard_rules(result)
             # PI 엔진(Phase I) 완성 전까지 cta_pi 목적지가 없으므로 응답에서 제거.
             # 프롬프트는 유지(지시 제거 시 출력 품질 하락 위험) — 생성은 하되 사후 None.
             result.full_content.cta_pi = None
             logger.info(
-                "verdict_v2 success: attempt=%d photos=%d (cta_pi suppressed)",
-                attempt + 1, len(photos),
+                "verdict_v2 success: attempt=%d photos=%d best_fit_idx=%s (cta_pi suppressed)",
+                attempt + 1, len(photos), result.full_content.best_fit_photo_index,
             )
             return result
         except (json.JSONDecodeError, ValidationError) as e:

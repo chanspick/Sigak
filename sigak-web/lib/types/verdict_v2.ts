@@ -8,6 +8,15 @@ export interface PreviewContent {
   hook_line: string;
   /** 2-3문장 근거 요약 (결제 전 30% hook). */
   reason_summary: string;
+  /** WTP 가설 — best_fit 사진 인덱스 (Optional, backward compat).
+   *  null = best_fit 미선정. */
+  best_fit_photo_index?: number | null;
+  /** best_fit 1장의 insight 풀 노출 텍스트 (결제 전 공개).
+   *  full_content.photo_insights[best_fit_photo_index].insight 와 동일. */
+  best_fit_insight?: string | null;
+  /** best_fit 1장의 improvement 풀 노출 텍스트.
+   *  full_content.photo_insights[best_fit_photo_index].improvement 와 동일. */
+  best_fit_improvement?: string | null;
 }
 
 export interface PhotoInsight {
@@ -45,6 +54,10 @@ export interface FullContent {
   numbers: VerdictNumbers;
   /** PI 엔진 미완으로 백엔드에서 None 주입. UI 무시. */
   cta_pi: null;
+  /** WTP 가설 — best_fit 사진 인덱스 (Optional, backward compat).
+   *  preview.best_fit_photo_index 와 동일 값 (백엔드 sync).
+   *  null = best_fit 미선정 (정규식 fallback 적용). */
+  best_fit_photo_index?: number | null;
 }
 
 /** R2 에 저장된 업로드 사진 public URL.
@@ -58,6 +71,9 @@ export interface VerdictV2CreateResponse {
   full_unlocked: boolean;
   photo_count: number;
   photo_urls: PhotoUrl[];
+  /** WTP 가설 — best_fit 1장의 R2 public URL (preview 영역에서 사용).
+   *  null = best_fit 미선정 또는 R2 저장 실패. */
+  best_fit_photo_url?: string | null;
 }
 
 export interface VerdictV2GetResponse {
@@ -68,6 +84,7 @@ export interface VerdictV2GetResponse {
   /** full_unlocked=true 일 때만 채워짐. */
   full_content: FullContent | null;
   photo_urls: PhotoUrl[];
+  best_fit_photo_url?: string | null;
 }
 
 export interface VerdictV2UnlockResponse {
@@ -76,4 +93,5 @@ export interface VerdictV2UnlockResponse {
   full_content: FullContent;
   balance: number;
   photo_urls: PhotoUrl[];
+  best_fit_photo_url?: string | null;
 }

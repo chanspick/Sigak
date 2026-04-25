@@ -32,9 +32,19 @@ class PreviewContent(_BaseSchema):
     - hook_line: ≤50 chars (30자 목표 + 여유 20자)
     - reason_summary: 2-3 문장, 근거 30% 까지만
     - 사진별 상세 insight / recommendation 구체 값 금지 (full 전용)
+
+    WTP 가설 예외 (best_fit 풀 노출):
+    - best_fit_photo_index: taste_profile 와 가장 부합하는 photo_index
+    - best_fit_insight / best_fit_improvement: 해당 1장의 상세를 결제 전 풀 공개.
+      "AI 가 진짜 보네" 신뢰 형성 → 나머지 N-1 장 궁금증 → 결제 트리거.
+    - 위 3 필드 모두 Optional. 부재 시 기존 동작 100% 유지 (backward compat).
     """
     hook_line: str = Field(min_length=1, max_length=50)
     reason_summary: str = Field(min_length=1, max_length=500)
+    # WTP 가설 — best_fit 1 장 풀 노출 (Optional, backward compat)
+    best_fit_photo_index: Optional[int] = Field(default=None, ge=0)
+    best_fit_insight: Optional[str] = Field(default=None, min_length=1, max_length=500)
+    best_fit_improvement: Optional[str] = Field(default=None, min_length=1, max_length=500)
 
 
 # ─────────────────────────────────────────────
@@ -94,6 +104,10 @@ class FullContent(_BaseSchema):
     # '시각이 본 나' CTA — D5 Phase 3 에서 Sonnet 이 verdict 와 함께 동시 생성.
     # Optional 로 둬 Priority 2 이후 PI 리포트 구조 변경 시 후방호환 여지 확보.
     cta_pi: Optional[CtaPi] = None
+    # WTP 가설 — best_fit 사진 인덱스. preview.best_fit_photo_index 와 동일 값
+    # (build_verdict_v2 후처리에서 sync). unlock 후 정렬 시 첫 번째 자리.
+    # None 이면 정규식 fallback (BEST_FIT_PATTERNS) 적용.
+    best_fit_photo_index: Optional[int] = Field(default=None, ge=0)
 
 
 # ─────────────────────────────────────────────

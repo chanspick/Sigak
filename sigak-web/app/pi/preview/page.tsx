@@ -21,13 +21,37 @@ import { previewPIv3 } from "@/lib/api/pi";
 import type { PIv3Report } from "@/lib/api/pi";
 import { PIv3Screen } from "@/components/pi-v3/PIv3Screen";
 
+// LLM 호출 (Sonnet + Haiku) 합산 ~30-60s 가능. 90s 후 timeout 으로 stuck 방어.
+const PREVIEW_TIMEOUT_MS = 90_000;
+
 export default function PIPreviewPage() {
   const router = useRouter();
   const [report, setReport] = useState<PIv3Report | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const [slowHint, setSlowHint] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
+    setReport(null);
+    setSlowHint(false);
+
+    // 15s 후 "조금 오래 걸리고 있어요" 안내 (loading 인식)
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) setSlowHint(true);
+    }, 15_000);
+
+    // 90s 후 timeout 강제 처리 (stuck 방어)
+    const timeoutTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        cancelled = true;
+        setError(
+          "응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.",
+        );
+      }
+    }, PREVIEW_TIMEOUT_MS);
+
     (async () => {
       try {
         const res = await previewPIv3();
@@ -49,13 +73,27 @@ export default function PIPreviewPage() {
           router.replace("/pi/upload?next=preview");
           return;
         }
-        setError(e instanceof Error ? e.message : "PI 준비에 실패했어요.");
+        // 친화 메시지 — 기술 메시지는 작은 글씨로 별도 노출
+        if (e instanceof ApiError && e.status === 500) {
+          setError("분석 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.");
+        } else if (e instanceof TypeError) {
+          // "Failed to fetch" 등 네트워크 레벨
+          setError("연결이 끊겼어요. 네트워크 확인 후 다시 시도해 주세요.");
+        } else {
+          setError(
+            e instanceof Error
+              ? e.message
+              : "PI 준비에 실패했어요. 잠시 후 다시 시도해 주세요.",
+          );
+        }
       }
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(timeoutTimer);
     };
-  }, [router]);
+  }, [router, retryKey]);
 
   if (error) {
     return (
@@ -72,16 +110,76 @@ export default function PIPreviewPage() {
       >
         <div style={{ textAlign: "center", maxWidth: 320 }}>
           <p
+            className="font-serif"
+            style={{
+              fontSize: 18,
+              fontWeight: 400,
+              lineHeight: 1.5,
+              letterSpacing: "-0.005em",
+              marginBottom: 12,
+            }}
+          >
+            분석 준비에 실패했어요
+          </p>
+          <p
             className="font-sans"
             role="alert"
             style={{
-              fontSize: 13,
-              color: "var(--color-danger)",
+              fontSize: 12,
+              lineHeight: 1.6,
+              opacity: 0.65,
               letterSpacing: "-0.005em",
+              marginBottom: 24,
             }}
           >
             {error}
           </p>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              marginTop: 8,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="font-sans"
+              style={{
+                height: 48,
+                background: "var(--color-ink)",
+                color: "var(--color-paper)",
+                border: "none",
+                borderRadius: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: "0.5px",
+                cursor: "pointer",
+              }}
+            >
+              다시 시도
+            </button>
+            <button
+              type="button"
+              onClick={() => router.replace("/")}
+              className="font-sans"
+              style={{
+                height: 44,
+                background: "transparent",
+                color: "var(--color-ink)",
+                border: "1px solid rgba(0,0,0,0.15)",
+                borderRadius: 0,
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: "0.3px",
+                cursor: "pointer",
+                opacity: 0.7,
+              }}
+            >
+              홈으로
+            </button>
+          </div>
         </div>
       </main>
     );
@@ -94,20 +192,40 @@ export default function PIPreviewPage() {
           minHeight: "100vh",
           background: "var(--color-paper)",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
+          padding: 28,
+          gap: 12,
         }}
         aria-busy
       >
         <p
-          className="font-sans"
+          className="font-serif"
           style={{
-            fontSize: 12,
-            opacity: 0.4,
+            fontSize: 16,
+            opacity: 0.7,
             letterSpacing: "-0.005em",
+            margin: 0,
           }}
         >
-          분석 준비 중...
+          분석 준비 중
+        </p>
+        <p
+          className="font-sans"
+          style={{
+            fontSize: 11,
+            opacity: 0.4,
+            letterSpacing: "-0.005em",
+            margin: 0,
+            textAlign: "center",
+            maxWidth: 280,
+            lineHeight: 1.6,
+          }}
+        >
+          {slowHint
+            ? "조금 오래 걸리고 있어요. 30초~1분 정도 더 걸릴 수 있어요."
+            : "이미지 분석 + 결 정리 중이에요"}
         </p>
       </main>
     );

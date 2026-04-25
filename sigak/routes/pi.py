@@ -48,7 +48,33 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/pi", tags=["pi"])
 router_v2 = APIRouter(prefix="/api/v2/pi", tags=["pi-v2"])
-router_v3 = APIRouter(prefix="/api/v3/pi", tags=["pi-v3"])
+def _pi_v3_maintenance_gate() -> None:
+    """PI v3 임시 잠금 — product 본질 검증 미완 (2026-04-26).
+
+    본인 결정: 9 컴포넌트 풀 렌더링 OK 지만 진단 깊이 부족 / matched_celebs +
+    trend_overlay + styling_trends 빈 inject / UI 가공 부족 → 5천원 가치 미달.
+    재오픈 전 영역:
+      - matched_celebs / trend matching wiring fix (PI-B / PI-C)
+      - Sonnet vision prompt 재작성 (generic → specific)
+      - UI 재설계 (JSON dump → narrative-first)
+      - LIVE probe + 마케터 + 친구 5명 검수
+
+    재오픈 시 본 dependency 제거 (router_v3 의 dependencies kwarg 비우기).
+    """
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            "시각이 본 당신은 더 정교한 형태로 곧 돌아옵니다. "
+            "그 동안 피드 추천, Best Shot, 추구미 분석을 먼저 써보세요."
+        ),
+    )
+
+
+router_v3 = APIRouter(
+    prefix="/api/v3/pi",
+    tags=["pi-v3"],
+    dependencies=[Depends(_pi_v3_maintenance_gate)],
+)
 
 
 # ─────────────────────────────────────────────

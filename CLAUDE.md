@@ -1,8 +1,8 @@
 # SIGAK 프로덕트 설계 문서 (통합 최종본)
 
-**버전:** v2.0
-**작성:** 2026-04-22
-**상태:** Week 2 재설계 착수 직전, 확정 사항 51개 반영 완료
+**버전:** v2.1
+**작성:** 2026-04-22 / **갱신:** 2026-04-25
+**상태:** Phase G~M 코드 완료. v1 런칭 잔여 = PI v1 결정 + KB 콘텐츠 + 마이그레이션 + LIVE probe (§15 참조)
 
 > 과거 MoAI Execution Directive 는 `CLAUDE.moai.md` 로 보존. 에이전트 규칙은 `.claude/rules/moai/` 유지.
 
@@ -48,20 +48,29 @@ SIGAK (시각) 은 **개인의 시각적 정체성을 분석하고, 추구하는
 3. **큐레이션 기반 Knowledge Base** — AI 자동 생성이 아닌 사람 큐레이션 트렌드/방법론.
 4. **시계열 아카이브** — 유저 미감 변천사 장기 보관. 경쟁사 따라올 수 없는 데이터 자산.
 
-### 현 상태 (2026-04-22)
+### 현 상태 (2026-04-25 갱신)
 
-**이미 완성된 것:**
-- Sia 대화 엔진 Phase A-F (416 tests green)
-- Verdict v2 풀 E2E (Sonnet Vision + preview/full + 10 토큰 unlock + 프론트 연결)
-- 토큰 시스템 (atomic 차감, idempotency, 3팩 catalog: STARTER/REGULAR/PRO)
-- 프론트 components/sia/* (Task 0/1 포팅)
-- 프론트 components/report/sections/* 12개 (구 PI 원형 UI)
+**완료 (코드 레벨):**
+- Phase G 공통 인프라 — CoordinateSystem / UserTasteProfile / UserDataVault / KnowledgeMatcher / SiaWriter
+- Phase H Sia v4 — 페르소나 B + 메시지 단위 + 100% 주관식 + 14 타입 + 5 fixture (manjae/jieun/junho/seoyeon/doyoon)
+- Phase I PI 엔진 — `pi_engine.py` + `schemas/pi_report.py` + `routes/pi.py` (DB 마이그레이션은 잔여)
+- Phase J 추구미 — IG + Pinterest 어댑터 + raw 영구 보존 + Haiku narrative + vault 5/5 (J5)
+- Phase K Best Shot — 4 런칭 블로커 해소 (이름 동적 + Haiku SiaWriter + vault count + UI)
+- Phase L Verdict v2 — best_fit 풀 노출 + 프론트 swap (마케터 WTP 가설 적용)
+- Phase M Monthly — 스켈레톤 (스케줄러 스텁 + DB 스키마 + "준비 중" UI)
+- 프론트 — Sia 14 타입 + IG loading + 모바일 키보드 100dvh + 토큰 칩 + /profile 3탭
+- 강화 루프 — write-back 4/4 + read-back 5/6 + vault 5/5 (Monthly read-back 만 미구현)
 
-**재작업 필요:**
-- Sia 페르소나 A→B 전환 + 턴 단위→메시지 단위 + 100% 주관식
-- PI 실제 엔진 구현 (현재 placeholder)
-- 공통 인프라 레이어 (UserTasteProfile, UserDataVault, Knowledge Base 등)
-- 신규 상품 엔진 4개 (PI, Best Shot, 추구미 IG/Pinterest, 이달의 시각)
+**v1 런칭 잔여:**
+- 🔴 PI v1 포함 의사결정 (전략 보류 vs 데드라인 합리화) — §14 미확정 신설 항목
+- 🔴 `pi_reports` DB 마이그레이션 실행 (user_id PK → report_id + version + is_current)
+- 🟡 Knowledge Base 콘텐츠 (트렌드 2개만 존재 / methodology + references 디렉토리 부재)
+- 🟡 본인 4 기능 LIVE probe (Sia 재진입 / Best Shot 30토큰 / Aspiration IG / Pinterest)
+- 🟡 `cost_monitor.py` env / `r2_client._client_mode` env 운영 검증 (Railway)
+- 🟡 `components/report/sections/` B안 폐기 5개 / `components/sigak/` 신규 혼재 정리
+- 🟢 test_phase_j.py mock 4건 v1.5 시그니처 sync (2026-04-25 처리)
+
+**시계열 trajectory[] 항상 빈 리스트** — 4 기능 진입 시 populate 자체는 가능한 구조이나 실 누적 0건. v1.5 메타분석 카피("쓸수록 정교") 검증 데이터 부재.
 
 ---
 
@@ -740,7 +749,7 @@ f"monthly:{user_id}:{year_month}"
 
 ## 15. 개발 로드맵 (Phase G~Q)
 
-### Phase G — 공통 인프라 리팩토링 ⬅️ **즉시 실행 가능**
+### Phase G — 공통 인프라 리팩토링 ✅ **완료** (2026-04-23 ~)
 
 **범위:**
 - CoordinateSystem (Shape/Volume/Age)
@@ -759,7 +768,7 @@ f"monthly:{user_id}:{year_month}"
 
 **소요:** 1-2일
 
-### Phase H — Sia 재설계 (페르소나 B + 메시지 단위 + 100% 주관식) 🔴 블로킹
+### Phase H — Sia 재설계 (페르소나 B + 메시지 단위 + 100% 주관식) ✅ **v4 완료**
 
 **선행:** 마케터 페르소나 B 인격 + CONFRONTATION 5개 템플릿
 
@@ -778,7 +787,7 @@ f"monthly:{user_id}:{year_month}"
 
 **소요:** 2-3일 (마케터 해소 후)
 
-### Phase I — PI 엔진 구현
+### Phase I — PI 엔진 구현 ✅ **코드 완료** / 🔴 **v1 포함 결정 + 마이그레이션 잔여**
 
 **선행:** G + H + Knowledge Base 콘텐츠 일부
 
@@ -794,27 +803,31 @@ f"monthly:{user_id}:{year_month}"
 
 **소요:** 1-2일
 
-### Phase J — 추구미 분석
+### Phase J — 추구미 분석 ✅ **J5 완료** (vault 5/5 + Haiku narrative + raw 영구 보존)
 
-aspiration_engine_ig / aspiration_engine_pinterest (동일 구조) / 좌우 병치 리포트 / 삼각형 레이더 / 블록리스트 체크
+aspiration_engine_ig / aspiration_engine_pinterest (동일 구조) / 좌우 병치 리포트 / 삼각형 레이더 / 블록리스트 체크.
+**LIVE probe 잔여**: 본인 IG 1번 + Pinterest 보드 1번 결제로 narrative 자연도 / DB raw 보존 / 환불 path 검증.
 
 **소요:** 1일
 
-### Phase K — Best Shot
+### Phase K — Best Shot ✅ **런칭 블로커 4 해소**
 
-대량 업로드 / 품질 필터 1차 / Profile 점수 2차 / Knowledge Base 호환 / 상위 30 + Sia / Haiku 4.5 Vision 검토
+대량 업로드 / 품질 필터 1차 / Profile 점수 2차 / Knowledge Base 호환 / 상위 30 + Sia / Haiku 4.5 Vision.
+**잔여**: COST_CAP_DAILY env 운영 검증 / 본인 30토큰 1회 결제 LIVE probe / `r2_client._client_mode` 운영 r2 잡힘 검증.
 
 **소요:** 1-2일
 
-### Phase L — Verdict v2 확장 (최소 침습)
+### Phase L — Verdict v2 확장 (최소 침습) ✅ **완료** (best_fit 풀 노출)
 
-시그니처에 `matched_trends`, `taste_profile` 추가 / Knowledge Base 매칭 주입 / 기존 JSON 유지 / 프론트 변경 최소
+시그니처에 `matched_trends`, `taste_profile` 추가 / Knowledge Base 매칭 주입 / 기존 JSON 유지 / 프론트 변경 최소.
+**+ 마케터 WTP 가설 적용**: BestFitCard 풀 노출 + BlurredPhotosGrid (백엔드 19 + 프론트 9 = 28 신규 테스트).
 
 **소요:** 0.5일
 
-### Phase M — 이달의 시각 스켈레톤
+### Phase M — 이달의 시각 스켈레톤 ✅ **완료** (실 엔진 v1.1+)
 
-스케줄러 스텁 (cron) / DB 스키마 / "준비 중" UI
+스케줄러 스텁 (cron) / DB 스키마 / "준비 중" UI.
+**Note**: read-back 강화 루프 미구현 = trajectory[] populate 0건. v1.1 실 엔진 합류 시 시계열 카피 검증 첫 데이터 확보.
 
 **소요:** 0.5일
 
@@ -836,17 +849,36 @@ Tier 1 트렌드 10-20 / 방법론 6-10 / 셀럽 20-30 / Notion/YAML sync
 
 E2E / 버그 / FGI 10-30명 / 피드백 1-2 사이클 / 런칭
 
-### Critical Path
+### Critical Path (2026-04-25 갱신)
+
+Phase G~M 코드 완료. v1 런칭 잔여 critical path:
 
 ```
-마케터 페르소나 B + CONFRONTATION → Phase H → Phase Q
-         │
-         └→ Knowledge Base 콘텐츠 → Phase I, J, K → Phase Q
-              │
-본인 UI 디자인 → Phase N ────────────────────────┘
-
-Phase G → Phase L (병렬 가능) → Phase M (병렬 가능)
+[BLOCKER] PI v1 포함 의사결정 (본인) ──┐
+                                       ├→ pi_reports 마이그레이션 SQL ─┐
+[BLOCKER] KB 콘텐츠 methodology+ref ──┘    (Claude Code 즉시 가능)      │
+          (마케터)                                                     │
+                                                                       ├→ Phase Q
+[CHECK] 본인 4 기능 LIVE probe ────┐                                  │   (FGI 10-30명)
+[CHECK] Pinterest DEBUG_DUMP 1회 ─ │                                  │
+[CHECK] Railway env (cost_monitor / R2 _client_mode) ─┘               │
+                                                                       │
+[CLEANUP] components/report B안 / components/sigak 정리 ──────────────┘
+          (Claude Code 즉시 가능)
 ```
+
+**즉시 처리 가능 (Claude Code 영역)**:
+- pi_reports 마이그레이션 SQL 작성 (user_id PK → report_id + version + is_current)
+- components/report/sections/ B안 폐기 5개 (face/skin/hair/celeb/overlay)
+- components/sigak/ 정책 재정리 (verdict-v2-screen.tsx 등 신규 분리)
+- 죽은 코드 정리 (sia_session.py / sia_prompts.py / sia_validators.py / pi.py / verdicts.py 폐기 시점 결정)
+
+**본인/마케터 병목**:
+- PI v1 포함 결정 (본인 — KPI / 카피 전략 갈림)
+- KB methodology + references 콘텐츠 (마케터)
+- 4 기능 LIVE probe (본인 — 카피 자연도 검증 유일 도구)
+- Pinterest DEBUG_DUMP 1회 결제 (본인 30분)
+- Railway env 검증 (본인)
 
 ---
 

@@ -94,11 +94,9 @@ export function ChangeView() {
 
   const entries = state.data.entries;
 
-  if (entries.length < MIN_ENTRIES_FOR_CHART) {
-    return <ChangeEmpty count={entries.length} />;
-  }
-
-  return <ChangeChart entries={entries} />;
+  // 임시 (2026-04-26) — 변화 그래프 v1.5 후속. 현재는 monthly 메시지만 노출.
+  // entries 갯수 무관 ChangeEmpty 강제. 재개 시 if 조건 + ChangeChart 복원.
+  return <ChangeEmpty count={entries.length} />;
 }
 
 // ─────────────────────────────────────────────

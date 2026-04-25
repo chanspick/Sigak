@@ -539,13 +539,21 @@ def _load_current_report(db, user_id: str) -> Optional[PIReport]:
         return None
     try:
         report = PIReport.model_validate(row.report_data)
-        # PI v1 components 복원 — pi_v1_spec 플래그 또는 components 키 존재 시
-        # report_data JSONB 안 components dict 를 attribute 로 attach.
-        # 이미 DB 에 저장된 리포트도 v3 sections 풀 노출 가능 (PI-D 정합).
+        # PI v1 components 복원 — report_data JSONB 안 components dict 를
+        # attribute 로 attach. PI-D 의 _compose_v3_sections 가 우선 사용.
         if isinstance(row.report_data, dict):
             components = row.report_data.get("components")
             if isinstance(components, dict) and components:
                 setattr(report, "_pi_v1_components", components)
+                return report
+            # 옛 모델 (v1 fix 전 / fallback 경로 생성) — components 키 부재.
+            # is_current 그대로 두면 영원히 placeholder 노출 → None 반환해서
+            # generate_pi_report_v1 가 새 version 강제 생성 (옛 row 자동 archive).
+            logger.info(
+                "PI legacy row detected (components 부재) — forcing regenerate: user=%s",
+                user_id,
+            )
+            return None
         return report
     except Exception:
         logger.exception("legacy pi_reports row parse failed: user=%s", user_id)

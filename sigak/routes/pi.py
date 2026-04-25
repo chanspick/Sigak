@@ -650,6 +650,43 @@ def _photo_insights_to_section_content(photos: list, category: str) -> dict:
     return {"category": category, "items": items}
 
 
+def _compose_v3_sections_from_v1_components(
+    v1_components: dict, *, mode: str,
+) -> list[PIv3Section]:
+    """PI-A v1 9 컴포넌트 dict → v3 PIv3Section list 직접 변환.
+
+    PI-A 의 _assemble_9_components 결과 dict 형태:
+      {
+        "cover":              {"weight": "vault", "mode": "preview", "content": {...}},
+        "celeb_reference":    {"weight": "raw", "mode": "preview", "content": {...}},
+        "face_structure":     {"weight": "raw", "mode": "teaser", "content": {...}},
+        ...
+      }
+
+    각 컴포넌트의 .content 를 PIv3Section.content 로 직접 매핑.
+    visibility 는 mode (preview/full) + PI_V3_PREVIEW_VISIBILITY 정책.
+    """
+    sections: list[PIv3Section] = []
+    for sid in PI_V3_SECTION_ORDER:
+        component = v1_components.get(sid)
+        if isinstance(component, dict):
+            content = component.get("content") or {}
+            if not isinstance(content, dict):
+                content = {}
+        else:
+            content = {}
+        visibility = (
+            "full" if mode == "full"
+            else PI_V3_PREVIEW_VISIBILITY.get(sid, "locked")
+        )
+        sections.append(PIv3Section(
+            section_id=sid,                    # type: ignore[arg-type]
+            visibility=visibility,             # type: ignore[arg-type]
+            content=content,
+        ))
+    return sections
+
+
 def _compose_v3_sections(report, *, mode: str) -> list[PIv3Section]:
     """PIReport → 9 PIv3Section list.
 
@@ -657,19 +694,18 @@ def _compose_v3_sections(report, *, mode: str) -> list[PIv3Section]:
       preview: PI_V3_PREVIEW_VISIBILITY 적용
       full   : 모든 section visibility = "full"
 
-    PI-A 의 PIReport 가 7 카테고리 PhotoInsight 를 가지고 있는 현 시점에서,
-    section.content 는 다음과 같이 채움 (PI-C 통합 시점에 component-specific
-    shape 로 진화):
-      cover               — public_photos (signature 카테고리) + sia_overall_message
-      celeb_reference     — locked_photos 의 trend_match
-      face_structure      — locked_photos 의 detail_analysis
-      type_reference      — locked_photos 의 style_element
-      gap_analysis        — locked_photos 의 aspiration_gap
-      skin_analysis       — locked_photos 의 weaker_angle (또는 style_element 재활용)
-      coordinate_map      — user_taste_profile_snapshot 의 current_position
-      hair_recommendation — locked_photos 의 methodology + matched_trend_ids
-      action_plan         — boundary_message + matched_trend_ids
+    분기 (2026-04-25 PI-A v1 통합):
+      (a) report._pi_v1_components 있음 → 직접 9 컴포넌트 dict 사용 (정합)
+      (b) 없음 → 옛 25-photo 카테고리 모델 fallback (legacy 호환)
     """
+    # PI-A v1 components 우선 — 새로 생성된 PIReport 는 항상 이 분기
+    v1_components = getattr(report, "_pi_v1_components", None)
+    if isinstance(v1_components, dict) and v1_components:
+        return _compose_v3_sections_from_v1_components(
+            v1_components, mode=mode,
+        )
+
+    # Legacy fallback — DB 에서 load 한 옛 PIReport (25-photo 카테고리 모델)
     by_category: dict[str, list] = {}
     for p in (getattr(report, "public_photos", None) or []):
         cat = getattr(p, "category", None) or "signature"

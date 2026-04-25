@@ -1737,4 +1737,9 @@ def generate_pi_report_v1(
         matched_types=matched_types,
     )
 
+    # 11. PI-D v3 section 변환 정합 — components dict 를 report 인스턴스에 attach.
+    # PIReport schema 자체에는 components 필드 없음 (PI-C 영역). PI-D 의
+    # _compose_v3_sections 가 본 attribute 우선 사용해서 9 컴포넌트 풀 노출.
+    setattr(report, "_pi_v1_components", components)
+
     return report

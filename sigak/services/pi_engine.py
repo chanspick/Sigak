@@ -1528,7 +1528,28 @@ def generate_pi_report_v1(
     if db is None:
         raise PIEngineError("db unavailable")
 
-    # 0. 기존 is_current 확인 (force 아닌 경우)
+    # 0. PI-B/PI-C inject 데이터 sanitize — 얼굴 미감지/매칭 실패 graceful degradation.
+    # PI-A inject 인터페이스 spec 은 non-Optional 이지만 PI-B 가 face 분석 실패 시
+    # None 반환 가능. 운영 unblock + 빈 데이터로 fallback narrative 생성.
+    if coord_3axis is None:
+        from services.coordinate_system import neutral_coordinate
+        coord_3axis = neutral_coordinate()
+        logger.warning(
+            "PI-B coord_3axis is None — neutral fallback (user=%s, face 미감지 의심)",
+            user_id,
+        )
+    if face_features is None:
+        face_features = {}
+    if matched_celebs is None:
+        matched_celebs = []
+    if matched_types is None:
+        matched_types = []
+    if matched_trends is None:
+        matched_trends = []
+    if methodology_reasons is None:
+        methodology_reasons = []
+
+    # 0-b. 기존 is_current 확인 (force 아닌 경우)
     if not force_new_version:
         existing = _load_current_report(db, user_id)
         if existing is not None:

@@ -11,12 +11,17 @@ kwargs 를 Optional 로 추가.
 """
 from __future__ import annotations
 
+import json
 import logging
-from typing import Optional, Protocol, runtime_checkable
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from schemas.user_taste import UserTasteProfile
+from services.coordinate_system import GapVector
 from services.sia_validators_v4 import (
     check_a17_commerce,
+    check_a18_length,
     check_a20_abstract_praise,
     check_markdown_markup,
 )
@@ -75,6 +80,26 @@ class SiaWriter(Protocol):
         """PI 공개/잠금 경계 카피."""
         ...
 
+    def generate_aspiration_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        gap_vector: GapVector,
+        target_display_name: str,
+        target_analysis_snapshot: Optional[dict] = None,
+        matched_trends: Optional[list] = None,
+        user_name: Optional[str] = None,
+        photo_pairs: Optional[list[dict]] = None,
+    ) -> dict:
+        """추구미 비교 narrative 생성 — JSON dict 반환 (Phase J5).
+
+        반환 키:
+          overall_message / gap_summary / action_hints
+          raw_haiku_response (휘발 방지)
+          matched_trends_used
+        """
+        ...
+
 
 # ─────────────────────────────────────────────
 #  Helpers
@@ -103,6 +128,177 @@ def _name_honorific(user_name: Optional[str]) -> str:
     if name.endswith("님"):
         return name
     return f"{name}님"
+
+
+# ─────────────────────────────────────────────
+#  Aspiration 전용 헬퍼 (Phase J5 — vault 5/5 풀 활용)
+# ─────────────────────────────────────────────
+
+@lru_cache(maxsize=1)
+def _load_aspiration_system_prompt() -> str:
+    """prompts/haiku_aspiration/base.md 로딩 (1회 캐시)."""
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "prompts" / "haiku_aspiration" / "base.md"
+    )
+    return path.read_text(encoding="utf-8")
+
+
+def _render_taste_profile_slim(profile: UserTasteProfile) -> dict:
+    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 dump."""
+    dump = profile.model_dump(mode="json")
+    return {
+        "current_position": dump.get("current_position"),
+        "aspiration_vector": dump.get("aspiration_vector"),
+        "conversation_signals": dump.get("conversation_signals"),
+        "user_original_phrases": dump.get("user_original_phrases"),
+        "strength_score": dump.get("strength_score"),
+    }
+
+
+def _summarize_target_snapshot(snap: Optional[dict]) -> str:
+    """target_analysis_snapshot 핵심만 요약 — prompt 길이 폭주 방지."""
+    if not snap:
+        return "(target Vision 분석 없음 — gap_vector 만으로 narrative)"
+    parts: list[str] = []
+    for key in (
+        "tone_category", "mood", "color_palette",
+        "style_consistency", "pose_frequency",
+    ):
+        v = snap.get(key)
+        if v is None:
+            continue
+        if isinstance(v, float):
+            parts.append(f"{key}: {v:.2f}")
+        elif isinstance(v, (int, str)):
+            parts.append(f"{key}: {str(v)[:80]}")
+        else:
+            parts.append(f"{key}: {str(v)[:80]}")
+    return "\n".join(parts) if parts else "(요약 가능 필드 없음)"
+
+
+def _summarize_matched_trends(trends: Optional[list]) -> str:
+    """matched_trends → 짧은 요약 (트렌드 ID + title + 첫 hint)."""
+    if not trends:
+        return "(KB 매칭 트렌드 없음)"
+    lines: list[str] = []
+    for t in trends[:5]:
+        if isinstance(t, dict):
+            tid = t.get("trend_id") or "(no_id)"
+            title = (t.get("title") or "").strip()
+            hints = t.get("action_hints") or []
+        else:
+            tid = getattr(t, "trend_id", None) or "(no_id)"
+            title = (getattr(t, "title", None) or "").strip()
+            hints = getattr(t, "action_hints", None) or []
+        first_hint = (hints[0] if hints else "").strip() if isinstance(hints, list) else ""
+        lines.append(f"- [{tid}] {title} | hint: {first_hint}")
+    return "\n".join(lines) if lines else "(매칭 정보 추출 실패)"
+
+
+def _build_aspiration_fallback(
+    *,
+    honor: str,
+    target_display_name: str,
+    gap_vector: GapVector,
+    profile: UserTasteProfile,
+) -> dict:
+    """Haiku 실패 시 deterministic fallback — 페르소나 B + A-17/A-20 통과."""
+    primary_axis = gap_vector.primary_axis
+    overall = (
+        f"{honor} 본인 피드와 {target_display_name} 쪽 결을 같이 봤어요. "
+        f"{primary_axis} 축에서 가장 큰 갭이 보이더라구요. "
+        "지금 데이터로는 여기까지 또렷해요. "
+        "조금씩 더 쓰시면 결이 더 잡히실 거예요."
+    )
+    gap_short = f"{primary_axis} 축에서 갭이 가장 크고 그 결로 한 칸 이동해보시는 거잖아요."
+    hints = [
+        f"{primary_axis} 쪽 시도 한 컷을 다음 피드에 넣어보세요",
+        "추구미 사진의 톤을 한 번 비교해보세요",
+        "다음 분석 때 다시 짚어드릴게요",
+    ]
+    return {
+        "overall_message": overall,
+        "gap_summary": gap_short,
+        "action_hints": hints,
+    }
+
+
+def _parse_aspiration_response(raw: str, fallback: dict) -> dict:
+    """Haiku JSON 응답 파싱 — 실패 시 fallback dict copy."""
+    if not raw:
+        return dict(fallback)
+    text = raw.strip()
+    # ```json wrapper 제거
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        logger.warning(
+            "aspiration JSON parse failed — fallback. raw=%r", text[:120],
+        )
+        return dict(fallback)
+    if not isinstance(parsed, dict):
+        return dict(fallback)
+    overall = str(parsed.get("overall_message") or fallback["overall_message"])
+    gap_summary = str(parsed.get("gap_summary") or fallback["gap_summary"])
+    raw_hints = parsed.get("action_hints") or fallback["action_hints"]
+    if not isinstance(raw_hints, list):
+        raw_hints = fallback["action_hints"]
+    hints = [str(h).strip() for h in raw_hints if str(h).strip()][:5]
+    return {
+        "overall_message": overall,
+        "gap_summary": gap_summary,
+        "action_hints": hints,
+    }
+
+
+def _collect_violations_aspiration(text: str) -> list[str]:
+    """Aspiration JSON 응답 검증 — A-17/A-18/A-20/markdown 4종 통합.
+
+    JSON 파싱 후 user-facing 텍스트만 검증.
+    A-18 length 는 overall_message 단독 (300자 hard).
+    A-17/A-20/markdown 은 overall+gap+hints 합집합 (영업/추상 어디든 0건).
+    파싱 실패 시 raw 전체 검증 (A-18 제외 — 길이 폭주 방지).
+    """
+    try:
+        clean = text.strip()
+        if clean.startswith("```"):
+            lines = clean.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            clean = "\n".join(lines).strip()
+        parsed = json.loads(clean)
+    except Exception:
+        parsed = None
+
+    out: list[str] = []
+    if isinstance(parsed, dict):
+        overall = str(parsed.get("overall_message") or "")
+        gap_summary = str(parsed.get("gap_summary") or "")
+        hints_raw = parsed.get("action_hints") or []
+        if isinstance(hints_raw, list):
+            hints_text = " ".join(str(h) for h in hints_raw if str(h).strip())
+        else:
+            hints_text = ""
+        full_user_facing = "\n".join([overall, gap_summary, hints_text]).strip()
+        out.extend(check_a17_commerce(full_user_facing))
+        out.extend(check_a20_abstract_praise(full_user_facing))
+        out.extend(check_markdown_markup(full_user_facing))
+        out.extend(check_a18_length(overall))
+    else:
+        out.extend(check_a17_commerce(text))
+        out.extend(check_a20_abstract_praise(text))
+        out.extend(check_markdown_markup(text))
+    return out
 
 
 # ─────────────────────────────────────────────
@@ -158,6 +354,31 @@ class StubSiaWriter:
             f"{honor} 시각이 본 건 여기까지 펼쳐드렸어요. "
             f"나머지 {locked_count}장은 더 쓰실수록 정교해져요"
         )
+
+    def generate_aspiration_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        gap_vector: GapVector,
+        target_display_name: str,
+        target_analysis_snapshot: Optional[dict] = None,
+        matched_trends: Optional[list] = None,
+        user_name: Optional[str] = None,
+        photo_pairs: Optional[list[dict]] = None,
+    ) -> dict:
+        """Stub — Haiku 미호출. deterministic fallback dict + raw 자리 채움."""
+        honor = _name_honorific(user_name)
+        fallback = _build_aspiration_fallback(
+            honor=honor,
+            target_display_name=target_display_name,
+            gap_vector=gap_vector,
+            profile=profile,
+        )
+        return {
+            **fallback,
+            "raw_haiku_response": "",   # stub: Haiku 미호출
+            "matched_trends_used": list(matched_trends or []),
+        }
 
 
 # ─────────────────────────────────────────────
@@ -313,6 +534,73 @@ class HaikuSiaWriter:
             user_name=user_name,
         )
 
+    def generate_aspiration_overall(
+        self,
+        *,
+        profile: UserTasteProfile,
+        gap_vector: GapVector,
+        target_display_name: str,
+        target_analysis_snapshot: Optional[dict] = None,
+        matched_trends: Optional[list] = None,
+        user_name: Optional[str] = None,
+        photo_pairs: Optional[list[dict]] = None,
+    ) -> dict:
+        """Aspiration 비교 narrative — Haiku 4.5 + 페르소나 B + 5 필드 + JSON.
+
+        반환 키:
+          overall_message / gap_summary / action_hints
+          raw_haiku_response (휘발 방지 — 원본 문자열 보존)
+          matched_trends_used (활용한 KB 트렌드 list)
+        """
+        honor = _name_honorific(user_name)
+        slim = _render_taste_profile_slim(profile)
+        target_summary = _summarize_target_snapshot(target_analysis_snapshot)
+        trends_summary = _summarize_matched_trends(matched_trends)
+        gap_n = gap_vector.narrative()
+        pair_n = len(photo_pairs or [])
+
+        user_prompt = (
+            f"[유저 호명] {honor}\n"
+            f"[추구미 대상] {target_display_name}\n\n"
+            f"[taste_profile slim — 5 필드]\n"
+            f"{json.dumps(slim, ensure_ascii=False, indent=2)}\n\n"
+            f"[gap_vector]\n"
+            f"  primary: {gap_vector.primary_axis} "
+            f"{gap_vector.primary_delta:+.2f}\n"
+            f"  secondary: {gap_vector.secondary_axis} "
+            f"{gap_vector.secondary_delta:+.2f}\n"
+            f"  tertiary: {gap_vector.tertiary_axis} "
+            f"{gap_vector.tertiary_delta:+.2f}\n"
+            f"  narrative_hint: {gap_n}\n\n"
+            f"[target_analysis 핵심]\n{target_summary}\n\n"
+            f"[matched_trends — KB 매칭]\n{trends_summary}\n\n"
+            f"[photo_pairs 수] {pair_n}\n\n"
+            "위 정보로 본인 피드 ↔ 추구미 비교 narrative 를 JSON 으로 출력하십시오. "
+            "키: overall_message / gap_summary / action_hints. "
+            "JSON 외 텍스트 / 마크다운 wrapper 절대 금지."
+        )
+
+        fallback_dict = _build_aspiration_fallback(
+            honor=honor,
+            target_display_name=target_display_name,
+            gap_vector=gap_vector,
+            profile=profile,
+        )
+        fallback_text = json.dumps(fallback_dict, ensure_ascii=False)
+
+        raw = self._call_with_retry(
+            system=_load_aspiration_system_prompt(),
+            user_prompt=user_prompt,
+            max_tokens=600,
+            fallback_text=fallback_text,
+            validator=_collect_violations_aspiration,
+        )
+
+        parsed = _parse_aspiration_response(raw, fallback_dict)
+        parsed["raw_haiku_response"] = raw   # 휘발 방지
+        parsed["matched_trends_used"] = list(matched_trends or [])
+        return parsed
+
     # ─────────────────────────────────────────────
     #  internal — Haiku 호출 + validator wrap
     # ─────────────────────────────────────────────
@@ -325,11 +613,16 @@ class HaikuSiaWriter:
         max_tokens: int,
         fallback_text: str,
         max_retries: int = 1,
+        validator: Optional[Callable[[str], list[str]]] = None,
     ) -> str:
-        """Haiku 호출 → A-17/A-20/markdown 검증 → 위반 시 1회 재시도 → fallback.
+        """Haiku 호출 → validator 검증 → 위반 시 1회 재시도 → fallback.
 
+        validator default: _collect_violations (A-17/A-20/markdown).
+        Aspiration 등 다른 영역은 validator 인자로 전용 검증 함수 주입 가능.
         API 키 / 네트워크 / JSON 에러 전부 fallback 으로 수렴. 예외 raise 안 함.
         """
+        _validator = validator or _collect_violations
+
         try:
             from services.sia_llm import _get_client
             from config import get_settings
@@ -369,7 +662,7 @@ class HaikuSiaWriter:
                 continue
             last_text = text
 
-            violations = _collect_violations(text)
+            violations = _validator(text)
             if not violations:
                 return text
             logger.warning(

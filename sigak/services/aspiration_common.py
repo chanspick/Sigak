@@ -35,7 +35,7 @@ from services.coordinate_system import (
 )
 from services.knowledge_base import load_trends
 from services.knowledge_matcher import match_trends_for_user
-from services.sia_writer import get_sia_writer
+from services.sia_writer import _render_taste_profile_slim, get_sia_writer
 from schemas.user_taste import UserTasteProfile
 
 
@@ -243,6 +243,127 @@ def _upload_target_to_r2(
     return r2_client.public_url(key) or f"r2://{key}"
 
 
+# ─────────────────────────────────────────────
+#  v1.5 raw 영구 보존 헬퍼 — Apify raw + Vision raw
+#
+#  PII 정책 (이용약관 §11 Apify 재배포 룰 준수):
+#  - raw_items 안의 pinner.username / instagram_data.username /
+#    latest_comments[].text / 다른 유저 멘션 = PII.
+#  - DB / LLM / SIGAK UI 절대 노출 금지.
+#  - R2 보존만 OK (본인 보드 = 본인 동의 영역, 본인 IG = 본인 동의).
+#  - 메타분석 시 R2 fetch 로만 활용.
+# ─────────────────────────────────────────────
+
+def materialize_apify_raw_to_r2(
+    raw_items: list,
+    *,
+    user_id: str,
+    analysis_id: str,
+) -> Optional[str]:
+    """Apify raw 응답 (list[dict]) 를 R2 apify_raw.json 으로 저장.
+
+    Args:
+      raw_items: Apify scraper 가 반환한 dict list (Pinterest pin 또는 IG post 전수).
+      user_id: R2 key prefix 소유자.
+      analysis_id: 분석 식별자.
+
+    Returns:
+      R2 public URL (성공) 또는 None (raw_items 빈값 or R2 업로드 실패).
+      실패는 메인 플로우 무영향.
+    """
+    if not raw_items:
+        return None
+    from services import r2_client
+
+    key = r2_client.aspiration_apify_raw_key(user_id, analysis_id)
+    try:
+        payload = json.dumps(
+            {
+                "items": raw_items,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "item_count": len(raw_items),
+            },
+            ensure_ascii=False,
+            default=str,
+        ).encode("utf-8")
+        r2_client.put_bytes(key, payload, content_type="application/json")
+    except Exception:
+        logger.exception("apify_raw R2 put failed: key=%s", key)
+        return None
+
+    return r2_client.public_url(key) or f"r2://{key}"
+
+
+def materialize_vision_raw_to_r2(
+    vision_raw_text: Optional[str],
+    *,
+    user_id: str,
+    analysis_id: str,
+) -> Optional[str]:
+    """Sonnet Vision raw response text 를 R2 vision_raw.json 으로 저장.
+
+    Args:
+      vision_raw_text: Sonnet Vision 응답 raw text (str). None 이면 저장 X.
+      user_id: R2 key prefix 소유자.
+      analysis_id: 분석 식별자.
+
+    Returns:
+      R2 public URL (성공) 또는 None.
+    """
+    if not vision_raw_text:
+        return None
+    from services import r2_client
+
+    key = r2_client.aspiration_vision_raw_key(user_id, analysis_id)
+    try:
+        payload = json.dumps(
+            {
+                "raw": vision_raw_text,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "char_length": len(vision_raw_text),
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        r2_client.put_bytes(key, payload, content_type="application/json")
+    except Exception:
+        logger.exception("vision_raw R2 put failed: key=%s", key)
+        return None
+
+    return r2_client.public_url(key) or f"r2://{key}"
+
+
+def materialize_ig_vision_raw_to_r2(
+    vision_raw_text: Optional[str],
+    *,
+    user_id: str,
+    snapshot_ts: str,
+) -> Optional[str]:
+    """본인 IG essentials 의 Sonnet Vision raw 를 R2 ig_snapshots/{ts}/vision_raw.json 저장.
+
+    추구미 영역과 별도 prefix — ig_snapshots 디렉터리 안. PII 격리 동일.
+    """
+    if not vision_raw_text:
+        return None
+    from services import r2_client
+
+    key = r2_client.ig_snapshot_vision_raw_key(user_id, snapshot_ts)
+    try:
+        payload = json.dumps(
+            {
+                "raw": vision_raw_text,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "char_length": len(vision_raw_text),
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        r2_client.put_bytes(key, payload, content_type="application/json")
+    except Exception:
+        logger.exception("ig_vision_raw R2 put failed: key=%s", key)
+        return None
+
+    return r2_client.public_url(key) or f"r2://{key}"
+
+
 def extract_user_posts_from_vault(vault) -> list[IgLatestPost]:
     """vault.ig_feed_cache.latest_posts → IgLatestPost 리스트.
 
@@ -325,8 +446,22 @@ def add_to_blocklist(
 def persist_analysis(
     db,
     analysis: AspirationAnalysis,
+    *,
+    extra_result_data: Optional[dict] = None,
 ) -> None:
-    """aspiration_analyses INSERT. Transaction ownership 은 caller."""
+    """aspiration_analyses INSERT. Transaction ownership 은 caller.
+
+    Phase J5 — extra_result_data:
+      AspirationAnalysis.model_dump 외 보존할 추가 필드.
+      (raw_haiku_response / raw_sonnet_vision_response / action_hints /
+       matched_trends_used / strength_score_at_time / user_original_phrases_at_time …)
+      dump 와 키 충돌 시 dump 가 우선 (안전망 — schema 필드 보존).
+    """
+    payload = analysis.model_dump(mode="json")
+    if extra_result_data:
+        for k, v in extra_result_data.items():
+            if k not in payload:
+                payload[k] = v
     db.execute(
         text(
             "INSERT INTO aspiration_analyses "
@@ -338,7 +473,7 @@ def persist_analysis(
             "uid": analysis.user_id,
             "t": analysis.target_type,
             "ti": analysis.target_identifier,
-            "rd": json.dumps(analysis.model_dump(mode="json"), ensure_ascii=False, default=str),
+            "rd": json.dumps(payload, ensure_ascii=False, default=str),
             "ca": analysis.created_at,
         },
     )
@@ -393,21 +528,52 @@ def _axis_delta(gap: GapVector, axis: str) -> float:
 
 
 # ─────────────────────────────────────────────
-#  Overall message (Sia writer)
+#  taste_profile slim helper (Phase J5 — vault 5/5)
+# ─────────────────────────────────────────────
+
+def _render_taste_profile_for_aspiration(profile: UserTasteProfile) -> dict:
+    """Verdict v2 _render_taste_profile() 패턴 — 5 필드 dump.
+
+    sia_writer._render_taste_profile_slim 에 위임 (단일 진실 원천).
+    Phase J5 — Aspiration narrative 가 vault 5 필드 (current_position /
+    aspiration_vector / conversation_signals / user_original_phrases /
+    strength_score) 풀 활용하기 위한 slim dump.
+    """
+    return _render_taste_profile_slim(profile)
+
+
+# ─────────────────────────────────────────────
+#  Overall message — Haiku Sia writer 어댑터
 # ─────────────────────────────────────────────
 
 def compose_overall_message(
     *,
     target_display_name: str,
-    gap: GapVector,
-    matched_trend_count: int,
-) -> str:
-    """추구미 리포트 종합 메시지 — stub writer 의 간결한 정리.
+    gap_vector: GapVector,
+    profile: UserTasteProfile,
+    target_analysis_snapshot: Optional[dict] = None,
+    matched_trends: Optional[list] = None,
+    user_name: Optional[str] = None,
+    photo_pairs: Optional[list[dict]] = None,
+) -> dict:
+    """추구미 비교 narrative — sia_writer.generate_aspiration_overall() 어댑터.
 
-    Phase H 이후 SiaWriter concrete 에서 Haiku 기반 풍부화.
+    Phase J5 — stub format 폐기. Haiku 호출 + vault 5/5 + JSON dict 반환.
+
+    반환 키:
+      overall_message     str (5-7 문장 페르소나 B narrative)
+      gap_summary         str (1-2 문장 갭 요약)
+      action_hints        list[str] (3-5 개)
+      raw_haiku_response  str (휘발 방지 — 원본 보존)
+      matched_trends_used list (활용한 KB 트렌드 dump)
     """
-    return (
-        f"{target_display_name} 쪽 결을 살펴봤어요.\n"
-        f"본인 좌표에서 {gap.narrative()}\n"
-        f"이 방향으로 잇는 트렌드 {matched_trend_count}건을 같이 정리했습니다."
+    writer = get_sia_writer()
+    return writer.generate_aspiration_overall(
+        profile=profile,
+        gap_vector=gap_vector,
+        target_display_name=target_display_name,
+        target_analysis_snapshot=target_analysis_snapshot,
+        matched_trends=matched_trends,
+        user_name=user_name,
+        photo_pairs=photo_pairs,
     )

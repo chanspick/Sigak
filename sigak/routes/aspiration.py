@@ -138,7 +138,7 @@ def create_aspiration_ig(
         db.rollback()
         raise HTTPException(500, "토큰 차감 중복 경합 — 재시도 해주세요.")
 
-    # 엔진 실행
+    # 엔진 실행 — Phase J5: profile (vault 5/5) + user_name 흘림
     result: AspirationRunResult = run_aspiration_ig(
         db,
         user_id=user["id"],
@@ -146,6 +146,8 @@ def create_aspiration_ig(
         user_coordinate=user_profile.current_position,
         target_handle_raw=handle,
         user_posts=user_posts,
+        profile=user_profile,
+        user_name=vault.basic_info.name,
     )
 
     # 실패 정책 — 수집 실패면 환불
@@ -164,13 +166,20 @@ def create_aspiration_ig(
         )
 
     # 저장 + user_history append (STEP 4)
-    persist_analysis(db, result.analysis)
+    # Phase J5 — narrative dict (raw_haiku_response / matched_trends_used /
+    # action_hints / gap_summary / strength_score_at_time / user_original_phrases_at_time)
+    # 를 result_data JSONB 에 합쳐 저장. 휘발 방지.
+    persist_analysis(
+        db, result.analysis, extra_result_data=result.narrative,
+    )
     _append_aspiration_history(db, user_id=user["id"], analysis=result.analysis)
     db.commit()
 
     # STEP 11 — 응답에서도 matched_trends hydrate (첫 조회 CTA 노출)
+    # v1.5: snapshot 우선 (분석 시점 동결), 없으면 KB hydrate fallback.
     result.analysis.matched_trends = _hydrate_matched_trends(
-        result.analysis.matched_trend_ids
+        result.analysis.matched_trend_ids,
+        snapshot=result.analysis.matched_trends_snapshot,
     )
 
     return AspirationStartResponse(
@@ -245,6 +254,8 @@ def create_aspiration_pinterest(
         user_coordinate=user_profile.current_position,
         board_url=body.board_url,
         user_posts=user_posts,
+        profile=user_profile,
+        user_name=vault.basic_info.name,
     )
 
     if result.status != "completed" or result.analysis is None:
@@ -261,7 +272,10 @@ def create_aspiration_pinterest(
             token_balance=tokens_service.get_balance(db, user["id"]),
         )
 
-    persist_analysis(db, result.analysis)
+    # Phase J5 — narrative 휘발 방지 보존
+    persist_analysis(
+        db, result.analysis, extra_result_data=result.narrative,
+    )
     db.commit()
 
     return AspirationStartResponse(
@@ -302,15 +316,43 @@ def get_aspiration(
         raise HTTPException(403, "본인 분석이 아닙니다.")
 
     analysis = AspirationAnalysis.model_validate(row.result_data)
-    analysis.matched_trends = _hydrate_matched_trends(analysis.matched_trend_ids)
+    # v1.5: snapshot 우선, 없으면 KB hydrate fallback (구 row 후방호환).
+    analysis.matched_trends = _hydrate_matched_trends(
+        analysis.matched_trend_ids,
+        snapshot=analysis.matched_trends_snapshot,
+    )
     return analysis
 
 
-def _hydrate_matched_trends(trend_ids: list[str]):
-    """STEP 11 — trend_id 목록을 KB 에서 resolve 해서 MatchedTrendView 리스트 반환.
+def _hydrate_matched_trends(
+    trend_ids: list[str],
+    *,
+    snapshot: Optional[list[dict]] = None,
+):
+    """matched_trends 응답 hydrate — v1.5 후방호환.
 
-    KB 로드 실패 / 미존재 id 는 skip. 예외 전부 흡수.
+    우선순위:
+      1. snapshot 있으면 그것 사용 (분석 시점 동결, KB 변경 무관)
+      2. snapshot None / 빈값 → KB hydrate fallback (구 row, KB 신뢰)
+
+    KB 변경 시 과거 리포트 행동지침 보존 보장. 예외 전부 흡수.
     """
+    # 1) Snapshot 우선 — 분석 시점 동결된 객체 그대로 복원
+    if snapshot:
+        try:
+            from schemas.aspiration import MatchedTrendView
+            return [
+                MatchedTrendView.model_validate(d)
+                for d in snapshot
+                if isinstance(d, dict)
+            ]
+        except Exception:
+            logger.exception(
+                "matched_trends snapshot parse failed → falling back to KB hydrate"
+            )
+            # snapshot 깨졌어도 fallback 으로 진행
+
+    # 2) KB hydrate fallback (snapshot 없는 구 row)
     if not trend_ids:
         return []
     try:
@@ -360,6 +402,12 @@ def _append_aspiration_history(db, *, user_id: str, analysis) -> None:
             )
             for p in (analysis.photo_pairs or [])
         ]
+        # Phase J5 — gap_vector dump 보존 (좌표 메타).
+        gap_dump = (
+            analysis.gap_vector.model_dump(mode="json")
+            if getattr(analysis, "gap_vector", None) is not None
+            else None
+        )
         entry = AspirationHistoryEntry(
             analysis_id=analysis.analysis_id,
             created_at=analysis.created_at,
@@ -371,6 +419,7 @@ def _append_aspiration_history(db, *, user_id: str, analysis) -> None:
             gap_narrative=analysis.gap_narrative,
             sia_overall_message=analysis.sia_overall_message,
             target_analysis_snapshot=analysis.target_analysis_snapshot,
+            aspiration_vector_snapshot=gap_dump,
         )
         user_history.append_history(
             db, user_id=user_id, category="aspiration_analyses", entry=entry,

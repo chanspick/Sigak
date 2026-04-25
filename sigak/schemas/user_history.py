@@ -99,6 +99,9 @@ class AspirationHistoryEntry(BaseModel):
     gap_narrative: Optional[str] = None
     sia_overall_message: Optional[str] = None
     target_analysis_snapshot: Optional[dict[str, Any]] = None
+    # Phase J5 — 분석 시점 gap_vector dump 보존 (좌표 메타, raw 아님).
+    # 다음 분석 진입 시 "이전 갭 방향" 비교 가능. raw 격리 테스트 통과 필드.
+    aspiration_vector_snapshot: Optional[dict[str, Any]] = None
 
 
 class VerdictHistoryEntry(BaseModel):

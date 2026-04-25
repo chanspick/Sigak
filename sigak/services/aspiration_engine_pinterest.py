@@ -26,6 +26,7 @@ import httpx
 
 from schemas.aspiration import AspirationAnalysis
 from schemas.user_profile import IgLatestPost
+from schemas.user_taste import UserTasteProfile
 from services.aspiration_common import (
     compose_overall_message,
     derive_coordinate_from_analysis,
@@ -35,7 +36,7 @@ from services.aspiration_common import (
     materialize_pairs_to_r2,
     select_photo_pairs,
 )
-from services.aspiration_engine_ig import AspirationRunResult
+from services.aspiration_engine_ig import AspirationRunResult, _ensure_profile
 from services.coordinate_system import VisualCoordinate, neutral_coordinate
 from services.ig_feed_analyzer import analyze_ig_feed
 from config import get_settings
@@ -61,8 +62,10 @@ def run_aspiration_pinterest(
     user_coordinate: Optional[VisualCoordinate],
     board_url: str,
     user_posts: Optional[list[IgLatestPost]] = None,
+    profile: Optional[UserTasteProfile] = None,
+    user_name: Optional[str] = None,
 ) -> AspirationRunResult:
-    """Pinterest 보드 URL → AspirationAnalysis.
+    """Pinterest 보드 URL → AspirationAnalysis + narrative.
 
     Args:
       db: blocklist 체크용
@@ -70,6 +73,9 @@ def run_aspiration_pinterest(
       board_url: https://www.pinterest.com/{user}/{board}/ 형식 기대
       user_posts: 본인 IG posts (vault.ig_feed_cache.latest_posts).
                   photo_pairs 좌측 채움. None/[] 면 페어 없음.
+      profile: UserTasteProfile snapshot — 5 필드 풀 활용 (Phase J5).
+               None 이면 user_coordinate 만 들어간 minimal profile 합성.
+      user_name: Sia narrative 호명용 (basic_info.name).
     """
     normalized_url = _normalize_board_url(board_url)
     if not normalized_url:
@@ -89,8 +95,9 @@ def run_aspiration_pinterest(
         return AspirationRunResult("failed_scrape", error_detail="apify_api_key missing")
 
     # 2. Apify 수집 (Pinterest actor)
+    # v1.5: tuple unpacking — image_urls + raw_items / board_name 등 메타.
     try:
-        image_urls = _call_pinterest_actor(
+        image_urls, board_meta = _call_pinterest_actor(
             board_url=normalized_url,
             api_key=settings.apify_api_key,
             actor_id=settings.apify_pinterest_actor_id,
@@ -107,7 +114,8 @@ def run_aspiration_pinterest(
     synthetic_posts = _wrap_images_as_posts(image_urls[:10])
 
     # 4. Vision 분석 (Sonnet)
-    target_analysis = analyze_ig_feed(
+    # v1.5: vision_raw 함께 반환 — 추구미 R2 디렉터리에 분리 저장 (LLM 격리).
+    target_analysis, target_vision_raw = analyze_ig_feed(
         posts=synthetic_posts,
         biography=None,      # Pinterest 는 bio 개념 없음
     )
@@ -138,11 +146,19 @@ def run_aspiration_pinterest(
         gender=user_gender or "female",
     )
 
-    # 8. Sia 종합
-    overall = compose_overall_message(
-        target_display_name=f"Pinterest 보드",
-        gap=gap,
-        matched_trend_count=len(matched_trend_ids),
+    # 8. Sia 종합 narrative — Phase J5: Haiku + vault 5/5 + JSON dict
+    # board_meta.board_name 우선, 없으면 "Pinterest 보드" fallback.
+    pre_display_name = board_meta.get("board_name") or "Pinterest 보드"
+    effective_profile = _ensure_profile(profile, user_id, user_coord)
+    target_snapshot_dump = target_analysis.model_dump(mode="json")
+    narrative = compose_overall_message(
+        target_display_name=pre_display_name,
+        gap_vector=gap,
+        profile=effective_profile,
+        target_analysis_snapshot=target_snapshot_dump,
+        matched_trends=None,                 # routes 에서 KB hydrate (저장 후)
+        user_name=user_name,
+        photo_pairs=[p.model_dump() for p in pairs],
     )
 
     # 9. R2 materialization — Pinterest 이미지 영구 저장 (analysis_id 선행 발급)
@@ -151,26 +167,103 @@ def run_aspiration_pinterest(
         pairs, user_id=user_id, analysis_id=analysis_id,
     )
 
+    # 9-b. v1.5 — Apify raw + Vision raw R2 분리 저장 (LLM 격리).
+    # PII (pinner.username / instagram_data.username 등) 보호 위해 DB 직접 X.
+    # 메타분석 시 R2 fetch 로만 활용. 실패는 메인 플로우 무영향.
+    from services.aspiration_common import (
+        materialize_apify_raw_to_r2, materialize_vision_raw_to_r2,
+    )
+    r2_apify_raw_key = materialize_apify_raw_to_r2(
+        board_meta.get("raw_items") or [],
+        user_id=user_id, analysis_id=analysis_id,
+    )
+    r2_vision_raw_key = materialize_vision_raw_to_r2(
+        target_vision_raw, user_id=user_id, analysis_id=analysis_id,
+    )
+
+    # 9-c. 작업 9 — matched_trends 분석 시점 스냅샷 (KB 변경 시 행동지침 보존)
+    matched_trends_snapshot = _hydrate_matched_trends_snapshot(matched_trend_ids)
+
     # 10. 조립
     analysis = AspirationAnalysis(
         analysis_id=analysis_id,
         user_id=user_id,
         target_type="pinterest",
         target_identifier=board_id,
-        target_display_name="Pinterest 보드",
+        target_display_name=pre_display_name,
         created_at=datetime.now(timezone.utc),
         user_coordinate=user_coord,
         target_coordinate=target_coord,
         gap_vector=gap,
         gap_narrative=gap.narrative(),
         photo_pairs=pairs_persisted,
-        sia_overall_message=overall,
+        sia_overall_message=narrative["overall_message"],
         matched_trend_ids=matched_trend_ids,
-        target_analysis_snapshot=target_analysis.model_dump(mode="json"),
+        target_analysis_snapshot=target_snapshot_dump,
         images_captured_count=len(image_urls),
         r2_target_dir=r2_target_dir,
+        r2_apify_raw_key=r2_apify_raw_key,
+        r2_vision_raw_key=r2_vision_raw_key,
+        matched_trends_snapshot=matched_trends_snapshot,
     )
-    return AspirationRunResult("completed", analysis=analysis)
+
+    # narrative 에 분석 시점 vault 5 필드 메타 추가 (사용자 명령서 6-B)
+    narrative_persisted = dict(narrative)
+    narrative_persisted["user_original_phrases_at_time"] = list(
+        effective_profile.user_original_phrases
+    )
+    narrative_persisted["strength_score_at_time"] = effective_profile.strength_score
+
+    return AspirationRunResult(
+        "completed",
+        analysis=analysis,
+        narrative=narrative_persisted,
+    )
+
+
+# ─────────────────────────────────────────────
+#  matched_trends 스냅샷 (작업 9) — 후방호환
+#  TODO (Phase H+I): Haiku raw response 도 R2 분리 저장 패턴 적용.
+#  위치: user_media/{user_id}/aspiration_targets/{analysis_id}/haiku_responses/
+#    ├── photo_pair_NN_user.json
+#    ├── photo_pair_NN_target.json
+#    └── overall_message.json
+#  인스턴스 4 (Aspiration narrative 정교화) 또는 후속 작업 범위.
+# ─────────────────────────────────────────────
+
+def _hydrate_matched_trends_snapshot(trend_ids: list[str]) -> Optional[list[dict]]:
+    """KB 에서 trend hydrate → MatchedTrendView dict list. 분석 시점 동결 저장용.
+
+    KB 변경 시 과거 리포트 행동지침 보존 (CLAUDE.md 시계열 보존 원칙).
+    예외/빈값은 None 반환 — 응답 시점 KB hydrate fallback 동작.
+    """
+    if not trend_ids:
+        return None
+    try:
+        from schemas.aspiration import MatchedTrendView
+        from services.knowledge_base import load_trends
+        all_trends = load_trends()
+        by_id = {t.trend_id: t for t in all_trends}
+        snapshot: list[dict] = []
+        for tid in trend_ids:
+            t = by_id.get(tid)
+            if t is None:
+                continue
+            view = MatchedTrendView(
+                trend_id=t.trend_id,
+                title=t.title,
+                category=str(t.category),
+                detailed_guide=t.detailed_guide,
+                action_hints=list(t.action_hints or []),
+                score=None,
+            )
+            snapshot.append(view.model_dump(mode="json"))
+        return snapshot or None
+    except Exception:
+        logger.exception(
+            "matched_trends snapshot hydrate failed for ids=%s", trend_ids,
+        )
+        return None
 
 
 # ─────────────────────────────────────────────
@@ -213,15 +306,30 @@ def _call_pinterest_actor(
     api_key: str,
     actor_id: str,
     timeout: float,
-) -> list[str]:
-    """apify~pinterest-scraper 실행 → 이미지 URL list.
+) -> tuple[list[str], dict]:
+    """devcake~pinterest-data-scraper 실행 → (이미지 URLs, raw 응답 메타).
 
-    MVP 가정 payload (actor 문서 확인 전, placeholder):
-      {"startUrls": [{"url": board_url}], "maxPins": 10}
-    응답 각 item 의 "imageUrl" or "image.url" 필드 추출.
+    v1.5 변경:
+      - 반환 list[str] → tuple[list[str], dict]
+      - dict 안: board_name / raw_items (필터 후 핀별 dict 전수) /
+                 total_pins_raw / pins_after_filter
+      - 필터: is_product_pin / 비디오 핀 / 이미지 없는 핀 skip
+      - 응답 shape (devcake actor): item.images.{orig, 736x, 474x, 236x}.url
+        size_keys 우선순위 fallback (LIVE probe 생략, 방어 로직).
 
-    실 actor 사용 전 스키마 검증 + 어댑터 튜닝 필요. 예외는 caller 에서 흡수.
+    DEBUG_PINTEREST_RAW_DUMP=1 환경변수 시 첫 호출 응답을 픽스처로 dump
+    (tests/fixtures/pinterest_response_sample.json). 본인 (창업자) E2E 검증 시
+    환경변수 켜고 1번 호출 → 픽스처 확보 → size_keys 우선순위 검토 후 끄기.
+
+    PII 정책 (이용약관 §11):
+      - raw_items 안 pinner.username / instagram_data.username 등 = PII.
+      - 본 함수는 raw 를 반환만, R2 분리 저장은 caller (aspiration_common 헬퍼).
+      - DB / LLM / SIGAK UI 노출 금지 — caller 격리 책임.
+
+    예외는 caller 에서 흡수.
     """
+    import os
+
     url = APIFY_PINTEREST_ENDPOINT_TMPL.format(actor_id=actor_id)
     payload = {
         "startUrls": [{"url": board_url}],
@@ -232,21 +340,74 @@ def _call_pinterest_actor(
         resp.raise_for_status()
         data = resp.json()
         if not isinstance(data, list):
-            raise ValueError(f"unexpected Pinterest actor response type: {type(data).__name__}")
+            raise ValueError(
+                f"unexpected Pinterest actor response type: {type(data).__name__}"
+            )
+
+    # DEBUG dump — LIVE probe 대용. 본인 E2E 첫 호출 시 환경변수 켜서 픽스처 확보.
+    if os.getenv("DEBUG_PINTEREST_RAW_DUMP") == "1":
+        try:
+            import json as _json
+            from pathlib import Path
+            fixture_path = Path("tests/fixtures/pinterest_response_sample.json")
+            fixture_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(fixture_path, "w", encoding="utf-8") as f:
+                _json.dump(data, f, ensure_ascii=False, indent=2)
+            logger.warning(
+                "pinterest raw dumped to fixtures (DEBUG mode): %d items → %s",
+                len(data), fixture_path,
+            )
+        except Exception:
+            logger.exception("pinterest raw dump failed")
 
     urls: list[str] = []
+    raw_items: list[dict] = []  # 필터 후 핀별 raw 전수 보존 (R2 저장용)
+    board_name: Optional[str] = None
+
     for item in data:
         if not isinstance(item, dict):
             continue
-        candidate = (
-            item.get("imageUrl")
-            or (item.get("image") or {}).get("url")
-            or item.get("image_large_url")
-            or item.get("url")
-        )
-        if isinstance(candidate, str) and candidate.startswith("http"):
-            urls.append(candidate)
-    return urls
+        # 필터 1: 커머스 핀 skip (추구미 부적절)
+        if item.get("is_product_pin") is True:
+            continue
+        # 필터 2: 비디오 핀 skip (이미지 분석 대상 외)
+        if item.get("videos"):
+            continue
+        # 필터 3: 이미지 없는 핀 skip + size_keys 우선순위 fallback
+        images = item.get("images")
+        if not isinstance(images, dict):
+            continue
+        candidate: Optional[str] = None
+        for size_key in ("orig", "736x", "474x", "236x"):
+            size_obj = images.get(size_key)
+            if isinstance(size_obj, dict):
+                u = size_obj.get("url")
+                if isinstance(u, str) and u.startswith("http"):
+                    candidate = u
+                    break
+        if not candidate:
+            logger.warning(
+                "pinterest_no_url: keys=%s", list(images.keys()),
+            )
+            continue
+
+        urls.append(candidate)
+        raw_items.append(item)
+
+        # board_name lazy capture (첫 유효 핀의 board.name)
+        if board_name is None:
+            board = item.get("board")
+            if isinstance(board, dict):
+                bn = board.get("name")
+                if isinstance(bn, str) and bn.strip():
+                    board_name = bn.strip()
+
+    return urls, {
+        "board_name": board_name,
+        "raw_items": raw_items,
+        "total_pins_raw": len(data),
+        "pins_after_filter": len(urls),
+    }
 
 
 def _wrap_images_as_posts(image_urls: list[str]) -> list[IgLatestPost]:

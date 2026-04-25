@@ -15,6 +15,7 @@ from schemas.aspiration import (
     TargetType,
 )
 from schemas.user_profile import IgFeedCache, IgFeedAnalysis, IgLatestPost
+from schemas.user_taste import UserTasteProfile
 from services.aspiration_common import (
     compose_overall_message,
     derive_coordinate_from_analysis,
@@ -47,17 +48,25 @@ AspirationRunStatus = Literal[
 
 
 class AspirationRunResult:
-    """엔진 반환값 — 라우트가 status + analysis 해석."""
+    """엔진 반환값 — 라우트가 status + analysis + narrative 해석.
+
+    Phase J5 — narrative:
+      sia_writer.generate_aspiration_overall() 결과 dict.
+      raw_haiku_response / matched_trends_used / action_hints / gap_summary 보존.
+      route 가 persist_analysis(extra_result_data=narrative) 로 휘발 방지.
+    """
 
     def __init__(
         self,
         status: AspirationRunStatus,
         analysis: Optional[AspirationAnalysis] = None,
         error_detail: Optional[str] = None,
+        narrative: Optional[dict] = None,
     ):
         self.status = status
         self.analysis = analysis
         self.error_detail = error_detail
+        self.narrative = narrative
 
 
 # ─────────────────────────────────────────────
@@ -72,8 +81,10 @@ def run_aspiration_ig(
     user_coordinate: Optional[VisualCoordinate],
     target_handle_raw: str,
     user_posts: Optional[list[IgLatestPost]] = None,
+    profile: Optional[UserTasteProfile] = None,
+    user_name: Optional[str] = None,
 ) -> AspirationRunResult:
-    """제3자 IG 핸들 → AspirationAnalysis.
+    """제3자 IG 핸들 → AspirationAnalysis + narrative.
 
     Args:
       db: SQLAlchemy session. blocklist 체크 용.
@@ -83,9 +94,12 @@ def run_aspiration_ig(
       target_handle_raw: "@yuni" / "yuni" 등
       user_posts: 본인 IG posts (vault.ig_feed_cache.latest_posts).
                   photo_pairs 좌측 채움. None/[] 면 페어 생성 불가.
+      profile: UserTasteProfile snapshot — 5 필드 풀 활용 (Phase J5).
+               None 이면 user_coordinate 만 들어간 minimal profile 합성.
+      user_name: Sia narrative 호명용 (basic_info.name).
 
     Returns:
-      AspirationRunResult — 상태별로 analysis 유무 다름.
+      AspirationRunResult — analysis + narrative (raw 보존).
     """
     handle = _normalize_handle(target_handle_raw)
     if not handle:
@@ -123,7 +137,8 @@ def run_aspiration_ig(
         return AspirationRunResult("failed_private")
 
     # 4. 공개 계정 — cache build (Vision 포함). 이 cache 는 user 에 저장 X (메모리만).
-    target_cache: IgFeedCache = _build_full_cache(profile_raw, posts_raw=raw_items)
+    # v1.5: vision_raw 함께 받아 추구미 R2 디렉터리에 분리 저장 (LLM 격리).
+    target_cache, target_vision_raw = _build_full_cache(profile_raw, posts_raw=raw_items)
     target_analysis = target_cache.analysis
     if target_analysis is None:
         # Vision 실패 — coordinate 산출 불가. degrade 로 진행할지 실패할지 정책 결정.
@@ -154,11 +169,17 @@ def run_aspiration_ig(
         gender=user_gender or "female",
     )
 
-    # 8. Sia 종합 메시지 (stub writer — Phase H 이후 Haiku 기반 교체)
-    overall = compose_overall_message(
+    # 8. Sia 종합 narrative — Phase J5: Haiku + vault 5/5 + JSON dict
+    effective_profile = _ensure_profile(profile, user_id, user_coord)
+    target_snapshot_dump = target_analysis.model_dump(mode="json")
+    narrative = compose_overall_message(
         target_display_name=f"@{handle}",
-        gap=gap,
-        matched_trend_count=len(matched_trend_ids),
+        gap_vector=gap,
+        profile=effective_profile,
+        target_analysis_snapshot=target_snapshot_dump,
+        matched_trends=None,                 # routes 에서 KB hydrate (저장 후)
+        user_name=user_name,
+        photo_pairs=[p.model_dump() for p in pairs],
     )
 
     # 9. R2 materialization — IG CDN TTL 대비 영구 저장 (analysis_id 먼저 발급)
@@ -166,6 +187,26 @@ def run_aspiration_ig(
     pairs_persisted, r2_target_dir = materialize_pairs_to_r2(
         pairs, user_id=user_id, analysis_id=analysis_id,
     )
+
+    # 9-b. v1.5 — Apify raw + Vision raw R2 분리 저장 (LLM 격리, 추구미 IG 도 동일).
+    # 본인 IG 피드 (ig_feed_cache.raw) 와 별개 영역. PII 격리 동일.
+    from services.aspiration_common import (
+        materialize_apify_raw_to_r2, materialize_vision_raw_to_r2,
+    )
+    r2_apify_raw_key = materialize_apify_raw_to_r2(
+        list(raw_items),
+        user_id=user_id, analysis_id=analysis_id,
+    )
+    r2_vision_raw_key = materialize_vision_raw_to_r2(
+        target_vision_raw, user_id=user_id, analysis_id=analysis_id,
+    )
+
+    # 9-c. 작업 9 — matched_trends 분석 시점 스냅샷 (KB 변경 시 행동지침 보존).
+    # aspiration_engine_pinterest 에 정의된 함수 lazy import (순환 import 회피).
+    from services.aspiration_engine_pinterest import (
+        _hydrate_matched_trends_snapshot,
+    )
+    matched_trends_snapshot = _hydrate_matched_trends_snapshot(matched_trend_ids)
 
     # 10. AspirationAnalysis 조립
     analysis = AspirationAnalysis(
@@ -180,12 +221,46 @@ def run_aspiration_ig(
         gap_vector=gap,
         gap_narrative=gap.narrative(),
         photo_pairs=pairs_persisted,
-        sia_overall_message=overall,
+        sia_overall_message=narrative["overall_message"],
         matched_trend_ids=matched_trend_ids,
-        target_analysis_snapshot=target_analysis.model_dump(mode="json"),
+        target_analysis_snapshot=target_snapshot_dump,
         images_captured_count=sum(
             1 for p in (target_cache.latest_posts or []) if p.display_url
         ),
         r2_target_dir=r2_target_dir,
+        r2_apify_raw_key=r2_apify_raw_key,
+        r2_vision_raw_key=r2_vision_raw_key,
+        matched_trends_snapshot=matched_trends_snapshot,
     )
-    return AspirationRunResult("completed", analysis=analysis)
+
+    # narrative 에 분석 시점 vault 5 필드 메타 추가 (사용자 명령서 6-B)
+    narrative_persisted = dict(narrative)
+    narrative_persisted["user_original_phrases_at_time"] = list(
+        effective_profile.user_original_phrases
+    )
+    narrative_persisted["strength_score_at_time"] = effective_profile.strength_score
+
+    return AspirationRunResult(
+        "completed",
+        analysis=analysis,
+        narrative=narrative_persisted,
+    )
+
+
+def _ensure_profile(
+    profile: Optional[UserTasteProfile],
+    user_id: str,
+    user_coordinate: VisualCoordinate,
+) -> UserTasteProfile:
+    """profile 이 None 이면 좌표만 들어간 minimal profile 합성 (회귀 가드).
+
+    Day 1 유저 / 호출자 미흘림 케이스 fallback. 5 필드 중 current_position 만
+    채워지고 나머지는 default — narrative 가 strength_score 0 으로 인식.
+    """
+    if profile is not None:
+        return profile
+    return UserTasteProfile(
+        user_id=user_id,
+        snapshot_at=datetime.now(timezone.utc),
+        current_position=user_coordinate,
+    )

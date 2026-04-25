@@ -20,6 +20,7 @@ Public API:
 """
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -32,6 +33,7 @@ from schemas.sia_state import (
     RangeMode,
     UserMessageFlags,
 )
+from schemas.user_history import UserHistory
 
 
 # ─────────────────────────────────────────────
@@ -90,6 +92,8 @@ def _build_context(
     state: ConversationState,
     user_flags: Optional[UserMessageFlags],
     vision_summary: str,
+    vault_history: Optional[UserHistory] = None,
+    user_phrases: Optional[list[str]] = None,
 ) -> str:
     last_user = state.last_user()
     last_user_text = last_user.text if last_user else "(유저 발화 없음)"
@@ -112,7 +116,116 @@ def _build_context(
     ]
     if vision_summary:
         parts.extend(["", "## Vision 요약", vision_summary])
+
+    # 재대화 시 본인 누적 데이터 주입 (4 기능: PI/Verdict/Best Shot/Aspiration).
+    # vault_history None / 모든 list 비어있으면 vault_block == "" → 섹션 추가 skip
+    # → 첫 진입 유저 회귀 0건.
+    vault_block = _format_vault_history_block(vault_history, user_phrases)
+    if vault_block:
+        parts.extend(["", "## 본인 누적 데이터 (재대화 시)", vault_block])
     return "\n".join(parts)
+
+
+# ─────────────────────────────────────────────
+#  Vault history block — 재대화 누적 데이터 주입
+# ─────────────────────────────────────────────
+
+# 길이 가드 상수 (스펙 1-F)
+_VAULT_FIRST_SENTENCE_MAX = 100      # 각 history message 첫 문장 ≤ 100자
+_VAULT_PHRASE_MAX = 30               # user_original_phrase 각 ≤ 30자
+_VAULT_BLOCK_MAX = 500               # 전체 블록 ≤ 500자
+_VAULT_PHRASE_LIMIT = 3              # 상위 3개만 노출
+
+
+# 첫 문장 분리 패턴 — 한국어 마침표(. ) / 일본어 / 종결 기호 / 줄바꿈 우선.
+# `re.split` 으로 구분자와 함께 분리한 뒤 [0] 사용.
+_FIRST_SENTENCE_SPLIT = re.compile(r"(?<=[.!?。!?])\s+|\n+")
+
+
+def _first_sentence(text: str, max_chars: int = _VAULT_FIRST_SENTENCE_MAX) -> str:
+    """첫 문장 추출 + 길이 truncate. 빈/None 입력 → ""."""
+    if not text or not isinstance(text, str):
+        return ""
+    head = _FIRST_SENTENCE_SPLIT.split(text.strip(), maxsplit=1)[0].strip()
+    if not head:
+        return ""
+    if len(head) > max_chars:
+        head = head[: max_chars - 1].rstrip() + "…"
+    return head
+
+
+def _truncate_phrase(phrase: str, max_chars: int = _VAULT_PHRASE_MAX) -> str:
+    s = (phrase or "").strip()
+    if not s:
+        return ""
+    if len(s) > max_chars:
+        s = s[: max_chars - 1].rstrip() + "…"
+    return s
+
+
+def _format_vault_history_block(
+    vault_history: Optional[UserHistory],
+    user_phrases: Optional[list[str]] = None,
+) -> str:
+    """본인 누적 데이터를 prompt 주입용 마크다운 블록으로 직렬화.
+
+    빈 history (모든 list 빈) AND 빈 phrases → "" 반환 → 첫 진입 유저 회귀 0.
+    개별 항목 None-safe. 전체 블록 ≤ 500자 (초과 시 후반 truncate).
+    """
+    if vault_history is None and not user_phrases:
+        return ""
+
+    bs_count = len(vault_history.best_shot_sessions) if vault_history else 0
+    vd_count = len(vault_history.verdict_sessions) if vault_history else 0
+    asp_count = len(vault_history.aspiration_analyses) if vault_history else 0
+    phrases = user_phrases or []
+
+    if bs_count == 0 and vd_count == 0 and asp_count == 0 and not phrases:
+        return ""
+
+    lines: list[str] = []
+
+    # 카운트 한 줄 — 0 인 카테고리는 스킵하지 않고 일관 표기 (유저가 이력 인지)
+    lines.append(
+        f"- 본인 사용 이력: Best Shot {bs_count}회 / 피드 추천 {vd_count}회 / "
+        f"추구미 분석 {asp_count}회"
+    )
+
+    # 최신 피드 추천 방향 — verdict_sessions[0].recommendation.get("style_direction", "")
+    if vd_count > 0 and vault_history is not None:
+        rec = vault_history.verdict_sessions[0].recommendation or {}
+        style_dir = rec.get("style_direction", "") if isinstance(rec, dict) else ""
+        head = _first_sentence(style_dir)
+        if head:
+            lines.append(f"- 최신 피드 추천 방향: {head}")
+
+    # 최신 Best Shot 종합 — best_shot_sessions[0].overall_message
+    if bs_count > 0 and vault_history is not None:
+        head = _first_sentence(vault_history.best_shot_sessions[0].overall_message or "")
+        if head:
+            lines.append(f"- 최신 Best Shot 종합: {head}")
+
+    # 최신 추구미 갭 — aspiration_analyses[0].gap_narrative
+    if asp_count > 0 and vault_history is not None:
+        head = _first_sentence(vault_history.aspiration_analyses[0].gap_narrative or "")
+        if head:
+            lines.append(f"- 최신 추구미 갭: {head}")
+
+    # 본인 자주 쓰는 표현 — 상위 3개, 각 30자 truncate
+    if phrases:
+        truncated = [_truncate_phrase(p) for p in phrases[:_VAULT_PHRASE_LIMIT]]
+        cleaned = [p for p in truncated if p]
+        if cleaned:
+            quoted = ", ".join(f"\"{p}\"" for p in cleaned)
+            lines.append(f"- 본인 자주 쓰는 표현: {quoted}")
+
+    block = "\n".join(lines)
+
+    # 전체 블록 ≤ 500자 — 초과 시 후반부 잘라내고 표시.
+    if len(block) > _VAULT_BLOCK_MAX:
+        block = block[: _VAULT_BLOCK_MAX - 1].rstrip() + "…"
+
+    return block
 
 
 # ─────────────────────────────────────────────
@@ -277,6 +390,8 @@ def load_haiku_prompt(
     confrontation_block: Optional[str] = None,
     apply_self_pr_prefix: bool = False,
     range_mode: RangeMode = "limit",
+    vault_history: Optional[UserHistory] = None,
+    user_phrases: Optional[list[str]] = None,
 ) -> str:
     """HAIKU_TYPES 7개 중 하나에 해당하는 system prompt 조립.
 
@@ -290,7 +405,15 @@ def load_haiku_prompt(
     3) 조건부 지시    : Composition 플래그 (is_first_turn / is_combined /
                        secondary_type / confrontation_block / apply_self_pr_prefix /
                        range_mode / user_disclaimer_memory) 기반 활성화된 모드만
-    4) 동적 컨텍스트  : user_name / 누적 카운터 / 직전 유저 메시지 / flag / vision
+    4) 동적 컨텍스트  : user_name / 누적 카운터 / 직전 유저 메시지 / flag / vision /
+                       vault_history (재대화 누적 데이터) / user_phrases
+
+    재대화 시 본인 누적 데이터 주입 (1-A ~ 1-F):
+      vault_history    UserHistory — 4 기능 누적 (Best Shot / 피드 추천 / 추구미 분석 /
+                       Sia 대화). None or 모든 list 빈 → 첫 진입 유저 회귀 0.
+      user_phrases     UserTasteProfile.user_original_phrases — 상위 3개 노출.
+                       caller (routes/sia.py) 가 vault.get_user_taste_profile()
+                       에서 추출 후 전달.
 
     플래그 기본값은 기존 호출부 회귀 방지 — 전부 기본값이면 기존 동작과 동일.
     """
@@ -314,7 +437,11 @@ def load_haiku_prompt(
         range_mode=range_mode,
     )
 
-    ctx = _build_context(state, user_flags, vision_summary)
+    ctx = _build_context(
+        state, user_flags, vision_summary,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
+    )
 
     # composition_block 이 빈 문자열이면 생략하고 3 섹션만 조립 (회귀 방지)
     sections = [base, type_md]

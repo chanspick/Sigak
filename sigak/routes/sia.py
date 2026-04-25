@@ -37,6 +37,7 @@ from schemas.sia_state import (
     MsgType,
     UserTurn,
 )
+from schemas.user_history import UserHistory
 from schemas.user_profile import ConversationMessage
 from services import conversations as conv_service
 from services import sia_llm, sia_session_v4
@@ -52,6 +53,7 @@ from services.sia_llm import _render_ig_summary
 from services.sia_prompts_v4 import load_haiku_prompt
 from services.sia_session import _backup_key, session_key  # Redis 키 재사용
 from services.sia_validators_v4 import populate_turn_counts, validate
+from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
 
 
@@ -319,11 +321,42 @@ def _update_counters_for_assistant(
         state.self_pr_prefix_used += 1
 
 
+def _load_vault_for_sia(
+    db, user_id: str,
+) -> tuple[Optional[UserHistory], Optional[list[str]]]:
+    """Sia 재대화 vault 주입용 — UserHistory + user_original_phrases 추출.
+
+    DB 부재 / vault row 없음 / 어떤 단계 실패도 None 반환 → caller 는
+    "vault 없음 = 첫 진입 유저" 와 동일하게 회귀 0 처리.
+
+    매 turn 호출 (단일 SELECT, 1-3ms). ConversationState string 캐싱은 v1.5 백로그.
+    """
+    try:
+        vault = load_vault(db, user_id)
+    except Exception:
+        logger.exception("sia vault load failed user=%s — proceeding without", user_id)
+        return None, None
+    if vault is None:
+        return None, None
+
+    history = vault.user_history
+    try:
+        phrases = vault.get_user_taste_profile().user_original_phrases or None
+    except Exception:
+        logger.exception(
+            "sia vault.get_user_taste_profile failed user=%s — phrases=None", user_id,
+        )
+        phrases = None
+    return history, phrases
+
+
 def _render_assistant_message(
     composition: Composition,
     state: ConversationState,
     *,
     history_context: str = "",
+    vault_history: Optional[UserHistory] = None,
+    user_phrases: Optional[list[str]] = None,
 ) -> str:
     """Composition → assistant 메시지 텍스트.
 
@@ -333,8 +366,10 @@ def _render_assistant_message(
     M1 결합 출력 (OPENING + OBSERVATION) 은 OPENING 하드코딩 + OBSERVATION Haiku
     두 호출의 결과를 한 문자열로 합쳐서 반환.
 
-    history_context: STEP 5i — chat_start 에서만 non-empty (이전 대화 맥락).
+    history_context: STEP 5i — chat_start 에서만 non-empty (이전 대화 맥락 markdown).
       first turn Haiku prompt 앞에 prepend.
+    vault_history / user_phrases: 재대화 시 본인 누적 데이터 (4 기능) → Haiku
+      `_build_context` 의 "## 본인 누적 데이터 (재대화 시)" 블록으로 주입.
     """
     msg_type = composition.primary_type
 
@@ -348,7 +383,10 @@ def _render_assistant_message(
         opening_text = render_hardcoded(MsgType.OPENING_DECLARATION, state)
         obs_text = _call_haiku(
             MsgType.OBSERVATION, state, composition,
-            is_first_turn=True, history_context=history_context,
+            is_first_turn=True,
+            history_context=history_context,
+            vault_history=vault_history,
+            user_phrases=user_phrases,
         )
         # M1 호명/행위 중복 방지 — Haiku 가 observation.md HARD 지시 무시 시 후처리
         obs_text = _strip_m1_meta_preamble(obs_text, state.user_name)
@@ -367,7 +405,10 @@ def _render_assistant_message(
     # HAIKU 단독 or EMPATHY 결합
     return _call_haiku(
         msg_type, state, composition,
-        is_first_turn=False, history_context=history_context,
+        is_first_turn=False,
+        history_context=history_context,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
     )
 
 
@@ -419,6 +460,8 @@ def _call_haiku(
     is_first_turn: bool,
     max_reject_retries: int = 1,
     history_context: str = "",
+    vault_history: Optional[UserHistory] = None,
+    user_phrases: Optional[list[str]] = None,
 ) -> str:
     """load_haiku_prompt 조립 + Haiku 호출 + validator hard error 시 재시도.
 
@@ -428,6 +471,8 @@ def _call_haiku(
 
     history_context: STEP 5i — 첫 턴 (is_first_turn=True) + non-empty 시
       prompt 앞에 이전 대화/분석 맥락 prepend.
+    vault_history / user_phrases: load_haiku_prompt 로 forward — `_build_context`
+      에서 "## 본인 누적 데이터 (재대화 시)" 블록 주입.
     """
     last_user = state.last_user()
     user_flags = last_user.flags if last_user else None
@@ -445,6 +490,8 @@ def _call_haiku(
         confrontation_block=composition.confrontation_block,
         apply_self_pr_prefix=composition.apply_self_pr_prefix,
         range_mode=composition.range_mode,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
     )
     # STEP 5i — 첫 턴에만 history 맥락 prepend (cross-session)
     if is_first_turn and history_context:
@@ -564,7 +611,7 @@ def chat_start(
             composition.primary_type,
         )
 
-    # STEP 5i — 이전 대화/분석 맥락 주입 (cross-session)
+    # STEP 5i — 이전 대화/분석 맥락 주입 (cross-session, markdown prepend)
     history_context = ""
     try:
         from services.history_injector import build_history_context
@@ -576,8 +623,15 @@ def chat_start(
     except Exception:
         logger.exception("chat_start: history_injector failed user=%s", user["id"])
 
+    # 재대화 vault 주입 (4 기능 누적 데이터 + user_original_phrases) → Haiku
+    # _build_context "## 본인 누적 데이터 (재대화 시)" 블록.
+    vault_history, user_phrases = _load_vault_for_sia(db, user["id"])
+
     opening_message = _render_assistant_message(
-        composition, state, history_context=history_context,
+        composition, state,
+        history_context=history_context,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
     )
     _record_assistant_turn(state, opening_message, composition)
     sia_session_v4.save_conversation_state(state)
@@ -647,8 +701,15 @@ def chat_message(
     composition = decide(state)
     msg_type = composition.primary_type
 
+    # 재대화 vault 주입 — chat_start 와 동일 entry. 매 turn load (단일 SELECT, 1-3ms).
+    vault_history, user_phrases = _load_vault_for_sia(db, user["id"])
+
     # 3. 응답 렌더
-    assistant_text = _render_assistant_message(composition, state)
+    assistant_text = _render_assistant_message(
+        composition, state,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
+    )
 
     # 4. Validator — 경고만 (STEP 2-G 스코프: 파이프라인 개통 우선)
     v = validate(

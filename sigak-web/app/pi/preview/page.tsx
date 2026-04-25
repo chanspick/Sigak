@@ -33,19 +33,20 @@ export default function PIPreviewPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let settled = false;   // fetch 성공/실패 시 true → timeout 무력화
     setError(null);
     setReport(null);
     setSlowHint(false);
 
     // 15s 후 "조금 오래 걸리고 있어요" 안내 (loading 인식)
     const slowTimer = window.setTimeout(() => {
-      if (!cancelled) setSlowHint(true);
+      if (!cancelled && !settled) setSlowHint(true);
     }, 15_000);
 
-    // 90s 후 timeout 강제 처리 (stuck 방어)
+    // 90s 후 timeout — fetch 가 아직 응답 없을 때만 발화 (report 보고 있을 땐 무관)
     const timeoutTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        cancelled = true;
+      if (!cancelled && !settled) {
+        settled = true;
         setError(
           "응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.",
         );
@@ -55,6 +56,9 @@ export default function PIPreviewPage() {
     (async () => {
       try {
         const res = await previewPIv3();
+        settled = true;   // ✅ fetch 끝남 — timeout 무력화
+        window.clearTimeout(timeoutTimer);
+        window.clearTimeout(slowTimer);
         if (!cancelled) {
           // 이미 unlocked 상태면 풀 화면으로 직진
           if (!res.is_preview) {
@@ -64,6 +68,9 @@ export default function PIPreviewPage() {
           setReport(res);
         }
       } catch (e) {
+        settled = true;   // ✅ 실패도 settled — timeout 무력화
+        window.clearTimeout(timeoutTimer);
+        window.clearTimeout(slowTimer);
         if (cancelled) return;
         if (e instanceof ApiError && e.status === 401) {
           router.replace("/");

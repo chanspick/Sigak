@@ -815,9 +815,14 @@ def _build_v3_response(
     mode: str,
     token_balance: Optional[int] = None,
 ) -> PIv3Report:
-    """PIReport → PIv3Report wrapper. mode = "preview" | "full"."""
+    """PIReport → PIv3Report wrapper. mode = "preview" | "full".
+
+    BETA 기간 (PI-REVIVE 2026-04-26): unlock_cost_tokens=0 + needs=0 응답.
+    PreviewPaywall UI 자동 "무료" 표시 / insufficient 분기 비활성.
+    """
     is_preview = (mode != "full")
-    needs = max(0, PI_V3_UNLOCK_COST_TOKENS - (token_balance or 0)) if is_preview else None
+    cost = _effective_unlock_cost()
+    needs = max(0, cost - (token_balance or 0)) if is_preview else None
 
     return PIv3Report(
         report_id=getattr(report, "report_id", "") or "",
@@ -828,7 +833,7 @@ def _build_v3_response(
         ),
         is_preview=is_preview,
         sections=_compose_v3_sections(report, mode=mode),
-        unlock_cost_tokens=PI_V3_UNLOCK_COST_TOKENS,
+        unlock_cost_tokens=cost,
         token_balance=token_balance,
         needs_payment_tokens=needs,
     )
@@ -905,6 +910,26 @@ def _clear_pi_pending_flag(db, user_id: str) -> None:
         logger.debug("pi_pending flag update skipped for user=%s", user_id)
 
 
+def _is_beta_free() -> bool:
+    """PI BETA 무료 기간 여부 (PI-REVIVE 2026-04-26).
+
+    config.beta_free_until 이전 = True (paywall UI cost=0 + unlock 차감 0).
+    파싱 실패 시 False (안전 fallback — 토큰 차감 정상 흐름).
+    """
+    from datetime import date
+    from config import get_settings
+    try:
+        beta_until = date.fromisoformat(get_settings().beta_free_until)
+        return date.today() < beta_until
+    except (ValueError, AttributeError):
+        return False
+
+
+def _effective_unlock_cost() -> int:
+    """BETA 기간 = 0, 아니면 PI_V3_UNLOCK_COST_TOKENS (50)."""
+    return 0 if _is_beta_free() else PI_V3_UNLOCK_COST_TOKENS
+
+
 # ─────────────────────────────────────────────
 #  v3 endpoints
 # ─────────────────────────────────────────────
@@ -922,13 +947,14 @@ def get_pi_v3_status(
     baseline_key, baseline_at, pi_pending = _fetch_baseline_status(db, user_id)
     has_baseline = bool(baseline_key)
 
-    # current report
-    current_row = _select_current_v2(db, user_id)
-    has_current = current_row is not None
+    # current report — 옛 v1 placeholder (status='generating' / report_id 없음) 는
+    # has_current_report=False 로 처리 (PI-REVIVE 2026-04-26). 신 v3 row 만 True.
+    has_current = _has_real_current_report(db, user_id)
+    current_row = _select_current_v2(db, user_id) if has_current else None
     current_report_id = None
     current_version = None
     unlocked_at = None
-    if has_current and current_row.report_data:
+    if current_row and current_row.report_data:
         current_report_id = current_row.report_data.get("report_id")
         current_version = current_row.report_data.get("version")
         unlocked_at = (
@@ -936,7 +962,9 @@ def get_pi_v3_status(
         )
 
     balance = tokens_service.get_balance(db, user_id)
-    needs = max(0, PI_V3_UNLOCK_COST_TOKENS - balance)
+    # BETA 기간 = paywall UI cost=0 / needs=0 (PI-REVIVE 2026-04-26)
+    cost = _effective_unlock_cost()
+    needs = max(0, cost - balance)
 
     return PIv3Status(
         has_baseline=has_baseline,
@@ -945,7 +973,7 @@ def get_pi_v3_status(
         current_report_id=current_report_id,
         current_version=current_version,
         unlocked_at=unlocked_at,
-        unlock_cost_tokens=PI_V3_UNLOCK_COST_TOKENS,
+        unlock_cost_tokens=cost,
         token_balance=balance,
         needs_payment_tokens=needs,
         pi_pending=pi_pending,
@@ -1037,8 +1065,10 @@ def preview_pi_v3(
 
     history_context = _build_history_context(vault)
 
-    # pi_engine 호출 — preview 도 풀 PI 생성 (visibility 만 가공)
-    # force_new_version=False : is_current 있으면 재사용, 없으면 신규
+    # pi_engine 호출 — preview 도 풀 PI 생성 (visibility 만 가공).
+    # PI-REVIVE 2026-04-26: 옛 v1 placeholder (status='generating' / report_id 없음)
+    # 가 is_current 자리 차지하면 재사용 X, 신 v3 강제 생성. 신 v3 row 있으면 재사용.
+    force_new = not _has_real_current_report(db, user_id)
     from services.pi_engine import PIEngineError
     try:
         report = _call_pi_engine_safely(
@@ -1047,7 +1077,7 @@ def preview_pi_v3(
             baseline_r2_key=baseline_key,
             vault=vault,
             history_context=history_context,
-            force_new_version=False,
+            force_new_version=force_new,
         )
     except PIEngineError as e:
         logger.exception("PI v3 preview engine failed user=%s", user_id)

@@ -1650,6 +1650,21 @@ async def run_analysis_legacy(user_id: str):
     finally:
         db.close()
 
+    # Phase A B-1 진단 로깅 — vault 상태 가시화
+    try:
+        convos = vault.user_history.conversations if vault.user_history else []
+        asps = getattr(vault, "aspiration_history", None) or []
+        profile = getattr(vault, "user_taste_profile", None)
+        phrases = profile.user_original_phrases if profile and hasattr(profile, "user_original_phrases") else []
+        sf = getattr(vault, "structured_fields", None)
+        sf_keys = list(sf.keys()) if isinstance(sf, dict) else (list(sf.model_dump().keys()) if sf else [])
+        print(
+            f"[VAULT_DIAG] user={user_id} convos={len(convos)} asps={len(asps)} "
+            f"phrases={len(phrases)} structured_keys={sf_keys}"
+        )
+    except Exception as e:
+        print(f"[VAULT_DIAG] inspect failed: {e}")
+
     if not vault_has_content(vault):
         raise HTTPException(
             400,
@@ -1657,6 +1672,9 @@ async def run_analysis_legacy(user_id: str):
         )
 
     vault_context = render_vault_context(vault)
+
+    # Phase A B-1 진단 로깅 — vault_context 길이 + 첫 300자 preview
+    print(f"[VAULT_CTX] user={user_id} len={len(vault_context)} preview={vault_context[:300]!r}")
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
     report_id, _ = _run_analysis_pipeline(

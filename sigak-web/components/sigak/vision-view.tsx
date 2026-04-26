@@ -134,47 +134,54 @@ function ErrorBlock({ message }: { message: string }) {
   );
 }
 
-// 1) 리포트 없음 — 정면 사진 한 컷 안내 (transition 카피 보존)
+// 1) 리포트 없음 — 정면 사진 한 컷 안내 (transition 카피 보존, 마케터 톤 정합)
 function PhotoUploadNeededBlock() {
   return (
-    <section style={{ padding: "32px 28px 60px" }}>
+    <section style={{ padding: "24px 24px 60px", maxWidth: 480, margin: "0 auto" }}>
       <div
         style={{
-          padding: "20px 22px",
-          border: "1px solid rgba(0, 0, 0, 0.12)",
-          background: "rgba(0, 0, 0, 0.02)",
+          padding: "22px 22px",
+          border: "1px solid var(--color-line)",
+          background: "rgba(0, 0, 0, 0.04)",
+          borderRadius: 14,
         }}
       >
         <div
-          className="font-sans uppercase"
+          className="uppercase"
           style={{
+            fontFamily: "var(--font-mono)",
             fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "1.5px",
-            opacity: 0.4,
-            marginBottom: 10,
+            letterSpacing: "0.12em",
+            color: "var(--color-mute)",
+            marginBottom: 12,
           }}
         >
-          PI — Personal Image
+          PI — PERSONAL IMAGE
         </div>
         <p
           className="font-serif"
           style={{
             margin: 0,
-            fontSize: 18,
-            lineHeight: 1.55,
-            letterSpacing: "-0.01em",
+            fontSize: 20,
+            fontWeight: 500,
+            lineHeight: 1.5,
+            letterSpacing: "-0.018em",
+            color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          시각이 본 나, 완성하려면<br />정면 사진 한 장이 필요해요.
+          시각이 본 나, 완성하려면
+          <br />
+          정면 사진 한 장이 필요해요
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </p>
         <p
           className="font-sans"
           style={{
             margin: "12px 0 0",
-            fontSize: 12,
+            fontSize: 13,
             lineHeight: 1.7,
-            opacity: 0.6,
+            color: "var(--color-mute)",
             letterSpacing: "-0.005em",
           }}
         >
@@ -187,29 +194,29 @@ function PhotoUploadNeededBlock() {
         className="font-sans"
         style={{
           marginTop: 18,
+          display: "flex",
           width: "100%",
-          height: 54,
+          padding: "17px 24px",
           background: "var(--color-ink)",
           color: "var(--color-paper)",
           border: "none",
-          borderRadius: 0,
-          fontSize: 14,
+          borderRadius: 100,
+          fontSize: 15,
           fontWeight: 600,
-          letterSpacing: "0.5px",
-          display: "flex",
+          letterSpacing: "-0.012em",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
           textDecoration: "none",
         }}
       >
-        📷 사진 한 장 보여드리기
+        분석 시작하기 →
       </Link>
     </section>
   );
 }
 
-// 2) 리포트 있음 — 최신 report 카드 + 풀 화면 link + 다시 받기 (옛 system, BETA 무료)
+// 2) 리포트 있음 — 최신 report 카드 + 다시 받기 (옛 system, BETA 무료, 마케터 톤 정합)
 function MyReportsBlock({ report }: { report: MyReport }) {
   const dateLabel = report.created_at
     ? new Date(report.created_at).toLocaleDateString("ko-KR", {
@@ -220,26 +227,27 @@ function MyReportsBlock({ report }: { report: MyReport }) {
     : null;
 
   return (
-    <section style={{ padding: "32px 28px 60px" }}>
+    <section style={{ padding: "24px 24px 60px", maxWidth: 480, margin: "0 auto" }}>
       <Link
         href={`/report/${encodeURIComponent(report.id)}/full`}
         className="font-sans"
         style={{
           display: "block",
-          padding: "24px 22px",
-          border: "1px solid rgba(0,0,0,0.15)",
+          padding: "22px",
+          border: "1px solid var(--color-line)",
+          borderRadius: 14,
+          background: "rgba(0, 0, 0, 0.04)",
           color: "var(--color-ink)",
           textDecoration: "none",
-          background: "var(--color-paper)",
         }}
       >
         <div
-          className="font-sans uppercase"
+          className="uppercase"
           style={{
+            fontFamily: "var(--font-mono)",
             fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "1.5px",
-            opacity: 0.4,
+            letterSpacing: "0.12em",
+            color: "var(--color-mute)",
           }}
         >
           시각이 본 당신
@@ -249,20 +257,23 @@ function MyReportsBlock({ report }: { report: MyReport }) {
           style={{
             margin: "10px 0 0",
             fontSize: 18,
-            lineHeight: 1.55,
-            letterSpacing: "-0.01em",
+            fontWeight: 500,
+            lineHeight: 1.5,
+            letterSpacing: "-0.015em",
+            color: "var(--color-ink)",
           }}
         >
           현재 리포트 열기 →
         </p>
         {dateLabel && (
           <p
-            className="font-sans"
+            className="tabular-nums"
             style={{
               margin: "8px 0 0",
+              fontFamily: "var(--font-mono)",
               fontSize: 11,
-              opacity: 0.5,
-              letterSpacing: "-0.005em",
+              color: "var(--color-mute-2)",
+              letterSpacing: "0.04em",
             }}
           >
             {dateLabel} 분석
@@ -272,7 +283,7 @@ function MyReportsBlock({ report }: { report: MyReport }) {
 
       <div
         style={{
-          marginTop: 18,
+          marginTop: 14,
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -284,20 +295,20 @@ function MyReportsBlock({ report }: { report: MyReport }) {
           style={{
             display: "flex",
             width: "100%",
-            height: 48,
+            padding: "15px 24px",
             alignItems: "center",
             justifyContent: "center",
             background: "transparent",
-            color: "var(--color-ink)",
-            border: "1px solid rgba(0,0,0,0.15)",
-            fontSize: 13,
+            color: "var(--color-mute)",
+            border: "1.5px solid var(--color-line)",
+            borderRadius: 100,
+            fontSize: 14,
             fontWeight: 500,
-            letterSpacing: "-0.005em",
+            letterSpacing: "-0.01em",
             textDecoration: "none",
-            borderRadius: 0,
           }}
         >
-          📷 사진 다시 올려서 새로 받기
+          사진 다시 올려서 새로 받기
         </Link>
       </div>
     </section>

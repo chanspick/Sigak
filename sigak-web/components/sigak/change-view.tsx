@@ -114,51 +114,52 @@ function ChangeEmpty({ count }: { count: number }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px 28px",
+        padding: "40px 24px",
         gap: 18,
         maxWidth: 420,
         margin: "0 auto",
       }}
     >
       <span
-        className="font-sans uppercase"
+        className="uppercase"
         style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "1.6px",
-          opacity: 0.4,
-          color: "var(--color-ink)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.18em",
+          color: "var(--color-mute)",
         }}
       >
         MONTHLY
       </span>
-      <p
+      <h2
         className="font-serif"
         style={{
           margin: 0,
           fontSize: 22,
-          lineHeight: 1.5,
-          letterSpacing: "-0.01em",
+          fontWeight: 700,
+          lineHeight: 1.45,
+          letterSpacing: "-0.022em",
           color: "var(--color-ink)",
-          opacity: 0.85,
           textAlign: "center",
+          wordBreak: "keep-all",
         }}
       >
         매달 15일,
         <br />
         당신의 결을 정리해드려요
-      </p>
+        <span style={{ color: "var(--color-danger)" }}>.</span>
+      </h2>
       <p
         className="font-sans"
         style={{
           margin: 0,
-          fontSize: 13,
-          lineHeight: 1.75,
-          opacity: 0.6,
+          fontSize: 13.5,
+          lineHeight: 1.7,
+          color: "var(--color-mute)",
           letterSpacing: "-0.005em",
-          color: "var(--color-ink)",
           textAlign: "center",
           maxWidth: 360,
+          wordBreak: "keep-all",
         }}
       >
         변화는 각 월 15일에 여러분의 SIGAK 서비스 경험과 트렌드 변화를
@@ -166,13 +167,13 @@ function ChangeEmpty({ count }: { count: number }) {
       </p>
       {count > 0 && (
         <p
-          className="font-sans tabular-nums"
+          className="tabular-nums"
           style={{
             margin: 0,
+            fontFamily: "var(--font-mono)",
             fontSize: 11,
-            opacity: 0.35,
-            letterSpacing: "-0.005em",
-            color: "var(--color-ink)",
+            color: "var(--color-mute-2)",
+            letterSpacing: "0.04em",
           }}
         >
           지금까지 쌓인 기록 · {count}건
@@ -234,43 +235,47 @@ function ChangeChart({ entries }: { entries: ChangeEntry[] }) {
   const hoverEntry = hoverIdx != null ? entries[hoverIdx] : null;
 
   return (
-    <section style={{ padding: "28px 28px 60px" }}>
+    <section style={{ padding: "28px 24px 60px", maxWidth: 480, margin: "0 auto" }}>
       {/* Header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "baseline",
-          marginBottom: 14,
+          marginBottom: 16,
         }}
       >
         <span
-          className="font-sans uppercase"
+          className="uppercase"
           style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "1.5px",
-            opacity: 0.4,
-            color: "var(--color-ink)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.12em",
+            color: "var(--color-mute)",
           }}
         >
           궤적
         </span>
         <span
-          className="font-serif tabular-nums"
-          style={{ fontSize: 14, color: "var(--color-ink)" }}
+          className="tabular-nums"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--color-mute-2)",
+            letterSpacing: "0.04em",
+          }}
         >
           {entries.length}건
         </span>
       </div>
 
-      {/* Axis toggles */}
+      {/* Axis toggles — pill */}
       <div
         style={{
           display: "flex",
           gap: 8,
           flexWrap: "wrap",
-          marginBottom: 14,
+          marginBottom: 16,
         }}
       >
         {[{ key: "all" as const, label: "ALL", kr: "전체" }, ...AXES].map((a) => {
@@ -283,17 +288,18 @@ function ChangeChart({ entries }: { entries: ChangeEntry[] }) {
               onClick={() => setActive(a.key)}
               className="font-sans"
               style={{
-                padding: "6px 10px",
-                background: isActive ? "var(--color-ink)" : "transparent",
+                padding: "6px 12px",
+                background: isActive ? "var(--color-ink)" : "rgba(0, 0, 0, 0.04)",
                 color: isActive ? "var(--color-paper)" : color,
                 border: isActive
                   ? "1px solid var(--color-ink)"
-                  : "1px solid rgba(0, 0, 0, 0.15)",
+                  : "1px solid var(--color-line-strong)",
+                fontFamily: "var(--font-mono)",
                 fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "1.5px",
+                fontWeight: 500,
+                letterSpacing: "0.06em",
                 cursor: "pointer",
-                borderRadius: 0,
+                borderRadius: 100,
               }}
             >
               {a.label}

@@ -131,3 +131,19 @@ export function listPIv3Versions(): Promise<PIv3VersionsList> {
 export function getPIv3Report(reportId: string): Promise<PIv3Report> {
   return authFetch<PIv3Report>(`/api/v3/pi/${encodeURIComponent(reportId)}`);
 }
+
+// ─────────────────────────────────────────────
+//  DELETE — PI 리포트 + baseline 일괄 삭제 (PI-REVIVE 2026-04-26)
+// ─────────────────────────────────────────────
+
+export interface PIDeleteResponse {
+  deleted: boolean;
+  pi_rows_removed: number;
+  baseline_cleared: boolean;
+}
+
+export function deletePIv3(): Promise<PIDeleteResponse> {
+  return authFetch<PIDeleteResponse>("/api/v3/pi", {
+    method: "DELETE",
+  });
+}

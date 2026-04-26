@@ -1237,3 +1237,78 @@ def get_pi_v3_report(
 
     balance = tokens_service.get_balance(db, user_id)
     return _build_v3_response(report, mode="full", token_balance=balance)
+
+
+# ─────────────────────────────────────────────
+#  DELETE /api/v3/pi  (PI-REVIVE 2026-04-26)
+# ─────────────────────────────────────────────
+
+class PIDeleteResponse(BaseModel):
+    deleted: bool
+    pi_rows_removed: int
+    baseline_cleared: bool
+
+
+@router_v3.delete("", response_model=PIDeleteResponse)
+def delete_pi_v3(
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+) -> PIDeleteResponse:
+    """본인 PI 리포트 전체 + baseline 메타데이터 삭제.
+
+    삭제 대상:
+      - pi_reports WHERE user_id = :uid (모든 version, v1/v2/v3 호환)
+      - users.pi_baseline_r2_key / pi_baseline_uploaded_at = NULL
+      - users.pi_pending = FALSE
+    보존:
+      - R2 baseline 사진 자체 (cleanup job 영역)
+      - vault user_history.pi_history (분석 시계열 자산)
+    결과: 다음 /vision 진입 시 has_baseline=False → BaselineNeededBlock → 처음부터.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    user_id = user["id"]
+
+    # pi_reports 일괄 삭제 (user_id 또는 report_id PK 둘 다 호환)
+    pi_count = 0
+    try:
+        result = db.execute(
+            text("DELETE FROM pi_reports WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+        pi_count = int(result.rowcount or 0)
+    except Exception:
+        logger.exception("PI delete (pi_reports) failed user=%s", user_id)
+        raise HTTPException(500, "PI 리포트 삭제 실패")
+
+    # users baseline 메타데이터 NULL 처리 (alembic 미적용 시 swallow)
+    baseline_cleared = False
+    try:
+        db.execute(
+            text(
+                "UPDATE users SET "
+                "  pi_baseline_r2_key = NULL, "
+                "  pi_baseline_uploaded_at = NULL, "
+                "  pi_pending = FALSE "
+                "WHERE id = :uid"
+            ),
+            {"uid": user_id},
+        )
+        baseline_cleared = True
+    except Exception:
+        logger.warning(
+            "PI delete baseline metadata clear skipped (alembic 미적용?) user=%s",
+            user_id,
+        )
+
+    db.commit()
+    logger.info(
+        "[pi delete] user=%s pi_rows=%d baseline_cleared=%s",
+        user_id, pi_count, baseline_cleared,
+    )
+    return PIDeleteResponse(
+        deleted=(pi_count > 0 or baseline_cleared),
+        pi_rows_removed=pi_count,
+        baseline_cleared=baseline_cleared,
+    )

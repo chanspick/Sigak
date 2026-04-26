@@ -46,3 +46,21 @@ export async function getAspirationAnalysis(
     `${BASE}/${encodeURIComponent(analysisId)}`,
   );
 }
+
+// ─────────────────────────────────────────────
+//  DELETE — 본인 분석 단건 삭제 (PI-REVIVE 2026-04-26)
+// ─────────────────────────────────────────────
+
+export interface AspirationDeleteResponse {
+  deleted: boolean;
+  history_entry_removed: boolean;
+}
+
+export async function deleteAspirationAnalysis(
+  analysisId: string,
+): Promise<AspirationDeleteResponse> {
+  return authFetch<AspirationDeleteResponse>(
+    `${BASE}/${encodeURIComponent(analysisId)}`,
+    { method: "DELETE" },
+  );
+}

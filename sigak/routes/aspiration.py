@@ -497,6 +497,111 @@ def _append_aspiration_history(db, *, user_id: str, analysis) -> None:
         logger.exception("append_aspiration_history failed user=%s", user_id)
 
 
+# ─────────────────────────────────────────────
+#  DELETE /{analysis_id}  (PI-REVIVE 2026-04-26)
+# ─────────────────────────────────────────────
+
+class AspirationDeleteResponse(BaseModel):
+    deleted: bool
+    history_entry_removed: bool
+
+
+@router.delete("/{analysis_id}", response_model=AspirationDeleteResponse)
+def delete_aspiration(
+    analysis_id: str,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+) -> AspirationDeleteResponse:
+    """본인 추구미 분석 단건 삭제. 타 유저 → 403.
+
+    삭제 대상:
+      - aspiration_analyses WHERE id = :id AND user_id = :uid
+      - users.user_history.aspiration_analyses 에서 해당 analysis_id entry 제거
+    보존:
+      - R2 photos / Apify raw / target_analysis_snapshot (cleanup job 영역)
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    # 소유권 검증
+    row = db.execute(
+        text("SELECT user_id FROM aspiration_analyses WHERE id = :id"),
+        {"id": analysis_id},
+    ).first()
+    if row is None:
+        raise HTTPException(404, "분석 결과를 찾을 수 없습니다.")
+    if row.user_id != user["id"]:
+        raise HTTPException(403, "본인 분석이 아닙니다.")
+
+    # row 삭제
+    try:
+        db.execute(
+            text("DELETE FROM aspiration_analyses WHERE id = :id"),
+            {"id": analysis_id},
+        )
+    except Exception:
+        logger.exception("aspiration delete failed user=%s id=%s", user["id"], analysis_id)
+        raise HTTPException(500, "분석 결과 삭제 실패")
+
+    # user_history.aspiration_analyses 에서 entry 제거 (best-effort)
+    history_removed = _remove_aspiration_history_entry(
+        db, user_id=user["id"], analysis_id=analysis_id,
+    )
+
+    db.commit()
+    logger.info(
+        "[aspiration delete] user=%s id=%s history_removed=%s",
+        user["id"], analysis_id, history_removed,
+    )
+    return AspirationDeleteResponse(
+        deleted=True,
+        history_entry_removed=history_removed,
+    )
+
+
+def _remove_aspiration_history_entry(
+    db, *, user_id: str, analysis_id: str,
+) -> bool:
+    """user_history.aspiration_analyses 배열에서 analysis_id 매칭 entry 제거.
+
+    JSONB 함수 사용 (Postgres). 실패 시 swallow + log (메인 삭제 영향 X).
+
+    Returns:
+      True if 1개 이상 entry 제거됨, False 없음/실패.
+    """
+    try:
+        result = db.execute(
+            text(
+                """
+                UPDATE users
+                SET user_history = jsonb_set(
+                    COALESCE(user_history, '{}'::jsonb),
+                    '{aspiration_analyses}',
+                    COALESCE(
+                        (
+                            SELECT jsonb_agg(elem)
+                            FROM jsonb_array_elements(
+                                COALESCE(user_history->'aspiration_analyses', '[]'::jsonb)
+                            ) elem
+                            WHERE elem->>'analysis_id' <> :aid
+                        ),
+                        '[]'::jsonb
+                    )
+                )
+                WHERE id = :uid
+                """
+            ),
+            {"uid": user_id, "aid": analysis_id},
+        )
+        return (result.rowcount or 0) > 0
+    except Exception:
+        logger.exception(
+            "user_history aspiration entry remove failed user=%s id=%s",
+            user_id, analysis_id,
+        )
+        return False
+
+
 def _refund_aspiration(
     db,
     *,

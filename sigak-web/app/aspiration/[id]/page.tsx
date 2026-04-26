@@ -22,7 +22,10 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { ApiError } from "@/lib/api/fetch";
-import { getAspirationAnalysis } from "@/lib/api/aspiration";
+import {
+  deleteAspirationAnalysis,
+  getAspirationAnalysis,
+} from "@/lib/api/aspiration";
 import type {
   AspirationAnalysis,
   MatchedTrendView,
@@ -38,6 +41,27 @@ export default function AspirationResultPage() {
 
   const [analysis, setAnalysis] = useState<AspirationAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (deleting || !analysisId) return;
+    const ok = window.confirm(
+      "이 추구미 분석을 삭제할까요? 사진 비교와 트렌드 매칭이 모두 사라져요.",
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAspirationAnalysis(analysisId);
+      router.replace("/aspiration");
+    } catch (e) {
+      setDeleting(false);
+      setDeleteError(
+        e instanceof Error ? e.message : "삭제에 실패했어요. 잠시 후 다시 시도.",
+      );
+    }
+  }
 
   useEffect(() => {
     if (!analysisId) return;
@@ -195,6 +219,40 @@ export default function AspirationResultPage() {
           >
             홈으로
           </Link>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="font-sans"
+            style={{
+              marginTop: 8,
+              background: "transparent",
+              border: "none",
+              padding: "8px 0",
+              fontSize: 12,
+              color: "var(--color-mute-2)",
+              textDecoration: "underline",
+              cursor: deleting ? "default" : "pointer",
+              opacity: deleting ? 0.55 : 1,
+            }}
+          >
+            {deleting ? "삭제 중..." : "이 분석 삭제"}
+          </button>
+          {deleteError && (
+            <p
+              className="font-sans"
+              role="alert"
+              style={{
+                margin: 0,
+                fontSize: 11,
+                color: "var(--color-danger)",
+                letterSpacing: "-0.005em",
+                textAlign: "center",
+              }}
+            >
+              {deleteError}
+            </p>
+          )}
         </section>
       </main>
 
@@ -319,22 +377,6 @@ function PairHalf({
             이미지 없음
           </div>
         )}
-        <span
-          className="font-sans"
-          style={{
-            position: "absolute",
-            top: 6,
-            left: 6,
-            padding: "2px 8px",
-            background: "rgba(0,0,0,0.6)",
-            color: "#fff",
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-          }}
-        >
-          {label}
-        </span>
       </div>
       {comment && (
         <p
@@ -368,7 +410,7 @@ function MatchedTrendsSection({ trends }: { trends: MatchedTrendView[] }) {
           color: "var(--color-mute)",
         }}
       >
-        이쪽으로 가면 겹치는 결
+        추구미 방향의 트렌드
       </h2>
       <p
         className="font-sans"

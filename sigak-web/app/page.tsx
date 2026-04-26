@@ -15,6 +15,7 @@ import { getCurrentUser, getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
 import { TopBar } from "@/components/ui/sigak";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
+import { AspirationGrid } from "@/components/sigak/aspiration-grid";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
@@ -263,6 +264,8 @@ function LoggedInFeed() {
       {tab === "feed" && (
         <section style={{ padding: "20px 0 0" }}>
           <VerdictGrid />
+          {/* 추구미 분석 이력 — VerdictGrid 와 동일 3-col 패턴, 자체 SectionHeader 내장 */}
+          <AspirationGrid />
         </section>
       )}
       {tab === "sigak" && (

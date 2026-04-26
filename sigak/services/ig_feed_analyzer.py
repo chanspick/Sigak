@@ -28,6 +28,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -77,7 +78,7 @@ def analyze_ig_feed(
     posts: list[IgLatestPost],
     biography: Optional[str],
     *,
-    max_retries: int = 1,
+    max_retries: int = 4,
 ) -> tuple[Optional[IgFeedAnalysis], Optional[str]]:
     """피드 이미지 + 메타 → Sonnet Vision 분석 → (IgFeedAnalysis, raw_text).
 
@@ -86,14 +87,18 @@ def analyze_ig_feed(
       - raw_text = Sonnet response 의 원본 텍스트. caller 가 R2 분리 저장 결정.
       - 정제 IgFeedAnalysis 만 LLM 노출 OK, raw_text 는 LLM 주입 금지.
 
+    PI-REVIVE 2026-04-26: 429 rate limit 강화. Pinterest aspiration 도 본 모듈
+    재사용 (Vision generic). Rate limit 시 exponential backoff 자동 대기.
+
     Args:
         posts: latest_posts. display_url 누락 항목은 자동 제외.
         biography: IG bio (빈 문자열 / None 허용).
-        max_retries: 파싱/검증 실패 시 재시도. default 1.
+        max_retries: 파싱/검증/API 실패 시 재시도. default 4 (= 총 5 attempts).
+            429 rate limit 시 backoff 15s/30s/60s/120s 자동 대기.
 
     Returns:
         (IgFeedAnalysis, raw_text) on success.
-        (None, None) on failure (any exception path).
+        (None, None) on failure (any exception path 또는 retry 소진).
         caller 는 cache.analysis=None 으로 저장하고 Sia 폴백에 맡긴다.
     """
     images = [p for p in posts if p.display_url]
@@ -110,6 +115,8 @@ def analyze_ig_feed(
         n_images=len(images),
     )
 
+    # Rate limit backoff schedule (sec). Anthropic minute-window = 60s, double-safety.
+    backoff_schedule = [15, 30, 60, 120]
     last_error: Optional[Exception] = None
     for attempt in range(max_retries + 1):
         try:
@@ -128,12 +135,45 @@ def analyze_ig_feed(
                 attempt + 1, e,
             )
             continue
+        except anthropic.RateLimitError as e:
+            # 429 — exponential backoff 후 재시도. minute-window 통과 가능.
+            last_error = e
+            if attempt < max_retries:
+                wait_s = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
+                logger.warning(
+                    "ig_feed_analyzer rate limited (attempt %d) — backoff %ds before retry",
+                    attempt + 1, wait_s,
+                )
+                time.sleep(wait_s)
+            else:
+                logger.error(
+                    "ig_feed_analyzer rate limited (attempt %d) — exhausted retries",
+                    attempt + 1,
+                )
+            continue
+        except anthropic.APIStatusError as e:
+            last_error = e
+            status = getattr(e, "status_code", None)
+            if attempt < max_retries:
+                wait_s = (
+                    backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
+                    if status == 429 else min(5 * (attempt + 1), 30)
+                )
+                logger.warning(
+                    "ig_feed_analyzer API status error %s (attempt %d) — backoff %ds",
+                    status, attempt + 1, wait_s,
+                )
+                time.sleep(wait_s)
+            continue
         except anthropic.APIError as e:
             last_error = e
-            logger.warning(
-                "ig_feed_analyzer Sonnet API error (attempt %d): %s",
-                attempt + 1, e,
-            )
+            if attempt < max_retries:
+                wait_s = min(5 * (attempt + 1), 30)
+                logger.warning(
+                    "ig_feed_analyzer API error (attempt %d) — backoff %ds: %s",
+                    attempt + 1, wait_s, e,
+                )
+                time.sleep(wait_s)
             continue
         except Exception as e:
             last_error = e

@@ -310,6 +310,18 @@ function PreviewBestFitGate({
         <>
           <section style={{ padding: "32px 28px 8px" }}>
             <SectionTitle>{`나머지 ${remainingCount}장`}</SectionTitle>
+            <p
+              className="font-sans"
+              style={{
+                margin: "8px 0 0",
+                fontSize: 12,
+                color: "var(--color-mute)",
+                letterSpacing: "-0.005em",
+                lineHeight: 1.55,
+              }}
+            >
+              잠금 영역 · 전체 분석 열기로 해제
+            </p>
           </section>
           <BlurredPhotosGrid
             photoUrls={photoUrls}
@@ -1153,7 +1165,12 @@ function NumbersBlock({ numbers }: { numbers: VerdictNumbers }) {
         }}
       >
         {items.map((it) => (
-          <div key={it.label}>
+          <div
+            key={it.label}
+            style={
+              it.label === "지배 톤" ? { gridColumn: "1 / -1" } : undefined
+            }
+          >
             <dt
               className="font-sans"
               style={{

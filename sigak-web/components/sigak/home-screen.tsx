@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 import { createVerdictV2, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
@@ -122,41 +122,42 @@ export function HomeScreen() {
     >
       <TopBar backTarget="/" />
 
-      {/* Serif 헤드라인 */}
-      <section style={{ padding: "48px 28px 40px" }}>
+      {/* 헤드라인 — 마케터 정합 (Noto Serif 24-26 700 + period accent) */}
+      <section style={{ padding: "44px 24px 32px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <h1
           className="font-serif"
           style={{
-            fontSize: 34,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 24,
+            fontWeight: 700,
+            lineHeight: 1.42,
+            letterSpacing: "-0.022em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          한 장을 골라드립니다.
+          올린 사진 중에<br />
+          한 장 골라드려요
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h1>
         <p
           className="font-sans"
           style={{
-            marginTop: 16,
-            fontSize: 13,
-            opacity: 0.5,
-            lineHeight: 1.6,
-            color: "var(--color-ink)",
+            marginTop: 10,
+            fontSize: 14,
+            color: "var(--color-mute)",
+            lineHeight: 1.65,
+            letterSpacing: "-0.005em",
           }}
         >
-          3~10장 올려주세요.
+          3장 이상 올려주시면 시각이 가장 잘 맞는 한 장을 골라드려요.
         </p>
       </section>
 
-      <Rule />
-
       {/* 사진 섹션 */}
-      <section style={{ padding: "28px 28px 24px" }}>
+      <section style={{ padding: "0 24px 24px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label>사진</Label>
+          <Label>PHOTO</Label>
           <LabelRight>{items.length} / {MAX_PHOTOS}</LabelRight>
         </div>
 
@@ -184,15 +185,33 @@ export function HomeScreen() {
 
       <div style={{ flex: 1 }} />
 
-      {/* CTA */}
-      <div style={{ padding: "20px 28px 24px" }}>
-        <PrimaryButton
+      {/* CTA — 마케터 pill (radius 100) */}
+      <div style={{ padding: "20px 24px 24px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
+        <button
+          type="button"
           onClick={handleStart}
           disabled={!canStart}
-          disabledLabel="3장 이상 올려주세요"
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            width: "100%",
+            padding: "17px 24px",
+            background: canStart ? "var(--color-ink)" : "var(--color-line-strong)",
+            color: canStart ? "var(--color-paper)" : "#fff",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: canStart ? "pointer" : "not-allowed",
+            transition: "all 0.2s ease",
+          }}
         >
-          시작
-        </PrimaryButton>
+          {canStart ? "분석 시작하기 →" : "3장 이상 올려주세요"}
+        </button>
       </div>
 
       {/* 사업자 정보 (PG 심사 필수) */}
@@ -227,42 +246,40 @@ function DropzoneEmpty({ onAdd }: { onAdd: () => void }) {
       style={{
         width: "100%",
         aspectRatio: "16/10",
-        background: "transparent",
-        border: "1px solid rgba(0, 0, 0, 0.15)",
+        background: "rgba(0, 0, 0, 0.04)",
+        border: "1.5px dashed var(--color-line-strong)",
+        borderRadius: 12,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
         fontFamily: "var(--font-sans)",
-        color: "var(--color-ink)",
-        marginTop: 12,
+        color: "var(--color-mute)",
+        marginTop: 10,
         padding: 0,
+        gap: 10,
+        transition: "border-color 0.2s ease, background 0.2s ease",
       }}
     >
-      <div style={{ position: "relative", width: 20, height: 20, marginBottom: 12 }}>
-        <div
-          style={{
-            position: "absolute",
-            top: 9.5,
-            left: 0,
-            width: 20,
-            height: 1,
-            background: "var(--color-ink)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: 9.5,
-            top: 0,
-            width: 1,
-            height: 20,
-            background: "var(--color-ink)",
-          }}
-        />
-      </div>
-      <span style={{ fontSize: 14, fontWeight: 500 }}>사진 올리기</span>
+      <span
+        style={{
+          fontSize: 22,
+          color: "var(--color-mute-2)",
+          lineHeight: 1,
+        }}
+      >
+        +
+      </span>
+      <span
+        style={{
+          fontSize: 13,
+          color: "var(--color-mute)",
+          letterSpacing: "-0.005em",
+        }}
+      >
+        사진 올리기
+      </span>
     </button>
   );
 }
@@ -284,10 +301,10 @@ function DropzoneGrid({
   return (
     <div
       style={{
-        marginTop: 12,
+        marginTop: 10,
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 6,
+        gap: 8,
       }}
     >
       {items.map((it, i) => (
@@ -297,7 +314,9 @@ function DropzoneGrid({
               width: "100%",
               aspectRatio: "1/1",
               overflow: "hidden",
-              background: "rgba(0, 0, 0, 0.04)",
+              background: "rgba(0, 0, 0, 0.06)",
+              borderRadius: 12,
+              border: "1.5px solid var(--color-line-strong)",
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -309,6 +328,7 @@ function DropzoneGrid({
                 height: "100%",
                 objectFit: "cover",
                 display: "block",
+                borderRadius: 10,
               }}
             />
           </div>
@@ -321,14 +341,15 @@ function DropzoneGrid({
             aria-label="삭제"
             style={{
               position: "absolute",
-              top: 6,
-              right: 6,
-              width: 20,
-              height: 20,
+              top: 7,
+              right: 7,
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
               border: "none",
-              background: "var(--color-ink)",
-              color: "var(--color-paper)",
-              fontSize: 10,
+              background: "rgba(45, 45, 45, 0.65)",
+              color: "#fff",
+              fontSize: 12,
               cursor: "pointer",
               padding: 0,
               display: "flex",
@@ -347,37 +368,26 @@ function DropzoneGrid({
           aria-label="사진 추가"
           style={{
             aspectRatio: "1/1",
-            border: "1px solid rgba(0, 0, 0, 0.15)",
-            background: "transparent",
+            border: "1.5px dashed var(--color-line-strong)",
+            background: "rgba(0, 0, 0, 0.04)",
+            borderRadius: 12,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             padding: 0,
+            transition: "border-color 0.2s ease, background 0.2s ease",
           }}
         >
-          <div style={{ position: "relative", width: 14, height: 14 }}>
-            <div
-              style={{
-                position: "absolute",
-                top: 6.5,
-                left: 0,
-                width: 14,
-                height: 1,
-                background: "var(--color-ink)",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                left: 6.5,
-                top: 0,
-                width: 1,
-                height: 14,
-                background: "var(--color-ink)",
-              }}
-            />
-          </div>
+          <span
+            style={{
+              fontSize: 22,
+              color: "var(--color-mute-2)",
+              lineHeight: 1,
+            }}
+          >
+            +
+          </span>
         </button>
       )}
     </div>
@@ -388,29 +398,15 @@ function DropzoneGrid({
 //  Shared small bits
 // ─────────────────────────────────────────────
 
-function Rule() {
-  return (
-    <div
-      style={{
-        height: 1,
-        background: "var(--color-ink)",
-        margin: "0 28px",
-        opacity: 0.15,
-      }}
-    />
-  );
-}
-
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-sans uppercase"
+      className="uppercase"
       style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "1.5px",
-        opacity: 0.4,
-        color: "var(--color-ink)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.12em",
+        color: "var(--color-mute)",
       }}
     >
       {children}
@@ -421,11 +417,12 @@ function Label({ children }: { children: React.ReactNode }) {
 function LabelRight({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-serif tabular-nums"
+      className="tabular-nums"
       style={{
-        fontSize: 14,
-        fontWeight: 400,
-        color: "var(--color-ink)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--color-mute-2)",
+        letterSpacing: "0.04em",
       }}
     >
       {children}

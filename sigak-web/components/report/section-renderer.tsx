@@ -1,12 +1,7 @@
 // 섹션 렌더러 — 섹션 ID에 따라 적절한 섹션 컴포넌트 렌더링.
 //
-// PI v3 9 컴포넌트 (본인 결정 2026-04-25):
-//   raw 3   : cover / celeb_reference / face_structure
-//   vault 3 : type_reference / gap_analysis / skin_analysis
-//   trend 3 : coordinate_map / hair_recommendation / action_plan
-//
-// PI v3 풀 화면은 components/pi-v3/PIv3Screen 이 inline 렌더.
-// 이 파일은 v1/v2 legacy 리포트 흐름 유지 + executive_summary / trend_context 폐기.
+// PI v3 폐기 (PI-REVIVE Phase 5, 2026-04-26). 옛 SIGAK_V3 system 사용.
+// 풀 리포트 = /report/{id}/full + components/report/sections/* (B안 재활용 5개).
 
 import type { AccessLevel, ReportSection } from "@/lib/types/report";
 import { isSectionLocked } from "@/lib/utils/report";

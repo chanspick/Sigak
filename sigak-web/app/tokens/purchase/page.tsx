@@ -123,11 +123,6 @@ function PurchaseContent() {
             title="진단을 보려면."
             subtitle="10 토큰. 충전 후 바로 이어집니다."
           />
-        ) : intent === "unlock_pi" ? (
-          <IntentHeadline
-            title="PI를 확인하려면."
-            subtitle="50 토큰. 충전 후 바로 이어집니다."
-          />
         ) : intent === "blur_release" || intent === "sigak_report" ? (
           <IntentHeadline
             title="가려진 것들을 풀려면."

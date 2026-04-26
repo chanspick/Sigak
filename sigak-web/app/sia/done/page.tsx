@@ -4,10 +4,11 @@
  * query: ?report={report_id}  필수. 없으면 홈으로.
  *   Phase H5 완료 전까지 report_id = sessionId fallback.
  *
- * 4 기능 런칭 스코프: PI 전용 라우트 `/pi/[id]` 미구현.
- *   LoadingSlides 15초 → 정적 완료 페이지 (Best Shot / 추구미 / 홈 cross-link).
- *   리포트 수신/이메일 발송 약속 카피 금지 (인프라 미준비).
- *   PI 통합 시점에 router.replace("/pi/{id}") 로 교체.
+ * PI Revival v5 (2026-04-26): CTA → `/photo-upload` 새 page.
+ *   /sia (대화) → /sia/done (LoadingSlides 15s + CTA)
+ *   → /photo-upload (사진 multipart picker)
+ *   → /api/v1/submit + /api/v1/analyze (옛 SIGAK_V3 시스템)
+ *   → /report/{report_id}/full
  */
 
 "use client";
@@ -46,7 +47,8 @@ function DoneContent() {
 }
 
 function CompletionScreen({ reportId }: { reportId: string }) {
-  // Phase I PI-D: LoadingSlides 끝나면 Sia → PI transition 으로 직진.
+  // PI Revival v5: LoadingSlides 끝나면 Sia → 옛 SIGAK_V3 PI entry 로 직진.
+  // CTA → /photo-upload (multipart picker) → /api/v1/submit + analyze → /report/{id}/full.
   // 정면 사진 한 컷 안내 + 나중에 / 둘러보기 분기.
   return (
     <main
@@ -117,7 +119,7 @@ function CompletionScreen({ reportId }: { reportId: string }) {
         }}
       >
         <Link
-          href={`/pi/upload?next=preview&from_session=${encodeURIComponent(reportId)}`}
+          href={`/photo-upload?from_session=${encodeURIComponent(reportId)}`}
           className="font-sans"
           style={{
             display: "block",

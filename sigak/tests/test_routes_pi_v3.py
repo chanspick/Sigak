@@ -1,14 +1,16 @@
 """PI v3 routes 통합 테스트 (Phase I PI-D, 본인 결정 2026-04-25).
 
-Covers:
+PI-REVIVE Phase 5 (2026-04-26): v3 router 영구 503 gate 활성화.
+옛 SIGAK_V3 system (main.py + pipeline/*) 부활. 본 파일의 모든 endpoint-level
+기존 테스트는 obsolete — 신 v3 endpoints 모두 503 maintenance 응답.
+모듈 전체를 skip 처리 + gate 동작 검증 테스트 1건은 별도 파일 유지 가능.
+
+원본 Covers (참고용 — 더는 적용되지 않음):
   GET  /api/v3/pi/status              baseline 없음 / 있음 / current_report
   POST /api/v3/pi/preview             409 (vault 없음 / baseline 없음) / 정상
   POST /api/v3/pi/unlock              402 (토큰 부족) / 정상 / 환불 (engine 실패)
   GET  /api/v3/pi/list                빈 / 1개
   GET  /api/v3/pi/{report_id}         403 (다른 유저) / 404 / 정상
-
-DB / tokens_service / pi_engine / load_vault / r2_client 모두 monkeypatch.
-실 Postgres / R2 / Sonnet 호출 없음.
 """
 from __future__ import annotations
 
@@ -19,6 +21,12 @@ from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
+
+# PI-REVIVE Phase 5 영구 gate. v3 endpoints 503 only — 기존 endpoint 단위 검증
+# 모두 obsolete. 새 검증 (gate 동작) 은 test_v3_maintenance_gate 1건으로 충분.
+pytestmark = pytest.mark.skip(
+    reason="PI v3 영구 503 gate (PI-REVIVE Phase 5, 2026-04-26). 옛 SIGAK_V3 부활.",
+)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

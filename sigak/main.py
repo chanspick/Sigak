@@ -12,7 +12,7 @@ import os
 import uuid
 import traceback
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -1082,6 +1082,19 @@ def _run_analysis_pipeline(
 #  Report 조회
 # ─────────────────────────────────────────────
 
+def _is_pi_beta_free() -> bool:
+    """BETA 무료 기간 확인. config.beta_free_until 이전이면 True.
+
+    PI-REVIVE Phase 5 (2026-04-26): BETA 기간 동안 옛 SIGAK_V3 system 의
+    풀 리포트 paywall 우회 (access_level → 'full'). config 파싱 실패 시
+    안전 fallback (False = 정상 paywall 흐름).
+    """
+    try:
+        return date.today() < date.fromisoformat(get_settings().beta_free_until)
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
 @app.get("/api/v1/report/{report_id}")
 async def get_report(report_id: str):
     """리포트 조회. report_id 또는 user_id로 접근 가능."""
@@ -1133,7 +1146,12 @@ async def get_report(report_id: str):
 
     if "formatted" in report:
         response = {**report["formatted"]}
-        access = report.get("access_level", "standard")
+        # PI-REVIVE Phase 5 (2026-04-26): BETA 무료 기간 = paywall 우회.
+        # access="full" 강제 → 모든 section.locked=False, paywall 블록 자동 생략.
+        if _is_pi_beta_free():
+            access = "full"
+        else:
+            access = report.get("access_level", "standard")
         response["access_level"] = access
         response["pending_level"] = report.get("pending_level")
         response["user_id"] = report.get("user_id", "")

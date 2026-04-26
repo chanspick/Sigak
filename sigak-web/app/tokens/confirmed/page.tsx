@@ -25,7 +25,6 @@ import { ApiError } from "@/lib/api/fetch";
 import { api } from "@/lib/api/fetch";
 import { releaseBlur, unlockDiagnosis } from "@/lib/api/verdicts";
 import { releaseSigakReport } from "@/lib/api/sigak-report";
-import { unlockPIv3 } from "@/lib/api/pi";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
@@ -37,8 +36,6 @@ type Phase =
   | "sigak_release_failed"    // intent=sigak_report 실패 (deprecated)
   | "diagnosis_unlocked"      // v2 intent=unlock_diagnosis 성공
   | "diagnosis_unlock_failed" // v2 intent=unlock_diagnosis 실패 (토큰 적립됨)
-  | "pi_unlocked"             // v2 intent=unlock_pi 성공
-  | "pi_unlock_failed"        // v2 intent=unlock_pi 실패 (토큰 적립됨)
   | "charged"                 // 일반 충전 완료
   | "failed";                 // payment confirm 자체 실패
 
@@ -49,7 +46,6 @@ function ConfirmedContent() {
   const [phase, setPhase] = useState<Phase>("confirming");
   const [balance, setBalance] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [piReportId, setPiReportId] = useState<string | null>(null);   // v3 unlock 결과
   const executedRef = useRef(false);
 
   // Toss 쿼리
@@ -160,24 +156,6 @@ function ConfirmedContent() {
             e instanceof Error
               ? e.message
               : "진단 해제에 실패했습니다. 판정 페이지에서 다시 시도해 주세요.",
-          );
-        }
-        return;
-      }
-
-      // 2-d. v3 PI: intent=unlock_pi — 50토큰 unlock + 풀 PI 생성 (Phase I PI-D)
-      if (intent === "unlock_pi") {
-        try {
-          const rel = await unlockPIv3();
-          if (rel.token_balance != null) setBalance(rel.token_balance);
-          setPiReportId(rel.report_id);
-          setPhase("pi_unlocked");
-        } catch (e) {
-          setPhase("pi_unlock_failed");
-          setErrorMessage(
-            e instanceof Error
-              ? e.message
-              : "PI 해제에 실패했습니다. 시각 탭에서 다시 시도해 주세요.",
           );
         }
         return;
@@ -353,58 +331,6 @@ function ConfirmedContent() {
           </>
         )}
 
-        {phase === "pi_unlocked" && (
-          <>
-            <h1
-              className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
-            >
-              PI가 열렸습니다.
-            </h1>
-            <p
-              className="font-sans"
-              style={{ marginTop: 16, fontSize: 13, opacity: 0.5, lineHeight: 1.6 }}
-            >
-              결제 완료 · PI 해제 완료.
-            </p>
-            <BalanceRow balance={balance} />
-          </>
-        )}
-
-        {phase === "pi_unlock_failed" && (
-          <>
-            <h1
-              className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
-            >
-              결제는 완료됐어요.
-            </h1>
-            <p
-              className="font-sans"
-              style={{ marginTop: 16, fontSize: 13, opacity: 0.55, lineHeight: 1.7, letterSpacing: "-0.005em" }}
-            >
-              토큰은 적립됐지만 PI 해제 중 오류가 있었어요.
-              <br />
-              시각 탭에서 다시 시도해 주세요.
-            </p>
-            <BalanceRow balance={balance} />
-            {errorMessage && (
-              <p
-                className="font-sans"
-                role="alert"
-                style={{
-                  marginTop: 20,
-                  fontSize: 12,
-                  color: "var(--color-danger)",
-                  letterSpacing: "-0.005em",
-                }}
-              >
-                {errorMessage}
-              </p>
-            )}
-          </>
-        )}
-
         {phase === "sigak_release_failed" && (
           <>
             <h1
@@ -520,24 +446,6 @@ function ConfirmedContent() {
         {phase === "diagnosis_unlock_failed" && verdictId && (
           <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
             판정 페이지로
-          </PrimaryButton>
-        )}
-        {phase === "pi_unlocked" && (
-          <PrimaryButton
-            onClick={() =>
-              router.replace(
-                piReportId
-                  ? `/pi/${encodeURIComponent(piReportId)}`
-                  : "/vision",
-              )
-            }
-          >
-            PI 보러 가기
-          </PrimaryButton>
-        )}
-        {phase === "pi_unlock_failed" && (
-          <PrimaryButton onClick={() => router.replace("/vision")}>
-            시각 탭으로
           </PrimaryButton>
         )}
         {phase === "charged" && (

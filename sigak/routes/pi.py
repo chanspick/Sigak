@@ -49,23 +49,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/pi", tags=["pi"])
 router_v2 = APIRouter(prefix="/api/v2/pi", tags=["pi-v2"])
 def _pi_v3_maintenance_gate() -> None:
-    """PI v3 임시 잠금 — product 본질 검증 미완 (2026-04-26).
+    """PI v3 영구 잠금 — 옛 SIGAK_V3 system 부활 (PI-REVIVE Phase 5, 2026-04-26).
 
-    본인 결정: 9 컴포넌트 풀 렌더링 OK 지만 진단 깊이 부족 / matched_celebs +
-    trend_overlay + styling_trends 빈 inject / UI 가공 부족 → 5천원 가치 미달.
-    재오픈 전 영역:
-      - matched_celebs / trend matching wiring fix (PI-B / PI-C)
-      - Sonnet vision prompt 재작성 (generic → specific)
-      - UI 재설계 (JSON dump → narrative-first)
-      - LIVE probe + 마케터 + 친구 5명 검수
+    본인 결정: 신 PI v3 폐기 + 옛 SIGAK_V3 system (main.py + pipeline/*) 풀 부활.
+    BETA 기간 (config.beta_free_until 이전) = 옛 system 풀 리포트 무료 공개.
+    이후 = 풀 paywall 정상 작동.
 
-    재오픈 시 본 dependency 제거 (router_v3 의 dependencies kwarg 비우기).
+    이 dependency 는 router_v3 모든 엔드포인트에 영구 attach. 재오픈 계획 없음.
     """
     raise HTTPException(
         status_code=503,
         detail=(
-            "시각이 본 당신은 더 정교한 형태로 곧 돌아옵니다. "
-            "그 동안 피드 추천, Best Shot, 추구미 분석을 먼저 써보세요."
+            "PI 시스템 갱신 중. 옛 SIGAK_V3 system (시각이 본 당신) 사용 중. "
+            "/report/{id}/full 에서 풀 리포트 확인 가능."
         ),
     )
 
@@ -73,6 +69,7 @@ def _pi_v3_maintenance_gate() -> None:
 router_v3 = APIRouter(
     prefix="/api/v3/pi",
     tags=["pi-v3"],
+    dependencies=[Depends(_pi_v3_maintenance_gate)],
 )
 
 

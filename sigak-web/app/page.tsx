@@ -12,6 +12,7 @@ import { getKakaoRedirectUri } from "@/lib/kakao";
 import { TopBar } from "@/components/ui/sigak";
 import { FeedShell } from "@/components/sigak/feed-shell";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
+import { AspirationGrid } from "@/components/sigak/aspiration-grid";
 import { FeatureCards } from "@/components/sigak/feature-cards";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
@@ -59,6 +60,7 @@ function LoggedInFeed() {
     >
       <FeedShell verdictCount={verdictCount}>
         <VerdictGrid onTotalChange={setVerdictCount} />
+        <AspirationGrid />
         <FeatureCards />
       </FeedShell>
       <SiteFooter />

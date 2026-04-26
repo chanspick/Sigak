@@ -83,3 +83,22 @@ export interface AspirationStartResponse {
   analysis: AspirationAnalysis | null;
   token_balance: number;
 }
+
+// ─────────────────────────────────────────────
+//  List (피드 그리드용) — GET /api/v2/aspiration
+// ─────────────────────────────────────────────
+
+/** 1행 요약. cover_photo_url 은 photo_pairs[0].target_photo_url. */
+export interface AspirationListItem {
+  analysis_id: string;
+  target_type: AspirationTargetType;
+  target_identifier: string;
+  cover_photo_url: string | null;
+  created_at: string;
+}
+
+export interface AspirationListResponse {
+  analyses: AspirationListItem[];
+  total: number;
+  has_more: boolean;
+}

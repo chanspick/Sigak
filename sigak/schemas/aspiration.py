@@ -128,3 +128,27 @@ class AspirationStartResponse(BaseModel):
     status: Literal["completed", "failed_blocked", "failed_private", "failed_scrape"]
     analysis: Optional[AspirationAnalysis] = None
     token_balance: int
+
+
+class AspirationListItem(BaseModel):
+    """피드 그리드용 — aspiration_analyses 1행 요약.
+
+    cover_photo_url 은 result_data.photo_pairs[0].target_photo_url (추구미 대상
+    사진). 본인 피드와 대비되어 "누구를 분석했는지" 가 한눈에 보이도록.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    analysis_id: str
+    target_type: TargetType
+    target_identifier: str
+    cover_photo_url: Optional[str] = None
+    created_at: str
+
+
+class AspirationListResponse(BaseModel):
+    """추구미 분석 리스트 응답 (created_at DESC)."""
+    model_config = ConfigDict(extra="ignore")
+
+    analyses: list[AspirationListItem]
+    total: int
+    has_more: bool

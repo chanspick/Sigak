@@ -29,6 +29,8 @@ from sqlalchemy.exc import IntegrityError
 from deps import db_session, get_current_user
 from schemas.aspiration import (
     AspirationAnalysis,
+    AspirationListItem,
+    AspirationListResponse,
     AspirationStartResponse,
     TargetType,
 )
@@ -283,6 +285,73 @@ def create_aspiration_pinterest(
         status="completed",
         analysis=result.analysis,
         token_balance=balance_after,
+    )
+
+
+# ─────────────────────────────────────────────
+#  GET /  (list, user-scoped)
+# ─────────────────────────────────────────────
+
+@router.get("", response_model=AspirationListResponse)
+def list_aspirations(
+    limit: int = 30,
+    offset: int = 0,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+) -> AspirationListResponse:
+    """유저 본인의 추구미 분석 리스트. 피드 그리드용.
+
+    created_at DESC. 커버 사진은 photo_pairs[0].target_photo_url (없으면 null).
+    verdict 리스트와 동일 패턴 — 본인만 조회. 무한 스크롤 대비 limit/offset.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+
+    total_row = db.execute(
+        text("SELECT COUNT(*) AS c FROM aspiration_analyses WHERE user_id = :uid"),
+        {"uid": user["id"]},
+    ).first()
+    total = int(total_row.c) if total_row else 0
+
+    rows = db.execute(
+        text(
+            "SELECT id, target_type, target_identifier, result_data, created_at "
+            "FROM aspiration_analyses "
+            "WHERE user_id = :uid "
+            "ORDER BY created_at DESC "
+            "LIMIT :lim OFFSET :off"
+        ),
+        {"uid": user["id"], "lim": limit, "off": offset},
+    ).fetchall()
+
+    items: list[AspirationListItem] = []
+    for row in rows:
+        result_data = row.result_data or {}
+        pairs = result_data.get("photo_pairs") or []
+        cover: Optional[str] = None
+        if isinstance(pairs, list) and pairs:
+            first = pairs[0]
+            if isinstance(first, dict):
+                cover = first.get("target_photo_url") or None
+        created_at_iso = (
+            row.created_at.isoformat() if row.created_at else ""
+        )
+        items.append(
+            AspirationListItem(
+                analysis_id=row.id,
+                target_type=row.target_type,
+                target_identifier=row.target_identifier,
+                cover_photo_url=cover,
+                created_at=created_at_iso,
+            )
+        )
+
+    has_more = (offset + len(items)) < total
+    return AspirationListResponse(
+        analyses=items, total=total, has_more=has_more,
     )
 
 

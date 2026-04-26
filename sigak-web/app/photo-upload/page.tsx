@@ -165,14 +165,8 @@ function PhotoUploadContent() {
     }
   }, [photos, router, fromSession]);
 
-  // 진행 중 화면
+  // 진행 중 화면 — 마케터 redesign/로딩_1815.html 차용 (dotPulse + 로고 + 서브 힌트)
   if (submitting) {
-    const stageLabel =
-      stage === "submit"
-        ? "사진 보내는 중"
-        : stage === "analyze"
-          ? "분석 준비 중"
-          : "처리 중";
     return (
       <main
         style={{
@@ -183,37 +177,95 @@ function PhotoUploadContent() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "60px 28px",
+          padding: "40px 28px",
+          textAlign: "center",
         }}
         aria-busy
       >
+        {/* SIGAK 로고 60x60 */}
+        <svg
+          width="60"
+          height="60"
+          viewBox="0 0 40 40"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ marginBottom: 40 }}
+          aria-hidden
+        >
+          <rect width="40" height="40" rx="7" fill="#1a1a1a" />
+          <g stroke="#ffffff" strokeWidth="1.5" fill="none" strokeLinecap="round">
+            <line x1="20" y1="6" x2="20" y2="13" />
+            <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z" />
+            <circle cx="20" cy="19.5" r="2.6" />
+          </g>
+          <path
+            d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z"
+            fill="#ffffff"
+          />
+        </svg>
+
         <p
-          className="font-sans uppercase"
+          className="font-sans"
           style={{
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: "1.5px",
-            opacity: 0.4,
-            marginBottom: 16,
+            fontSize: 16,
+            color: "var(--color-ink)",
+            opacity: 0.75,
+            lineHeight: 1.7,
+            letterSpacing: "-0.005em",
+            marginBottom: 28,
           }}
         >
-          {stageLabel}
+          sia가 피드를 분석중이에요.
         </p>
-        <h2
-          className="font-serif"
+
+        {/* dot-pulse 3-dot */}
+        <div
           style={{
-            fontSize: 24,
-            fontWeight: 400,
-            lineHeight: 1.4,
-            letterSpacing: "-0.01em",
-            textAlign: "center",
-            maxWidth: 320,
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            marginBottom: 36,
+          }}
+          aria-hidden
+        >
+          <span
+            className="animate-dot-pulse"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--color-danger)",
+            }}
+          />
+          <span
+            className="animate-dot-pulse-delay-1"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--color-danger)",
+            }}
+          />
+          <span
+            className="animate-dot-pulse-delay-2"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--color-danger)",
+            }}
+          />
+        </div>
+
+        <p
+          className="font-sans"
+          style={{
+            fontSize: 12,
+            color: "var(--color-mute)",
+            letterSpacing: "-0.003em",
           }}
         >
-          {stage === "analyze"
-            ? "깊게 들여다보고 있어요.\n최적의 분석을 준비중입니다."
-            : "정면 사진을 받고 있어요."}
-        </h2>
+          최대 30초 정도 걸릴 수 있어요
+        </p>
       </main>
     );
   }
@@ -279,33 +331,56 @@ function PhotoUploadContent() {
           화장은 안 하셔도 분석 가능해요.
         </p>
 
-        {/* 사진 슬롯 그리드 — 정면 1 + 측면 2 */}
+        {/* 사진 슬롯 그리드 — 정면 1 + 측면 2 (마케터 dashed + 슬롯 번호 차용) */}
         <div
           style={{
             marginTop: 32,
             display: "grid",
             gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 12,
+            gap: 10,
           }}
         >
           {Array.from({ length: MAX_PHOTOS }, (_, i) => {
             const photo = photos[i];
             const slotLabels = ["정면", "측면 1", "측면 2"];
+            const slotNum = `0${i + 1}`;
+            const filled = !!photo;
             return (
               <div
                 key={i}
                 style={{
                   aspectRatio: "3 / 4",
-                  border: "1px solid var(--color-line-strong)",
+                  borderRadius: 12,
+                  border: filled
+                    ? "1.5px solid var(--color-line-strong)"
+                    : "1.5px dashed var(--color-line-strong)",
+                  background: filled ? "transparent" : "rgba(0, 0, 0, 0.04)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
                   overflow: "hidden",
                   position: "relative",
-                  background: "var(--color-paper)",
+                  transition: "border-color 0.2s ease, background 0.2s ease",
                 }}
               >
+                {/* 슬롯 번호 (좌상단) */}
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    left: 12,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.14em",
+                    color: filled ? "rgba(255,255,255,0.85)" : "var(--color-mute-2)",
+                    textShadow: filled ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                    zIndex: 1,
+                  }}
+                >
+                  {slotNum}
+                </span>
+
                 {photo ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -316,6 +391,7 @@ function PhotoUploadContent() {
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
+                        borderRadius: 10,
                       }}
                     />
                     <button
@@ -325,19 +401,19 @@ function PhotoUploadContent() {
                       aria-label={`${slotLabels[i]} 사진 제거`}
                       style={{
                         position: "absolute",
-                        top: 6,
-                        right: 6,
+                        top: 7,
+                        right: 7,
                         width: 22,
                         height: 22,
                         borderRadius: "50%",
                         border: 0,
-                        background: "rgba(0,0,0,0.55)",
+                        background: "rgba(45,45,45,0.65)",
                         color: "#fff",
-                        fontSize: 11,
+                        fontSize: 12,
                         cursor: "pointer",
                       }}
                     >
-                      ×
+                      ✕
                     </button>
                     <button
                       type="button"
@@ -349,8 +425,9 @@ function PhotoUploadContent() {
                         left: 6,
                         right: 6,
                         padding: "4px 0",
+                        borderRadius: 6,
                         border: 0,
-                        background: "rgba(0,0,0,0.55)",
+                        background: "rgba(45,45,45,0.65)",
                         color: "#fff",
                         fontSize: 10,
                         letterSpacing: "0.3px",
@@ -377,35 +454,52 @@ function PhotoUploadContent() {
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: 6,
+                      gap: 8,
                     }}
                   >
-                    <span style={{ fontSize: 24, opacity: 0.3 }}>+</span>
+                    <span style={{ fontSize: 22, color: "var(--color-mute-2)", lineHeight: 1 }}>
+                      +
+                    </span>
                     <span
                       style={{
                         fontSize: 11,
-                        opacity: 0.5,
+                        color: "var(--color-mute)",
                         letterSpacing: "-0.005em",
                       }}
                     >
                       {slotLabels[i]}
                     </span>
-                    {i === 0 && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          opacity: 0.4,
-                          letterSpacing: "-0.005em",
-                        }}
-                      >
-                        필수
-                      </span>
-                    )}
                   </button>
                 )}
               </div>
             );
           })}
+        </div>
+
+        {/* count-dot 3개 (마케터 차용) */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 14,
+          }}
+          aria-hidden
+        >
+          {Array.from({ length: MAX_PHOTOS }, (_, i) => (
+            <span
+              key={i}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background:
+                  i < photos.length ? "var(--color-danger)" : "var(--color-line-strong)",
+                transition: "background 0.2s ease",
+              }}
+            />
+          ))}
         </div>
 
         <input
@@ -433,15 +527,16 @@ function PhotoUploadContent() {
         )}
       </section>
 
-      {/* 제출 영역 */}
+      {/* 제출 영역 — 마케터 pill CTA + BETA 무료 라벨 */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 8,
+          gap: 4,
           marginInline: "auto",
           maxWidth: 380,
           width: "100%",
+          marginTop: 28,
         }}
       >
         <button
@@ -450,36 +545,55 @@ function PhotoUploadContent() {
           disabled={photos.length === 0 || submitting}
           className="font-sans"
           style={{
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
             width: "100%",
-            padding: "18px 22px",
+            padding: "17px 24px",
             border: 0,
+            borderRadius: 100,
             background:
               photos.length === 0 ? "var(--color-line-strong)" : "var(--color-ink)",
             color: "var(--color-paper)",
             fontSize: 15,
             fontWeight: 600,
-            letterSpacing: "-0.005em",
+            letterSpacing: "-0.012em",
             cursor:
               photos.length === 0 || submitting ? "not-allowed" : "pointer",
-            opacity: photos.length === 0 ? 0.5 : 1,
+            transition: "all 0.25s ease",
           }}
         >
-          {photos.length === 0 ? "정면 한 장만 있어도 시작" : "분석 시작"}
+          {photos.length === 0
+            ? "사진을 1장 이상 올려주세요"
+            : "정밀 분석 시작하기 →"}
         </button>
+        <p
+          className="font-sans"
+          style={{
+            textAlign: "center",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            letterSpacing: "0.08em",
+            color: "var(--color-mute)",
+            marginTop: 10,
+            minHeight: 16,
+          }}
+        >
+          BETA 기간 무료
+        </p>
         <a
           href="/"
           className="font-sans"
           style={{
             display: "block",
-            height: 48,
-            lineHeight: "48px",
+            height: 44,
+            lineHeight: "44px",
             textAlign: "center",
             fontSize: 13,
             fontWeight: 500,
             letterSpacing: "0.3px",
-            opacity: 0.5,
-            color: "var(--color-ink)",
+            color: "var(--color-mute)",
             textDecoration: "none",
             marginTop: 4,
           }}

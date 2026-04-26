@@ -7,7 +7,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { useTokenBalance } from "@/hooks/use-token-balance";
@@ -775,11 +775,11 @@ const CHAT_DEMO_FADE = 350;
 const CHAT_DEMO_AFTER_FADE = 960;
 
 function ChatDemo() {
-  // tick 으로 cycle 재생 — cycleKey 의 strict mode race 회피.
-  // 재귀 setTimeout (runCycle) 으로 무한 반복.
+  // 카톡창 패턴 — 첫 메시지가 컨테이너 맨 위에 등장하고 새 메시지가 아래로 추가.
+  // height fixed + overflow scroll 방식 X (위 메시지 잘림 — 본인 보고 2026-04-26).
+  // conditional render (slice(0, visibleCount)) 로 메시지가 점진적으로 mount.
   const [visibleCount, setVisibleCount] = useState(0);
   const [hidden, setHidden] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -791,7 +791,6 @@ function ChatDemo() {
     function runCycle(): void {
       if (cancelled) return;
 
-      // 즉시 reset → 다음 paint 부터 메시지 등장
       setVisibleCount(0);
       setHidden(false);
 
@@ -803,7 +802,6 @@ function ChatDemo() {
         timers.push(t);
       });
 
-      // PAUSE 후 fadeOut
       timers.push(
         setTimeout(() => {
           if (cancelled) return;
@@ -811,7 +809,6 @@ function ChatDemo() {
         }, lastDelay + CHAT_DEMO_PAUSE),
       );
 
-      // AFTER_FADE 후 다음 cycle (재귀)
       timers.push(
         setTimeout(() => {
           if (cancelled) return;
@@ -820,55 +817,39 @@ function ChatDemo() {
       );
     }
 
-    // mount 즉시 첫 cycle 시작 — paint 사이클 후 첫 메시지 (300ms 시점)
     runCycle();
 
     return () => {
       cancelled = true;
       timers.forEach((t) => clearTimeout(t));
     };
-    // mount-only — strict mode double invocation 시에도 cancelled flag 로 안전.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 새 메시지 등장 시 자동 스크롤 (카톡창처럼 아래로 내려옴)
-  // overflowY: auto 라야 scrollTop 작동.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [visibleCount]);
 
   return (
     <div
       style={{
-        position: "relative",
-        height: 360,
         background: "rgba(0, 0, 0, 0.04)",
         borderRadius: 14,
         padding: "20px 18px",
-        overflow: "hidden",
       }}
     >
       <div
-        ref={scrollRef}
-        className="hide-scrollbar"
         style={{
-          height: "100%",
-          overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           gap: 7,
           opacity: hidden ? 0 : 1,
           transition: `opacity ${CHAT_DEMO_FADE}ms ease`,
-          pointerEvents: "none",
+          minHeight: 60,
         }}
       >
-        {CHAT_DEMO_MESSAGES.map((msg, i) => {
+        {CHAT_DEMO_MESSAGES.slice(0, visibleCount).map((msg, i) => {
           const isAi = msg.side === "ai";
-          const visible = i < visibleCount;
           return (
             <div
               key={i}
+              className="animate-bubble-in"
               style={{
                 alignSelf: isAi ? "flex-start" : "flex-end",
                 maxWidth: isAi ? "78%" : "74%",
@@ -880,10 +861,6 @@ function ChatDemo() {
                 lineHeight: 1.55,
                 whiteSpace: "pre-line",
                 flexShrink: 0,
-                opacity: visible ? 1 : 0,
-                transform: visible ? "scale(1)" : "scale(0.87)",
-                transition:
-                  "opacity 280ms cubic-bezier(0.34, 1.45, 0.64, 1), transform 280ms cubic-bezier(0.34, 1.45, 0.64, 1)",
               }}
             >
               {msg.text}

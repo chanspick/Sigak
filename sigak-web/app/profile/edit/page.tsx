@@ -27,25 +27,23 @@ export default function ProfileEditPage() {
       router.replace("/auth/login?next=/profile/edit");
       return;
     }
-    // 1) localStorage 의 ig_handle 즉시 반영 (체감 latency ↓)
+    // 1) localStorage 의 ig_handle 즉시 반영 (체감 latency ↓) — 표시용만
     const u = getCurrentUser();
     const localHandle = (u && (u as { ig_handle?: string }).ig_handle) || null;
     if (localHandle) {
       setCurrentIg(localHandle);
-      setIgInput(localHandle);
     }
     // 2) backend 에서 정확한 ig_handle 재조회 후 갱신
+    // input 은 default 빈 (사용자가 새 핸들 직접 입력)
     (async () => {
       try {
         const me = await getMe();
         const handle = (me as { ig_handle?: string | null }).ig_handle ?? null;
         setCurrentIg(handle);
-        setIgInput(handle || "");
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           router.replace("/auth/login");
         }
-        // 그 외는 localStorage 값 유지
       }
     })();
   }, [router]);
@@ -64,7 +62,7 @@ export default function ProfileEditPage() {
         ig_handle: normalized || null,
       });
       setCurrentIg(res.ig_handle);
-      setIgInput(res.ig_handle || "");
+      setIgInput("");  // 저장 후 입력 비움 — "현재 핸들" 카드만 갱신
       if (res.ig_fetch_status === "pending") {
         setSavedMessage(
           "새 인스타그램 정보를 가져오고 있어요. 잠시 후 분석에 반영돼요.",
@@ -128,24 +126,40 @@ export default function ProfileEditPage() {
           </p>
         </header>
 
-        <section style={{ marginBottom: 28 }}>
-          <Label>INSTAGRAM 핸들</Label>
-          {currentIg && (
-            <p
-              className="tabular-nums"
-              style={{
-                margin: "6px 0 12px",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--color-mute-2)",
-                letterSpacing: "0.04em",
-              }}
-            >
-              현재: @{currentIg}
-            </p>
-          )}
+        {/* 현재 핸들 카드 — 큰 글자로 표시 (read only) */}
+        <section style={{ marginBottom: 24 }}>
+          <Label>현재 핸들</Label>
           <div
             style={{
+              marginTop: 8,
+              padding: "18px 22px",
+              background: "rgba(0, 0, 0, 0.04)",
+              border: "1px solid var(--color-line)",
+              borderRadius: 14,
+            }}
+          >
+            <p
+              className="font-serif tabular-nums"
+              style={{
+                margin: 0,
+                fontSize: 20,
+                fontWeight: 500,
+                color: currentIg ? "var(--color-ink)" : "var(--color-mute-2)",
+                letterSpacing: "-0.018em",
+                wordBreak: "break-all",
+              }}
+            >
+              {currentIg ? `@${currentIg}` : "등록된 핸들이 없어요"}
+            </p>
+          </div>
+        </section>
+
+        {/* 새 핸들 입력 — input form */}
+        <section style={{ marginBottom: 28 }}>
+          <Label>새 핸들로 변경</Label>
+          <div
+            style={{
+              marginTop: 8,
               display: "flex",
               alignItems: "center",
               border: "1px solid var(--color-line-strong)",

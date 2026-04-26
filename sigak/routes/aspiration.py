@@ -140,11 +140,29 @@ def create_aspiration_ig(
         db.rollback()
         raise HTTPException(500, "토큰 차감 중복 경합 — 재시도 해주세요.")
 
-    # 엔진 실행 — Phase J5: profile (vault 5/5) + user_name 흘림
-    # Phase J6: 본인 IgFeedAnalysis 도 흘려 narrative 도출 근거 풀어쓰기 가능.
+    # 엔진 실행 — v2 (Sonnet cross-analysis):
+    #   - profile (vault 5/5) + user_name + 본인 IgFeedAnalysis 흘림
+    #   - history_context (Sia / Verdict / Best Shot / Aspiration / PI 이전 세션)
+    #     로 vault 풀 데이터 narrative 안에 echo 강제 (Verdict v2 패턴 차용).
     user_ig_analysis = (
         vault.ig_feed_cache.get("analysis") if vault.ig_feed_cache else None
     )
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=[
+                "conversations", "verdict_sessions", "best_shot_sessions",
+                "aspiration_analyses", "pi_history",
+            ],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception(
+            "aspiration ig history_injector failed user=%s", user["id"],
+        )
+
     result: AspirationRunResult = run_aspiration_ig(
         db,
         user_id=user["id"],
@@ -155,6 +173,7 @@ def create_aspiration_ig(
         profile=user_profile,
         user_name=vault.basic_info.name,
         user_analysis_snapshot=user_ig_analysis,
+        history_context=history_context,
     )
 
     # 실패 정책 — 수집 실패면 환불
@@ -257,6 +276,22 @@ def create_aspiration_pinterest(
     user_ig_analysis = (
         vault.ig_feed_cache.get("analysis") if vault.ig_feed_cache else None
     )
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=[
+                "conversations", "verdict_sessions", "best_shot_sessions",
+                "aspiration_analyses", "pi_history",
+            ],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception(
+            "aspiration pinterest history_injector failed user=%s", user["id"],
+        )
+
     result = run_aspiration_pinterest(
         db,
         user_id=user["id"],
@@ -267,6 +302,7 @@ def create_aspiration_pinterest(
         profile=user_profile,
         user_name=vault.basic_info.name,
         user_analysis_snapshot=user_ig_analysis,
+        history_context=history_context,
     )
 
     if result.status != "completed" or result.analysis is None:

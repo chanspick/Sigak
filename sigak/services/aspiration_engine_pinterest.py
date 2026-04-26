@@ -24,11 +24,14 @@ from typing import Optional
 
 import httpx
 
-from schemas.aspiration import AspirationAnalysis
+from schemas.aspiration import (
+    AspirationAnalysis,
+    AspirationNumbers,
+    AspirationRecommendation,
+)
 from schemas.user_profile import IgLatestPost
 from schemas.user_taste import UserTasteProfile
 from services.aspiration_common import (
-    compose_overall_message,
     derive_coordinate_from_analysis,
     generate_analysis_id,
     is_blocked,
@@ -37,8 +40,15 @@ from services.aspiration_common import (
     select_photo_pairs,
 )
 from services.aspiration_engine_ig import AspirationRunResult, _ensure_profile
+from services.aspiration_engine_sonnet import (
+    AspirationV2Error,
+    PhotoInput as SonnetPhotoInput,
+    build_aspiration_v2_fallback,
+    compose_aspiration_v2,
+)
 from services.coordinate_system import GapVector, VisualCoordinate, neutral_coordinate
 from services.ig_feed_analyzer import analyze_ig_feed
+from services.knowledge_matcher import match_trends_for_user
 from config import get_settings
 
 
@@ -65,6 +75,7 @@ def run_aspiration_pinterest(
     profile: Optional[UserTasteProfile] = None,
     user_name: Optional[str] = None,
     user_analysis_snapshot: Optional[dict] = None,
+    history_context: str = "",
 ) -> AspirationRunResult:
     """Pinterest 보드 URL → AspirationAnalysis + narrative.
 
@@ -140,28 +151,62 @@ def run_aspiration_pinterest(
         max_pairs=5,
     )
 
-    # 7. Knowledge Base 매칭
-    matched_trend_ids = match_trends_for_aspiration_direction(
-        gap=gap,
-        user_coord=user_coord,
-        gender=user_gender or "female",
-    )
-
-    # 8. Sia 종합 narrative — Phase J5: Haiku + vault 5/5 + JSON dict
-    # board_meta.board_name 우선, 없으면 "Pinterest 보드" fallback.
+    # 7. Knowledge Base 매칭 — 카테고리 다양성 강제 (mood / silhouette /
+    #    color / styling_method spirit 다 흘러가도록).
     pre_display_name = board_meta.get("board_name") or "Pinterest 보드"
     effective_profile = _ensure_profile(profile, user_id, user_coord)
-    target_snapshot_dump = target_analysis.model_dump(mode="json")
-    narrative = compose_overall_message(
-        target_display_name=pre_display_name,
-        gap_vector=gap,
-        profile=effective_profile,
-        target_analysis_snapshot=target_snapshot_dump,
-        user_analysis_snapshot=user_analysis_snapshot,
-        matched_trends=None,                 # routes 에서 KB hydrate (저장 후)
-        user_name=user_name,
-        photo_pairs=[p.model_dump() for p in pairs],
+    gender_norm = user_gender if user_gender in ("female", "male") else "female"
+    matched_trends_objs = match_trends_for_user(
+        effective_profile,
+        gender=gender_norm,   # type: ignore[arg-type]
+        season=None,
+        limit=5,
     )
+    matched_trend_ids = [m.trend.trend_id for m in matched_trends_objs]
+
+    # 8. Sonnet 4.6 cross-analysis (Verdict v2 패턴) — 단일 호출에 풀 컨텍스트
+    target_snapshot_dump = target_analysis.model_dump(mode="json")
+    user_photo_inputs: list[SonnetPhotoInput] = [
+        {"url": p.display_url} for p in user_posts_effective if p.display_url
+    ][:5]
+    target_photo_inputs: list[SonnetPhotoInput] = [
+        {"url": p.display_url} for p in synthetic_posts if p.display_url
+    ][:5]
+
+    try:
+        sonnet_result = compose_aspiration_v2(
+            user_id=user_id,
+            user_name=user_name,
+            user_photos=user_photo_inputs,
+            target_photos=target_photo_inputs,
+            target_display_name=pre_display_name,
+            target_type="pinterest",
+            gap_vector_dump=gap.model_dump(mode="json"),
+            user_analysis_snapshot=user_analysis_snapshot,
+            target_analysis_snapshot=target_snapshot_dump,
+            taste_profile=effective_profile,
+            matched_trends=matched_trends_objs,
+            history_context=history_context,
+        )
+    except AspirationV2Error:
+        logger.exception(
+            "aspiration v2 sonnet failed user=%s board=%s — fallback dict",
+            user_id, board_id,
+        )
+        sonnet_result = build_aspiration_v2_fallback(
+            user_name=user_name,
+            target_display_name=pre_display_name,
+            gap_vector_dump=gap.model_dump(mode="json"),
+            pair_n=len(pairs),
+        )
+
+    # 8-b. pair_comment 채움
+    pair_comments = sonnet_result.get("photo_pair_comments") or []
+    for i in range(len(pairs)):
+        if i < len(pair_comments) and pair_comments[i]:
+            pairs[i] = pairs[i].model_copy(update={
+                "pair_comment": pair_comments[i],
+            })
 
     # 9. R2 materialization — Pinterest 이미지 영구 저장 (analysis_id 선행 발급)
     analysis_id = generate_analysis_id()
@@ -191,7 +236,38 @@ def run_aspiration_pinterest(
         user_name=user_name,
     )
 
-    # 10. 조립
+    # 10. v2 신규 필드 매핑 — recommendation / numbers
+    rec_dump = sonnet_result.get("recommendation") or {}
+    recommendation = None
+    if isinstance(rec_dump, dict) and rec_dump.get("style_direction"):
+        try:
+            recommendation = AspirationRecommendation(
+                style_direction=str(rec_dump.get("style_direction") or ""),
+                next_action=str(rec_dump.get("next_action") or ""),
+                why=str(rec_dump.get("why") or ""),
+            )
+        except Exception:
+            logger.warning("recommendation parse failed user=%s", user_id)
+
+    numbers_dump = sonnet_result.get("numbers") or {}
+    numbers = None
+    if isinstance(numbers_dump, dict):
+        try:
+            primary_axis_raw = str(numbers_dump.get("primary_axis") or "shape")
+            if primary_axis_raw not in ("shape", "volume", "age"):
+                primary_axis_raw = gap.primary_axis
+            alignment_raw = str(numbers_dump.get("alignment") or "보통")
+            if alignment_raw not in ("근접", "보통", "상충"):
+                alignment_raw = "보통"
+            numbers = AspirationNumbers(
+                primary_axis=primary_axis_raw,   # type: ignore[arg-type]
+                primary_delta=float(numbers_dump.get("primary_delta") or 0.0),
+                alignment=alignment_raw,         # type: ignore[arg-type]
+            )
+        except Exception:
+            logger.warning("numbers parse failed user=%s", user_id)
+
+    # 11. AspirationAnalysis 조립 (v2 새 필드 포함)
     analysis = AspirationAnalysis(
         analysis_id=analysis_id,
         user_id=user_id,
@@ -202,9 +278,15 @@ def run_aspiration_pinterest(
         user_coordinate=user_coord,
         target_coordinate=target_coord,
         gap_vector=gap,
-        gap_narrative=(narrative.get("gap_summary") or gap.narrative()),
+        gap_narrative=str(sonnet_result.get("gap_narrative") or gap.narrative()),
         photo_pairs=pairs_persisted,
-        sia_overall_message=narrative["overall_message"],
+        best_fit_pair_index=sonnet_result.get("best_fit_pair_index"),
+        hook_line=str(sonnet_result.get("hook_line") or "") or None,
+        sia_overall_message=str(
+            sonnet_result.get("sia_overall_message") or ""
+        ),
+        recommendation=recommendation,
+        numbers=numbers,
         matched_trend_ids=matched_trend_ids,
         target_analysis_snapshot=target_snapshot_dump,
         images_captured_count=len(image_urls),
@@ -214,12 +296,17 @@ def run_aspiration_pinterest(
         matched_trends_snapshot=matched_trends_snapshot,
     )
 
-    # narrative 에 분석 시점 vault 5 필드 메타 추가 (사용자 명령서 6-B)
-    narrative_persisted = dict(narrative)
-    narrative_persisted["user_original_phrases_at_time"] = list(
-        effective_profile.user_original_phrases
-    )
-    narrative_persisted["strength_score_at_time"] = effective_profile.strength_score
+    # narrative 휘발 방지 — raw_sonnet_response + 분석 시점 vault 메타 보존
+    narrative_persisted = {
+        "raw_sonnet_response": sonnet_result.get("raw_sonnet_response") or "",
+        "user_original_phrases_at_time": list(
+            effective_profile.user_original_phrases
+        ),
+        "strength_score_at_time": effective_profile.strength_score,
+        "matched_trends_used": [
+            m.trend.trend_id for m in matched_trends_objs
+        ],
+    }
 
     return AspirationRunResult(
         "completed",

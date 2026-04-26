@@ -119,13 +119,18 @@ def select_photo_pairs(
     *,
     max_pairs: int = 5,
 ) -> list[PhotoPair]:
-    """본인 × 대상 사진을 쌍으로 묶어 3~5 쌍 반환.
+    """본인 × 대상 사진 1:1 인덱스 매칭 페어 (3-5쌍).
 
-    MVP 전략 (단순, Phase J 이후 Sonnet Vision 세밀 매칭으로 업그레이드 가능):
+    v2 (Sonnet cross-analysis) — stub writer 호출 폐기. PhotoPair 는
+    URL 만 채워진 빈 shell. ``aspiration_engine_sonnet.compose_aspiration_v2``
+    결과의 ``photo_pair_comments[i]`` 가 호출자에서 ``pair_comment`` 에 채워짐.
+    ``user_sia_comment`` / ``target_sia_comment`` 는 schemas default ""
+    유지 (v1.5 호환만, 새 프론트는 사용 X).
+
+    MVP 전략:
       - user_posts 에서 display_url 있는 것 중 앞 max_pairs 장
       - target_posts 에서 display_url 있는 것 중 앞 max_pairs 장
-      - 1:1 인덱스 매칭
-      - pair_axis_hint 는 gap.primary_axis 고정 (3-5쌍 모두 주 이동축 강조)
+      - 1:1 인덱스 매칭. Phase 후속에서 Sonnet Vision 세밀 매칭 가능.
     """
     user_urls = [p.display_url for p in user_posts if p.display_url][:max_pairs]
     target_urls = [p.display_url for p in target_posts if p.display_url][:max_pairs]
@@ -134,37 +139,15 @@ def select_photo_pairs(
     if n < 1:
         return []
 
-    writer = get_sia_writer()
-    # Stub writer 는 photo 별 코멘트를 간단 생성. Phase H+I 에서 Haiku 기반 풍부화.
     pairs: list[PhotoPair] = []
     for i in range(n):
         pairs.append(PhotoPair(
             user_photo_url=user_urls[i],
-            user_sia_comment=writer.generate_comment_for_photo(
-                photo_url=user_urls[i],
-                photo_context={"category": "user", "rank": i, "gap_axis": gap.primary_axis},
-                profile=_empty_profile(),
-            ),
             target_photo_url=target_urls[i],
-            target_sia_comment=writer.generate_comment_for_photo(
-                photo_url=target_urls[i],
-                photo_context={"category": "target", "rank": i, "gap_axis": gap.primary_axis},
-                profile=_empty_profile(),
-            ),
-            # pair_axis_hint hide — 5쌍 동일 라벨 반복은 noise. 도출 근거는
-            # gap_narrative / sia_overall_message 가 이미 풀어 설명함.
+            pair_comment=None,
             pair_axis_hint=None,
         ))
-
     return pairs
-
-
-def _empty_profile() -> UserTasteProfile:
-    """Stub writer 에 넣을 최소 profile — 실 구현 Phase H/I 에서 교체."""
-    return UserTasteProfile(
-        user_id="stub",
-        snapshot_at=datetime.now(timezone.utc),
-    )
 
 
 # ─────────────────────────────────────────────

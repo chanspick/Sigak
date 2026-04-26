@@ -39,16 +39,53 @@ class AspirationRequest(BaseModel):
 
 
 class PhotoPair(BaseModel):
-    """좌우 병치 1 쌍 — 본인 vs 추구미."""
+    """좌우 병치 1 쌍 — 본인 vs 추구미.
+
+    v2 (Sonnet cross-analysis) 부터 ``pair_comment`` 단일 필드가 main —
+    페어 단위 비교 한 줄. 기존 ``user_sia_comment`` / ``target_sia_comment``
+    는 v1.5 dual stub 호환 위해 Optional 유지. 새 엔진은 둘은 빈 문자열,
+    pair_comment 에 narrative 채움.
+    """
     model_config = ConfigDict(extra="ignore")
 
     user_photo_url: str
-    user_sia_comment: str
+    user_sia_comment: str = ""
 
     target_photo_url: str
-    target_sia_comment: str
+    target_sia_comment: str = ""
+
+    # v2 — 페어 단위 비교 narrative (본인 vs 추구미 한 쌍에서 읽히는 결 차이)
+    pair_comment: Optional[str] = None
 
     pair_axis_hint: Optional[str] = None   # 예: "shape 차이 강조"
+
+
+class AspirationRecommendation(BaseModel):
+    """v2 — 추구미 이동 권장 한 단락. Verdict v2.recommendation 패턴 차용.
+
+    style_direction / next_action / why 3 필드. 트렌드 카드 별도 노출 X —
+    matched_trends spirit 을 why 안에 자연스럽게 흡수 ("숫자/출처 노출 없이
+    내러티브로 녹임"). LLM hard rule 로 trend_id / score / 카테고리 라벨
+    출력 금지.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    style_direction: str    # 1-2 문장 — 추구미 쪽으로 어떤 결의 이동인지
+    next_action: str        # 1-2 문장 — 한 걸음 행동 ("다음 피드에 X 한 컷")
+    why: str                # 1-2 문장 — 왜 이 방향 (트렌드 spirit 흡수)
+
+
+class AspirationNumbers(BaseModel):
+    """v2 — 좌표 / alignment 메타. UI 보조 표시용.
+
+    Verdict v2.full_content.numbers 패턴 차용. primary_axis 만 명시 (3축
+    중 가장 큰 갭). UI 에서 "분위기 축에서 한 칸" 같은 칩에 활용.
+    """
+    model_config = ConfigDict(extra="ignore")
+
+    primary_axis: Literal["shape", "volume", "age"]
+    primary_delta: float                                       # -1.0 ~ +1.0
+    alignment: Literal["근접", "보통", "상충"]
 
 
 class AspirationAnalysis(BaseModel):
@@ -67,17 +104,31 @@ class AspirationAnalysis(BaseModel):
     user_coordinate: Optional[VisualCoordinate] = None
     target_coordinate: VisualCoordinate
     gap_vector: GapVector
-    gap_narrative: str                 # GapVector.narrative() 결과 선 저장
+    gap_narrative: str                 # v2 — Sonnet 4-5문장 본인 vs 추구미 비교
 
     # ── 좌우 병치 (3~5 쌍)
     photo_pairs: list[PhotoPair] = Field(default_factory=list)
 
+    # v2 — 가장 의미있는 1쌍 강조 (UI 첫 노출 또는 highlight). Verdict
+    # best_fit_photo_index 패턴 차용. None = 미선정.
+    best_fit_pair_index: Optional[int] = None
+
+    # v2 — 30자 이내 한 줄 통찰 (gap 직접 명시). Verdict preview.hook_line 패턴.
+    hook_line: Optional[str] = None
+
     # ── Sia 종합 메시지
     sia_overall_message: str
 
-    # ── Knowledge Base 매칭
+    # v2 — 추구미 이동 권장 (트렌드 spirit 흡수)
+    recommendation: Optional[AspirationRecommendation] = None
+
+    # v2 — 좌표/alignment 메타 (UI 칩 보조)
+    numbers: Optional[AspirationNumbers] = None
+
+    # ── Knowledge Base 매칭 (v2: prompt 컨텍스트로만 사용 — 응답 노출 X)
+    # matched_trend_ids / matched_trends 는 v1.5 호환 위해 필드 유지.
+    # 새 프론트는 사용 X (Recommendation 안에 흡수). DB row 영속 호환만.
     matched_trend_ids: list[str] = Field(default_factory=list)
-    # STEP 11 — 프론트 노출용 trend 객체 (읽기 시 KB 에서 hydrate, 저장 생략 가능)
     matched_trends: list["MatchedTrendView"] = Field(default_factory=list)
 
     # ── 디버그/추적용 raw

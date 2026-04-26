@@ -28,10 +28,25 @@ export interface GapVector {
 
 export interface PhotoPair {
   user_photo_url: string;
+  // v1.5 호환 (default ""). v2 부터 미사용 — pair_comment 만 사용.
   user_sia_comment: string;
   target_photo_url: string;
   target_sia_comment: string;
+  // v2 — 페어 단위 비교 한 줄 (Sonnet cross-analysis 결과). null 이면 미생성.
+  pair_comment: string | null;
   pair_axis_hint: string | null;
+}
+
+export interface AspirationRecommendation {
+  style_direction: string;
+  next_action: string;
+  why: string;
+}
+
+export interface AspirationNumbers {
+  primary_axis: AxisName;
+  primary_delta: number;     // -1.0 ~ +1.0
+  alignment: "근접" | "보통" | "상충";
 }
 
 export interface MatchedTrendView {
@@ -58,7 +73,21 @@ export interface AspirationAnalysis {
 
   photo_pairs: PhotoPair[];
 
+  // v2 — 가장 의미있는 1쌍 강조. UI 첫 노출/highlight. null 이면 비활성.
+  best_fit_pair_index: number | null;
+
+  // v2 — 30자 이내 한 줄 통찰 (gap 직접 명시). null 이면 미생성.
+  hook_line: string | null;
+
   sia_overall_message: string;
+
+  // v2 — 추구미 이동 권장 (트렌드 spirit 흡수). null 이면 fallback.
+  recommendation: AspirationRecommendation | null;
+
+  // v2 — 좌표/alignment 메타. UI 칩 보조.
+  numbers: AspirationNumbers | null;
+
+  // v1.5 호환 — v2 는 narrative 안에 흡수. UI 노출 X.
   matched_trend_ids: string[];
   matched_trends: MatchedTrendView[];
 

@@ -28,7 +28,7 @@ import {
 } from "@/lib/api/aspiration";
 import type {
   AspirationAnalysis,
-  MatchedTrendView,
+  AspirationRecommendation,
   PhotoPair,
 } from "@/lib/types/aspiration";
 import { PrimaryButton, TopBar } from "@/components/ui/sigak";
@@ -153,6 +153,20 @@ export default function AspirationResultPage() {
           >
             {targetLabel}
           </h1>
+          {analysis.hook_line && (
+            <p
+              className="font-sans"
+              style={{
+                margin: "12px 0 0",
+                fontSize: 13,
+                lineHeight: 1.55,
+                letterSpacing: "-0.005em",
+                color: "var(--color-mute)",
+              }}
+            >
+              {analysis.hook_line}
+            </p>
+          )}
         </header>
 
         {analysis.gap_narrative && (
@@ -181,14 +195,18 @@ export default function AspirationResultPage() {
               }}
             >
               {analysis.photo_pairs.map((pair, i) => (
-                <PairCard key={i} pair={pair} />
+                <PairCard
+                  key={i}
+                  pair={pair}
+                  highlighted={analysis.best_fit_pair_index === i}
+                />
               ))}
             </div>
           </section>
         )}
 
-        {analysis.matched_trends && analysis.matched_trends.length > 0 && (
-          <MatchedTrendsSection trends={analysis.matched_trends} />
+        {analysis.recommendation && (
+          <RecommendationSection rec={analysis.recommendation} />
         )}
 
         {analysis.sia_overall_message && (
@@ -289,9 +307,28 @@ function GapNarrative({ text }: { text: string }) {
   );
 }
 
-function PairCard({ pair }: { pair: PhotoPair }) {
+function PairCard({
+  pair,
+  highlighted,
+}: {
+  pair: PhotoPair;
+  highlighted?: boolean;
+}) {
+  // v2 — pair_comment (Sonnet cross-analysis 페어 단위 비교 한 줄) 만 노출.
+  // 기존 user_sia_comment / target_sia_comment 는 v1.5 호환 default "" 라
+  // UI 사용 X. v2 응답에서 pair_comment 가 채워짐.
+  const pairText = pair.pair_comment ?? "";
   return (
-    <article>
+    <article
+      style={
+        highlighted
+          ? {
+              padding: 8,
+              background: "var(--color-bubble-ai)",
+            }
+          : undefined
+      }
+    >
       <div
         style={{
           display: "grid",
@@ -299,29 +336,21 @@ function PairCard({ pair }: { pair: PhotoPair }) {
           gap: 8,
         }}
       >
-        <PairHalf
-          label="본인"
-          imageUrl={pair.user_photo_url}
-          comment={pair.user_sia_comment}
-        />
-        <PairHalf
-          label="추구미"
-          imageUrl={pair.target_photo_url}
-          comment={pair.target_sia_comment}
-        />
+        <PairHalf label="본인" imageUrl={pair.user_photo_url} />
+        <PairHalf label="추구미" imageUrl={pair.target_photo_url} />
       </div>
-      {pair.pair_axis_hint && (
+      {pairText && (
         <p
           className="font-sans"
           style={{
-            margin: "10px 0 0",
-            fontSize: 11,
-            letterSpacing: "0.05em",
-            color: "var(--color-mute-2)",
-            textAlign: "center",
+            margin: "12px 0 0",
+            fontSize: 13,
+            lineHeight: 1.6,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
           }}
         >
-          {pair.pair_axis_hint}
+          {pairText}
         </p>
       )}
     </article>
@@ -331,11 +360,9 @@ function PairCard({ pair }: { pair: PhotoPair }) {
 function PairHalf({
   label,
   imageUrl,
-  comment,
 }: {
   label: string;
   imageUrl: string;
-  comment: string;
 }) {
   return (
     <div>
@@ -378,169 +405,81 @@ function PairHalf({
           </div>
         )}
       </div>
-      {comment && (
-        <p
-          className="font-sans"
-          style={{
-            margin: "8px 0 0",
-            fontSize: 12,
-            lineHeight: 1.55,
-            color: "var(--color-ink)",
-            letterSpacing: "-0.005em",
-          }}
-        >
-          {comment}
-        </p>
-      )}
     </div>
   );
 }
 
-// STEP 11 — 추구미 방향 매칭 트렌드 카드 (KB hydrate)
-function MatchedTrendsSection({ trends }: { trends: MatchedTrendView[] }) {
+// v2 — 추구미 이동 권장 (트렌드 spirit narrative 안에 흡수). Verdict v2
+// recommendation 패턴 차용. 트렌드 카드 별도 노출 없음.
+function RecommendationSection({ rec }: { rec: AspirationRecommendation }) {
   return (
     <section style={{ marginTop: 36 }}>
       <h2
         className="font-sans"
         style={{
-          margin: "0 0 4px",
+          margin: "0 0 14px",
           fontSize: 12,
           fontWeight: 600,
           letterSpacing: "0.08em",
           color: "var(--color-mute)",
         }}
       >
-        추구미 방향의 트렌드
+        이동 방향
       </h2>
-      <p
-        className="font-sans"
-        style={{
-          margin: "0 0 14px",
-          fontSize: 11,
-          letterSpacing: "0.02em",
-          color: "var(--color-mute-2)",
-        }}
-      >
-        2026 S/S 트렌드 중 추구미 방향과 가까운 항목
-      </p>
       <div
         style={{
+          padding: "20px 22px",
+          background: "rgba(0, 0, 0, 0.04)",
           display: "flex",
-          gap: 10,
-          overflowX: "auto",
-          paddingBottom: 8,
-          WebkitOverflowScrolling: "touch",
-          scrollSnapType: "x mandatory",
+          flexDirection: "column",
+          gap: 12,
         }}
       >
-        {trends.slice(0, 5).map((t) => (
-          <TrendCard key={t.trend_id} trend={t} />
-        ))}
+        {rec.style_direction && (
+          <p
+            className="font-serif"
+            style={{
+              margin: 0,
+              fontSize: 15,
+              lineHeight: 1.7,
+              letterSpacing: "-0.005em",
+              color: "var(--color-ink)",
+            }}
+          >
+            {rec.style_direction}
+          </p>
+        )}
+        {rec.next_action && (
+          <p
+            className="font-sans"
+            style={{
+              margin: 0,
+              fontSize: 13,
+              lineHeight: 1.65,
+              letterSpacing: "-0.005em",
+              color: "var(--color-ink)",
+            }}
+          >
+            {rec.next_action}
+          </p>
+        )}
+        {rec.why && (
+          <p
+            className="font-sans"
+            style={{
+              margin: 0,
+              fontSize: 12,
+              lineHeight: 1.6,
+              letterSpacing: "0",
+              color: "var(--color-mute)",
+            }}
+          >
+            {rec.why}
+          </p>
+        )}
       </div>
     </section>
   );
-}
-
-
-function TrendCard({ trend }: { trend: MatchedTrendView }) {
-  const [expanded, setExpanded] = useState(false);
-  const guide = (trend.detailed_guide || "").trim();
-  const truncated = guide.length > 110 ? guide.slice(0, 110).trimEnd() + "…" : guide;
-  const displayGuide = expanded ? guide : truncated;
-
-  return (
-    <article
-      style={{
-        flex: "0 0 74%",
-        minWidth: 260,
-        maxWidth: 320,
-        padding: "16px 16px 14px",
-        background: "rgba(0, 0, 0, 0.04)",
-        scrollSnapAlign: "start",
-      }}
-    >
-      <p
-        className="font-sans"
-        style={{
-          margin: 0,
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "0.08em",
-          color: "var(--color-mute-2)",
-          textTransform: "uppercase",
-        }}
-      >
-        {renderCategoryLabel(trend.category)}
-      </p>
-      <h3
-        className="font-serif"
-        style={{
-          margin: "6px 0 10px",
-          fontSize: 15,
-          fontWeight: 500,
-          letterSpacing: "-0.005em",
-          lineHeight: 1.35,
-          color: "var(--color-ink)",
-        }}
-      >
-        {trend.title}
-      </h3>
-      {guide && (
-        <p
-          className="font-sans"
-          style={{
-            margin: "0 0 8px",
-            fontSize: 12,
-            lineHeight: 1.55,
-            color: "var(--color-ink)",
-            letterSpacing: "-0.003em",
-            whiteSpace: "pre-line",
-          }}
-        >
-          {displayGuide}
-        </p>
-      )}
-      {guide.length > 110 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="font-sans"
-          style={{
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            fontSize: 11,
-            color: "var(--color-mute)",
-            textDecoration: "underline",
-            cursor: "pointer",
-            letterSpacing: "0.02em",
-          }}
-        >
-          {expanded ? "접기" : "자세히"}
-        </button>
-      )}
-    </article>
-  );
-}
-
-
-function renderCategoryLabel(category: string): string {
-  switch (category) {
-    case "mood":
-      return "무드";
-    case "color_palette":
-      return "컬러";
-    case "silhouette":
-      return "실루엣";
-    case "styling_method":
-      return "스타일링";
-    case "makeup_method":
-      return "메이크업";
-    case "grooming_method":
-      return "그루밍";
-    default:
-      return "트렌드";
-  }
 }
 
 

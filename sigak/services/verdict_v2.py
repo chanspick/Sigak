@@ -25,6 +25,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import time
 from typing import Any, Literal, Optional, TypedDict
 
 import anthropic
@@ -41,6 +42,10 @@ logger = logging.getLogger(__name__)
 
 class VerdictV2Error(Exception):
     """Verdict 2.0 생성 재시도 후에도 실패."""
+
+
+class VerdictV2RateLimitedError(VerdictV2Error):
+    """Anthropic rate limit 으로 시도 모두 소진. UI 친화 메시지 분기용."""
 
 
 # ─────────────────────────────────────────────
@@ -629,7 +634,7 @@ def build_verdict_v2(
     trend_data: Optional[dict] = None,
     matched_trends: Optional[list] = None,
     taste_profile: Optional[Any] = None,
-    max_retries: int = 1,
+    max_retries: int = 4,
     history_context: str = "",
 ) -> VerdictV2Result:
     """Verdict 2.0 build — Sonnet 4.6 cross-analysis.
@@ -641,14 +646,16 @@ def build_verdict_v2(
         matched_trends: (Phase L, optional) KnowledgeMatcher 매칭 결과 list[MatchedTrend].
             유저 좌표에 맞춘 KB 트렌드. style_direction / cta_pi 내러티브에 참조.
         taste_profile: (Phase L, optional) UserTasteProfile snapshot. 대화+IG 누적 취향.
-        max_retries: 파싱/검증/API 실패 시 재시도 횟수. default 1.
+        max_retries: 파싱/검증/API 실패 시 재시도 횟수. default 4 (= 총 5 attempts).
+            Rate limit (429) 발생 시 exponential backoff 으로 자동 대기 (15s/30s/60s/120s).
 
     Returns:
         VerdictV2Result (preview + full_content)
 
     Raises:
         ValueError: photos 0 장 또는 10 장 초과
-        VerdictV2Error: Hard Rules 위반 / parse 실패 / API 오류 (재시도 후)
+        VerdictV2RateLimitedError: 429 rate limit 으로 모든 시도 실패 (UI 친화 메시지 분기)
+        VerdictV2Error: Hard Rules 위반 / parse 실패 / 일반 API 오류 (재시도 후)
     """
     if not photos:
         raise ValueError("photos required (>=1, <=10)")
@@ -658,6 +665,10 @@ def build_verdict_v2(
     trend_data = trend_data or {}
 
     last_error: Optional[Exception] = None
+    last_was_rate_limit = False
+    # Rate limit backoff schedule (sec). Anthropic minute-window = 60s, double-safety.
+    backoff_schedule = [15, 30, 60, 120]
+
     for attempt in range(max_retries + 1):
         try:
             raw = _call_sonnet(
@@ -670,12 +681,8 @@ def build_verdict_v2(
             parsed = json.loads(clean)
             result = VerdictV2Result.model_validate(parsed)
             # WTP 가설 — best_fit 일관성 보장 (HR 검증 이전).
-            # full_content.best_fit_photo_index 를 source of truth 로 preview.best_fit_*
-            # 동기화. photo_insights[idx].insight/improvement 그대로 복사.
             _sync_best_fit_fields(result)
             _validate_hard_rules(result)
-            # PI 엔진(Phase I) 완성 전까지 cta_pi 목적지가 없으므로 응답에서 제거.
-            # 프롬프트는 유지(지시 제거 시 출력 품질 하락 위험) — 생성은 하되 사후 None.
             result.full_content.cta_pi = None
             logger.info(
                 "verdict_v2 success: attempt=%d photos=%d best_fit_idx=%s (cta_pi suppressed)",
@@ -684,6 +691,7 @@ def build_verdict_v2(
             return result
         except (json.JSONDecodeError, ValidationError) as e:
             last_error = e
+            last_was_rate_limit = False
             logger.warning(
                 "verdict_v2 parse/validation failed (attempt %d): %s",
                 attempt + 1, e,
@@ -691,16 +699,61 @@ def build_verdict_v2(
             continue
         except VerdictV2Error as e:
             last_error = e
+            last_was_rate_limit = False
             logger.warning(
                 "verdict_v2 hard rules failed (attempt %d): %s",
                 attempt + 1, e,
             )
             continue
+        except anthropic.RateLimitError as e:
+            # 429 rate limit — exponential backoff 후 재시도. 사용자 노출 X.
+            last_error = e
+            last_was_rate_limit = True
+            if attempt < max_retries:
+                wait_s = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
+                logger.warning(
+                    "verdict_v2 rate limited (attempt %d) — backoff %ds before retry",
+                    attempt + 1, wait_s,
+                )
+                time.sleep(wait_s)
+            else:
+                logger.error(
+                    "verdict_v2 rate limited (attempt %d) — exhausted retries",
+                    attempt + 1,
+                )
+            continue
+        except anthropic.APIStatusError as e:
+            # 일반 API status error — 429 외 (502/503 등) 도 짧은 backoff 후 재시도
+            last_error = e
+            status = getattr(e, "status_code", None)
+            last_was_rate_limit = (status == 429)
+            if attempt < max_retries:
+                wait_s = (
+                    backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
+                    if last_was_rate_limit else min(5 * (attempt + 1), 30)
+                )
+                logger.warning(
+                    "verdict_v2 API status error %s (attempt %d) — backoff %ds",
+                    status, attempt + 1, wait_s,
+                )
+                time.sleep(wait_s)
+            continue
         except anthropic.APIError as e:
             last_error = e
-            logger.warning("Sonnet API error (attempt %d): %s", attempt + 1, e)
+            last_was_rate_limit = False
+            if attempt < max_retries:
+                wait_s = min(5 * (attempt + 1), 30)
+                logger.warning(
+                    "verdict_v2 API error (attempt %d) — backoff %ds: %s",
+                    attempt + 1, wait_s, e,
+                )
+                time.sleep(wait_s)
             continue
 
+    if last_was_rate_limit:
+        raise VerdictV2RateLimitedError(
+            f"verdict_v2 rate limited after {max_retries + 1} attempts"
+        )
     raise VerdictV2Error(
         f"verdict_v2 failed after {max_retries + 1} attempts: {last_error}"
     )

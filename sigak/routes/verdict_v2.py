@@ -44,6 +44,7 @@ from services.user_profiles import get_profile
 from services.verdict_v2 import (
     PhotoInput,
     VerdictV2Error,
+    VerdictV2RateLimitedError,
     build_verdict_v2,
     downscale_image,
 )
@@ -217,9 +218,28 @@ async def create_verdict_v2(
             taste_profile=taste_profile,     # Phase L 확장
             history_context=history_context,
         )
+    except VerdictV2RateLimitedError:
+        # 429 — 모든 backoff 시도 소진. 친화 메시지 + 503 (service unavailable, retry-after 힌트).
+        logger.warning("verdict v2 rate limited after backoff: user_id=%s", user["id"])
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_code": "rate_limited",
+                "message": "지금 분석이 많이 몰려있어요. 1-2분 뒤에 다시 시도해 주시면 바로 풀어드릴게요.",
+                "retry_after_seconds": 90,
+            },
+            headers={"Retry-After": "90"},
+        )
     except VerdictV2Error as e:
+        # 일반 실패 (parse / hard rules / 기타 API). raw 에러 사용자 노출 X.
         logger.exception("verdict v2 build failed: user_id=%s", user["id"])
-        raise HTTPException(500, f"피드 분석 생성 실패: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "build_failed",
+                "message": "피드 분석을 만드는 중에 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+            },
+        )
     except ValueError as e:
         # photo count mismatch 등 input validation
         raise HTTPException(400, str(e))

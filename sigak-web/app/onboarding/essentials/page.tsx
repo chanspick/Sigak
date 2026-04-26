@@ -17,7 +17,7 @@ import { getToken, logout } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe, saveEssentials } from "@/lib/api/onboarding";
 import type { Gender } from "@/lib/types/mvp";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -159,38 +159,102 @@ export default function OnboardingEssentialsPage() {
         }}
       />
 
-      <main style={{ padding: "48px 28px 24px", flex: 1 }}>
-        {/* 헤드라인 */}
+      <main style={{ padding: "48px 24px 24px", flex: 1, maxWidth: 480, margin: "0 auto", width: "100%" }}>
+        {/* 헤드라인 — 마케터 카피 차용 */}
         <h1
           className="font-serif"
           style={{
-            fontSize: 34,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 24,
+            fontWeight: 700,
+            lineHeight: 1.42,
+            letterSpacing: "-0.022em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          기본 정보를.
+          인스타 피드를 읽어올게요!
         </h1>
         <p
           className="font-sans"
           style={{
-            marginTop: 16,
-            fontSize: 13,
-            opacity: 0.5,
-            lineHeight: 1.6,
-            color: "var(--color-ink)",
+            marginTop: 10,
+            fontSize: 14,
+            color: "var(--color-mute)",
+            lineHeight: 1.65,
+            letterSpacing: "-0.005em",
           }}
         >
-          진단 전에 세 가지만 받아요.
+          나이와 성별을 알려주시면 더 정확히 분석할 수 있어요.
         </p>
 
-        {/* 성별 */}
+        {/* 인스타그램 핸들 (선택) */}
         <section style={{ marginTop: 40 }}>
-          <Label>성별</Label>
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+          <Label>INSTAGRAM HANDLE</Label>
+          <div
+            style={{
+              marginTop: 8,
+              display: "flex",
+              alignItems: "center",
+              border: "1px solid var(--color-line-strong)",
+              borderRadius: 12,
+              overflow: "hidden",
+              background: "rgba(0, 0, 0, 0.04)",
+              transition: "border-color 0.2s ease",
+            }}
+          >
+            <span
+              className="font-sans"
+              style={{
+                padding: "14px 10px 14px 14px",
+                fontSize: 15,
+                color: "var(--color-mute-2)",
+                userSelect: "none",
+                flexShrink: 0,
+              }}
+            >
+              @
+            </span>
+            <input
+              type="text"
+              value={igHandle}
+              onChange={(e) => setIgHandle(e.target.value)}
+              placeholder="instagram ID"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={50}
+              className="font-sans"
+              style={{
+                flex: 1,
+                padding: "14px 14px 14px 0",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontSize: 15,
+                color: "var(--color-ink)",
+              }}
+            />
+          </div>
+          {igHandle && !igHandleValid && (
+            <p
+              className="font-sans"
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                color: "var(--color-danger)",
+                letterSpacing: "-0.005em",
+              }}
+            >
+              영문·숫자·.·_ 로 30자 이내여야 해요
+            </p>
+          )}
+        </section>
+
+        {/* 성별 */}
+        <section style={{ marginTop: 22 }}>
+          <Label>GENDER</Label>
+          <div style={{ marginTop: 8, display: "flex", gap: 10 }}>
             {(
               [
                 { id: "female" as Gender, label: "여성" },
@@ -206,18 +270,19 @@ export default function OnboardingEssentialsPage() {
                   className="font-sans"
                   style={{
                     flex: 1,
-                    height: 50,
+                    padding: "13px 0",
                     fontSize: 14,
-                    fontWeight: 600,
-                    letterSpacing: "0.3px",
-                    background: active ? "var(--color-ink)" : "transparent",
-                    color: active ? "var(--color-paper)" : "var(--color-ink)",
+                    fontWeight: 500,
+                    letterSpacing: "-0.008em",
+                    background: active ? "var(--color-ink)" : "rgba(0, 0, 0, 0.04)",
+                    color: active ? "var(--color-paper)" : "var(--color-mute)",
                     border: active
-                      ? "1px solid var(--color-ink)"
-                      : "1px solid rgba(0, 0, 0, 0.15)",
-                    borderRadius: 0,
+                      ? "1.5px solid var(--color-ink)"
+                      : "1.5px solid var(--color-line-strong)",
+                    borderRadius: 12,
                     cursor: "pointer",
-                    transition: "opacity 180ms ease-out",
+                    transition: "all 0.18s ease",
+                    textAlign: "center",
                   }}
                 >
                   {g.label}
@@ -227,15 +292,15 @@ export default function OnboardingEssentialsPage() {
           </div>
         </section>
 
-        {/* 생년월일 */}
-        <section style={{ marginTop: 40 }}>
+        {/* 생년월일 — 우리 3 input 유지 (backend birth_date ISO 호환), 마케터 시각 정합 */}
+        <section style={{ marginTop: 22 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Label>생년월일</Label>
+            <Label>BIRTH DATE</Label>
             <LabelHint>만 14세 이상</LabelHint>
           </div>
           <div
             style={{
-              marginTop: 12,
+              marginTop: 8,
               display: "grid",
               gridTemplateColumns: "2fr 1fr 1fr",
               gap: 8,
@@ -278,63 +343,6 @@ export default function OnboardingEssentialsPage() {
           )}
         </section>
 
-        {/* 인스타그램 핸들 */}
-        <section style={{ marginTop: 40 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Label>인스타그램</Label>
-            <LabelHint>선택</LabelHint>
-          </div>
-          <p
-            className="font-sans"
-            style={{
-              margin: "4px 0 12px",
-              fontSize: 12,
-              lineHeight: 1.6,
-              opacity: 0.5,
-              letterSpacing: "-0.005em",
-              color: "var(--color-ink)",
-            }}
-          >
-            피드 이미지를 함께 보면 분석이 정확해져요. 공개 계정만 조회돼요.
-          </p>
-          <input
-            type="text"
-            value={igHandle}
-            onChange={(e) => setIgHandle(e.target.value)}
-            placeholder="@username"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            maxLength={50}
-            className="font-sans"
-            style={{
-              width: "100%",
-              height: 50,
-              padding: "0 14px",
-              fontSize: 14,
-              letterSpacing: "-0.005em",
-              background: "transparent",
-              color: "var(--color-ink)",
-              border: "1px solid rgba(0, 0, 0, 0.15)",
-              borderRadius: 0,
-              outline: "none",
-            }}
-          />
-          {igHandle && !igHandleValid && (
-            <p
-              className="font-sans"
-              style={{
-                marginTop: 8,
-                fontSize: 11,
-                color: "var(--color-danger)",
-                letterSpacing: "-0.005em",
-              }}
-            >
-              영문·숫자·.·_ 로 30자 이내여야 해요
-            </p>
-          )}
-        </section>
-
         {error && (
           <p
             className="font-sans"
@@ -349,17 +357,35 @@ export default function OnboardingEssentialsPage() {
             {error}
           </p>
         )}
-      </main>
 
-      <div style={{ padding: "20px 28px 24px" }}>
-        <PrimaryButton
+        {/* CTA — 마케터 pill (radius 100) */}
+        <button
+          type="button"
           onClick={handleSubmit}
           disabled={!canSubmit}
-          disabledLabel={submitting ? "저장 중..." : "항목을 채워주세요"}
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            width: "100%",
+            padding: "17px 24px",
+            background: canSubmit ? "var(--color-ink)" : "var(--color-line-strong)",
+            color: canSubmit ? "var(--color-paper)" : "#fff",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: canSubmit ? "pointer" : "not-allowed",
+            transition: "all 0.2s ease",
+            marginTop: 40,
+          }}
         >
-          다음
-        </PrimaryButton>
-      </div>
+          {submitting ? "저장 중..." : !canSubmit ? "항목을 채워주세요" : "다음 →"}
+        </button>
+      </main>
 
       <SiteFooter />
     </div>
@@ -386,7 +412,6 @@ function DateField({ value, onChange, placeholder, maxLength, ariaLabel }: DateF
       pattern="[0-9]*"
       value={value}
       onChange={(e) => {
-        // 숫자만 허용
         const digits = e.target.value.replace(/\D/g, "").slice(0, maxLength);
         onChange(digits);
       }}
@@ -397,12 +422,12 @@ function DateField({ value, onChange, placeholder, maxLength, ariaLabel }: DateF
       style={{
         height: 50,
         padding: "0 14px",
-        fontSize: 14,
+        fontSize: 15,
         letterSpacing: "-0.005em",
-        background: "transparent",
+        background: "rgba(0, 0, 0, 0.04)",
         color: "var(--color-ink)",
-        border: "1px solid rgba(0, 0, 0, 0.15)",
-        borderRadius: 0,
+        border: "1px solid var(--color-line-strong)",
+        borderRadius: 12,
         outline: "none",
         textAlign: "center",
       }}
@@ -413,13 +438,12 @@ function DateField({ value, onChange, placeholder, maxLength, ariaLabel }: DateF
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-sans uppercase"
+      className="uppercase"
       style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "1.5px",
-        opacity: 0.4,
-        color: "var(--color-ink)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.12em",
+        color: "var(--color-mute)",
       }}
     >
       {children}
@@ -434,8 +458,7 @@ function LabelHint({ children }: { children: React.ReactNode }) {
       style={{
         fontSize: 11,
         letterSpacing: "-0.005em",
-        opacity: 0.4,
-        color: "var(--color-ink)",
+        color: "var(--color-mute-2)",
       }}
     >
       {children}

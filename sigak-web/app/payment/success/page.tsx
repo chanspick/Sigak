@@ -2,6 +2,9 @@
 
 // 토스페이먼츠 결제 성공 → 서버 승인 → 리포트 이동
 // successUrl: /payment/success?paymentKey=xxx&orderId=xxx&amount=xxx
+//
+// 마케터 톤 정합 (2026-04-26): Noto Serif 헤드라인 + period accent +
+// pill CTA + 카드 시각 (radius 14 + soft bg). Tailwind → inline 통일.
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -39,7 +42,6 @@ function SuccessContent() {
 
         setStatus("success");
 
-        // 리포트 준비 완료 시 이동, 아니면 대기 안내
         if (result.report_id) {
           setTimeout(() => {
             router.replace(`/report/${result.report_id}`);
@@ -54,26 +56,124 @@ function SuccessContent() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] text-[var(--color-fg)]">
-      <div className="max-w-sm w-full text-center px-6">
-        <p className="text-xs tracking-[3px] uppercase text-[var(--color-muted)] mb-4">SIGAK</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--color-paper)",
+        color: "var(--color-ink)",
+        fontFamily: "var(--font-sans)",
+        padding: "40px 24px",
+      }}
+    >
+      <div style={{ maxWidth: 380, width: "100%", textAlign: "center" }}>
+        <p
+          className="uppercase"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.3em",
+            color: "var(--color-mute)",
+            marginBottom: 24,
+          }}
+        >
+          SIGAK
+        </p>
 
         {status === "confirming" && (
           <>
-            <div className="w-8 h-8 border-2 border-[var(--color-fg)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <h1 className="font-[family-name:var(--font-serif)] text-xl mb-2">결제 확인 중</h1>
-            <p className="text-sm text-[var(--color-muted)]">잠시만 기다려 주세요...</p>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                border: "2px solid var(--color-ink)",
+                borderTopColor: "transparent",
+                borderRadius: "50%",
+                margin: "0 auto 18px",
+                animation: "spin 1s linear infinite",
+              }}
+              aria-hidden
+            />
+            <h1
+              className="font-serif"
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                margin: 0,
+                color: "var(--color-ink)",
+              }}
+            >
+              결제 확인 중
+              <span style={{ color: "var(--color-danger)" }}>.</span>
+            </h1>
+            <p
+              className="font-sans"
+              style={{
+                marginTop: 10,
+                fontSize: 13.5,
+                color: "var(--color-mute)",
+                letterSpacing: "-0.005em",
+              }}
+            >
+              잠시만 기다려 주세요...
+            </p>
           </>
         )}
 
         {status === "success" && (
           <>
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--color-fg)] flex items-center justify-center mx-auto mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "var(--color-ink)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 22px",
+              }}
+              aria-hidden
+            >
+              <svg width="24" height="20" viewBox="0 0 24 20" fill="none">
+                <path
+                  d="M2 10L8.5 16.5L22 3"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-            <h1 className="font-[family-name:var(--font-serif)] text-xl mb-2">결제 완료</h1>
-            <p className="text-sm text-[var(--color-muted)]">
-              AI 분석을 시작합니다.<br />
+            <h1
+              className="font-serif"
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                margin: 0,
+                color: "var(--color-ink)",
+                marginBottom: 8,
+              }}
+            >
+              결제 완료
+              <span style={{ color: "var(--color-danger)" }}>.</span>
+            </h1>
+            <p
+              className="font-sans"
+              style={{
+                margin: 0,
+                fontSize: 13.5,
+                color: "var(--color-mute)",
+                letterSpacing: "-0.005em",
+                lineHeight: 1.65,
+              }}
+            >
+              AI 분석을 시작합니다.
+              <br />
               완료되면 자동으로 리포트 페이지로 이동합니다.
             </p>
           </>
@@ -81,21 +181,89 @@ function SuccessContent() {
 
         {status === "error" && (
           <>
-            <h1 className="font-[family-name:var(--font-serif)] text-xl mb-2">결제 오류</h1>
-            <p className="text-sm text-red-500 mb-4">{errorMsg}</p>
-            <a href="/sia" className="text-sm font-medium underline text-[var(--color-fg)]">
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "rgba(163, 45, 45, 0.08)",
+                border: "1.5px solid rgba(163, 45, 45, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 22px",
+              }}
+              aria-hidden
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <path
+                  d="M11 7V12"
+                  stroke="var(--color-danger)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <circle cx="11" cy="15.5" r="1.2" fill="var(--color-danger)" />
+              </svg>
+            </div>
+            <h1
+              className="font-serif"
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                margin: 0,
+                color: "var(--color-ink)",
+                marginBottom: 8,
+              }}
+            >
+              결제 오류
+              <span style={{ color: "var(--color-danger)" }}>.</span>
+            </h1>
+            <p
+              style={{
+                margin: "0 0 24px",
+                fontSize: 13.5,
+                color: "var(--color-danger)",
+                letterSpacing: "-0.005em",
+                lineHeight: 1.6,
+              }}
+            >
+              {errorMsg}
+            </p>
+            <a
+              href="/sia"
+              className="font-sans"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "13px 32px",
+                background: "var(--color-ink)",
+                color: "var(--color-paper)",
+                border: "none",
+                borderRadius: 100,
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: "-0.01em",
+                textDecoration: "none",
+              }}
+            >
               다시 시도하기
             </a>
           </>
         )}
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
 
 export default function PaymentSuccessPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[var(--color-bg)]" />}>
+    <Suspense
+      fallback={<div style={{ minHeight: "100vh", background: "var(--color-paper)" }} />}
+    >
       <SuccessContent />
     </Suspense>
   );

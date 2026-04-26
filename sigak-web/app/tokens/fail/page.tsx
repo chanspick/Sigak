@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 function FailContent() {
@@ -33,27 +33,29 @@ function FailContent() {
     >
       <TopBar backTarget="/tokens/purchase" />
 
-      <main style={{ flex: 1, padding: "48px 28px 24px" }}>
+      <main style={{ flex: 1, padding: "48px 24px 24px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
         <h1
           className="font-serif"
           style={{
-            fontSize: 32,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 28,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            letterSpacing: "-0.025em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          {isUserCancel ? "결제를 취소했어요." : "결제가 중단됐어요."}
+          {isUserCancel ? "결제를 취소했어요" : "결제가 중단됐어요"}
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h1>
         <p
           className="font-sans"
           style={{
-            marginTop: 16,
-            fontSize: 13,
-            opacity: 0.55,
-            lineHeight: 1.7,
+            marginTop: 12,
+            fontSize: 14,
+            color: "var(--color-mute)",
+            lineHeight: 1.65,
             letterSpacing: "-0.005em",
           }}
         >
@@ -65,19 +67,15 @@ function FailContent() {
         {!isUserCancel && (code || orderId) && (
           <div
             style={{
-              marginTop: 28,
-              paddingTop: 14,
-              paddingBottom: 14,
-              borderTop: "1px solid rgba(0, 0, 0, 0.1)",
-              borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+              marginTop: 24,
+              background: "rgba(0, 0, 0, 0.04)",
+              border: "1px solid var(--color-line)",
+              borderRadius: 14,
+              padding: "12px 18px",
             }}
           >
-            {code && (
-              <InfoRow label="code" value={code} />
-            )}
-            {orderId && (
-              <InfoRow label="order" value={orderId} />
-            )}
+            {code && <InfoRow label="CODE" value={code} />}
+            {orderId && <InfoRow label="ORDER" value={orderId} />}
           </div>
         )}
 
@@ -85,9 +83,9 @@ function FailContent() {
           <p
             className="font-sans"
             style={{
-              marginTop: 20,
+              marginTop: 18,
               fontSize: 12,
-              opacity: 0.5,
+              color: "var(--color-mute)",
               lineHeight: 1.7,
               letterSpacing: "-0.005em",
             }}
@@ -95,7 +93,11 @@ function FailContent() {
             문의:{" "}
             <a
               href="mailto:partner@sigak.asia"
-              style={{ textDecoration: "underline", textUnderlineOffset: 2 }}
+              style={{
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+                color: "var(--color-ink)",
+              }}
             >
               partner@sigak.asia
             </a>
@@ -103,20 +105,50 @@ function FailContent() {
         )}
       </main>
 
-      <div style={{ padding: "20px 28px 32px", display: "flex", flexDirection: "column", gap: 10 }}>
-        <PrimaryButton onClick={() => router.replace("/tokens/purchase")}>
+      <div
+        style={{
+          padding: "20px 24px 32px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          maxWidth: 480,
+          margin: "0 auto",
+          width: "100%",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => router.replace("/tokens/purchase")}
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            padding: "17px 24px",
+            background: "var(--color-ink)",
+            color: "var(--color-paper)",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
           다시 시도
-        </PrimaryButton>
+        </button>
         <Link
           href="/"
           className="font-sans"
           style={{
             textAlign: "center",
             fontSize: 13,
-            opacity: 0.55,
+            color: "var(--color-mute)",
             letterSpacing: "-0.005em",
-            color: "var(--color-ink)",
             textDecoration: "none",
+            padding: "8px 0",
           }}
         >
           홈으로
@@ -136,24 +168,27 @@ function InfoRow({ label, value }: { label: string; value: string }) {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "baseline",
-        padding: "6px 0",
+        padding: "8px 0",
       }}
     >
       <span
-        className="font-sans uppercase"
+        className="uppercase"
         style={{
+          fontFamily: "var(--font-mono)",
           fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: "1.5px",
-          opacity: 0.4,
-          color: "var(--color-ink)",
+          letterSpacing: "0.12em",
+          color: "var(--color-mute)",
         }}
       >
         {label}
       </span>
       <span
-        className="font-mono tabular-nums"
-        style={{ fontSize: 11, opacity: 0.8, color: "var(--color-ink)" }}
+        className="tabular-nums"
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "var(--color-ink)",
+        }}
       >
         {value}
       </span>

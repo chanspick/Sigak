@@ -14,12 +14,16 @@ interface CoverProps {
 }
 
 // 리포트 상단 커버 영역
+// Phase B-5 (PI-REVIVE 2026-04-26): "Edition standard" 태그 숨김.
+// standard tier 는 BETA 기본값이라 라벨 노출이 의미 없음. creator/wedding 등
+// 차별화 tier 일 때만 노출.
 export function Cover({ content }: CoverProps) {
   const tierLabels: Record<string, string> = {
     basic: "Basic Diagnostic",
     creator: "Creator Edition",
     wedding: "Wedding Edition",
   };
+  const showEdition = !!tierLabels[content.tier]; // standard / 미정의 tier 는 미노출
 
   return (
     <section className="pt-16 pb-12 border-b border-[var(--color-border)]">
@@ -49,12 +53,14 @@ export function Cover({ content }: CoverProps) {
           <span className="text-[var(--color-muted)] w-16">Date</span>
           <span>{content.date}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[var(--color-muted)] w-16">Edition</span>
-          <span className="text-xs tracking-[2px] uppercase font-semibold">
-            {tierLabels[content.tier] ?? content.tier}
-          </span>
-        </div>
+        {showEdition && (
+          <div className="flex items-center gap-2">
+            <span className="text-[var(--color-muted)] w-16">Edition</span>
+            <span className="text-xs tracking-[2px] uppercase font-semibold">
+              {tierLabels[content.tier]}
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );

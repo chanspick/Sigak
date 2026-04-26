@@ -5,7 +5,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
@@ -127,35 +127,9 @@ function LoggedOutLanding() {
         </h1>
       </section>
 
-      {/* CHAT PREVIEW (정적) */}
+      {/* CHAT DEMO (무한반복) */}
       <section style={{ padding: "28px 24px 0" }}>
-        <div
-          style={{
-            background: "rgba(0, 0, 0, 0.04)",
-            borderRadius: 14,
-            padding: "20px 18px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <ChatBubble side="ai">
-            @sigak_official님 피드 다 훑어봤어요
-            <br />
-            몇 가지 짚어드려도 될까요?
-          </ChatBubble>
-          <ChatBubble side="ai">
-            셀카가 거의 다 오른쪽에서 살짝 위 각도던데
-            <br />
-            왼쪽 광대가 좀 더 도드라지는 편이세요?
-          </ChatBubble>
-          <ChatBubble side="user">헐 맞아요 그게 컴플렉스예요</ChatBubble>
-          <ChatBubble side="ai">
-            그래서 그 각도를 본능적으로 고르신 거예요
-            <br />
-            오른쪽 턱선이 더 살아서 광대가 덜 보이거든요
-          </ChatBubble>
-        </div>
+        <ChatDemo />
         <p
           className="font-sans"
           style={{
@@ -181,6 +155,9 @@ function LoggedOutLanding() {
           desc="내 피드가 추구미를 잘 따라가고 있는지, 개선할 점도 제공해요"
         />
       </section>
+
+      {/* VOICES (stats + REVIEWS carousel) */}
+      <VoicesSection />
 
       {/* FINAL CTA */}
       <section style={{ padding: "60px 24px 24px", textAlign: "center" }}>
@@ -288,22 +265,303 @@ function LoggedOutLanding() {
   );
 }
 
-function ChatBubble({ side, children }: { side: "ai" | "user"; children: React.ReactNode }) {
-  const isAi = side === "ai";
+// ─────────────────────────────────────────────
+//  ChatDemo — 마케터 랜딩의 12 버블 sequential 등장 + 페이드아웃 → 무한반복.
+//  타이밍은 redesign/랜딩_1815.html JS 그대로 (~10.5s 사이클).
+// ─────────────────────────────────────────────
+
+const CHAT_DEMO_MESSAGES: Array<{ side: "ai" | "user"; text: string; delay: number }> = [
+  { side: "ai",   delay:  300, text: "@sigak_official님 피드 다 훑어봤어요\n몇 가지 짚어드려도 될까요?" },
+  { side: "ai",   delay: 1000, text: "셀카가 거의 다 오른쪽에서 살짝 위 각도던데\n왼쪽 광대가 좀 더 도드라지는 편이세요?" },
+  { side: "user", delay: 1650, text: "헐 맞아요 그게 컴플렉스예요" },
+  { side: "ai",   delay: 2300, text: "그래서 그 각도를 본능적으로 고르신 거예요\n오른쪽 턱선이 더 살아서 광대가 덜 보이거든요" },
+  { side: "ai",   delay: 2950, text: "근데 본인 장점이 콧대랑 눈매라\n그 각도가 두 개 다 잘 살리고 있어요" },
+  { side: "user", delay: 3700, text: "아 그래서 그쪽이 나은 느낌이었구나\n그럼 정면 사진은 어떻게 찍어야 돼요?" },
+  { side: "ai",   delay: 4300, text: "정면 찍을 땐 카메라를 살짝 더 위로 올리세요" },
+  { side: "ai",   delay: 4850, text: "앞머리로 광대 끝부분만 살짝 가려주면\n콧대는 더 길어 보이고 광대는 안 도드라져요" },
+  { side: "user", delay: 5450, text: "오 그건 진짜 몰랐네" },
+  { side: "ai",   delay: 6050, text: "옷 색도 그래요 베이지 그레이 카키 위주던데\n혹시 흰옷 입으면 얼굴 부어 보이세요?" },
+  { side: "user", delay: 6650, text: "맞아요 그래서 잘 안 입어요" },
+  { side: "ai",   delay: 7300, text: "본인 쿨톤이라 새하얀 흰색은 얼굴이 떠요\n근데 아이보리나 오프화이트는 잘 받으실 거예요" },
+];
+const CHAT_DEMO_PAUSE = 2500;
+const CHAT_DEMO_FADE = 400;
+
+function ChatDemo() {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [fadingOut, setFadingOut] = useState(false);
+  const [cycleKey, setCycleKey] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    setVisibleCount(0);
+    setFadingOut(false);
+
+    CHAT_DEMO_MESSAGES.forEach((msg, i) => {
+      timers.push(setTimeout(() => setVisibleCount(i + 1), msg.delay));
+    });
+
+    const lastDelay = CHAT_DEMO_MESSAGES[CHAT_DEMO_MESSAGES.length - 1].delay;
+    timers.push(
+      setTimeout(() => setFadingOut(true), lastDelay + CHAT_DEMO_PAUSE),
+    );
+    timers.push(
+      setTimeout(
+        () => setCycleKey((k) => k + 1),
+        lastDelay + CHAT_DEMO_PAUSE + CHAT_DEMO_FADE + 200,
+      ),
+    );
+
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [cycleKey]);
+
+  // 새 메시지 등장 시 자동 스크롤 (마지막이 보이도록)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [visibleCount]);
+
   return (
     <div
       style={{
-        alignSelf: isAi ? "flex-start" : "flex-end",
-        maxWidth: isAi ? "82%" : "78%",
-        background: isAi ? "var(--color-bubble-ai)" : "var(--color-bubble-user)",
-        color: isAi ? "var(--color-ink)" : "var(--color-paper)",
-        borderRadius: isAi ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
-        padding: "8px 12px",
-        fontSize: 13,
-        lineHeight: 1.55,
+        position: "relative",
+        height: 320,
+        background: "rgba(0, 0, 0, 0.04)",
+        borderRadius: 14,
+        padding: "20px 18px",
+        overflow: "hidden",
       }}
     >
-      {children}
+      <div
+        ref={scrollRef}
+        style={{
+          height: "100%",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: 7,
+          opacity: fadingOut ? 0 : 1,
+          transition: `opacity ${CHAT_DEMO_FADE}ms ease`,
+        }}
+      >
+        {CHAT_DEMO_MESSAGES.map((msg, i) => {
+          const isAi = msg.side === "ai";
+          const visible = i < visibleCount;
+          return (
+            <div
+              key={`${cycleKey}-${i}`}
+              style={{
+                alignSelf: isAi ? "flex-start" : "flex-end",
+                maxWidth: isAi ? "82%" : "78%",
+                background: isAi ? "var(--color-bubble-ai)" : "var(--color-bubble-user)",
+                color: isAi ? "var(--color-ink)" : "var(--color-paper)",
+                borderRadius: isAi ? "20px 20px 20px 5px" : "20px 20px 5px 20px",
+                padding: "9px 13px",
+                fontSize: 13,
+                lineHeight: 1.55,
+                whiteSpace: "pre-line",
+                flexShrink: 0,
+                opacity: visible ? 1 : 0,
+                transform: visible ? "scale(1)" : "scale(0.87)",
+                transition:
+                  "opacity 280ms cubic-bezier(0.34, 1.45, 0.64, 1), transform 280ms cubic-bezier(0.34, 1.45, 0.64, 1)",
+              }}
+            >
+              {msg.text}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  VoicesSection — EARLY READERS stats + REVIEWS carousel (6초 회전)
+// ─────────────────────────────────────────────
+
+const REVIEWS: Array<{ text: string; meta: string }> = [
+  {
+    text: "솔직히 기대 안 했는데 소름. 저번 주에 제주도 사진 세 장 중에 고민하다가 결국 일주일 넘게 못 올렸는데, 두 번째가 그동안 피드 톤이랑 비교했을 때 가장 덜 튄다고 함. 친구한테 물어보면 다 이쁘다고만 하는데 얘는 이유를 말해줘서 납득이 됐음.",
+    meta: "24 · 여성",
+  },
+  {
+    text: "무슨 좌표로 내 얼굴 설명해주는 거 처음 봄. 퍼컬 같은 건 유형 찍어놓고 끝인데 이건 뭐 엄청 자세하게 얼굴 포인트 하나하나 수치로 설명하니까 너무 유용함.",
+    meta: "29 · 여성",
+  },
+  {
+    text: "재미로 들어가봤는데 무료 토큰으로 제 피드 검사 받아봤는데 이 사진은 네가 추구하는 톤이랑 어디가 어떻게 어긋남 이런 식으로 말해줘요.",
+    meta: "22 · 여성",
+  },
+  {
+    text: "제 얼굴형 인정하기 싫은데 다 맞는 말이라 할 말이 없네요..",
+    meta: "23 · 남성",
+  },
+  {
+    text: "피드 뭐 올릴지 여사친들한테 물어봐도 친구들마다 말이 달라서 결정장애 왔는데 이제 여기서 그냥 골라달라고 해요.",
+    meta: "30 · 남성",
+  },
+];
+const REVIEW_INTERVAL = 6000;
+const REVIEW_FADE = 400;
+
+function VoicesSection() {
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setVisible(false);
+      const t = setTimeout(() => {
+        setIdx((i) => (i + 1) % REVIEWS.length);
+        setVisible(true);
+      }, REVIEW_FADE);
+      return () => clearTimeout(t);
+    }, REVIEW_INTERVAL);
+    return () => clearInterval(tick);
+  }, []);
+
+  return (
+    <section
+      style={{
+        padding: "80px 24px 64px",
+        marginTop: 60,
+        borderTop: "1px solid var(--color-line)",
+        background: "rgba(0, 0, 0, 0.025)",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          letterSpacing: "0.3em",
+          color: "var(--color-mute)",
+          marginBottom: 26,
+        }}
+      >
+        EARLY READERS
+      </div>
+
+      <div
+        style={{
+          maxWidth: 400,
+          margin: "0 auto 44px",
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "20px 16px",
+        }}
+      >
+        <StatItem num="209" label="누적 피드 분석 수" />
+        <StatItem num="61" label="누적 시각 리포트 분석 수" />
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          maxWidth: 300,
+          margin: "0 auto 32px",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.22em",
+          color: "var(--color-mute)",
+        }}
+      >
+        <div style={{ flex: 1, height: 1, background: "var(--color-line-strong)" }} />
+        REVIEWS
+        <div style={{ flex: 1, height: 1, background: "var(--color-line-strong)" }} />
+      </div>
+
+      <p
+        className="font-serif"
+        style={{
+          fontWeight: 300,
+          fontSize: 16.5,
+          lineHeight: 1.82,
+          color: "var(--color-ink)",
+          letterSpacing: "-0.012em",
+          maxWidth: 400,
+          margin: "0 auto",
+          minHeight: 200,
+          padding: "0 8px",
+          opacity: visible ? 0.85 : 0,
+          transition: `opacity ${REVIEW_FADE}ms ease`,
+          wordBreak: "keep-all",
+        }}
+      >
+        {REVIEWS[idx].text}
+      </p>
+
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: "var(--color-mute)",
+          marginTop: 20,
+          opacity: visible ? 1 : 0,
+          transition: `opacity ${REVIEW_FADE}ms ease`,
+        }}
+      >
+        {REVIEWS[idx].meta}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          marginTop: 32,
+        }}
+      >
+        {REVIEWS.map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: 20,
+              height: 1,
+              margin: "0 3px",
+              background: i === idx ? "var(--color-danger)" : "var(--color-line-strong)",
+              transition: "background 0.3s ease",
+            }}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StatItem({ num, label }: { num: string; label: string }) {
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div
+        className="font-serif"
+        style={{
+          fontWeight: 500,
+          fontSize: 28,
+          letterSpacing: "-0.018em",
+          color: "var(--color-danger)",
+          lineHeight: 1,
+          marginBottom: 6,
+        }}
+      >
+        {num}
+        <sup style={{ fontSize: 16, fontWeight: 500, marginLeft: 1 }}>+</sup>
+      </div>
+      <div
+        style={{
+          fontSize: 11.5,
+          color: "var(--color-mute)",
+          lineHeight: 1.4,
+          letterSpacing: "-0.005em",
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 }

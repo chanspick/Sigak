@@ -878,10 +878,17 @@ def _get_trend_point() -> dict | None:
 def _build_aspiration_references(
     vault_aspiration_history: Optional[list] = None,
 ) -> list[dict]:
-    """Phase B-4: vault.aspiration_history → 카드 list 변환.
+    """Phase B-4 / B-5: vault.aspiration_history → 카드 list 변환.
 
-    각 entry: {target_handle, source, created_at, gap_narrative,
+    각 entry: {target_handle, source, created_at,
               primary_axis, primary_delta}
+
+    Phase B-5 (PI-REVIVE 2026-04-26): gap_narrative 필드 제거.
+    이유: vault 의 raw narrative 가 "shape 축 갭 -0.25, 그 결로 한 칸 이동..."
+    같이 좌표 숫자 + 영문 axis 키 + 어색한 한국어 mix → UX 깨짐.
+    카드는 meta (handle/date/source/primary_axis 화살표) 만 노출.
+    추후 LLM-refine narrative 가 필요하면 별도 처리.
+
     최근 5건만. 빈 input → 빈 list (frontend 가 조건부 렌더).
     """
     if not vault_aspiration_history:
@@ -906,12 +913,8 @@ def _build_aspiration_references(
                 created_at_str = created_at_raw.isoformat()
             else:
                 created_at_str = str(created_at_raw)
-        gap_narrative = (
-            entry_dict.get("gap_narrative")
-            or entry_dict.get("sia_overall_message")
-            or ""
-        )
-        # 좌표 메타 (분석 시점 gap_vector snapshot)
+
+        # 좌표 메타 (분석 시점 gap_vector snapshot) — UI 카드의 화살표 라벨용
         vector_snap = entry_dict.get("aspiration_vector_snapshot") or {}
         primary_axis = vector_snap.get("primary_axis") if isinstance(vector_snap, dict) else None
         primary_delta = vector_snap.get("primary_delta") if isinstance(vector_snap, dict) else None
@@ -920,7 +923,7 @@ def _build_aspiration_references(
             "target_handle": target_handle,
             "source": source,
             "created_at": created_at_str,
-            "gap_narrative": gap_narrative[:200] if gap_narrative else "",
+            # Phase B-5: gap_narrative drop (vault raw text 깨짐). frontend 미렌더.
             "primary_axis": primary_axis,
             "primary_delta": (
                 round(primary_delta, 2)
@@ -939,13 +942,17 @@ def _build_gap_analysis(
     report_content: dict,
     aspiration_anchor: Optional[dict] = None,
     vault_aspiration_history: Optional[list] = None,
+    gap_narration: Optional[dict] = None,
 ) -> dict:
     """gap_analysis 섹션 -- standard 잠금.
 
     Phase B-4 (PI-REVIVE 2026-04-26):
       vault_aspiration_history 가 있으면 aspiration_references 필드 추가.
-      유저가 누적한 추구미 분석 (IG/Pinterest) 카드 list 노출.
-      "쌓일수록 정교" 가치 제안 가시화.
+
+    Phase B-5 (PI-REVIVE 2026-04-26):
+      gap_narration (LLM 생성 narrate_gap_analysis 산출물) PRIMARY 사용.
+      gap_summary + per-axis difficulty/to_label/recommendation 모두 LLM 톤.
+      비어있으면 기존 deterministic template fallback.
     """
     magnitude = gap.get("magnitude", 0)
     gap_diff = _gap_difficulty(magnitude)
@@ -990,9 +997,21 @@ def _build_gap_analysis(
     secondary_ax = AXIS_LABELS.get(secondary_dir, {})
     secondary_shift_kr = secondary_ax.get("high") if secondary_delta_val > 0 else secondary_ax.get("low", "")
 
-    gap_summary = f"가장 큰 변화는 더 {primary_shift_kr} 방향으로 가는 거예요."
-    if secondary_shift_kr and secondary_dir != primary_dir and abs(secondary_delta_val) > 0.1:
-        gap_summary += f" 그리고 전체적으로 더 {secondary_shift_kr} 느낌으로요."
+    # Phase B-5: gap_narration LLM 우선, 없으면 deterministic fallback
+    llm_summary = ""
+    llm_axis_map: dict[str, dict] = {}
+    if isinstance(gap_narration, dict):
+        llm_summary = str(gap_narration.get("gap_summary", "") or "").strip()
+        for a in gap_narration.get("axis_narratives", []) or []:
+            if isinstance(a, dict) and a.get("axis"):
+                llm_axis_map[a["axis"]] = a
+
+    if llm_summary:
+        gap_summary = llm_summary
+    else:
+        gap_summary = f"가장 큰 변화는 더 {primary_shift_kr} 방향으로 가는 거예요."
+        if secondary_shift_kr and secondary_dir != primary_dir and abs(secondary_delta_val) > 0.1:
+            gap_summary += f" 그리고 전체적으로 더 {secondary_shift_kr} 느낌으로요."
 
     # direction_items 생성
     direction_items = []
@@ -1004,18 +1023,32 @@ def _build_gap_analysis(
         to_score = max(-1.0, min(1.0, float(aspiration_coords.get(axis_name, 0) or 0)))
         from_label = get_position_label(axis_name, from_score)
 
-        # delta 작으면 "거의 일치", 아니면 목표 방향 명시
-        if abs(delta_val) < 0.15:
-            to_label = "거의 일치"
-            axis_diff = "거의 일치"
-            name_kr = ax_labels.get('name_kr', axis_name)
-            recommendation = f"{name_kr}{_postposition(name_kr, '은', '는')} 현재와 추구미가 거의 같아요. 지금 방향 그대로 좋아요."
+        # Phase B-5: LLM axis narrative PRIMARY (있을 때)
+        llm_axis = llm_axis_map.get(axis_name)
+        if llm_axis:
+            to_label = str(llm_axis.get("to_label") or "").strip() or (
+                "거의 일치" if abs(delta_val) < 0.15 else (
+                    f"{ax_labels.get('high', '') if delta_val > 0 else ax_labels.get('low', '')} 방향으로"
+                )
+            )
+            axis_diff = str(llm_axis.get("difficulty") or "").strip() or (
+                "거의 일치" if abs(delta_val) < 0.15 else _axis_difficulty(delta_val)
+            )
+            recommendation = str(llm_axis.get("recommendation") or "").strip() or (
+                build_gap_recommendation(axis_name, delta_val)
+            )
         else:
-            # "중간" 대신 이동 방향으로 표시 (예: "프레시 방향으로")
-            target_direction = ax_labels.get("high", "") if delta_val > 0 else ax_labels.get("low", "")
-            to_label = f"{target_direction} 방향으로"
-            axis_diff = _axis_difficulty(delta_val)
-            recommendation = build_gap_recommendation(axis_name, delta_val)
+            # deterministic fallback
+            if abs(delta_val) < 0.15:
+                to_label = "거의 일치"
+                axis_diff = "거의 일치"
+                name_kr = ax_labels.get('name_kr', axis_name)
+                recommendation = f"{name_kr}{_postposition(name_kr, '은', '는')} 현재와 추구미가 거의 같아요. 지금 방향 그대로 좋아요."
+            else:
+                target_direction = ax_labels.get("high", "") if delta_val > 0 else ax_labels.get("low", "")
+                to_label = f"{target_direction} 방향으로"
+                axis_diff = _axis_difficulty(delta_val)
+                recommendation = build_gap_recommendation(axis_name, delta_val)
 
         direction_items.append({
             "axis": axis_name,
@@ -1580,6 +1613,7 @@ def format_report_for_frontend(
     aspiration_anchor: Optional[dict] = None,
     type_match_explanation: Optional[dict] = None,
     vault_aspiration_history: Optional[list] = None,
+    gap_narration: Optional[dict] = None,
 ) -> dict:
     """
     파이프라인 분석 결과를 프론트엔드 ReportData 구조로 변환한다.
@@ -1633,6 +1667,7 @@ def format_report_for_frontend(
             similar_types, aspiration_interpretation, report_content,
             aspiration_anchor=aspiration_anchor,
             vault_aspiration_history=vault_aspiration_history,
+            gap_narration=gap_narration,
         ),
         _build_hair_recommendation(gap, report_content, gender=gender),
         _build_action_plan(gap, face_features, report_content, gender=gender),

@@ -251,7 +251,7 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
 from config import get_settings
 from pipeline.face import analyze_face
 from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels
-from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure, explain_type_match
+from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure, explain_type_match, narrate_gap_analysis
 from pipeline.action_spec import build_action_spec, build_overlay_plan
 from pipeline.hair_spec import build_hair_spec
 from pipeline.similarity import find_similar_types, select_teaser_type
@@ -902,6 +902,8 @@ def _run_analysis_pipeline(
     vault_context: str = "",
     vault_aspiration_history: Optional[list] = None,
 ) -> tuple:
+    # gap_narration 은 함수 내부 Step 7.6 에서 산출 → format_report 에 전달
+    # (시그니처는 caller-side 에서 설정 안함)
     """
     기존 analyze의 Step 1~9 전체. 결제 확인된 order만 실행.
     Returns (report_id, report_dict) tuple.
@@ -973,6 +975,22 @@ def _run_analysis_pipeline(
         except Exception as e:
             print(f"[TYPE_MATCH] explain_type_match 실패 (deterministic fallback): {e}")
             type_match_explanation = None
+
+    # Step 7.6: GAP narrative LLM (Phase B-5, PI-REVIVE 2026-04-26)
+    # gap_summary + 3축 axis_narratives 를 deterministic template 대신 LLM 동적 생성.
+    # 본인 피드백: "하드코딩된거 줄이고 llm한테 자유도를 주시는 게 좋을 거 같아요"
+    gap_narration = None
+    try:
+        gap_narration = narrate_gap_analysis(
+            current_coords=current_coords,
+            aspiration_coords=aspiration_coords,
+            gap=gap,
+            gender=gender,
+            vault_context=vault_context,
+        )
+    except Exception as e:
+        print(f"[GAP_NARRATE] narrate_gap_analysis 실패 (deterministic fallback): {e}")
+        gap_narration = None
 
     # Step 8: 액션 스펙
     top_type = similar_types[0] if similar_types else {"key": "type_2", "name_kr": "차갑지만 동안", "similarity": 0.5, "mode": "coord"}
@@ -1048,6 +1066,7 @@ def _run_analysis_pipeline(
         aspiration_interpretation=aspiration_result, aspiration_anchor=aspiration_anchor,
         type_match_explanation=type_match_explanation,
         vault_aspiration_history=vault_aspiration_history,
+        gap_narration=gap_narration,
     )
 
     # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).

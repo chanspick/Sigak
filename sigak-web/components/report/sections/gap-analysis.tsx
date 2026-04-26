@@ -27,12 +27,12 @@ interface DirectionItem {
   recommendation: string;
 }
 
-// Phase B-4 (PI-REVIVE 2026-04-26): 누적 추구미 분석 카드
+// Phase B-4 / B-5 (PI-REVIVE 2026-04-26): 누적 추구미 분석 카드
+// gap_narrative 제거 (vault raw text 가 좌표 숫자 + 영문 axis 키 mix 로 UX 깨짐)
 interface AspirationReference {
   target_handle: string;
   source: string; // "instagram" | "pinterest"
   created_at: string; // ISO datetime
-  gap_narrative: string;
   primary_axis?: string | null;
   primary_delta?: number | null;
 }
@@ -457,7 +457,7 @@ function AspirationReferenceCard({ entry }: { entry: AspirationReference }) {
 
   return (
     <div className="p-4 border border-[var(--color-border)] rounded-lg">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-[1px] uppercase text-[var(--color-muted)]">
             {sourceLabel}
@@ -471,14 +471,9 @@ function AspirationReferenceCard({ entry }: { entry: AspirationReference }) {
         )}
       </div>
       {directionLabel && (
-        <div className="text-[10px] text-[var(--color-muted)] mb-2 tracking-[0.5px]">
+        <div className="text-[11px] text-[var(--color-muted)] tracking-[0.5px]">
           주요 갭: {directionLabel}
         </div>
-      )}
-      {entry.gap_narrative && (
-        <p className="text-[12px] leading-relaxed text-[var(--color-fg)] opacity-80">
-          {entry.gap_narrative}
-        </p>
       )}
     </div>
   );

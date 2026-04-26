@@ -724,3 +724,139 @@ JSON으로만 응답해주세요."""
     except (json.JSONDecodeError, Exception) as e:
         print(f"[TYPE_MATCH_FALLBACK] parse/call error: {e}")
         return {"reasons": [], "styling_tips": []}
+
+
+# ─────────────────────────────────────────────
+#  5. Gap Analysis Narration (Phase B-5)
+#     하드코딩 template → LLM 자유도. vault tone echo.
+# ─────────────────────────────────────────────
+
+GAP_NARRATE_SYSTEM = """당신은 SIGAK 추구미 갭 해설 전문가입니다.
+유저의 현재 좌표 + 추구 좌표 + (vault 있으면) lifestyle 데이터를 종합해서
+GAP ANALYSIS 섹션의 narrative 를 만듭니다.
+
+톤:
+- 페르소나 B (친근 비서). "~네요" "~군요" "~같아요" 금지.
+- "~예요" "~해요" 단정형. hedging 절대 X.
+- 따뜻하고 직접적. 일반론 ("자연스럽게", "조화롭게") 금지.
+- vault 있으면 유저 발화/lifestyle echo 자연스럽게.
+
+출력 구조:
+1. gap_summary (1-2 문장):
+   - 가장 큰 변화 + 두번째 변화 통합 narrative.
+   - 좌표 숫자 노출 X. 자연어로만 ("부드러운 골격으로 이동 + 성숙한 무드 가미").
+   - vault 있으면 유저 lifestyle 톤 반영 ("운동할 때의 역동성을 잃지 않으면서 부드러운 골격으로...").
+
+2. axis_narratives (3개, shape/volume/age 각각):
+   - difficulty: "큰 변화" / "중간 변화" / "작은 변화" / "거의 일치" 중 1개 (delta 기반)
+   - to_label: "X 방향으로" 형식 (예: "부드러운 방향으로", "성숙한 방향으로", "거의 일치")
+   - recommendation (1-2 문장): vault tone reflect. 일반론 X.
+     예: "골격에서는 윤곽을 둥글게 풀어주는 게 핵심이에요. 운동할 때도 너무 강하게 잡지 X..."
+
+규칙:
+- 좌표 숫자 (0.5, -0.3 등) 절대 노출 X
+- 영문 axis 키 (shape, volume, age) 노출 X — 한글 라벨 ("골격", "존재감", "무드")
+- 단순 반복 금지 — 각 axis 의 narrative 가 다르게.
+- 셀럽 이름 우리 생성물 금지. 단 vault 의 echo 는 OK.
+
+JSON으로만 응답:
+{
+  "gap_summary": "1-2 문장 통합 narrative",
+  "axis_narratives": [
+    {"axis": "shape", "difficulty": "큰 변화", "to_label": "부드러운 방향으로", "recommendation": "1-2 문장"},
+    {"axis": "volume", "difficulty": "거의 일치", "to_label": "거의 일치", "recommendation": "1 문장"},
+    {"axis": "age", "difficulty": "중간 변화", "to_label": "성숙한 방향으로", "recommendation": "1-2 문장"}
+  ]
+}"""
+
+
+def narrate_gap_analysis(
+    current_coords: dict,
+    aspiration_coords: dict,
+    gap: dict,
+    gender: str = "female",
+    vault_context: str = "",
+) -> dict:
+    """GAP 섹션 narrative LLM 생성. 하드코딩 template 대체.
+
+    Phase B-5 (PI-REVIVE 2026-04-26):
+      gap_summary + 3축 axis_narratives (difficulty / to_label /
+      recommendation) 를 LLM 으로 한번에 생성. vault 톤 echo.
+
+    Returns:
+        {"gap_summary": str, "axis_narratives": [{axis, difficulty, to_label, recommendation}]}
+        파싱/호출 실패 시 빈 dict (caller deterministic fallback).
+    """
+    vault_block = _build_vault_block(vault_context)
+    has_vault = bool(vault_block)
+
+    gap_vector = gap.get("vector", {}) if gap else {}
+    primary_dir = gap.get("primary_direction", "shape") if gap else "shape"
+    magnitude = gap.get("magnitude", 0) if gap else 0
+
+    user_prompt = f"""유저의 현재 → 추구 갭 narrative 를 산출해주세요.
+{vault_block}
+[현재 좌표]
+- 골격 (shape): {current_coords.get('shape', 0):+.2f} (음수=둥근/부드러운, 양수=날카로운/또렷한)
+- 존재감 (volume): {current_coords.get('volume', 0):+.2f} (음수=섬세/은은한, 양수=뚜렷한/강렬한)
+- 무드 (age): {current_coords.get('age', 0):+.2f} (음수=발랄한/어림, 양수=성숙한)
+
+[추구 좌표]
+- 골격: {aspiration_coords.get('shape', 0):+.2f}
+- 존재감: {aspiration_coords.get('volume', 0):+.2f}
+- 무드: {aspiration_coords.get('age', 0):+.2f}
+
+[갭 벡터]
+- 가장 큰 변화 축: {primary_dir}
+- 전체 magnitude: {magnitude:.2f}
+- shape delta: {gap_vector.get('shape', 0):+.2f}
+- volume delta: {gap_vector.get('volume', 0):+.2f}
+- age delta: {gap_vector.get('age', 0):+.2f}
+
+분석 가이드:
+- {('vault 의 lifestyle/추구 narrative 가 톤 PRIMARY' if has_vault else '좌표만 사용')}
+- gap_summary 1-2 문장 (전체 변화 방향 통합)
+- axis_narratives 3개 (shape/volume/age 각각, 같은 순서로)
+- difficulty 기준 (delta 절대값): >0.4 = "큰 변화" / 0.2-0.4 = "중간 변화" / 0.1-0.2 = "작은 변화" / <0.1 = "거의 일치"
+- 거의 일치 시 recommendation 은 "지금 방향 그대로 좋아요" 류
+- 좌표 숫자 노출 X. 한글 라벨 ("골격", "존재감", "무드") 만.
+
+JSON으로만 응답해주세요."""
+
+    print(f"[GAP_NARRATE_PROMPT] has_vault={has_vault} primary={primary_dir} mag={magnitude:.2f}")
+
+    try:
+        raw = _call_llm(GAP_NARRATE_SYSTEM, user_prompt, max_tokens=700)
+        print(f"[GAP_NARRATE_RESULT] raw_len={len(raw)} preview={raw[:300]!r}")
+
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0]
+        result = json.loads(cleaned)
+        if not isinstance(result, dict):
+            return {}
+        gap_summary = result.get("gap_summary", "")
+        axes = result.get("axis_narratives", [])
+        if not isinstance(axes, list):
+            axes = []
+        # 축 결과 sanity (3개 + axis 키 정합)
+        cleaned_axes = []
+        for a in axes:
+            if not isinstance(a, dict):
+                continue
+            ax_name = a.get("axis", "")
+            if ax_name not in ("shape", "volume", "age"):
+                continue
+            cleaned_axes.append({
+                "axis": ax_name,
+                "difficulty": str(a.get("difficulty", "")),
+                "to_label": str(a.get("to_label", "")),
+                "recommendation": str(a.get("recommendation", "")),
+            })
+        return {
+            "gap_summary": str(gap_summary) if gap_summary else "",
+            "axis_narratives": cleaned_axes,
+        }
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"[GAP_NARRATE_FALLBACK] parse/call error: {e}")
+        return {}

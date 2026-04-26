@@ -1,31 +1,43 @@
-// SIGAK MVP v1.2 (Rebrand) — TopBar
+// SIGAK MVP v1.2 — TopBar (2026-04-27 마케터 정합 + 홈 통일)
 //
-// 검정 52px 바 + 중앙 letterspaced "SIGAK" 워드마크.
-// 필요한 화면에서만 back chevron 노출:
-//   - backTarget="/" → router.push(target)
-//   - onBack={() => ...} → 커스텀 콜백
-//   - 둘 다 안 주면 chevron 안 보임 (루트/터미널 화면용)
+// 본인 결정: "상단 뒤로가기 포함된 바를 홈하고 통일시켜야 좋을 것 같아요"
+// 이전 ink 검정 52px → paper 베이지 28px padding (홈 HomeTopNav 정합).
 //
-// SIGAK 중앙 정렬은 chevron 유무와 무관하게 유지 (absolute positioning).
+// 구조:
+//   좌측 ← 뒤로 (옵션, backTarget/onBack 있을 때만)
+//   중앙 sigak (Noto Serif 15px 500)
+//   우측 토큰 pill (옵션, hideTokens=true 면 X)
+//
+// 모든 페이지 (onboarding/welcome/essentials/complete, tokens/purchase/fail/
+// confirmed, aspiration, best-shot, photo-upload, verdict/new HomeScreen 등)
+// 자동 정합.
 "use client";
 
 import { useRouter } from "next/navigation";
 
-interface TopBarProps {
-  /** 지정 시 왼쪽에 back chevron 렌더. 클릭 → router.push. */
-  backTarget?: string;
-  /** 지정 시 왼쪽에 back chevron 렌더. 클릭 → 콜백. backTarget보다 우선. */
-  onBack?: () => void;
+import { useTokenBalance } from "@/hooks/use-token-balance";
 
-  // 하위 호환 무시 props (레거시 호출부 깨지지 않도록)
+interface TopBarProps {
+  /** 지정 시 왼쪽에 ← 뒤로 렌더. 클릭 → router.push. */
+  backTarget?: string;
+  /** 지정 시 왼쪽에 ← 뒤로 렌더. 클릭 → 콜백. backTarget보다 우선. */
+  onBack?: () => void;
+  /** 우측 토큰 pill 숨김 (auth 전 / 토큰 의미 없는 페이지). default false. */
+  hideTokens?: boolean;
+
+  // 하위 호환 무시 props
   variant?: string;
   tokens?: number;
   stepLabel?: string;
-  hideTokens?: boolean;
 }
 
-export function TopBar({ backTarget, onBack }: TopBarProps = {}) {
+export function TopBar({
+  backTarget,
+  onBack,
+  hideTokens = false,
+}: TopBarProps = {}) {
   const router = useRouter();
+  const { balance } = useTokenBalance();
   const showBack = onBack != null || backTarget != null;
 
   function handleBack() {
@@ -34,72 +46,103 @@ export function TopBar({ backTarget, onBack }: TopBarProps = {}) {
   }
 
   return (
-    <nav
+    <header
       style={{
-        position: "relative",
-        height: 52,
-        background: "var(--color-ink)",
-        color: "var(--color-paper)",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        background: "var(--color-paper)",
+        borderBottom: "1px solid var(--color-line)",
         flexShrink: 0,
       }}
     >
-      {/* Left: back chevron (absolute) */}
-      {showBack && (
-        <button
-          type="button"
-          onClick={handleBack}
-          aria-label="뒤로"
-          style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 52,
-            height: 52,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-          }}
-        >
-          <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
-            <path
-              d="M8 1L1 8l7 7"
-              stroke="var(--color-paper)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-              opacity="0.85"
-            />
-          </svg>
-        </button>
-      )}
-
-      {/* Center: SIGAK wordmark (always centered) */}
       <div
         style={{
-          height: "100%",
+          maxWidth: 480,
+          margin: "0 auto",
+          padding: "20px 24px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: "space-between",
         }}
       >
-        <span
-          className="font-sans"
+        {/* Left — ← 뒤로 (옵션) */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+          {showBack && (
+            <button
+              type="button"
+              onClick={handleBack}
+              aria-label="뒤로"
+              className="font-sans"
+              style={{
+                fontSize: 13.5,
+                color: "var(--color-ink)",
+                opacity: 0.75,
+                fontWeight: 500,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                letterSpacing: "-0.005em",
+              }}
+            >
+              ← 뒤로
+            </button>
+          )}
+        </div>
+
+        {/* Center — sigak Noto Serif (홈 정합) */}
+        <div
+          className="font-serif"
           style={{
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: "6px",
-            color: "var(--color-paper)",
+            fontSize: 15,
+            fontWeight: 500,
+            letterSpacing: "-0.005em",
+            color: "var(--color-ink)",
           }}
         >
-          SIGAK
-        </span>
+          sigak
+        </div>
+
+        {/* Right — 토큰 pill (옵션) */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+          {!hideTokens && (
+            <button
+              type="button"
+              onClick={() => router.push("/tokens/purchase")}
+              aria-label="토큰 충전"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "var(--color-ink)",
+                color: "var(--color-paper)",
+                borderRadius: 100,
+                padding: "5px 12px",
+                border: "none",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                fontWeight: 500,
+                letterSpacing: "0.04em",
+                cursor: "pointer",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "var(--color-danger)",
+                }}
+              />
+              <span className="tabular-nums">
+                {balance == null ? "—" : balance.toLocaleString()}
+              </span>
+            </button>
+          )}
+        </div>
       </div>
-    </nav>
+    </header>
   );
 }

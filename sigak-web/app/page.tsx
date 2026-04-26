@@ -775,37 +775,64 @@ const CHAT_DEMO_FADE = 350;
 const CHAT_DEMO_AFTER_FADE = 960;
 
 function ChatDemo() {
+  // tick 으로 cycle 재생 — cycleKey 의 strict mode race 회피.
+  // 재귀 setTimeout (runCycle) 으로 무한 반복.
   const [visibleCount, setVisibleCount] = useState(0);
-  const [fadingOut, setFadingOut] = useState(false);
-  const [cycleKey, setCycleKey] = useState(0);
+  const [hidden, setHidden] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    setVisibleCount(0);
-    setFadingOut(false);
 
-    CHAT_DEMO_MESSAGES.forEach((msg, i) => {
-      timers.push(setTimeout(() => setVisibleCount(i + 1), msg.delay));
-    });
+    const lastDelay =
+      CHAT_DEMO_MESSAGES[CHAT_DEMO_MESSAGES.length - 1].delay;
 
-    const lastDelay = CHAT_DEMO_MESSAGES[CHAT_DEMO_MESSAGES.length - 1].delay;
-    timers.push(
-      setTimeout(() => setFadingOut(true), lastDelay + CHAT_DEMO_PAUSE),
-    );
-    timers.push(
-      setTimeout(
-        () => setCycleKey((k) => k + 1),
-        lastDelay + CHAT_DEMO_PAUSE + CHAT_DEMO_AFTER_FADE,
-      ),
-    );
+    function runCycle(): void {
+      if (cancelled) return;
+
+      // 즉시 reset → 다음 paint 부터 메시지 등장
+      setVisibleCount(0);
+      setHidden(false);
+
+      CHAT_DEMO_MESSAGES.forEach((msg, i) => {
+        const t = setTimeout(() => {
+          if (cancelled) return;
+          setVisibleCount(i + 1);
+        }, msg.delay);
+        timers.push(t);
+      });
+
+      // PAUSE 후 fadeOut
+      timers.push(
+        setTimeout(() => {
+          if (cancelled) return;
+          setHidden(true);
+        }, lastDelay + CHAT_DEMO_PAUSE),
+      );
+
+      // AFTER_FADE 후 다음 cycle (재귀)
+      timers.push(
+        setTimeout(() => {
+          if (cancelled) return;
+          runCycle();
+        }, lastDelay + CHAT_DEMO_PAUSE + CHAT_DEMO_AFTER_FADE),
+      );
+    }
+
+    // mount 즉시 첫 cycle 시작 — paint 사이클 후 첫 메시지 (300ms 시점)
+    runCycle();
 
     return () => {
+      cancelled = true;
       timers.forEach((t) => clearTimeout(t));
     };
-  }, [cycleKey]);
+    // mount-only — strict mode double invocation 시에도 cancelled flag 로 안전.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 새 메시지 등장 시 자동 스크롤 (마지막이 보이도록)
+  // 새 메시지 등장 시 자동 스크롤 (카톡창처럼 아래로 내려옴)
+  // overflowY: auto 라야 scrollTop 작동.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -815,7 +842,7 @@ function ChatDemo() {
     <div
       style={{
         position: "relative",
-        height: 320,
+        height: 360,
         background: "rgba(0, 0, 0, 0.04)",
         borderRadius: 14,
         padding: "20px 18px",
@@ -824,14 +851,16 @@ function ChatDemo() {
     >
       <div
         ref={scrollRef}
+        className="hide-scrollbar"
         style={{
           height: "100%",
-          overflow: "hidden",
+          overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           gap: 7,
-          opacity: fadingOut ? 0 : 1,
+          opacity: hidden ? 0 : 1,
           transition: `opacity ${CHAT_DEMO_FADE}ms ease`,
+          pointerEvents: "none",
         }}
       >
         {CHAT_DEMO_MESSAGES.map((msg, i) => {
@@ -839,10 +868,9 @@ function ChatDemo() {
           const visible = i < visibleCount;
           return (
             <div
-              key={`${cycleKey}-${i}`}
+              key={i}
               style={{
                 alignSelf: isAi ? "flex-start" : "flex-end",
-                // 마케터 정합: AI 78% / User 74%
                 maxWidth: isAi ? "78%" : "74%",
                 background: isAi ? "var(--color-bubble-ai)" : "var(--color-bubble-user)",
                 color: isAi ? "var(--color-ink)" : "var(--color-paper)",
@@ -854,7 +882,6 @@ function ChatDemo() {
                 flexShrink: 0,
                 opacity: visible ? 1 : 0,
                 transform: visible ? "scale(1)" : "scale(0.87)",
-                // 마케터 정합: .28s spring (cubic-bezier 0.34, 1.45, 0.64, 1)
                 transition:
                   "opacity 280ms cubic-bezier(0.34, 1.45, 0.64, 1), transform 280ms cubic-bezier(0.34, 1.45, 0.64, 1)",
               }}

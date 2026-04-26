@@ -136,6 +136,13 @@ body {
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* ──────────────────────────────────────────────
+ * Scrollbar 숨김 (overflow scroll/auto + 자동 스크롤 컨테이너용)
+ * 마케터 redesign/랜딩_1815.html ChatDemo 패턴.
+ * ────────────────────────────────────────────── */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ──────────────────────────────────────────────
  * Modal bottom-sheet slide up (마케터 redesign/토큰부족_모달_1815.html 차용)
  * TokenInsufficientModal / 결제완료 모달 등 bottom-sheet UI 공유.
  * ────────────────────────────────────────────── */

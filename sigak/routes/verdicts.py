@@ -214,7 +214,7 @@ def list_verdicts(
 
     rows = db.execute(
         text(
-            "SELECT id, ranked_photo_ids, blur_released, created_at "
+            "SELECT id, ranked_photo_ids, blur_released, created_at, version "
             "FROM verdicts "
             "WHERE user_id = :uid "
             "ORDER BY created_at DESC "
@@ -225,11 +225,26 @@ def list_verdicts(
 
     items: list[VerdictListItem] = []
     for row in rows:
+        # version 분기 — v2 verdict 도 같은 테이블에 저장되며 ranked_photo_ids
+        # shape 가 다름 (v1: [{filename, ...}], v2: [{r2_key, photo_index, ...}]).
+        # 2026-04-26 fix: 피드 그리드 썸네일 누락 (v2 verdict 가 v1 파서 통과 못 함).
         ranked = row.ranked_photo_ids or []
-        gold_filename = (
-            ranked[0].get("filename") if isinstance(ranked, list) and ranked else None
-        )
-        gold_url = _photo_url(user["id"], gold_filename) if gold_filename else None
+        version = getattr(row, "version", None) or "v1"
+        gold_url: Optional[str] = None
+        if version == "v2":
+            # v2: ranked_photo_ids 의 r2_key → public URL. 첫 사진을 thumbnail.
+            # (정확한 best_fit 은 preview_content.best_fit_photo_index 봐야 하지만
+            # 그리드 썸네일 용도로는 첫 사진으로 충분 — 후속 정합 가능)
+            from routes.verdict_v2 import _photo_urls_from_ranked
+            urls = _photo_urls_from_ranked(ranked)
+            gold_url = urls[0] if urls else None
+        else:
+            # v1 기존 로직
+            gold_filename = (
+                ranked[0].get("filename") if isinstance(ranked, list) and ranked else None
+            )
+            gold_url = _photo_url(user["id"], gold_filename) if gold_filename else None
+
         created_at_iso = (
             row.created_at.isoformat() if row.created_at else ""
         )

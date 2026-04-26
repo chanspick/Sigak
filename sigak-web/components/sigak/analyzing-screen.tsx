@@ -1,18 +1,18 @@
-// SIGAK MVP v1.2 (Rebrand) — AnalyzingScreen
+// SIGAK MVP v1.2 — AnalyzingScreen
 //
-// 진행바 동작 (실제 POST 응답과 동기화):
-//   1. 마운트 → 2.5초 동안 cubic ease로 0% → 90% 도달
-//   2. POST가 아직 진행 중이면 90%에서 hold (부드러운 pulse)
-//   3. POST 응답 오면(done=true) 90% → 100%로 400ms snap
-//   4. 100% 도달 후 onFinish 콜백 호출 → 상위가 navigate
+// 2026-04-26 마케터 정합: photo-upload 분석 로딩 화면과 동일 패턴.
+//   - SIGAK 로고 60x60 검정
+//   - "sia가 피드를 분석중이에요." (마케터 redesign/로딩_1815.html 차용)
+//   - dotPulse 3-dot stagger 애니메이션 (var(--color-danger))
+//   - "최대 30초 정도 걸릴 수 있어요" 서브 힌트
+//   - TopBar / ProgressBar 제거 (단순화)
 //
-// 이 설계로 "100% 찍고 멍때리는" 상황 제거. 빠른 응답이면 2.9초 안에 완료,
-// 느린 응답이면 90%에서 합리적으로 대기.
+// done / onFinish 흐름은 보존:
+//   1. mount → CLIMB_MS 동안 progress 누적 (UI 미노출, 내부 timer 만)
+//   2. done=true 도달 시 COMPLETE_MS 후 onFinish 호출 → 상위 navigate
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-import { ProgressBar, TopBar } from "@/components/ui/sigak";
 
 export interface AnalyzingStep {
   id: string;
@@ -34,155 +34,146 @@ export const ONBOARDING_ANALYSIS_STEPS: AnalyzingStep[] = [
   { id: "004", ko: "리포트 생성", en: "REPORT GENERATION" },
 ];
 
-type Phase = "climbing" | "holding" | "completing";
-
-const CLIMB_MS = 2500;       // 0% → 90%
-const HOLD_CAP_PCT = 90;     // hold 단계 상한
-const COMPLETE_MS = 400;     // 90% → 100% snap
-const POST_COMPLETE_BUFFER_MS = 120; // 100% 도달 후 navigate 전 짧은 여유
+const CLIMB_MS = 2500;
+const COMPLETE_MS = 400;
+const POST_COMPLETE_BUFFER_MS = 120;
 
 interface AnalyzingScreenProps {
   candidateCount: number;
-  /** 헤드라인 override. 기본 "읽고 있습니다." */
+  /** 호환용 — 사용 X (내부 단순화). */
   headline?: string;
-  /** 실제 비동기 작업 완료 여부. true가 되면 100%로 snap. */
+  /** 실제 비동기 작업 완료 여부. true 도달 시 COMPLETE_MS 후 onFinish. */
   done?: boolean;
-  /** 100% 도달 + 버퍼 후 호출. 상위가 navigate 하는 용도. */
+  /** 완료 후 호출 — 상위가 navigate. */
   onFinish?: () => void;
 }
 
 export function AnalyzingScreen({
-  candidateCount,
-  headline = "고르고 있어요.",
+  candidateCount: _candidateCount,
+  headline: _headline,
   done = false,
   onFinish,
 }: AnalyzingScreenProps) {
-  const [pct, setPct] = useState(0);
-  const [phase, setPhase] = useState<Phase>("climbing");
+  const [climbed, setClimbed] = useState(false);
   const finishedRef = useRef(false);
 
-  // Phase 1: 0% → 90% cubic ease over CLIMB_MS
+  // CLIMB_MS 후 climbed=true (내부 progress 신호 — UI 미노출)
   useEffect(() => {
-    if (phase !== "climbing") return;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / CLIMB_MS);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setPct(Math.round(eased * HOLD_CAP_PCT));
-      if (p < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        setPct(HOLD_CAP_PCT);
-        setPhase("holding");
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [phase]);
+    const t = setTimeout(() => setClimbed(true), CLIMB_MS);
+    return () => clearTimeout(t);
+  }, []);
 
-  // Phase 2 → 3: done + holding 도달 시 completing으로
+  // done && climbed → COMPLETE_MS 후 onFinish
   useEffect(() => {
-    if (done && phase === "holding") setPhase("completing");
-  }, [done, phase]);
-
-  // Phase 3: 현재 pct → 100% linear over COMPLETE_MS, 완료 시 onFinish
-  useEffect(() => {
-    if (phase !== "completing") return;
-    const start = performance.now();
-    const from = pct;
-    let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / COMPLETE_MS);
-      setPct(Math.round(from + (100 - from) * p));
-      if (p < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        setPct(100);
-        if (!finishedRef.current) {
-          finishedRef.current = true;
-          setTimeout(() => onFinish?.(), POST_COMPLETE_BUFFER_MS);
-        }
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // from을 dep에 넣으면 매 렌더 리셋되므로 고정 — phase 변화 시에만 실행.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+    if (!done || !climbed) return;
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    const t = setTimeout(
+      () => onFinish?.(),
+      COMPLETE_MS + POST_COMPLETE_BUFFER_MS,
+    );
+    return () => clearTimeout(t);
+  }, [done, climbed, onFinish]);
 
   return (
-    <div
+    <main
       style={{
         minHeight: "100vh",
         background: "var(--color-paper)",
         color: "var(--color-ink)",
-        fontFamily: "var(--font-sans)",
         display: "flex",
         flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "40px 28px",
+        textAlign: "center",
       }}
+      aria-busy
     >
-      <TopBar />
+      {/* SIGAK 로고 60x60 (마케터 로딩_1815.html 정합) */}
+      <svg
+        width="60"
+        height="60"
+        viewBox="0 0 40 40"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ marginBottom: 40 }}
+        aria-hidden
+      >
+        <rect width="40" height="40" rx="7" fill="#1a1a1a" />
+        <g stroke="#ffffff" strokeWidth="1.5" fill="none" strokeLinecap="round">
+          <line x1="20" y1="6" x2="20" y2="13" />
+          <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z" />
+          <circle cx="20" cy="19.5" r="2.6" />
+        </g>
+        <path
+          d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z"
+          fill="#ffffff"
+        />
+      </svg>
 
+      <p
+        className="font-sans"
+        style={{
+          fontSize: 16,
+          color: "var(--color-ink)",
+          opacity: 0.75,
+          lineHeight: 1.7,
+          letterSpacing: "-0.005em",
+          marginBottom: 28,
+        }}
+      >
+        sia가 피드를 분석중이에요.
+      </p>
+
+      {/* dot-pulse 3-dot */}
       <div
         style={{
-          flex: 1,
           display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: "0 28px",
+          gap: 8,
+          alignItems: "center",
+          marginBottom: 36,
         }}
+        aria-hidden
       >
-        <h1
-          className="font-serif"
+        <span
+          className="animate-dot-pulse"
           style={{
-            fontSize: 32,
-            fontWeight: 400,
-            lineHeight: 1.4,
-            letterSpacing: "-0.01em",
-            margin: 0,
-            color: "var(--color-ink)",
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "var(--color-danger)",
           }}
-        >
-          {headline}
-        </h1>
-        {candidateCount > 0 && (
-          <p
-            className="font-sans"
-            style={{
-              marginTop: 14,
-              fontSize: 13,
-              opacity: 0.5,
-              lineHeight: 1.6,
-              color: "var(--color-ink)",
-            }}
-          >
-            사진 {candidateCount}장.
-          </p>
-        )}
+        />
+        <span
+          className="animate-dot-pulse-delay-1"
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "var(--color-danger)",
+          }}
+        />
+        <span
+          className="animate-dot-pulse-delay-2"
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "var(--color-danger)",
+          }}
+        />
       </div>
 
-      <div
+      <p
+        className="font-sans"
         style={{
-          padding: "0 28px 48px",
-          // holding 단계에서 부드러운 opacity 펄스 → "멈춘 것 아님" 시그널
-          opacity: phase === "holding" ? undefined : 1,
-          animation:
-            phase === "holding"
-              ? "sigak-hold-pulse 1600ms ease-in-out infinite"
-              : undefined,
+          fontSize: 12,
+          color: "var(--color-mute)",
+          letterSpacing: "-0.003em",
         }}
       >
-        <ProgressBar pct={pct} label="진행" />
-      </div>
-
-      {/* inline keyframes — globals에 안 넣어도 이 화면 전용 */}
-      <style>{`
-        @keyframes sigak-hold-pulse {
-          0%, 100% { opacity: 1; }
-          50%      { opacity: 0.75; }
-        }
-      `}</style>
-    </div>
+        최대 30초 정도 걸릴 수 있어요
+      </p>
+    </main>
   );
 }

@@ -133,13 +133,12 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
 
   return (
     <div className="max-w-2xl mx-auto px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
-      {/* 1. free + standard 섹션 전체 렌더링 */}
+      {/* 1. free + standard 섹션 전체 렌더링 — Phase B-2.5: overlay prop 제거 */}
       {visibleSections.map((section) => (
         <SectionRenderer
           key={section.id}
           section={section}
           accessLevel="standard"
-          overlay={(report as unknown as { overlay?: { before_url: string; after_url: string } }).overlay ?? null}
         />
       ))}
 

@@ -15,27 +15,16 @@ import { HairRecommendation } from "./sections/hair-recommendation";
 import { ActionPlan } from "./sections/action-plan";
 import { TypeReference } from "./sections/type-reference";
 
-interface OverlayData {
-  before_url: string;
-  after_url: string;
-}
-
-interface HairSimulationData {
-  before_url: string;
-  after_url: string;
-  color_name: string;
-  color_hex: string;
-}
+// Phase B-2.5 (PI-REVIVE 2026-04-26): OverlayData / HairSimulationData props 제거.
+// MAKEUP OVERLAY + HAIR COLOR SIMULATION 슬라이더 미사용. v1.5 부활 시 복원.
 
 interface SectionRendererProps {
   section: ReportSection;
   accessLevel: AccessLevel;
-  overlay?: OverlayData | null;
-  hairSimulation?: HairSimulationData | null;
 }
 
 // 섹션 타입별 분기 렌더링 - 각 section의 locked 상태 계산 후 해당 컴포넌트로 전달
-export function SectionRenderer({ section, accessLevel, overlay, hairSimulation }: SectionRendererProps) {
+export function SectionRenderer({ section, accessLevel }: SectionRendererProps) {
   // 현재 access_level 기준으로 잠금 상태 계산
   const locked = isSectionLocked(section, accessLevel);
   // 섹션 콘텐츠 (unknown으로 중간 캐스팅하여 타입 안전하게 전달)
@@ -92,8 +81,6 @@ export function SectionRenderer({ section, accessLevel, overlay, hairSimulation 
         <ActionPlan
           content={content as Parameters<typeof ActionPlan>[0]["content"]}
           locked={locked}
-          overlay={overlay}
-          hairSimulation={hairSimulation}
         />
       );
     case "type_reference":

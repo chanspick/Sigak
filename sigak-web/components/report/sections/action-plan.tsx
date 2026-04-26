@@ -2,6 +2,9 @@
 // Fix #13: CumulativeProgressBar 제거, 한국어 우선순위 배지
 // Fix #16: 영문 존 이름 → 한국어 매핑
 // Fix #17: delta 수치, axis+delta 텍스트 완전 제거
+// Phase B-2.5 (PI-REVIVE 2026-04-26): MAKEUP OVERLAY + HAIR COLOR SIMULATION
+// Before/After 슬라이더 제거. ACTION PLAN zone 텍스트만 유지. v1.5 부활 시
+// overlay / hairSimulation props + 렌더 블록 + OverlayCompare import 복원.
 
 interface ActionRecommendation {
   action: string;
@@ -15,18 +18,6 @@ interface ActionItem {
   recommendations: ActionRecommendation[];
 }
 
-interface OverlayData {
-  before_url: string;
-  after_url: string;
-}
-
-interface HairSimulationData {
-  before_url: string;
-  after_url: string;
-  color_name: string;
-  color_hex: string;
-}
-
 interface ActionPlanContent {
   items: ActionItem[];
 }
@@ -34,8 +25,6 @@ interface ActionPlanContent {
 interface ActionPlanProps {
   content: ActionPlanContent;
   locked: boolean;
-  overlay?: OverlayData | null;
-  hairSimulation?: HairSimulationData | null;
 }
 
 // 존 이름 영문 → 한국어 매핑 (Fix #16)
@@ -88,10 +77,11 @@ function localizeCategory(category: string): string {
   return ZONE_KR[category] ?? category;
 }
 
-import { OverlayCompare } from "@/components/report/sections/overlay-compare";
+// Phase B-2.5: OverlayCompare import 제거 (Before/After 슬라이더 미사용).
+// v1.5 부활 시: import { OverlayCompare } from "@/components/report/sections/overlay-compare";
 
 // 실행 가이드 — 우선순위 배지 + 액션 + 팁
-export function ActionPlan({ content, locked, overlay, hairSimulation }: ActionPlanProps) {
+export function ActionPlan({ content, locked }: ActionPlanProps) {
   return (
     <section className="py-10 border-b border-[var(--color-border)]">
       {/* 섹션 헤더 */}
@@ -99,53 +89,8 @@ export function ActionPlan({ content, locked, overlay, hairSimulation }: ActionP
         ACTION PLAN
       </h2>
 
-      {/* Before/After 오버레이 비교 — 메이크업 + 헤어 */}
-      {(overlay?.before_url || hairSimulation?.before_url) && (
-        <div className="mb-8 space-y-8">
-          {/* 메이크업 오버레이 */}
-          {overlay?.before_url && overlay?.after_url && (
-            <div>
-              <p className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
-                MAKEUP OVERLAY
-              </p>
-              <OverlayCompare
-                beforeUrl={overlay.before_url}
-                afterUrl={overlay.after_url}
-                actionTags={content.items.map((item) => ({
-                  label: localizeCategory(item.category),
-                  priority: item.priority,
-                }))}
-                locked={locked}
-              />
-            </div>
-          )}
-
-          {/* 헤어컬러 시뮬레이션 */}
-          {hairSimulation?.before_url && hairSimulation?.after_url && (
-            <div>
-              <p className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
-                HAIR COLOR SIMULATION
-                {hairSimulation.color_name && (
-                  <span className="ml-2 normal-case tracking-normal font-normal">
-                    — {hairSimulation.color_name}
-                    {hairSimulation.color_hex && (
-                      <span
-                        className="inline-block w-3 h-3 rounded-full ml-1.5 align-middle border border-black/10"
-                        style={{ backgroundColor: hairSimulation.color_hex }}
-                      />
-                    )}
-                  </span>
-                )}
-              </p>
-              <OverlayCompare
-                beforeUrl={hairSimulation.before_url}
-                afterUrl={hairSimulation.after_url}
-                locked={locked}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      {/* Phase B-2.5: MAKEUP OVERLAY + HAIR COLOR SIMULATION 슬라이더 제거.
+          ACTION PLAN zone 텍스트 (아래) 만 유지. v1.5 부활 가능. */}
 
       {/* 카테고리 + 우선순위 배지 — 항상 선명 (블러 위) */}
       <div className="flex flex-wrap gap-2 mb-6">

@@ -150,12 +150,10 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
     <div className="max-w-2xl mx-auto px-[var(--spacing-page-x-mobile)] md:px-[var(--spacing-page-x)]">
       {report.sections.map((section) => (
         <div key={section.id}>
-          {/* 섹션 렌더링 */}
+          {/* 섹션 렌더링 — Phase B-2.5: overlay/hair_simulation props 제거 */}
           <SectionRenderer
             section={section}
             accessLevel={report.access_level}
-            overlay={(report as unknown as { overlay?: { before_url: string; after_url: string } }).overlay ?? null}
-            hairSimulation={(report as unknown as { hair_simulation?: { before_url: string; after_url: string; color_name: string; color_hex: string } }).hair_simulation ?? null}
           />
 
           {/* 해당 레벨 그룹의 마지막 섹션 뒤에 PaywallGate 삽입 */}

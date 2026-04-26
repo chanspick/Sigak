@@ -960,28 +960,30 @@ def _run_analysis_pipeline(
         gap=gap, interview_intent=aspiration_result.get("intent_tags"), gender=gender,
     )
 
-    # Step 8.5: 오버레이
-    overlay_plan = build_overlay_plan(action_spec, features)
-    import cv2
+    # Step 8.5: 오버레이 — Phase B-2.5 (PI-REVIVE 2026-04-26) 비활성.
+    # 본인 결정: MAKEUP OVERLAY Before/After 슬라이더 UI 제거, ACTION PLAN
+    # zone 텍스트만 유지. v1.5 부활 여지 보존 (코드 주석만, 삭제 X).
+    # 재활성: 아래 블록 주석 해제 + frontend slider 컴포넌트 복원.
     overlay_image_url = None
-    photo_dir = DATA_DIR / user_id
-    # 파이프라인 생성 파일 제외, 유저 원본 사진만
-    _generated_names = {"overlay.png", "hair_simulation.png"}
-    photo_files = [
-        p for p in sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
-        if p.name not in _generated_names
-    ]
-    if photo_files and analysis:
-        photo_img = cv2.imdecode(np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR)
-        if photo_img is not None:
-            lmk106 = analysis.get("landmarks_106")
-            face_bbox = analysis.get("bbox")
-            if lmk106:
-                overlay_plan_dicts = [{"zone": z.zone_name, "type": z.zone_type, "color": z.color_hex, "opacity": z.opacity} for z in overlay_plan]
-                overlay_img = render_overlay(img=photo_img, landmarks_106=np.array(lmk106), overlay_plan=overlay_plan_dicts, face_type=features.get("face_shape", ""), bbox=np.array(face_bbox) if face_bbox else None)
-                if overlay_img is not None:
-                    cv2.imwrite(str(photo_dir / "overlay.png"), overlay_img)
-                    overlay_image_url = f"/api/v1/uploads/{user_id}/overlay.png"
+    # overlay_plan = build_overlay_plan(action_spec, features)
+    # import cv2
+    # photo_dir = DATA_DIR / user_id
+    # _generated_names = {"overlay.png", "hair_simulation.png"}
+    # photo_files = [
+    #     p for p in sorted(photo_dir.glob("*.jpg")) + sorted(photo_dir.glob("*.jpeg")) + sorted(photo_dir.glob("*.png"))
+    #     if p.name not in _generated_names
+    # ]
+    # if photo_files and analysis:
+    #     photo_img = cv2.imdecode(np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR)
+    #     if photo_img is not None:
+    #         lmk106 = analysis.get("landmarks_106")
+    #         face_bbox = analysis.get("bbox")
+    #         if lmk106:
+    #             overlay_plan_dicts = [{"zone": z.zone_name, "type": z.zone_type, "color": z.color_hex, "opacity": z.opacity} for z in overlay_plan]
+    #             overlay_img = render_overlay(img=photo_img, landmarks_106=np.array(lmk106), overlay_plan=overlay_plan_dicts, face_type=features.get("face_shape", ""), bbox=np.array(face_bbox) if face_bbox else None)
+    #             if overlay_img is not None:
+    #                 cv2.imwrite(str(photo_dir / "overlay.png"), overlay_img)
+    #                 overlay_image_url = f"/api/v1/uploads/{user_id}/overlay.png"
 
     # Step 9: LLM 리포트 (퍼스널컬러 정보 포함)
     personal_color_label = ""
@@ -1024,46 +1026,48 @@ def _run_analysis_pipeline(
         aspiration_interpretation=aspiration_result, aspiration_anchor=aspiration_anchor,
     )
 
-    # 오버레이 URL 삽입
-    if overlay_image_url:
-        original_photos = photo_files
-        formatted_report["overlay"] = {
-            "before_url": f"/api/v1/uploads/{user_id}/{original_photos[0].name}" if original_photos else None,
-            "after_url": overlay_image_url,
-        }
+    # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).
+    # if overlay_image_url:
+    #     original_photos = photo_files
+    #     formatted_report["overlay"] = {
+    #         "before_url": f"/api/v1/uploads/{user_id}/{original_photos[0].name}" if original_photos else None,
+    #         "after_url": overlay_image_url,
+    #     }
 
-    # Step 10.5: 헤어컬러 시뮬레이션 (퍼스널컬러 → 1순위 추천색 적용)
-    hair_sim_url = None
-    try:
-        # skin_analysis 섹션에서 hair_colors 추출
-        skin_section = next(
-            (s for s in formatted_report.get("sections", []) if s.get("id") == "skin_analysis"),
-            None,
-        )
-        hair_colors = (skin_section or {}).get("content", {}).get("hair_colors", [])
-        if hair_colors and photo_files:
-            target_hex = hair_colors[0].get("hex", "")
-            if target_hex:
-                photo_img_for_hair = cv2.imdecode(
-                    np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR
-                )
-                if photo_img_for_hair is not None:
-                    sim_img = render_hair_simulation(photo_img_for_hair, target_hex)
-                    if sim_img is not None:
-                        sim_path = photo_dir / "hair_simulation.png"
-                        cv2.imwrite(str(sim_path), sim_img)
-                        hair_sim_url = f"/api/v1/uploads/{user_id}/hair_simulation.png"
-                        print(f"[HAIR_SIM] 생성 완료: {hair_sim_url}")
-    except Exception as e:
-        print(f"[HAIR_SIM] 실패 (무시): {e}")
-
-    if hair_sim_url:
-        formatted_report["hair_simulation"] = {
-            "before_url": f"/api/v1/uploads/{user_id}/{photo_files[0].name}" if photo_files else None,
-            "after_url": hair_sim_url,
-            "color_name": hair_colors[0].get("name", "") if hair_colors else "",
-            "color_hex": hair_colors[0].get("hex", "") if hair_colors else "",
-        }
+    # Step 10.5: 헤어컬러 시뮬레이션 — Phase B-2.5 (PI-REVIVE 2026-04-26) 비활성.
+    # 본인 결정: HAIR COLOR SIMULATION Before/After 슬라이더 UI 제거.
+    # v1.5 부활 여지 보존 (코드 주석만, 삭제 X).
+    # 재활성: 아래 블록 + 위 overlay 블록 주석 해제 + frontend slider 컴포넌트 복원.
+    # hair_sim_url = None
+    # try:
+    #     skin_section = next(
+    #         (s for s in formatted_report.get("sections", []) if s.get("id") == "skin_analysis"),
+    #         None,
+    #     )
+    #     hair_colors = (skin_section or {}).get("content", {}).get("hair_colors", [])
+    #     if hair_colors and photo_files:
+    #         target_hex = hair_colors[0].get("hex", "")
+    #         if target_hex:
+    #             photo_img_for_hair = cv2.imdecode(
+    #                 np.fromfile(str(photo_files[0]), dtype=np.uint8), cv2.IMREAD_COLOR
+    #             )
+    #             if photo_img_for_hair is not None:
+    #                 sim_img = render_hair_simulation(photo_img_for_hair, target_hex)
+    #                 if sim_img is not None:
+    #                     sim_path = photo_dir / "hair_simulation.png"
+    #                     cv2.imwrite(str(sim_path), sim_img)
+    #                     hair_sim_url = f"/api/v1/uploads/{user_id}/hair_simulation.png"
+    #                     print(f"[HAIR_SIM] 생성 완료: {hair_sim_url}")
+    # except Exception as e:
+    #     print(f"[HAIR_SIM] 실패 (무시): {e}")
+    #
+    # if hair_sim_url:
+    #     formatted_report["hair_simulation"] = {
+    #         "before_url": f"/api/v1/uploads/{user_id}/{photo_files[0].name}" if photo_files else None,
+    #         "after_url": hair_sim_url,
+    #         "color_name": hair_colors[0].get("name", "") if hair_colors else "",
+    #         "color_hex": hair_colors[0].get("hex", "") if hair_colors else "",
+    #     }
 
     # 저장
     from dataclasses import asdict

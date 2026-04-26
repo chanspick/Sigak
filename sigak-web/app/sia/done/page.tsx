@@ -89,15 +89,32 @@ function VerdictUploadView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleSlotChange(idx: number, file: File | null) {
-    if (!file) return;
+  function handleSlotChange(idx: number, files: FileList | null) {
+    if (!files || files.length === 0) return;
     setError(null);
+    const fileArr = Array.from(files);
     setItems((prev) => {
       const next = [...prev];
-      // idx 위치에 정확히 배치 (sparse 가능). 아래 렌더에서 items[idx] 로 조회.
+      // 첫 파일은 클릭한 슬롯에 (replace 가능)
       const replaced = next[idx];
       if (replaced) URL.revokeObjectURL(replaced.previewUrl);
-      next[idx] = { file, previewUrl: URL.createObjectURL(file) };
+      next[idx] = {
+        file: fileArr[0],
+        previewUrl: URL.createObjectURL(fileArr[0]),
+      };
+      // Phase B-7.1: multiple 선택 시 추가 파일은 다음 빈 슬롯 spillover
+      // 본인 모바일 피드백: "사진 올리기 너무 불편" → 갤러리에서 batch 선택 → 자동 채움
+      let cursor = idx + 1;
+      for (let i = 1; i < fileArr.length && cursor < 3; i++) {
+        // 빈 슬롯 찾기 (이미 차 있으면 skip)
+        while (cursor < 3 && next[cursor]) cursor++;
+        if (cursor >= 3) break;
+        next[cursor] = {
+          file: fileArr[i],
+          previewUrl: URL.createObjectURL(fileArr[i]),
+        };
+        cursor++;
+      }
       return next;
     });
   }
@@ -328,7 +345,8 @@ function VerdictUploadView() {
                   }}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleSlotChange(idx, e.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={(e) => handleSlotChange(idx, e.target.files)}
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -336,7 +354,7 @@ function VerdictUploadView() {
                     cursor: "pointer",
                     zIndex: 2,
                   }}
-                  aria-label={`사진 ${idx + 1} 추가`}
+                  aria-label={`사진 ${idx + 1} 추가 (여러 장 선택 가능)`}
                 />
                 {filled ? (
                   <>
@@ -474,8 +492,7 @@ function VerdictUploadView() {
             lineHeight: 1.5,
           }}
         >
-          정밀 분석을 위해 {MIN_PHOTOS}장 모두 올려주세요
-          {MAX_PHOTOS > MIN_PHOTOS && ` (최대 ${MAX_PHOTOS}장)`}
+          정밀 분석을 위해 {MIN_PHOTOS}장 모두 올려주세요. 갤러리에서 여러 장 한번에 선택 가능
         </p>
 
         {error && (

@@ -502,11 +502,14 @@ function PhotoUploadContent() {
           ))}
         </div>
 
+        {/* Phase B-7.1 (PI-REVIVE 2026-04-26): capture 속성 제거.
+            본인 모바일 피드백: "PI 레포트는 사진 찍게하는데 저건 말도안되고".
+            capture="environment" 가 카메라 강제 → 제거 시 OS 피커가
+            갤러리/카메라/파일 모두 선택지로 노출. */}
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFileChange}
           style={{ display: "none" }}
         />

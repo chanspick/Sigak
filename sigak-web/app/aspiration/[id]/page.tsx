@@ -140,13 +140,16 @@ export default function AspirationResultPage() {
             className="font-serif"
             style={{
               margin: "10px 0 0",
-              fontSize: 26,
-              fontWeight: 400,
-              lineHeight: 1.3,
-              letterSpacing: "-0.01em",
+              fontSize: 24,
+              fontWeight: 700,
+              lineHeight: 1.42,
+              letterSpacing: "-0.022em",
+              color: "var(--color-ink)",
+              wordBreak: "keep-all",
             }}
           >
             {targetLabel}
+            <span style={{ color: "var(--color-danger)" }}>.</span>
           </h1>
           {analysis.hook_line && (
             <p

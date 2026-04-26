@@ -194,16 +194,17 @@ export default function OnboardingStepPage() {
       </section>
 
       {/* 제목 */}
-      <section style={{ padding: "36px 28px 0" }}>
+      <section style={{ padding: "36px 24px 0", maxWidth: 480, margin: "0 auto" }}>
         <h1
           className="font-serif"
           style={{
-            fontSize: 28,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 24,
+            fontWeight: 700,
+            lineHeight: 1.42,
+            letterSpacing: "-0.022em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
           {step.title}

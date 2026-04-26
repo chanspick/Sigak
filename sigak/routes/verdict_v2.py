@@ -60,7 +60,9 @@ router = APIRouter(prefix="/api/v2/verdict", tags=["verdict-v2"])
 # ─────────────────────────────────────────────
 
 MIN_PHOTOS = 3
-MAX_PHOTOS = 10
+# MAX 10 → 5 (2026-04-26): 마케터 피드백 (10장 입력 시 리텐션 하락) + 본인 동의.
+# 3-5장 입력 → 베스트 1장 선정. frontend lib/api/verdicts.ts 동시 변경.
+MAX_PHOTOS = 5
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_PHOTO_BYTES = 10 * 1024 * 1024   # 10 MB per photo
 

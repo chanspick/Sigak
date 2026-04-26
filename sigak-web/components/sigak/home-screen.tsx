@@ -150,7 +150,7 @@ export function HomeScreen() {
             letterSpacing: "-0.005em",
           }}
         >
-          3장 이상 올려주시면 시각이 가장 잘 맞는 한 장을 골라드려요.
+          3~5장 올려주시면 시각이 가장 잘 맞는 한 장을 골라드려요.
         </p>
       </section>
 
@@ -210,7 +210,7 @@ export function HomeScreen() {
             transition: "all 0.2s ease",
           }}
         >
-          {canStart ? "분석 시작하기 →" : "3장 이상 올려주세요"}
+          {canStart ? "분석 시작하기 →" : "3장 이상 올려주세요 (최대 5장)"}
         </button>
       </div>
 

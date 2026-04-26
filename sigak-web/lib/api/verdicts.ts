@@ -18,9 +18,11 @@ import type {
 
 /** 업로드 파일 개수 제약 (백엔드 verdict_v2 와 통일).
  *  v2 엔드포인트는 MIN_PHOTOS=3 (sigak/routes/verdict_v2.py:61).
- *  v1 은 MIN=2 였으나 v2 결합 후 일관성을 위해 3 으로 통일. */
+ *  v1 은 MIN=2 였으나 v2 결합 후 일관성을 위해 3 으로 통일.
+ *  MAX 10 → 5 (2026-04-26): 마케터 피드백 — 10장 입력 시 리텐션 하락,
+ *  본인 동의. 3-5장 입력 → 베스트 1장 선정. backend 동시 변경. */
 export const MIN_PHOTOS = 3;
-export const MAX_PHOTOS = 10;
+export const MAX_PHOTOS = 5;
 
 /** MVP Home은 3장부터 CTA 활성. MIN_PHOTOS 와 일치. */
 export const UX_MIN_PHOTOS = 3;

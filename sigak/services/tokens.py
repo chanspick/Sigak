@@ -44,7 +44,9 @@ COST_DIAGNOSIS_UNLOCK = 10      # verdict 단위 진단 해제 — /verdicts/{id
 COST_PI_UNLOCK = 50             # 유저 1회 영속 PI 해제 — /pi/unlock
 
 # v2 Verdict 2.0 (2026-04-27, SPEC-ONBOARDING-V2 REQ-VERDICT-003)
-COST_VERDICT_V2_UNLOCK = 10     # full_content 해제 — /api/v2/verdict/{id}/unlock
+# 2026-04-26 마케터 피드백: 회당 10 → 사진 장당 3 토큰 (3장=9, 4장=12, 5장=15)
+COST_VERDICT_V2_UNLOCK_PER_PHOTO = 3    # full_content 해제 — /api/v2/verdict/{id}/unlock
+COST_VERDICT_V2_UNLOCK = COST_VERDICT_V2_UNLOCK_PER_PHOTO  # legacy alias (1장 케이스)
 
 # SIGAK v2.0 (CLAUDE.md §10.1, 2026-04-22) — 6 상품 전수 상수
 #   Idempotency key 패턴:

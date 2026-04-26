@@ -85,6 +85,10 @@ export interface VerdictV2GetResponse {
   full_content: FullContent | null;
   photo_urls: PhotoUrl[];
   best_fit_photo_url?: string | null;
+  /** 사진 장당 cost 정책 (2026-04-26 마케터 피드백) — frontend dynamic 표시용.
+   *  cost = COST_VERDICT_V2_UNLOCK_PER_PHOTO(3) * photo_count. */
+  photo_count?: number;
+  unlock_cost?: number;
 }
 
 export interface VerdictV2UnlockResponse {

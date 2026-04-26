@@ -36,7 +36,9 @@ import type {
   VerdictV2GetResponse,
 } from "@/lib/types/verdict_v2";
 
-const UNLOCK_COST = 10;
+// 2026-04-26 마케터 피드백: 회당 10 → 사진 장당 3 토큰.
+// backend GetResponse.unlock_cost 가 정합. fallback = 3 * photo_urls.length.
+const UNLOCK_COST_PER_PHOTO = 3;
 
 const BEST_FIT_PATTERNS = [
   /가장\s*가까운/,
@@ -103,9 +105,17 @@ export function VerdictV2Screen({ initial }: VerdictV2ScreenProps) {
       ? data.photo_urls[bestFitIndex]
       : null);
 
+  // 2026-04-26 마케터 피드백: 회당 10 → 사진 장당 3 토큰.
+  // backend GetResponse.unlock_cost 우선, fallback = photo_urls.length * 3.
+  const unlockCost =
+    data.unlock_cost ??
+    (data.photo_urls.length > 0
+      ? data.photo_urls.length * UNLOCK_COST_PER_PHOTO
+      : 3 * UNLOCK_COST_PER_PHOTO);
+
   async function handleUnlock() {
     if (unlocking) return;
-    if (balance != null && balance < UNLOCK_COST) {
+    if (balance != null && balance < unlockCost) {
       router.push(
         `/tokens/purchase?intent=unlock_verdict_v2&verdict_id=${encodeURIComponent(data.verdict_id)}`,
       );
@@ -195,6 +205,7 @@ export function VerdictV2Screen({ initial }: VerdictV2ScreenProps) {
           bestFitIndex={bestFitIndex}
           bestFitUrl={bestFitUrl}
           balance={balance}
+          unlockCost={unlockCost}
           busy={unlocking}
           error={unlockError}
           onUnlock={handleUnlock}
@@ -259,6 +270,7 @@ function PreviewBestFitGate({
   bestFitIndex,
   bestFitUrl,
   balance,
+  unlockCost,
   busy,
   error,
   onUnlock,
@@ -268,6 +280,7 @@ function PreviewBestFitGate({
   bestFitIndex: number | null;
   bestFitUrl: PhotoUrl;
   balance: number | null;
+  unlockCost: number;
   busy: boolean;
   error: string | null;
   onUnlock: () => void;
@@ -284,6 +297,7 @@ function PreviewBestFitGate({
     return (
       <UnlockSection
         balance={balance}
+        unlockCost={unlockCost}
         busy={busy}
         error={error}
         onClick={onUnlock}
@@ -332,6 +346,7 @@ function PreviewBestFitGate({
 
       <UnlockSection
         balance={balance}
+        unlockCost={unlockCost}
         busy={busy}
         error={error}
         onClick={onUnlock}
@@ -648,16 +663,18 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function UnlockSection({
   balance,
+  unlockCost,
   busy,
   error,
   onClick,
 }: {
   balance: number | null;
+  unlockCost: number;
   busy: boolean;
   error: string | null;
   onClick: () => void;
 }) {
-  const insufficient = balance != null && balance < UNLOCK_COST;
+  const insufficient = balance != null && balance < unlockCost;
   return (
     <section style={{ padding: "32px 28px 0" }}>
       <div
@@ -739,7 +756,7 @@ function UnlockSection({
               >
                 ·
               </span>
-              <span className="tabular-nums">{UNLOCK_COST} 토큰</span>
+              <span className="tabular-nums">{unlockCost} 토큰</span>
             </>
           )}
         </button>

@@ -101,6 +101,10 @@ class GetResponse(BaseModel):
     full_content: Optional[FullContent] = None
     photo_urls: list[Optional[str]] = []
     best_fit_photo_url: Optional[str] = None
+    # 사진 장당 cost 정책 (2026-04-26 마케터 피드백) — frontend dynamic 표시용.
+    # cost = COST_VERDICT_V2_UNLOCK_PER_PHOTO * photo_count
+    photo_count: int = 0
+    unlock_cost: int = 0
 
 
 # ─────────────────────────────────────────────
@@ -349,11 +353,11 @@ def unlock_verdict_v2(
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
-    # 1. Verdict 조회 + 검증
+    # 1. Verdict 조회 + 검증 — candidate_count 필요 (장당 cost 계산)
     row = db.execute(
         text(
             "SELECT id, user_id, version, full_unlocked, preview_content, "
-            "       full_content, ranked_photo_ids "
+            "       full_content, ranked_photo_ids, candidate_count "
             "FROM verdicts WHERE id = :id"
         ),
         {"id": verdict_id},
@@ -394,9 +398,10 @@ def unlock_verdict_v2(
             ),
         )
 
-    # 3. Balance check
+    # 3. Balance check — cost = COST_PER_PHOTO * candidate_count (마케터 피드백 2026-04-26)
+    photo_count = int(row.candidate_count or len(photo_urls) or 1)
+    cost = tokens_service.COST_VERDICT_V2_UNLOCK_PER_PHOTO * photo_count
     balance = tokens_service.get_balance(db, user["id"])
-    cost = tokens_service.COST_VERDICT_V2_UNLOCK
     if balance < cost:
         raise HTTPException(
             402,
@@ -535,7 +540,7 @@ def get_verdict_v2(
     row = db.execute(
         text(
             "SELECT id, user_id, version, full_unlocked, preview_content, "
-            "       full_content, ranked_photo_ids "
+            "       full_content, ranked_photo_ids, candidate_count "
             "FROM verdicts WHERE id = :id"
         ),
         {"id": verdict_id},
@@ -560,6 +565,8 @@ def get_verdict_v2(
 
     photo_urls = _photo_urls_from_ranked(row.ranked_photo_ids)
     best_fit_idx = _resolve_best_fit_index(preview, full)
+    photo_count = int(row.candidate_count or len(photo_urls) or 1)
+    unlock_cost = tokens_service.COST_VERDICT_V2_UNLOCK_PER_PHOTO * photo_count
     return GetResponse(
         verdict_id=verdict_id,
         version="v2",
@@ -568,6 +575,8 @@ def get_verdict_v2(
         full_content=full,
         photo_urls=photo_urls,
         best_fit_photo_url=_best_fit_url(photo_urls, best_fit_idx),
+        photo_count=photo_count,
+        unlock_cost=unlock_cost,
     )
 
 

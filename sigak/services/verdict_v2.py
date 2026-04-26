@@ -634,7 +634,7 @@ def build_verdict_v2(
     trend_data: Optional[dict] = None,
     matched_trends: Optional[list] = None,
     taste_profile: Optional[Any] = None,
-    max_retries: int = 4,
+    max_retries: int = 2,
     history_context: str = "",
 ) -> VerdictV2Result:
     """Verdict 2.0 build — Sonnet 4.6 cross-analysis.
@@ -666,8 +666,10 @@ def build_verdict_v2(
 
     last_error: Optional[Exception] = None
     last_was_rate_limit = False
-    # Rate limit backoff schedule (sec). Anthropic minute-window = 60s, double-safety.
-    backoff_schedule = [15, 30, 60, 120]
+    # Rate limit backoff schedule (sec). 2026-04-26 단축:
+    # 마케터 피드백 — 사용자가 4분 대기 X. fail-fast 후 친화 카피 + 재시도 안내.
+    # 총 max_retries=2 (3 attempts), 최악 wait = 5+10+15 = 30s.
+    backoff_schedule = [5, 10, 15]
 
     for attempt in range(max_retries + 1):
         try:

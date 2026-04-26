@@ -236,8 +236,9 @@ function EndConfirmModal({ onConfirm, onCancel }: EndConfirmModalProps) {
           width: "100%",
           maxWidth: 360,
           background: "var(--color-paper)",
-          padding: "28px 24px 20px",
+          padding: "28px 24px 22px",
           border: "1px solid var(--color-line)",
+          borderRadius: 14,
         }}
       >
         <h2
@@ -245,24 +246,26 @@ function EndConfirmModal({ onConfirm, onCancel }: EndConfirmModalProps) {
           className="font-serif"
           style={{
             margin: 0,
-            fontSize: 20,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 22,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            letterSpacing: "-0.022em",
             color: "var(--color-ink)",
+            textAlign: "center",
           }}
         >
-          여기까지 할까요?
+          여기까지 할까요
+          <span style={{ color: "var(--color-danger)" }}>?</span>
         </h2>
         <p
           className="font-sans"
           style={{
-            margin: "12px 0 0",
-            fontSize: 13,
+            margin: "10px 0 0",
+            fontSize: 13.5,
             lineHeight: 1.6,
             letterSpacing: "-0.005em",
-            opacity: 0.6,
-            color: "var(--color-ink)",
+            color: "var(--color-mute)",
+            textAlign: "center",
           }}
         >
           지금까지 나눈 얘기로 정리해드릴게요.
@@ -281,15 +284,16 @@ function EndConfirmModal({ onConfirm, onCancel }: EndConfirmModalProps) {
             className="font-sans"
             style={{
               flex: 1,
-              height: 48,
+              padding: "14px 16px",
               background: "transparent",
-              color: "var(--color-ink)",
-              border: "1px solid var(--color-line-strong)",
-              borderRadius: 0,
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: "0.3px",
+              color: "var(--color-mute)",
+              border: "1.5px solid var(--color-line)",
+              borderRadius: 100,
+              fontSize: 14,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             더 얘기할게요
@@ -300,15 +304,16 @@ function EndConfirmModal({ onConfirm, onCancel }: EndConfirmModalProps) {
             className="font-sans"
             style={{
               flex: 1,
-              height: 48,
+              padding: "14px 16px",
               background: "var(--color-ink)",
               color: "var(--color-paper)",
               border: "none",
-              borderRadius: 0,
-              fontSize: 13,
+              borderRadius: 100,
+              fontSize: 14,
               fontWeight: 600,
-              letterSpacing: "0.3px",
+              letterSpacing: "-0.012em",
               cursor: "pointer",
+              transition: "all 0.2s ease",
             }}
           >
             끝낼게요

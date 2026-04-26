@@ -171,7 +171,7 @@ function PhotoUploadContent() {
       stage === "submit"
         ? "사진 보내는 중"
         : stage === "analyze"
-          ? "분석하는 중"
+          ? "분석 준비 중"
           : "처리 중";
     return (
       <main
@@ -211,7 +211,7 @@ function PhotoUploadContent() {
           }}
         >
           {stage === "analyze"
-            ? "한참 들여다보고 있어요.\n조금만요."
+            ? "깊게 들여다보고 있어요.\n최적의 분석을 준비중입니다."
             : "정면 사진을 받고 있어요."}
         </h2>
       </main>

@@ -16,7 +16,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { getToken } from "@/lib/auth";
 import { authFetch, ApiError } from "@/lib/api/fetch";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 import {
   TOKEN_PACKS,
@@ -133,14 +133,15 @@ function PurchaseContent() {
             className="font-serif"
             style={{
               fontSize: 32,
-              fontWeight: 400,
-              lineHeight: 1.3,
-              letterSpacing: "-0.01em",
+              fontWeight: 700,
+              lineHeight: 1.25,
+              letterSpacing: "-0.025em",
               margin: 0,
               color: "var(--color-ink)",
             }}
           >
-            토큰 충전.
+            토큰 충전
+            <span style={{ color: "var(--color-danger)" }}>.</span>
           </h1>
         )}
 
@@ -156,8 +157,8 @@ function PurchaseContent() {
           ))}
         </div>
 
-        {/* 동의 */}
-        <div style={{ marginTop: 40 }}>
+        {/* 동의 — 두 번째 항목 아래 마무리 line */}
+        <div style={{ marginTop: 36, borderBottom: "1px solid var(--color-line)" }}>
           <ConsentRow
             checked={consents.refund}
             onToggle={() => setConsents((c) => ({ ...c, refund: !c.refund }))}
@@ -203,21 +204,36 @@ function PurchaseContent() {
         )}
       </main>
 
-      {/* CTA */}
+      {/* CTA — 마케터 pill (radius 100, mist 비활성 / ink 활성) */}
       <div style={{ padding: "20px 28px 24px" }}>
-        <PrimaryButton
+        <button
+          type="button"
           onClick={handlePurchase}
           disabled={!canSubmit}
-          disabledLabel={
-            submitting
-              ? "이동 중..."
-              : !allRequiredChecked
-                ? "필수 동의 항목을 확인해주세요"
-                : "결제"
-          }
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            padding: "17px 24px",
+            background: canSubmit ? "var(--color-ink)" : "var(--color-line-strong)",
+            color: canSubmit ? "var(--color-paper)" : "#fff",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: canSubmit ? "pointer" : "not-allowed",
+            transition: "all 0.25s ease",
+          }}
         >
-          결제하기
-        </PrimaryButton>
+          {submitting
+            ? "이동 중..."
+            : !allRequiredChecked
+              ? "필수 동의 항목을 확인해주세요"
+              : "결제하기"}
+        </button>
       </div>
 
       {/* 사업자 정보 (PG 심사 필수 — 결제 페이지는 핵심) */}
@@ -298,44 +314,46 @@ function PackCard({
       aria-checked={selected}
       style={{
         width: "100%",
-        padding: "20px 20px",
-        background: selected ? "var(--color-ink)" : "transparent",
+        padding: "20px 22px",
+        background: selected ? "var(--color-ink)" : "rgba(0, 0, 0, 0.04)",
         color: selected ? "var(--color-paper)" : "var(--color-ink)",
         border: selected
-          ? "1px solid var(--color-ink)"
-          : "1px solid rgba(0, 0, 0, 0.15)",
-        borderRadius: 0,
+          ? "1.5px solid var(--color-ink)"
+          : "1.5px solid var(--color-line-strong)",
+        borderRadius: 14,
         cursor: "pointer",
         textAlign: "left",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        transition: "background 120ms ease, color 120ms ease",
+        transition: "background 120ms ease, color 120ms ease, border-color 120ms ease",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
-            className="font-sans uppercase"
+            className="uppercase"
             style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "1.5px",
-              opacity: selected ? 0.7 : 0.5,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              opacity: selected ? 0.6 : 0.55,
             }}
           >
             {pack.name_kr}
           </span>
           {pack.badge && (
             <span
-              className="font-sans"
               style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "1px",
-                opacity: selected ? 0.7 : 0.45,
-                border: `0.5px solid ${selected ? "rgba(243, 240, 235, 0.4)" : "rgba(0, 0, 0, 0.3)"}`,
-                padding: "2px 6px",
+                fontFamily: "var(--font-mono)",
+                fontSize: 9.5,
+                fontWeight: 500,
+                letterSpacing: "0.06em",
+                padding: "3px 9px",
+                borderRadius: 100,
+                background: selected ? "rgba(255,255,255,0.12)" : "var(--color-paper)",
+                color: selected ? "rgba(255,255,255,0.65)" : "var(--color-mute)",
+                border: selected ? "none" : "1px solid var(--color-line-strong)",
               }}
             >
               {pack.badge}
@@ -343,18 +361,28 @@ function PackCard({
           )}
         </div>
         <div
-          className="font-serif tabular-nums"
-          style={{ fontSize: 22, fontWeight: 400, letterSpacing: "-0.01em" }}
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 5,
+          }}
         >
-          {pack.tokens.toLocaleString()}
+          <span
+            className="font-serif tabular-nums"
+            style={{
+              fontSize: 26,
+              fontWeight: 500,
+              letterSpacing: "-0.018em",
+              lineHeight: 1,
+            }}
+          >
+            {pack.tokens.toLocaleString()}
+          </span>
           <span
             className="font-sans"
             style={{
-              fontSize: 12,
-              fontWeight: 400,
-              letterSpacing: "-0.005em",
-              marginLeft: 6,
-              opacity: selected ? 0.7 : 0.55,
+              fontSize: 13,
+              opacity: selected ? 0.55 : 0.55,
             }}
           >
             토큰
@@ -365,16 +393,17 @@ function PackCard({
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
         <div
           className="font-serif tabular-nums"
-          style={{ fontSize: 18, fontWeight: 400 }}
+          style={{ fontSize: 18, fontWeight: 500, letterSpacing: "-0.015em" }}
         >
           ₩{pack.amount_krw.toLocaleString()}
         </div>
         <div
-          className="font-sans tabular-nums"
+          className="tabular-nums"
           style={{
-            fontSize: 11,
-            opacity: selected ? 0.7 : 0.5,
-            letterSpacing: "-0.005em",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            opacity: selected ? 0.5 : 0.55,
+            letterSpacing: "0.04em",
           }}
         >
           토큰당 ₩{pack.perTokenKrw}
@@ -405,8 +434,8 @@ function ConsentRow({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "14px 0",
-        borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+        padding: "16px 0",
+        borderTop: "1px solid var(--color-line)",
       }}
     >
       <button
@@ -418,21 +447,23 @@ function ConsentRow({
           width: 18,
           height: 18,
           flexShrink: 0,
-          border: checked ? "1px solid var(--color-ink)" : "1px solid rgba(0, 0, 0, 0.25)",
+          border: checked ? "1.5px solid var(--color-ink)" : "1.5px solid var(--color-line-strong)",
           background: checked ? "var(--color-ink)" : "transparent",
+          borderRadius: 4,
           cursor: "pointer",
           padding: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transition: "border-color 0.2s ease, background 0.2s ease",
         }}
       >
         {checked && (
           <svg width="10" height="8" viewBox="0 0 10 8" aria-hidden>
             <path
-              d="M1 4l3 3 5-6"
+              d="M1 4L3.5 6.5L9 1"
               stroke="var(--color-paper)"
-              strokeWidth="1.5"
+              strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"
@@ -444,30 +475,35 @@ function ConsentRow({
         onClick={onToggle}
         className="font-sans"
         style={{
-          fontSize: 13,
+          fontSize: 13.5,
           fontWeight: 400,
-          letterSpacing: "-0.005em",
-          lineHeight: 1.5,
+          letterSpacing: "-0.008em",
+          lineHeight: 1.4,
           cursor: "pointer",
           flex: 1,
           color: "var(--color-ink)",
+          opacity: 0.85,
+          wordBreak: "keep-all",
         }}
       >
-        [필수] {label}
+        <span style={{ color: "var(--color-danger)", fontWeight: 500, marginRight: 2 }}>
+          [필수]
+        </span>{" "}
+        {label}
       </label>
       {termsAnchor && (
         <Link
           href={`/terms${termsAnchor}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-sans"
           style={{
-            fontSize: 11,
-            letterSpacing: "-0.005em",
-            opacity: 0.5,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            color: "var(--color-mute)",
             textDecoration: "underline",
             textUnderlineOffset: 2,
-            color: "var(--color-ink)",
+            flexShrink: 0,
           }}
         >
           전문

@@ -875,6 +875,61 @@ def _get_trend_point() -> dict | None:
         return None
 
 
+def _build_aspiration_references(
+    vault_aspiration_history: Optional[list] = None,
+) -> list[dict]:
+    """Phase B-4: vault.aspiration_history → 카드 list 변환.
+
+    각 entry: {target_handle, source, created_at, gap_narrative,
+              primary_axis, primary_delta}
+    최근 5건만. 빈 input → 빈 list (frontend 가 조건부 렌더).
+    """
+    if not vault_aspiration_history:
+        return []
+
+    refs: list[dict] = []
+    for entry in vault_aspiration_history[:5]:
+        # entry 가 Pydantic model / dict 모두 처리
+        if hasattr(entry, "model_dump"):
+            entry_dict = entry.model_dump(mode="json")
+        elif isinstance(entry, dict):
+            entry_dict = entry
+        else:
+            continue
+
+        target_handle = entry_dict.get("target_handle") or "(미상)"
+        source = entry_dict.get("source", "instagram")
+        created_at_raw = entry_dict.get("created_at")
+        created_at_str = ""
+        if created_at_raw:
+            if hasattr(created_at_raw, "isoformat"):
+                created_at_str = created_at_raw.isoformat()
+            else:
+                created_at_str = str(created_at_raw)
+        gap_narrative = (
+            entry_dict.get("gap_narrative")
+            or entry_dict.get("sia_overall_message")
+            or ""
+        )
+        # 좌표 메타 (분석 시점 gap_vector snapshot)
+        vector_snap = entry_dict.get("aspiration_vector_snapshot") or {}
+        primary_axis = vector_snap.get("primary_axis") if isinstance(vector_snap, dict) else None
+        primary_delta = vector_snap.get("primary_delta") if isinstance(vector_snap, dict) else None
+
+        refs.append({
+            "target_handle": target_handle,
+            "source": source,
+            "created_at": created_at_str,
+            "gap_narrative": gap_narrative[:200] if gap_narrative else "",
+            "primary_axis": primary_axis,
+            "primary_delta": (
+                round(primary_delta, 2)
+                if isinstance(primary_delta, (int, float)) else None
+            ),
+        })
+    return refs
+
+
 def _build_gap_analysis(
     current_coords: dict,
     aspiration_coords: dict,
@@ -883,8 +938,15 @@ def _build_gap_analysis(
     aspiration_interpretation: dict,
     report_content: dict,
     aspiration_anchor: Optional[dict] = None,
+    vault_aspiration_history: Optional[list] = None,
 ) -> dict:
-    """gap_analysis 섹션 -- standard 잠금."""
+    """gap_analysis 섹션 -- standard 잠금.
+
+    Phase B-4 (PI-REVIVE 2026-04-26):
+      vault_aspiration_history 가 있으면 aspiration_references 필드 추가.
+      유저가 누적한 추구미 분석 (IG/Pinterest) 카드 list 노출.
+      "쌓일수록 정교" 가치 제안 가시화.
+    """
     magnitude = gap.get("magnitude", 0)
     gap_diff = _gap_difficulty(magnitude)
     gap_vector = gap.get("vector", {})
@@ -989,6 +1051,8 @@ def _build_gap_analysis(
             "gap_difficulty": gap_diff,
             "gap_summary": gap_summary,
             "direction_items": direction_items,
+            # Phase B-4 (PI-REVIVE 2026-04-26): 누적 추구미 분석 카드 (vault.aspiration_history)
+            "aspiration_references": _build_aspiration_references(vault_aspiration_history),
             # aesthetic_map -- 2D 시각화용 고정 좌표계
             "aesthetic_map": {
                 "current": {
@@ -1515,6 +1579,7 @@ def format_report_for_frontend(
     aspiration_interpretation: dict,
     aspiration_anchor: Optional[dict] = None,
     type_match_explanation: Optional[dict] = None,
+    vault_aspiration_history: Optional[list] = None,
 ) -> dict:
     """
     파이프라인 분석 결과를 프론트엔드 ReportData 구조로 변환한다.
@@ -1567,6 +1632,7 @@ def format_report_for_frontend(
             current_coords, aspiration_coords, gap,
             similar_types, aspiration_interpretation, report_content,
             aspiration_anchor=aspiration_anchor,
+            vault_aspiration_history=vault_aspiration_history,
         ),
         _build_hair_recommendation(gap, report_content, gender=gender),
         _build_action_plan(gap, face_features, report_content, gender=gender),

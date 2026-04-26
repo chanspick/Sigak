@@ -900,6 +900,7 @@ def _run_analysis_pipeline(
     interview_data: dict = None,
     analysis_data: dict = None,
     vault_context: str = "",
+    vault_aspiration_history: Optional[list] = None,
 ) -> tuple:
     """
     기존 analyze의 Step 1~9 전체. 결제 확인된 order만 실행.
@@ -908,6 +909,9 @@ def _run_analysis_pipeline(
     vault_context (Phase A B-1 — PI-REVIVE 2026-04-26):
         services.vault_renderer.render_vault_context() 산출물.
         빈 문자열이면 LLM prompt 변화 0 (기존 동작 보존). caller 가 결정.
+    vault_aspiration_history (Phase B-4 — PI-REVIVE 2026-04-26):
+        vault.aspiration_history list (AspirationHistoryEntry 또는 dict).
+        None/빈 list 면 GAP 섹션의 aspiration_references 빈 list (UI 미렌더).
     """
     # 파라미터 우선, 폴백으로 인메모리 dict
     user = user_data or USERS.get(user_id, {})
@@ -1043,6 +1047,7 @@ def _run_analysis_pipeline(
         face_interpretation=face_interpretation, report_content=report_content,
         aspiration_interpretation=aspiration_result, aspiration_anchor=aspiration_anchor,
         type_match_explanation=type_match_explanation,
+        vault_aspiration_history=vault_aspiration_history,
     )
 
     # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).
@@ -1699,13 +1704,21 @@ async def run_analysis_legacy(user_id: str):
 
     vault_context = render_vault_context(vault)
 
+    # Phase B-4 (PI-REVIVE 2026-04-26): aspiration_history meta 추출 → format_report 전달
+    try:
+        vault_aspiration_history = list(getattr(vault, "aspiration_history", None) or [])
+    except Exception:
+        vault_aspiration_history = []
+
     # Phase A B-1 진단 로깅 — vault_context 길이 + 첫 300자 preview
     print(f"[VAULT_CTX] user={user_id} len={len(vault_context)} preview={vault_context[:300]!r}")
+    print(f"[VAULT_ASP_HIST] user={user_id} count={len(vault_aspiration_history)}")
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
     report_id, report_dict = _run_analysis_pipeline(
         user_id, order, user_data, interview_data, analysis_data,
         vault_context=vault_context,
+        vault_aspiration_history=vault_aspiration_history,
     )
 
     # Phase A B-1 fix companion (2026-04-26): DBReport upsert.

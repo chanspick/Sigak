@@ -27,6 +27,16 @@ interface DirectionItem {
   recommendation: string;
 }
 
+// Phase B-4 (PI-REVIVE 2026-04-26): 누적 추구미 분석 카드
+interface AspirationReference {
+  target_handle: string;
+  source: string; // "instagram" | "pinterest"
+  created_at: string; // ISO datetime
+  gap_narrative: string;
+  primary_axis?: string | null;
+  primary_delta?: number | null;
+}
+
 interface GapAnalysisContent {
   current_type: string;
   current_type_id?: number;
@@ -49,6 +59,8 @@ interface GapAnalysisContent {
   gap_difficulty: string;
   gap_summary: string;
   direction_items: DirectionItem[];
+  // Phase B-4: 누적 추구미 분석 (vault.aspiration_history). 빈 배열이면 미렌더.
+  aspiration_references?: AspirationReference[];
 }
 
 interface GapAnalysisProps {
@@ -386,6 +398,88 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           )}
         </div>
       </div>
+
+      {/* ─── Phase B-4: 누적 추구미 분석 카드 ─── */}
+      {content.aspiration_references && content.aspiration_references.length > 0 && (
+        <div className="mt-10">
+          <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)] mb-3">
+            누적 추구미 분석 ({content.aspiration_references.length})
+          </h3>
+          <p className="text-[12px] text-[var(--color-muted)] mb-4 leading-relaxed">
+            지금까지 본인이 분석한 추구미 결과예요. 쌓일수록 좌표가 더 정교해져요.
+          </p>
+          <div className="flex flex-col gap-3">
+            {content.aspiration_references.map((entry, i) => (
+              <AspirationReferenceCard key={i} entry={entry} />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+// ─── Phase B-4: 누적 추구미 분석 카드 ───
+function AspirationReferenceCard({ entry }: { entry: AspirationReference }) {
+  // 날짜 포맷: "2026년 4월 26일"
+  const dateLabel = (() => {
+    if (!entry.created_at) return "";
+    try {
+      const d = new Date(entry.created_at);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return "";
+    }
+  })();
+
+  const sourceLabel = entry.source === "pinterest" ? "Pinterest" : "Instagram";
+  const handleDisplay = entry.target_handle.startsWith("@")
+    ? entry.target_handle
+    : `@${entry.target_handle}`;
+
+  // 좌표 메타 라벨 (있으면)
+  const axisLabelMap: Record<string, string> = {
+    shape: "골격",
+    volume: "존재감",
+    age: "무드",
+  };
+  const directionLabel = (() => {
+    if (!entry.primary_axis || entry.primary_delta == null) return "";
+    const axisKr = axisLabelMap[entry.primary_axis] ?? entry.primary_axis;
+    const dir = entry.primary_delta > 0 ? "+" : "";
+    return `${axisKr} ${dir}${entry.primary_delta}`;
+  })();
+
+  return (
+    <div className="p-4 border border-[var(--color-border)] rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold tracking-[1px] uppercase text-[var(--color-muted)]">
+            {sourceLabel}
+          </span>
+          <span className="text-[12px] font-medium text-[var(--color-fg)]">
+            {handleDisplay}
+          </span>
+        </div>
+        {dateLabel && (
+          <span className="text-[10px] text-[var(--color-muted)]">{dateLabel}</span>
+        )}
+      </div>
+      {directionLabel && (
+        <div className="text-[10px] text-[var(--color-muted)] mb-2 tracking-[0.5px]">
+          주요 갭: {directionLabel}
+        </div>
+      )}
+      {entry.gap_narrative && (
+        <p className="text-[12px] leading-relaxed text-[var(--color-fg)] opacity-80">
+          {entry.gap_narrative}
+        </p>
+      )}
+    </div>
   );
 }

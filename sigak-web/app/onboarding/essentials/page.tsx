@@ -21,8 +21,10 @@ import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 const CURRENT_YEAR = new Date().getFullYear();
-const MIN_YEAR = CURRENT_YEAR - 80;    // 80세까지
-const MAX_YEAR = CURRENT_YEAR - 14;    // 만 14세 이상 (consent 와 정합)
+// 마케터 정합 (redesign/온보딩_1815.html): 16~50세 + "50세 이상" 단일 dropdown.
+// backend 는 birth_date ISO 받으므로 frontend 에서 (현재년도 - age, 1월 1일) 변환.
+const MIN_AGE = 16;
+const MAX_AGE_EXACT = 50;  // 51 이상은 "50세 이상" 으로
 
 export default function OnboardingEssentialsPage() {
   const router = useRouter();
@@ -31,9 +33,7 @@ export default function OnboardingEssentialsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [gender, setGender] = useState<Gender | null>(null);
-  const [birthYear, setBirthYear] = useState<string>("");
-  const [birthMonth, setBirthMonth] = useState<string>("");
-  const [birthDay, setBirthDay] = useState<string>("");
+  const [age, setAge] = useState<string>("");  // "16" ~ "50" 또는 "50+"
   const [igHandle, setIgHandle] = useState<string>("");
 
   useEffect(() => {
@@ -64,29 +64,21 @@ export default function OnboardingEssentialsPage() {
     })();
   }, [router]);
 
+  // age (e.g. "20" 또는 "50+") → birth_date ISO 변환
+  // 마케터 단순 dropdown 호환 위해 day/month 정확치 X — 1월 1일로 approx.
+  // backend birth_date ISO 형식만 만족하면 됨 (정확한 생일 X, 만 N세 추정용).
   const { birthDateIso, dateValid } = useMemo(() => {
-    const y = Number(birthYear);
-    const m = Number(birthMonth);
-    const d = Number(birthDay);
-    if (!y || !m || !d) return { birthDateIso: null, dateValid: false };
-    if (y < MIN_YEAR || y > MAX_YEAR) return { birthDateIso: null, dateValid: false };
-    if (m < 1 || m > 12) return { birthDateIso: null, dateValid: false };
-    if (d < 1 || d > 31) return { birthDateIso: null, dateValid: false };
-    const dt = new Date(y, m - 1, d);
-    if (
-      dt.getFullYear() !== y ||
-      dt.getMonth() !== m - 1 ||
-      dt.getDate() !== d
-    ) {
+    if (!age) return { birthDateIso: null, dateValid: false };
+    const numericAge = age === "50+" ? 51 : Number(age);
+    if (!Number.isFinite(numericAge) || numericAge < MIN_AGE) {
       return { birthDateIso: null, dateValid: false };
     }
-    if (dt > new Date()) return { birthDateIso: null, dateValid: false };
-    const pad = (n: number) => n.toString().padStart(2, "0");
+    const birthYear = CURRENT_YEAR - numericAge;
     return {
-      birthDateIso: `${y}-${pad(m)}-${pad(d)}`,
+      birthDateIso: `${birthYear}-01-01`,
       dateValid: true,
     };
-  }, [birthYear, birthMonth, birthDay]);
+  }, [age]);
 
   const normalizedIgHandle = useMemo(() => {
     const trimmed = igHandle.trim();
@@ -292,55 +284,66 @@ export default function OnboardingEssentialsPage() {
           </div>
         </section>
 
-        {/* 생년월일 — 우리 3 input 유지 (backend birth_date ISO 호환), 마케터 시각 정합 */}
+        {/* 나이 — 마케터 정합 (redesign/온보딩_1815.html): 단일 dropdown 16~50세+ */}
         <section style={{ marginTop: 22 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <Label>BIRTH DATE</Label>
-            <LabelHint>만 14세 이상</LabelHint>
-          </div>
+          <Label>AGE</Label>
           <div
             style={{
+              position: "relative",
               marginTop: 8,
-              display: "grid",
-              gridTemplateColumns: "2fr 1fr 1fr",
-              gap: 8,
+              border: "1px solid var(--color-line-strong)",
+              borderRadius: 12,
+              overflow: "hidden",
+              background: "rgba(0, 0, 0, 0.04)",
+              transition: "border-color 0.2s ease",
             }}
           >
-            <DateField
-              value={birthYear}
-              onChange={setBirthYear}
-              placeholder="YYYY"
-              maxLength={4}
-              ariaLabel="출생 연도"
-            />
-            <DateField
-              value={birthMonth}
-              onChange={setBirthMonth}
-              placeholder="MM"
-              maxLength={2}
-              ariaLabel="출생 월"
-            />
-            <DateField
-              value={birthDay}
-              onChange={setBirthDay}
-              placeholder="DD"
-              maxLength={2}
-              ariaLabel="출생 일"
-            />
-          </div>
-          {!dateValid && (birthYear || birthMonth || birthDay) && (
-            <p
+            <select
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              aria-label="나이"
               className="font-sans"
               style={{
-                marginTop: 8,
-                fontSize: 11,
-                color: "var(--color-danger)",
-                letterSpacing: "-0.005em",
+                width: "100%",
+                padding: "14px 44px 14px 16px",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontSize: 15,
+                color: age ? "var(--color-ink)" : "var(--color-mute-2)",
+                appearance: "none",
+                WebkitAppearance: "none",
+                cursor: "pointer",
               }}
             >
-              올바른 생년월일을 입력해주세요
-            </p>
-          )}
+              <option value="" disabled>
+                나이를 선택해 주세요
+              </option>
+              {Array.from({ length: MAX_AGE_EXACT - MIN_AGE + 1 }, (_, i) => MIN_AGE + i).map(
+                (a) => (
+                  <option key={a} value={String(a)}>
+                    {a}세
+                  </option>
+                ),
+              )}
+              <option value="50+">50세 이상</option>
+            </select>
+            {/* chevron — 마케터 css ::after 정합 (10x10 border-bottom + border-right rotate 45) */}
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                right: 18,
+                top: "50%",
+                width: 8,
+                height: 8,
+                borderRight: "1.5px solid var(--color-mute)",
+                borderBottom: "1.5px solid var(--color-mute)",
+                transform: "translateY(-65%) rotate(45deg)",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
         </section>
 
         {error && (
@@ -396,45 +399,6 @@ export default function OnboardingEssentialsPage() {
 //  Subcomponents
 // ─────────────────────────────────────────────
 
-interface DateFieldProps {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  maxLength: number;
-  ariaLabel: string;
-}
-
-function DateField({ value, onChange, placeholder, maxLength, ariaLabel }: DateFieldProps) {
-  return (
-    <input
-      type="text"
-      inputMode="numeric"
-      pattern="[0-9]*"
-      value={value}
-      onChange={(e) => {
-        const digits = e.target.value.replace(/\D/g, "").slice(0, maxLength);
-        onChange(digits);
-      }}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      aria-label={ariaLabel}
-      className="font-sans tabular-nums"
-      style={{
-        height: 50,
-        padding: "0 14px",
-        fontSize: 15,
-        letterSpacing: "-0.005em",
-        background: "rgba(0, 0, 0, 0.04)",
-        color: "var(--color-ink)",
-        border: "1px solid var(--color-line-strong)",
-        borderRadius: 12,
-        outline: "none",
-        textAlign: "center",
-      }}
-    />
-  );
-}
-
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -444,21 +408,6 @@ function Label({ children }: { children: React.ReactNode }) {
         fontSize: 10,
         letterSpacing: "0.12em",
         color: "var(--color-mute)",
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function LabelHint({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      className="font-sans"
-      style={{
-        fontSize: 11,
-        letterSpacing: "-0.005em",
-        color: "var(--color-mute-2)",
       }}
     >
       {children}

@@ -38,7 +38,7 @@ import type {
   AspirationStartResponse,
 } from "@/lib/types/aspiration";
 import { LoadingSlides } from "@/components/sia/LoadingSlides";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 const COST_ASPIRATION = 20;
@@ -297,42 +297,45 @@ function isPlausiblePinterestUrl(raw: string): boolean {
 
 function Header({ balance }: { balance: number | null }) {
   return (
-    <header style={{ marginBottom: 24 }}>
+    <header style={{ marginBottom: 32 }}>
       <h1
         className="font-serif"
         style={{
           margin: 0,
-          fontSize: 28,
-          fontWeight: 400,
-          letterSpacing: "-0.01em",
-          lineHeight: 1.25,
+          fontSize: 24,
+          fontWeight: 700,
+          letterSpacing: "-0.022em",
+          lineHeight: 1.42,
+          color: "var(--color-ink)",
+          wordBreak: "keep-all",
         }}
       >
-        추구미 분석
+        추구미 살펴보기
       </h1>
       <p
         className="font-sans"
         style={{
           margin: "10px 0 0",
-          fontSize: 13,
-          lineHeight: 1.6,
+          fontSize: 14,
+          lineHeight: 1.65,
           color: "var(--color-mute)",
           letterSpacing: "-0.005em",
+          wordBreak: "keep-all",
         }}
       >
-        따라가고 싶은 결을 놓고, 지금의 본인과 어떻게 다른지 짚어드릴게요.
+        추구미에 부합하는 인스타 계정 및 핀터레스트를 알려주시면 유사도와 개선점을 알려드려요.
       </p>
-      {balance !== null && (
+      {balance !== null && balance < COST_ASPIRATION && (
         <div
           className="font-sans tabular-nums"
           style={{
-            marginTop: 16,
+            marginTop: 14,
             fontSize: 11,
             letterSpacing: "0.05em",
             color: "var(--color-mute-2)",
           }}
         >
-          토큰 {balance}개 보유  ·  1회 20 토큰
+          현재 잔액 {balance}토큰 · 1회 {COST_ASPIRATION} 토큰 필요
         </div>
       )}
     </header>
@@ -359,8 +362,8 @@ function TabSwitcher({
       role="tablist"
       style={{
         display: "flex",
-        borderBottom: "1px solid rgba(0, 0, 0, 0.12)",
-        marginBottom: 24,
+        borderBottom: "1px solid var(--color-line)",
+        marginBottom: 32,
       }}
     >
       {items.map((it) => {
@@ -382,15 +385,15 @@ function TabSwitcher({
             className="font-sans"
             style={{
               flex: 1,
-              padding: "12px 0 14px",
+              padding: "13px 0",
               background: "transparent",
               border: "none",
               borderBottom: active
-                ? "2px solid var(--color-ink)"
-                : "2px solid transparent",
-              fontSize: 13,
+                ? "1.5px solid var(--color-danger)"
+                : "1.5px solid transparent",
+              fontSize: 14,
               fontWeight: active ? 600 : 500,
-              letterSpacing: "0.3px",
+              letterSpacing: "-0.008em",
               color: disabled
                 ? "var(--color-mute-2)"
                 : active
@@ -436,47 +439,60 @@ function IgInputSection({
     <section>
       <label
         htmlFor="ig-input"
-        className="font-sans"
+        className="uppercase"
         style={{
           display: "block",
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: "0.05em",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
           color: "var(--color-mute)",
-          marginBottom: 10,
+          marginBottom: 8,
         }}
       >
         INSTAGRAM 핸들
       </label>
-      <input
-        id="ig-input"
-        type="text"
-        inputMode="url"
-        autoComplete="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        placeholder="@yuni 또는 instagram.com/yuni"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="font-sans"
+      <div
         style={{
-          width: "100%",
-          padding: "14px 14px",
-          fontSize: 15,
-          background: "transparent",
-          border: "1px solid rgba(0, 0, 0, 0.25)",
-          borderRadius: 0,
-          color: "var(--color-ink)",
-          letterSpacing: "-0.005em",
+          display: "flex",
+          alignItems: "center",
+          border: "1px solid var(--color-line-strong)",
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "rgba(0, 0, 0, 0.04)",
+          transition: "border-color 0.2s ease",
         }}
-      />
+      >
+        <input
+          id="ig-input"
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder="@yuni 또는 instagram.com/yuni"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="font-sans"
+          style={{
+            flex: 1,
+            padding: "14px 16px",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            fontSize: 15,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
+          }}
+        />
+      </div>
       {normalized && (
         <p
           className="font-sans tabular-nums"
           style={{
-            margin: "8px 0 0",
-            fontSize: 11,
-            color: "var(--color-mute-2)",
+            margin: "9px 0 0",
+            fontSize: 12,
+            color: "var(--color-mute)",
+            letterSpacing: "-0.005em",
           }}
         >
           분석 대상: @{normalized}
@@ -499,40 +515,52 @@ function PinterestInputSection({
     <section>
       <label
         htmlFor="pin-input"
-        className="font-sans"
+        className="uppercase"
         style={{
           display: "block",
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: "0.05em",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
           color: "var(--color-mute)",
-          marginBottom: 10,
+          marginBottom: 8,
         }}
       >
         PINTEREST 보드 URL
       </label>
-      <input
-        id="pin-input"
-        type="url"
-        inputMode="url"
-        autoComplete="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        placeholder="pinterest.com/your-name/board-name"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="font-sans"
+      <div
         style={{
-          width: "100%",
-          padding: "14px 14px",
-          fontSize: 15,
-          background: "transparent",
-          border: "1px solid rgba(0, 0, 0, 0.25)",
-          borderRadius: 0,
-          color: "var(--color-ink)",
-          letterSpacing: "-0.005em",
+          display: "flex",
+          alignItems: "center",
+          border: "1px solid var(--color-line-strong)",
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "rgba(0, 0, 0, 0.04)",
+          transition: "border-color 0.2s ease",
         }}
-      />
+      >
+        <input
+          id="pin-input"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder="pinterest.com/your-name/board-name"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="font-sans"
+          style={{
+            flex: 1,
+            padding: "14px 16px",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            fontSize: 15,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.005em",
+          }}
+        />
+      </div>
       {value.trim() && !valid && (
         <p
           className="font-sans"
@@ -540,6 +568,7 @@ function PinterestInputSection({
             margin: "8px 0 0",
             fontSize: 11,
             color: "var(--color-danger)",
+            letterSpacing: "-0.005em",
           }}
         >
           Pinterest 보드 URL 형식으로 입력해 주세요.
@@ -548,10 +577,11 @@ function PinterestInputSection({
       <p
         className="font-sans"
         style={{
-          margin: "12px 0 0",
-          fontSize: 11,
-          color: "var(--color-mute-2)",
+          margin: "9px 0 0",
+          fontSize: 12,
+          color: "var(--color-mute)",
           lineHeight: 1.6,
+          letterSpacing: "-0.005em",
         }}
       >
         Pinterest 채널은 곧 열어둘 예정이에요. 지금은 Instagram이 정확도가 더 높아요.
@@ -643,19 +673,27 @@ function ErrorPanel({
 function NoticeBlock() {
   return (
     <div
-      className="font-sans"
       style={{
         marginTop: 28,
         padding: "16px 18px",
-        background: "rgba(0, 0, 0, 0.03)",
-        fontSize: 12,
-        lineHeight: 1.7,
-        color: "var(--color-mute)",
-        letterSpacing: "-0.005em",
+        background: "rgba(0, 0, 0, 0.04)",
+        border: "1px solid var(--color-line)",
+        borderRadius: 14,
       }}
     >
-      <div>공개 계정만 분석할 수 있어요. 비공개나 차단 대상은 토큰이 환불됩니다.</div>
-      <div>한 번 분석한 대상도 시점이 다르면 결과가 달라질 수 있어요.</div>
+      <p
+        className="font-sans"
+        style={{
+          margin: 0,
+          fontSize: 12.5,
+          color: "var(--color-mute)",
+          lineHeight: 1.75,
+          letterSpacing: "-0.005em",
+          wordBreak: "keep-all",
+        }}
+      >
+        공개 계정만 살펴볼 수 있어요. 비공개나 차단 대상은 토큰이 환불됩니다. 한 번 살펴본 대상도 시점이 다르면 결과가 달라질 수 있어요.
+      </p>
     </div>
   );
 }
@@ -678,7 +716,7 @@ function StickyCta({
   pinterestValid: boolean;
 }) {
   const inputValid = tab === "ig" ? igValid : pinterestValid;
-  const labelMain = "분석 시작 (20 토큰)";
+  const labelMain = "추구미 살펴보기 →";
   const labelDisabled =
     !inputValid
       ? tab === "ig"
@@ -698,8 +736,8 @@ function StickyCta({
         left: 0,
         right: 0,
         background: "var(--color-paper)",
-        padding: "12px 24px 24px",
-        borderTop: "1px solid rgba(0, 0, 0, 0.08)",
+        padding: "16px 24px 24px",
+        borderTop: "1px solid var(--color-line)",
       }}
     >
       {lowBalance && (
@@ -718,14 +756,65 @@ function StickyCta({
           토큰 충전하러 가기
         </Link>
       )}
-      <PrimaryButton
+      <button
         type="button"
         onClick={onStart}
         disabled={!canStart}
-        disabledLabel={labelDisabled}
+        className="font-sans"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          width: "100%",
+          padding: "17px 24px",
+          background: canStart ? "var(--color-ink)" : "var(--color-line-strong)",
+          color: canStart ? "var(--color-paper)" : "#fff",
+          border: "none",
+          borderRadius: 100,
+          fontSize: 15,
+          fontWeight: 600,
+          letterSpacing: "-0.012em",
+          cursor: canStart ? "pointer" : "not-allowed",
+          transition: "all 0.25s ease",
+        }}
       >
-        {labelMain}
-      </PrimaryButton>
+        {canStart ? labelMain : labelDisabled}
+      </button>
+
+      {/* 토큰 비용 표시 (CTA 아래 dot + 라벨) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          marginTop: 12,
+          opacity: canStart ? 1 : 0,
+          transition: "opacity 0.25s ease",
+        }}
+        aria-hidden={!canStart}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "var(--color-danger)",
+          }}
+        />
+        <span
+          className="tabular-nums"
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--color-mute)",
+            letterSpacing: "0.08em",
+          }}
+        >
+          {COST_ASPIRATION}토큰
+        </span>
+      </div>
     </div>
   );
 }

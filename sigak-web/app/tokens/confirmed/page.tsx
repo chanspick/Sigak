@@ -25,7 +25,7 @@ import { ApiError } from "@/lib/api/fetch";
 import { api } from "@/lib/api/fetch";
 import { releaseBlur, unlockDiagnosis } from "@/lib/api/verdicts";
 import { releaseSigakReport } from "@/lib/api/sigak-report";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type Phase =
@@ -191,7 +191,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               확인하고 있습니다.
             </h1>
@@ -213,7 +213,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               해제되었습니다.
             </h1>
@@ -231,7 +231,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               결제는 완료됐어요.
             </h1>
@@ -265,7 +265,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               해제되었습니다.
             </h1>
@@ -283,7 +283,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               진단이 열렸습니다.
             </h1>
@@ -301,7 +301,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               결제는 완료됐어요.
             </h1>
@@ -335,7 +335,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               결제는 완료됐어요.
             </h1>
@@ -369,7 +369,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               충전 완료.
             </h1>
@@ -381,7 +381,7 @@ function ConfirmedContent() {
           <>
             <h1
               className="font-serif"
-              style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.3, margin: 0, letterSpacing: "-0.01em" }}
+              style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.25, margin: 0, letterSpacing: "-0.025em" }}
             >
               결제 확인 실패.
             </h1>
@@ -419,43 +419,43 @@ function ConfirmedContent() {
       {/* CTA */}
       <div style={{ padding: "20px 28px 32px" }}>
         {phase === "released" && verdictId && (
-          <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
+          <PillCta onClick={() => router.replace(`/verdict/${verdictId}`)}>
             결과 보러 가기
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "release_failed" && verdictId && (
-          <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
+          <PillCta onClick={() => router.replace(`/verdict/${verdictId}`)}>
             판정 페이지로
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "sigak_released" && (
-          <PrimaryButton onClick={() => router.replace("/")}>
+          <PillCta onClick={() => router.replace("/")}>
             시각 리포트 보러 가기
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "sigak_release_failed" && (
-          <PrimaryButton onClick={() => router.replace("/")}>
+          <PillCta onClick={() => router.replace("/")}>
             홈으로
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "diagnosis_unlocked" && verdictId && (
-          <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
+          <PillCta onClick={() => router.replace(`/verdict/${verdictId}`)}>
             진단 보러 가기
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "diagnosis_unlock_failed" && verdictId && (
-          <PrimaryButton onClick={() => router.replace(`/verdict/${verdictId}`)}>
+          <PillCta onClick={() => router.replace(`/verdict/${verdictId}`)}>
             판정 페이지로
-          </PrimaryButton>
+          </PillCta>
         )}
         {phase === "charged" && (
-          <PrimaryButton onClick={() => router.replace("/")}>홈으로</PrimaryButton>
+          <PillCta onClick={() => router.replace("/")}>홈으로</PillCta>
         )}
         {phase === "failed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <PrimaryButton onClick={() => router.replace("/tokens/purchase")}>
+            <PillCta onClick={() => router.replace("/tokens/purchase")}>
               다시 시도
-            </PrimaryButton>
+            </PillCta>
             <Link
               href="/"
               className="font-sans"
@@ -481,48 +481,95 @@ function ConfirmedContent() {
 }
 
 // ─────────────────────────────────────────────
-//  BalanceRow
+//  BalanceRow — 마케터 결제완료_모달의 token-change 카드 시각 정합
+//  radius 14 + soft bg + mono BALANCE label + Noto Serif 잔액
 // ─────────────────────────────────────────────
 
 function BalanceRow({ balance }: { balance: number | null }) {
   return (
     <div
       style={{
-        marginTop: 32,
-        paddingTop: 16,
-        paddingBottom: 16,
-        borderTop: "1px solid rgba(0, 0, 0, 0.1)",
-        borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+        marginTop: 28,
+        background: "rgba(0, 0, 0, 0.04)",
+        border: "1px solid var(--color-line)",
+        borderRadius: 14,
+        padding: "16px 22px",
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "baseline",
+        alignItems: "center",
       }}
     >
       <span
-        className="font-sans uppercase"
         style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "1.5px",
-          opacity: 0.4,
-          color: "var(--color-ink)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--color-mute)",
         }}
       >
-        현재 잔액
+        BALANCE
       </span>
       <span
         className="font-serif tabular-nums"
-        style={{ fontSize: 24, fontWeight: 400, color: "var(--color-ink)" }}
+        style={{
+          fontSize: 20,
+          fontWeight: 500,
+          color: "var(--color-ink)",
+          letterSpacing: "-0.018em",
+          display: "flex",
+          alignItems: "baseline",
+          gap: 5,
+        }}
       >
         {balance == null ? "—" : balance.toLocaleString()}
         <span
           className="font-sans"
-          style={{ fontSize: 12, opacity: 0.5, marginLeft: 6 }}
+          style={{ fontSize: 13, color: "var(--color-mute)" }}
         >
           토큰
         </span>
       </span>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  PillCta — 마케터 pill CTA (radius 100, ink bg, paper text)
+//  PillCta 의 마케터 정합 대체
+// ─────────────────────────────────────────────
+
+function PillCta({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="font-sans"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        padding: "17px 24px",
+        background: "var(--color-ink)",
+        color: "var(--color-paper)",
+        border: "none",
+        borderRadius: 100,
+        fontSize: 15,
+        fontWeight: 600,
+        letterSpacing: "-0.012em",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     report_delivery_hours: int = 24
     base_url: str = "https://www.sigak.asia"
 
+    # ── PI BETA 무료 기간 (PI-REVIVE 2026-04-26) ──
+    # 이 날짜 이전 = PI v3 unlock 토큰 차감 0. 이후 = 50 토큰 차감.
+    # ISO date string. Railway env BETA_FREE_UNTIL 로 override.
+    beta_free_until: str = "2026-05-15"
+
     class Config:
         env_file = (".env", "../.env")
         env_file_encoding = "utf-8"

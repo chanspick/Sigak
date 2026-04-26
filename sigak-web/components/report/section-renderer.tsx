@@ -18,7 +18,6 @@ import { CoordinateMap } from "./sections/coordinate-map";
 import { GapAnalysis } from "./sections/gap-analysis";
 import { HairRecommendation } from "./sections/hair-recommendation";
 import { ActionPlan } from "./sections/action-plan";
-import { CelebReference } from "./sections/celeb-reference";
 import { TypeReference } from "./sections/type-reference";
 
 interface OverlayData {
@@ -109,13 +108,7 @@ export function SectionRenderer({ section, accessLevel, overlay, hairSimulation 
           locked={locked}
         />
       );
-    case "celeb_reference":
-      return (
-        <CelebReference
-          content={content as Parameters<typeof CelebReference>[0]["content"]}
-          locked={locked}
-        />
-      );
+    // PI v3 폐기 — celeb_reference (본인 결정 2026-04-26 / CLAUDE.md feedback_no_celeb_names)
     // PI v3 폐기 — trend_context 는 hair_recommendation / action_plan 의 matched_trend_ids 로 흡수
     default:
       return null;

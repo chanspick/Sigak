@@ -164,7 +164,6 @@ PISectionId = Literal[
 # preview 분기 — 컴포넌트별 가시성 (혼합 iii 패턴)
 PI_V3_PREVIEW_VISIBILITY: dict[str, str] = {
     "cover":               "full",
-    "celeb_reference":     "full",
     "face_structure":      "teaser",
     "type_reference":      "teaser",
     "gap_analysis":        "teaser",
@@ -175,7 +174,7 @@ PI_V3_PREVIEW_VISIBILITY: dict[str, str] = {
 }
 
 PI_V3_SECTION_ORDER: list[str] = [
-    "cover", "celeb_reference", "face_structure",
+    "cover", "face_structure",
     "type_reference", "gap_analysis", "skin_analysis",
     "coordinate_map", "hair_recommendation", "action_plan",
 ]

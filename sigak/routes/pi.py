@@ -73,7 +73,6 @@ def _pi_v3_maintenance_gate() -> None:
 router_v3 = APIRouter(
     prefix="/api/v3/pi",
     tags=["pi-v3"],
-    dependencies=[Depends(_pi_v3_maintenance_gate)],
 )
 
 
@@ -836,7 +835,22 @@ def _build_v3_response(
 
 
 def _debit_v3_unlock(db, user_id: str) -> int:
-    """v3 unlock 50 토큰 차감 — 1분 idempotency bucket. 부족 시 402."""
+    """v3 unlock 50 토큰 차감 — 1분 idempotency bucket. 부족 시 402.
+
+    PI-REVIVE 2026-04-26: BETA 무료 기간 (config.beta_free_until 이전) = 0 차감.
+    """
+    # BETA 무료 기간 — 토큰 차감 X
+    from datetime import date
+    from config import get_settings
+    settings = get_settings()
+    try:
+        beta_until = date.fromisoformat(settings.beta_free_until)
+        if date.today() < beta_until:
+            logger.info("[pi v3 unlock] BETA free user=%s (no charge until %s)", user_id, beta_until)
+            return tokens_service.get_balance(db, user_id)
+    except (ValueError, AttributeError):
+        logger.warning("[pi v3 unlock] beta_free_until parse fail — fallback to charge")
+
     cost = PI_V3_UNLOCK_COST_TOKENS
     current = tokens_service.get_balance(db, user_id)
     if current < cost:

@@ -17,77 +17,67 @@ import { getPIv3Status } from "@/lib/api/pi";
 import type { PIv3Status } from "@/lib/api/pi";
 
 export function VisionView() {
-  // PI v3 임시 잠금 (2026-04-26) — product 본질 검증 미완. 5월 중 재개.
-  // 재개 시 본 함수를 git history (commit 95b82aa 이전) 에서 복원.
-  // PI status 호출 / baseline 분기 / unlock 카드 모두 비활성. 헬퍼 컴포넌트는
-  // dead code 로 남김 (재오픈 시 즉시 사용).
-  return <VisionMaintenance />;
-}
+  const router = useRouter();
 
-function VisionMaintenance() {
+  const [state, setState] = useState<{
+    loading: boolean;
+    status: PIv3Status | null;
+    error: string | null;
+  }>({ loading: true, status: null, error: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getPIv3Status();
+        if (!cancelled) setState({ loading: false, status: data, error: null });
+      } catch (e) {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 401) {
+          router.replace("/");
+          return;
+        }
+        setState({
+          loading: false,
+          status: null,
+          error: e instanceof Error ? e.message : "PI 상태 로드 실패",
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  if (state.loading) return <LoadingPlaceholder />;
+  if (state.error || !state.status)
+    return <ErrorBlock message={state.error ?? "알 수 없는 오류"} />;
+
+  const status = state.status;
+
+  // 1) baseline 미업로드 — 정면 사진 보여드리기
+  if (!status.has_baseline) {
+    return <BaselineNeededBlock />;
+  }
+
+  // 2) baseline 있지만 PI 미생성 — preview 진입 (50토큰 paywall 은 PIv3Screen 안에서)
+  if (!status.has_current_report) {
+    return (
+      <PIPendingBlock
+        cost={status.unlock_cost_tokens}
+        balance={status.token_balance}
+        needs={status.needs_payment_tokens}
+      />
+    );
+  }
+
+  // 3) PI 풀 — 시각이 본 당신 v{N} 카드
   return (
-    <section
-      style={{
-        padding: "60px 28px 80px",
-        maxWidth: 420,
-        margin: "0 auto",
-      }}
-    >
-      <span
-        className="font-sans uppercase"
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: "1.6px",
-          opacity: 0.4,
-          color: "var(--color-ink)",
-        }}
-      >
-        PREPARING
-      </span>
-      <h1
-        className="font-serif"
-        style={{
-          marginTop: 18,
-          fontSize: 26,
-          fontWeight: 400,
-          lineHeight: 1.45,
-          letterSpacing: "-0.01em",
-          color: "var(--color-ink)",
-        }}
-      >
-        시각이 본 당신은
-        <br />
-        곧 돌아옵니다
-      </h1>
-      <p
-        className="font-sans"
-        style={{
-          marginTop: 24,
-          fontSize: 14,
-          lineHeight: 1.75,
-          opacity: 0.72,
-          letterSpacing: "-0.005em",
-          color: "var(--color-ink)",
-        }}
-      >
-        시각 레포트는 여러분이 Sia와 대화하고 피드를 분석하는 만큼 여러분에
-        대해 잘 알아갑니다.
-      </p>
-      <p
-        className="font-sans"
-        style={{
-          marginTop: 12,
-          fontSize: 13,
-          lineHeight: 1.75,
-          opacity: 0.5,
-          letterSpacing: "-0.005em",
-          color: "var(--color-ink)",
-        }}
-      >
-        5월 중 개발 예정이에요.
-      </p>
-    </section>
+    <PIUnlockedBlock
+      reportId={status.current_report_id!}
+      version={status.current_version}
+      unlockedAt={status.unlocked_at}
+    />
   );
 }
 

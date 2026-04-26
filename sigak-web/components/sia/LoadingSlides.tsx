@@ -1,9 +1,15 @@
 /**
- * LoadingSlides — Sia 대화 종료 후 리포트 생성 대기 (15초).
+ * LoadingSlides — 분석 / 리포트 생성 대기 화면.
  *
- * 5 슬라이드 × 3초 = 총 15초. 마지막 슬라이드 종료 시 `onComplete` 콜백.
+ * 5 슬라이드 × 5초 = 총 25초 후 마지막 슬라이드 hold.
+ *   - onComplete 있으면 마지막 슬라이드 5초 후 콜백 (Sia → 리포트 redirect)
+ *   - onComplete 없으면 응답 올 때까지 마지막 슬라이드 무한 hold
+ *     (Aspiration: Sonnet cross-analysis ~35-40초 — 사진 10장 fetch + base64
+ *     + Sonnet 응답 + JSON parse + Hard Rules 검증)
+ *
+ * 마지막 슬라이드는 fade-out 안 함 — 하얀 화면 회귀 방지.
+ *
  * 스킵 불가 (클릭/터치/키보드 무반응).
- *
  * 카피: 마케터 세션 #5 확정 대기 — 현재 placeholder.
  *      페르소나 B 톤 (해요체). 이모지/ㅋ/ㅎ/~ 0건.
  * 접근성: aria-live="polite". prefers-reduced-motion 시 transition 비활성.
@@ -41,7 +47,7 @@ const SLIDES: Slide[] = [
   },
 ];
 
-const SLIDE_DURATION_MS = 3000;
+const SLIDE_DURATION_MS = 5000;
 const FADE_DURATION_MS = 500;
 
 interface LoadingSlidesProps {
@@ -57,19 +63,27 @@ export function LoadingSlides({ onComplete }: LoadingSlidesProps) {
     if (completedRef.current) return;
 
     const isLast = index >= SLIDES.length - 1;
-    // 페이드 아웃 → 다음 슬라이드 전환
+
+    if (isLast) {
+      // 마지막 슬라이드는 fade-out 안 만듬 (하얀 화면 회귀 방지).
+      // onComplete 있을 때만 SLIDE_DURATION_MS 후 콜백 (Sia → redirect).
+      // onComplete 없으면 응답 올 때까지 그대로 hold.
+      if (!onComplete) return;
+      const completeTimer = setTimeout(() => {
+        if (!completedRef.current) {
+          completedRef.current = true;
+          onComplete();
+        }
+      }, SLIDE_DURATION_MS);
+      return () => clearTimeout(completeTimer);
+    }
+
+    // 일반 슬라이드 — 페이드 아웃 → 다음 슬라이드 전환
     const fadeTimer = setTimeout(
       () => setFading(true),
       SLIDE_DURATION_MS - FADE_DURATION_MS,
     );
     const nextTimer = setTimeout(() => {
-      if (isLast) {
-        if (!completedRef.current) {
-          completedRef.current = true;
-          onComplete?.();
-        }
-        return;
-      }
       setIndex((i) => i + 1);
       setFading(false);
     }, SLIDE_DURATION_MS);

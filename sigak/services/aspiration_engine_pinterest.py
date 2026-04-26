@@ -338,13 +338,19 @@ def _normalize_board_url(raw: str) -> str:
     허용 shape:
       https://www.pinterest.com/{user}/{board}/
       https://pinterest.com/{user}/{board}/
+      https://{country}.pinterest.com/{user}/{board}/   (kr / jp / br / fr / de / es / it / ...)
       https://pin.it/...  (shortlink — MVP 거부)
+
+    모든 국가 subdomain → www.pinterest.com 으로 정규화. 한글/유니코드 board name 은
+    URL-encoded 그대로 유지 (Apify actor + Pinterest 자체 처리).
     """
     if not raw:
         return ""
     parsed = urllib.parse.urlparse(raw.strip())
     host = (parsed.hostname or "").lower()
-    if host not in ("www.pinterest.com", "pinterest.com"):
+    # pinterest.com 자체 + 모든 *.pinterest.com subdomain 허용 (kr/jp/br/fr/...).
+    # pin.it shortlink 는 reject (MVP 정책 유지).
+    if host != "pinterest.com" and not host.endswith(".pinterest.com"):
         return ""
     path = parsed.path.strip("/")
     parts = path.split("/")

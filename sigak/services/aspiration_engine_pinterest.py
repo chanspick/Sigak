@@ -37,7 +37,7 @@ from services.aspiration_common import (
     select_photo_pairs,
 )
 from services.aspiration_engine_ig import AspirationRunResult, _ensure_profile
-from services.coordinate_system import VisualCoordinate, neutral_coordinate
+from services.coordinate_system import GapVector, VisualCoordinate, neutral_coordinate
 from services.ig_feed_analyzer import analyze_ig_feed
 from config import get_settings
 
@@ -64,6 +64,7 @@ def run_aspiration_pinterest(
     user_posts: Optional[list[IgLatestPost]] = None,
     profile: Optional[UserTasteProfile] = None,
     user_name: Optional[str] = None,
+    user_analysis_snapshot: Optional[dict] = None,
 ) -> AspirationRunResult:
     """Pinterest 보드 URL → AspirationAnalysis + narrative.
 
@@ -156,6 +157,7 @@ def run_aspiration_pinterest(
         gap_vector=gap,
         profile=effective_profile,
         target_analysis_snapshot=target_snapshot_dump,
+        user_analysis_snapshot=user_analysis_snapshot,
         matched_trends=None,                 # routes 에서 KB hydrate (저장 후)
         user_name=user_name,
         photo_pairs=[p.model_dump() for p in pairs],
@@ -182,7 +184,12 @@ def run_aspiration_pinterest(
     )
 
     # 9-c. 작업 9 — matched_trends 분석 시점 스냅샷 (KB 변경 시 행동지침 보존)
-    matched_trends_snapshot = _hydrate_matched_trends_snapshot(matched_trend_ids)
+    matched_trends_snapshot = _hydrate_matched_trends_snapshot(
+        matched_trend_ids,
+        profile=effective_profile,
+        gap_vector=gap,
+        user_name=user_name,
+    )
 
     # 10. 조립
     analysis = AspirationAnalysis(
@@ -195,7 +202,7 @@ def run_aspiration_pinterest(
         user_coordinate=user_coord,
         target_coordinate=target_coord,
         gap_vector=gap,
-        gap_narrative=gap.narrative(),
+        gap_narrative=(narrative.get("gap_summary") or gap.narrative()),
         photo_pairs=pairs_persisted,
         sia_overall_message=narrative["overall_message"],
         matched_trend_ids=matched_trend_ids,
@@ -231,34 +238,89 @@ def run_aspiration_pinterest(
 #  인스턴스 4 (Aspiration narrative 정교화) 또는 후속 작업 범위.
 # ─────────────────────────────────────────────
 
-def _hydrate_matched_trends_snapshot(trend_ids: list[str]) -> Optional[list[dict]]:
-    """KB 에서 trend hydrate → MatchedTrendView dict list. 분석 시점 동결 저장용.
+def _hydrate_matched_trends_snapshot(
+    trend_ids: list[str],
+    *,
+    profile: Optional[UserTasteProfile] = None,
+    gap_vector: Optional[GapVector] = None,
+    user_name: Optional[str] = None,
+) -> Optional[list[dict]]:
+    """KB 에서 trend hydrate → MatchedTrendView snapshot dict list (분석 시점 동결).
 
     KB 변경 시 과거 리포트 행동지침 보존 (CLAUDE.md 시계열 보존 원칙).
+
+    Phase J6 — personalize:
+      profile 주어지면 SiaWriter.generate_trend_card_narrative() 로
+      detailed_guide 를 유저 결 + gap 기반 1-2 문장 narrative 로 덮어씀.
+      ThreadPoolExecutor 병렬 호출 (~1-2초).
+      profile None / LLM 실패 시 _sanitize_trend_guide() fallback —
+      KB raw [score: ±X / 라벨] 프리픽스만 제거 (화면 노출 차단 보장).
+
     예외/빈값은 None 반환 — 응답 시점 KB hydrate fallback 동작.
     """
     if not trend_ids:
         return None
     try:
+        from concurrent.futures import ThreadPoolExecutor
         from schemas.aspiration import MatchedTrendView
         from services.knowledge_base import load_trends
+        from services.sia_writer import (
+            _sanitize_trend_guide,
+            get_sia_writer,
+        )
+
         all_trends = load_trends()
         by_id = {t.trend_id: t for t in all_trends}
-        snapshot: list[dict] = []
+        views: list[MatchedTrendView] = []
         for tid in trend_ids:
             t = by_id.get(tid)
             if t is None:
                 continue
-            view = MatchedTrendView(
+            views.append(MatchedTrendView(
                 trend_id=t.trend_id,
                 title=t.title,
                 category=str(t.category),
                 detailed_guide=t.detailed_guide,
                 action_hints=list(t.action_hints or []),
                 score=None,
-            )
-            snapshot.append(view.model_dump(mode="json"))
-        return snapshot or None
+            ))
+
+        if not views:
+            return None
+
+        writer = get_sia_writer()
+
+        def _process(v: MatchedTrendView) -> MatchedTrendView:
+            try:
+                if profile is not None:
+                    text = writer.generate_trend_card_narrative(
+                        trend=v,
+                        profile=profile,
+                        gap_vector=gap_vector,
+                        user_name=user_name,
+                    )
+                    v.detailed_guide = (
+                        text or _sanitize_trend_guide(v.detailed_guide or "")
+                    )
+                else:
+                    v.detailed_guide = _sanitize_trend_guide(
+                        v.detailed_guide or ""
+                    )
+            except Exception:
+                logger.exception(
+                    "trend personalize failed (id=%s) — sanitize fallback",
+                    v.trend_id,
+                )
+                v.detailed_guide = _sanitize_trend_guide(
+                    v.detailed_guide or ""
+                )
+            return v
+
+        # 병렬 — 가장 느린 1번 시간만 (~1-2초)
+        with ThreadPoolExecutor(max_workers=min(5, len(views))) as ex:
+            personalized = list(ex.map(_process, views))
+
+        return [v.model_dump(mode="json") for v in personalized] or None
     except Exception:
         logger.exception(
             "matched_trends snapshot hydrate failed for ids=%s", trend_ids,

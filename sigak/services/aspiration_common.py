@@ -33,6 +33,15 @@ from services.coordinate_system import (
     VisualCoordinate,
     neutral_coordinate,
 )
+
+
+# 축별 소비자 ux 라벨 — pair_axis_hint 등 사용자 노출 영역.
+# 내부 용어 ("형태/부피/인상") 노출 차단. 결과/체감 중심.
+_PAIR_HINT_BY_AXIS: dict[str, str] = {
+    "shape": "윤곽의 결",
+    "volume": "입체감의 결",
+    "age": "분위기의 결",
+}
 from services.knowledge_base import load_trends
 from services.knowledge_matcher import match_trends_for_user
 from services.sia_writer import _render_taste_profile_slim, get_sia_writer
@@ -142,7 +151,9 @@ def select_photo_pairs(
                 photo_context={"category": "target", "rank": i, "gap_axis": gap.primary_axis},
                 profile=_empty_profile(),
             ),
-            pair_axis_hint=f"{gap.primary_axis} 축 차이",
+            # pair_axis_hint hide — 5쌍 동일 라벨 반복은 noise. 도출 근거는
+            # gap_narrative / sia_overall_message 가 이미 풀어 설명함.
+            pair_axis_hint=None,
         ))
 
     return pairs
@@ -566,6 +577,7 @@ def compose_overall_message(
     gap_vector: GapVector,
     profile: UserTasteProfile,
     target_analysis_snapshot: Optional[dict] = None,
+    user_analysis_snapshot: Optional[dict] = None,
     matched_trends: Optional[list] = None,
     user_name: Optional[str] = None,
     photo_pairs: Optional[list[dict]] = None,
@@ -573,6 +585,8 @@ def compose_overall_message(
     """추구미 비교 narrative — sia_writer.generate_aspiration_overall() 어댑터.
 
     Phase J5 — stub format 폐기. Haiku 호출 + vault 5/5 + JSON dict 반환.
+    Phase J6 ux — user_analysis_snapshot 추가: 본인 IgFeedAnalysis dump 흘려
+    LLM 이 양쪽 도출 근거 (tone/pose/consistency) 풀어쓰기 가능.
 
     반환 키:
       overall_message     str (5-7 문장 페르소나 B narrative)
@@ -587,6 +601,7 @@ def compose_overall_message(
         gap_vector=gap_vector,
         target_display_name=target_display_name,
         target_analysis_snapshot=target_analysis_snapshot,
+        user_analysis_snapshot=user_analysis_snapshot,
         matched_trends=matched_trends,
         user_name=user_name,
         photo_pairs=photo_pairs,

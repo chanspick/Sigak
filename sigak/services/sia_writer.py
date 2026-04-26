@@ -11,12 +11,15 @@ kwargs 를 Optional 로 추가.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
+from schemas.aspiration import MatchedTrendView
 from schemas.user_taste import UserTasteProfile
 from services.coordinate_system import GapVector
 from services.sia_validators_v4 import (
@@ -87,11 +90,15 @@ class SiaWriter(Protocol):
         gap_vector: GapVector,
         target_display_name: str,
         target_analysis_snapshot: Optional[dict] = None,
+        user_analysis_snapshot: Optional[dict] = None,
         matched_trends: Optional[list] = None,
         user_name: Optional[str] = None,
         photo_pairs: Optional[list[dict]] = None,
     ) -> dict:
         """추구미 비교 narrative 생성 — JSON dict 반환 (Phase J5).
+
+        Phase J6 ux: user_analysis_snapshot 추가 — 본인 IgFeedAnalysis dump.
+        prompt 안 [본인 분석 신호] 블록으로 도출 근거 풀어쓰기 컨텍스트 제공.
 
         반환 키:
           overall_message / gap_summary / action_hints
@@ -114,6 +121,22 @@ class SiaWriter(Protocol):
         """
         ...
 
+    def generate_trend_card_narrative(
+        self,
+        *,
+        trend: MatchedTrendView,
+        profile: UserTasteProfile,
+        gap_vector: Optional[GapVector] = None,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """KB 트렌드 → 유저 결 + 갭에 맞춘 1-2 문장 narrative (Phase J6).
+
+        원본 detailed_guide 가 [score: ...] 메타 + 미디어 인용 등 raw 형식이라
+        직출 부적합. profile + gap + trend 컨텍스트로 personalized narrative.
+        실패 시 _sanitize_trend_guide() fallback (raw 메타만 제거).
+        """
+        ...
+
 
 # ─────────────────────────────────────────────
 #  Helpers
@@ -131,6 +154,28 @@ def _collect_violations(text: str) -> list[str]:
     out.extend(check_a20_abstract_praise(text))
     out.extend(check_markdown_markup(text))
     return out
+
+
+# ─────────────────────────────────────────────
+#  Trend card guide sanitization (Phase J6)
+#
+#  KB YAML detailed_guide 첫 줄 [score: ±X / 라벨] 메타 프리픽스 제거.
+#  의도: KB 는 LLM 컨텍스트로 score 메타 보존, 사용자 화면엔 노출 차단.
+#  LLM personalize fallback 에서도 사용 — graceful degrade 보장.
+# ─────────────────────────────────────────────
+
+_TREND_SCORE_PREFIX = re.compile(r"^\s*\[score:[^\]]*\]\s*\n?", re.MULTILINE)
+
+
+def _sanitize_trend_guide(text: str) -> str:
+    """KB detailed_guide 의 [score: ±X / 라벨] 메타 프리픽스 제거.
+
+    LLM personalize 실패 시 graceful fallback 으로 사용. 화면엔 raw 메타
+    절대 노출 안 됨을 보장.
+    """
+    if not text:
+        return ""
+    return _TREND_SCORE_PREFIX.sub("", text).strip()
 
 
 def _name_honorific(user_name: Optional[str]) -> str:
@@ -473,6 +518,7 @@ class StubSiaWriter:
         gap_vector: GapVector,
         target_display_name: str,
         target_analysis_snapshot: Optional[dict] = None,
+        user_analysis_snapshot: Optional[dict] = None,
         matched_trends: Optional[list] = None,
         user_name: Optional[str] = None,
         photo_pairs: Optional[list[dict]] = None,
@@ -501,6 +547,21 @@ class StubSiaWriter:
         """Stub — PI overall fallback (Haiku 미호출). 톤 + Hard Rules 통과."""
         honor = _name_honorific(user_name)
         return _build_pi_overall_fallback(honor=honor, components=components)
+
+    def generate_trend_card_narrative(
+        self,
+        *,
+        trend: MatchedTrendView,
+        profile: UserTasteProfile,
+        gap_vector: Optional[GapVector] = None,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """Stub — KB raw [score: ...] 프리픽스만 제거. LLM 호출 없음.
+
+        deterministic fallback. 테스트 / 로컬 / API 키 미설정 환경 안전.
+        """
+        sanitized = _sanitize_trend_guide(trend.detailed_guide or "")
+        return sanitized or trend.title
 
 
 # ─────────────────────────────────────────────
@@ -553,6 +614,68 @@ Hard Rules:
 출력: 한 단락 텍스트만. JSON / 따옴표 / 설명 없음."""
 
 
+_HAIKU_TREND_CARD_SYSTEM = """당신은 SIGAK 의 Sia — 유저 미감 결을 짚어주는 친근한 비서입니다.
+
+역할:
+  KB 트렌드 정보 + 유저 taste_profile + gap_vector 를 받아, 이 트렌드가 유저
+  결과 어떻게 연결되는지 1-2 문장으로 자연스럽게 풀어 씁니다.
+
+톤 (페르소나 B 친밀체):
+  허용 어미: ~더라구요 / ~이시네 / ~인가봐요? / ~이시잖아요 / ~이세요
+  금지 어미: ~것 같아요 / ~것 같습니다 / ~할 수 있습니다 / ~군요
+
+[Hard Rules — 출력 절대 금지]
+  - 숫자 일체: 좌표값 (+0.30 등) / score / 백분율 / 연도 외 수치
+  - 메타 표기: [score: ±X / 라벨] / 화살표 (→ ↘ ▲) / 이모지 (🔥 등)
+  - 미디어 인용 라벨: 'Allure ~' / 'Vogue ~' 등 패션 매거진 명시 인용
+  - 내부 좌표 용어 (소비자 ux 가드):
+    · 축 이름: shape / volume / age (영문) / 형태 / 부피 / 인상 (한글 그대로)
+    · 정성 라벨: 소프트 / 샤프 / 프레시 / 성숙 / 평면 / 입체 / 베이비 / 매추어
+    · → "어른스러운" / "산뜻한" / "또렷한" / "부드러운" 등 일상 형용사로 풀어 표현
+  - 영업 어휘: "다음 단계" / "정리해드릴" / "추천해드릴" / "핵심 포인트" /
+    "리포트" / "컨설팅" / "구독" / "티어" / "프리미엄" / 가격 수치 전부
+  - 추상 칭찬어: "매력적" / "독특한" / "특별한" / "흥미로운" / "인상적" /
+    "센스 있" / "안목" / "감각이 있"
+  - 마크다운: `*`, `**`, `##`, `>`, ``` 전부 (순수 텍스트)
+  - KB 가이드 그대로 복사 금지 — 정보를 흡수해 새 narrative 생성
+
+[내용 가이드]
+  - "이 트렌드는 ~" 보다 "@호명 결에는 ~" 식 유저 중심 톤
+  - 본인 결 (taste_profile) 과 추구미 갭 (gap_vector) 양쪽 맥락 반영
+  - 1-2 문장, 50자 ~ 130자 범위 지향
+  - 호명 1회만 (있을 때)
+
+출력: 텍스트만. JSON / 따옴표 / 설명 / 인용부호 없음."""
+
+
+def _fetch_image_for_haiku(
+    url: str, *, timeout: float = 8.0,
+) -> Optional[tuple[str, str]]:
+    """이미지 URL → (base64_str, media_type). 실패 시 None.
+
+    Anthropic Vision 의 image source "base64" 형식 호환. R2 / IG / Pinterest
+    CDN 등 외부 URL 어느 것이든 동일 처리. fetch 실패는 caller graceful
+    degrade 책임 — image 없이 "사진 보고" system 으로 호출하면 Haiku 가
+    "죄송하지만..." 응답할 가능성이 높아, caller 는 즉시 fallback 권장.
+    """
+    try:
+        import httpx
+        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            ct = (
+                resp.headers.get("content-type", "image/jpeg")
+                .split(";")[0].strip().lower()
+            )
+            if not ct.startswith("image/"):
+                ct = "image/jpeg"
+            data = base64.standard_b64encode(resp.content).decode("ascii")
+            return data, ct
+    except Exception:
+        logger.warning("haiku image fetch failed: %s", url, exc_info=True)
+        return None
+
+
 class HaikuSiaWriter:
     """Haiku 4.5 실 호출 SiaWriter. 생성 후 validator wrap + 1회 재시도.
 
@@ -603,6 +726,7 @@ class HaikuSiaWriter:
             user_prompt=user_prompt,
             max_tokens=160,
             fallback_text=_FALLBACK_COMMENT,
+            image_url=photo_url,
         )
         return text
 
@@ -663,11 +787,15 @@ class HaikuSiaWriter:
         gap_vector: GapVector,
         target_display_name: str,
         target_analysis_snapshot: Optional[dict] = None,
+        user_analysis_snapshot: Optional[dict] = None,
         matched_trends: Optional[list] = None,
         user_name: Optional[str] = None,
         photo_pairs: Optional[list[dict]] = None,
     ) -> dict:
         """Aspiration 비교 narrative — Haiku 4.5 + 페르소나 B + 5 필드 + JSON.
+
+        Phase J6 ux: user_analysis_snapshot 추가 — 본인 IgFeedAnalysis dump.
+        prompt 안 [본인 분석 신호] 블록으로 도출 근거 풀어쓰기 컨텍스트 제공.
 
         반환 키:
           overall_message / gap_summary / action_hints
@@ -677,6 +805,8 @@ class HaikuSiaWriter:
         honor = _name_honorific(user_name)
         slim = _render_taste_profile_slim(profile)
         target_summary = _summarize_target_snapshot(target_analysis_snapshot)
+        # 동일 헬퍼 — 본인 IgFeedAnalysis 도 같은 키 셋 (tone/pose/consistency 등).
+        user_summary = _summarize_target_snapshot(user_analysis_snapshot)
         trends_summary = _summarize_matched_trends(matched_trends)
         gap_n = gap_vector.narrative()
         pair_n = len(photo_pairs or [])
@@ -694,10 +824,16 @@ class HaikuSiaWriter:
             f"  tertiary: {gap_vector.tertiary_axis} "
             f"{gap_vector.tertiary_delta:+.2f}\n"
             f"  narrative_hint: {gap_n}\n\n"
-            f"[target_analysis 핵심]\n{target_summary}\n\n"
+            f"[본인 사진 분석 신호 — 도출 근거 풀어쓰기 컨텍스트]\n"
+            f"{user_summary}\n\n"
+            f"[추구미 사진 분석 신호 — 도출 근거 풀어쓰기 컨텍스트]\n"
+            f"{target_summary}\n\n"
             f"[matched_trends — KB 매칭]\n{trends_summary}\n\n"
             f"[photo_pairs 수] {pair_n}\n\n"
-            "위 정보로 본인 피드 ↔ 추구미 비교 narrative 를 JSON 으로 출력하십시오. "
+            "위 정보로 본인 피드 ↔ 추구미 비교 narrative 를 JSON 으로 출력. "
+            "본인 / 추구미 양쪽 사진 분석 신호 (톤 / 포즈 / 일관성 / 무드 등) 를 "
+            "일상어로 풀어 도출 근거를 narrative 안에 녹여 설득력 확보. "
+            "raw 필드명 / 영문 라벨 / 숫자는 컨텍스트로만 활용, 출력 0건. "
             "키: overall_message / gap_summary / action_hints. "
             "JSON 외 텍스트 / 마크다운 wrapper 절대 금지."
         )
@@ -806,6 +942,63 @@ class HaikuSiaWriter:
             validator=_collect_violations_pi_report,
         )
 
+    def generate_trend_card_narrative(
+        self,
+        *,
+        trend: MatchedTrendView,
+        profile: UserTasteProfile,
+        gap_vector: Optional[GapVector] = None,
+        user_name: Optional[str] = None,
+    ) -> str:
+        """KB 트렌드 → 유저 결 + 갭 personalized 1-2 문장 narrative.
+
+        분석 시점 1회 호출 → matched_trends_snapshot 동결. 재조회 시 LLM 0건.
+        실패 시 _sanitize_trend_guide() fallback ([score: ...] 프리픽스 제거).
+        """
+        honor = _name_honorific(user_name)
+        raw_guide = (trend.detailed_guide or "").strip()
+        sanitized_for_context = _sanitize_trend_guide(raw_guide) or raw_guide
+        action_hints_str = (
+            " / ".join((trend.action_hints or [])[:3]) or "(없음)"
+        )
+        profile_slim = _render_taste_profile_slim(profile)
+
+        gap_block = ""
+        if gap_vector is not None:
+            gap_block = (
+                "\n[gap_vector — 추구미 이동 방향]\n"
+                f"  primary axis: {gap_vector.primary_axis}\n"
+                f"  secondary axis: {gap_vector.secondary_axis}\n"
+                f"  narrative_hint: {gap_vector.narrative()}\n"
+            )
+
+        user_prompt = (
+            f"[유저 호명] {honor}\n\n"
+            f"[트렌드]\n"
+            f"  제목: {trend.title}\n"
+            f"  카테고리: {trend.category}\n"
+            f"  KB 가이드 (컨텍스트 - 메타/인용/숫자 노출 금지):\n"
+            f"{sanitized_for_context}\n"
+            f"  action_hints: {action_hints_str}\n\n"
+            f"[유저 taste_profile slim]\n"
+            f"{json.dumps(profile_slim, ensure_ascii=False, indent=2)}\n"
+            f"{gap_block}\n"
+            "위 정보로 이 트렌드가 유저 본인 결 + 추구미 갭과 어떻게 연결되는지 "
+            "1-2 문장 narrative 씁니다. 호명 1회. KB 가이드 raw 안 [score: ...] / "
+            "이모지 / 미디어 인용 / 숫자는 컨텍스트로만 활용하고 출력엔 절대 노출 "
+            "금지. 80~130자 범위 지향."
+        )
+
+        # Fallback: sanitize 결과 (raw 메타 제거된 KB 텍스트). 그것도 빈값이면 title.
+        fallback = sanitized_for_context or trend.title
+
+        return self._call_with_retry(
+            system=_HAIKU_TREND_CARD_SYSTEM,
+            user_prompt=user_prompt,
+            max_tokens=240,
+            fallback_text=fallback,
+        )
+
     # ─────────────────────────────────────────────
     #  internal — Haiku 호출 + validator wrap
     # ─────────────────────────────────────────────
@@ -819,11 +1012,14 @@ class HaikuSiaWriter:
         fallback_text: str,
         max_retries: int = 1,
         validator: Optional[Callable[[str], list[str]]] = None,
+        image_url: Optional[str] = None,
     ) -> str:
         """Haiku 호출 → validator 검증 → 위반 시 1회 재시도 → fallback.
 
         validator default: _collect_violations (A-17/A-20/markdown).
         Aspiration 등 다른 영역은 validator 인자로 전용 검증 함수 주입 가능.
+        image_url 주어지면 백엔드 fetch + base64 → Vision image block 첨부.
+        fetch 실패 시 "사진 보고" system 과 충돌 위험 → 즉시 fallback 반환.
         API 키 / 네트워크 / JSON 에러 전부 fallback 으로 수렴. 예외 raise 안 함.
         """
         _validator = validator or _collect_violations
@@ -844,6 +1040,32 @@ class HaikuSiaWriter:
             logger.warning("Haiku client init failed — fallback", exc_info=True)
             return fallback_text
 
+        # image_url 있으면 Vision input 첨부 — fetch+base64.
+        # fetch 실패 = "사진 보고" system 과 충돌 ("죄송하지만 사진..." 응답
+        # 위험) → 즉시 fallback 반환. validator 가 못 잡는 형식이라 명시 차단.
+        message_content: Any
+        if image_url:
+            fetched = _fetch_image_for_haiku(image_url)
+            if fetched is None:
+                logger.info(
+                    "image fetch failed → fallback (url=%s)", image_url[:80],
+                )
+                return fallback_text
+            b64_data, media_type = fetched
+            message_content = [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": b64_data,
+                    },
+                },
+                {"type": "text", "text": user_prompt},
+            ]
+        else:
+            message_content = user_prompt
+
         last_text = ""
         for attempt in range(max_retries + 1):
             try:
@@ -851,7 +1073,7 @@ class HaikuSiaWriter:
                     model=settings.anthropic_model_haiku,
                     max_tokens=max_tokens,
                     system=system,
-                    messages=[{"role": "user", "content": user_prompt}],
+                    messages=[{"role": "user", "content": message_content}],
                 )
             except Exception:
                 logger.warning(

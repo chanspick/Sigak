@@ -21,7 +21,7 @@ CLAUDE.md §4.4 / §12.1 확정:
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -183,37 +183,43 @@ class GapVector(BaseModel):
     def narrative(self) -> str:
         """페르소나 B 톤 서술 — Sia 리포트에 그대로 사용 가능.
 
+        숫자 노출 없음. magnitude 정성 라벨 + 방향(negative_short → positive_short)
+        + 한국어 조사 자동 처리(받침 유무).
+
         예시 출력:
-          "형태 쪽으로 +0.30 이동이 크고 (소프트 → 샤프),
-           부피는 +0.15 보조 이동 (평면 → 입체),
-           인상은 거의 같이 가요."
+          "형태 쪽으로 크게 이동했어요 (샤프 → 소프트).
+           인상은 살짝 따라가요 (프레시 → 성숙).
+           부피는 거의 같이 가요."
         """
         parts: list[str] = []
-        for axis, delta, label_primary in (
-            (self.primary_axis, self.primary_delta, True),
-            (self.secondary_axis, self.secondary_delta, False),
-        ):
-            direction, axis_info = _direction_text(axis, delta)
-            if label_primary:
-                parts.append(
-                    f"{axis_info.name_kr} 쪽으로 {_fmt_signed(delta)} 이동이 크고 ({direction})"
-                )
-            else:
-                parts.append(
-                    f"{axis_info.name_kr}은 {_fmt_signed(delta)} 보조 이동 ({direction})"
-                )
 
-        # 3번째 축: |delta| 작으면 "거의 같이" 표현
-        if abs(self.tertiary_delta) < 0.05:
-            t_info = AXES[self.tertiary_axis]
-            parts.append(f"{t_info.name_kr}은 거의 같이 가요")
+        # primary
+        p_dir, p_info = _direction_text(self.primary_axis, self.primary_delta)
+        p_mag = _magnitude_label(self.primary_delta)
+        p_josa = _topic_josa(p_info.name_kr)
+        if p_mag is None:
+            parts.append(f"{p_info.name_kr}{p_josa} 거의 같이 가요")
         else:
-            t_direction, t_info = _direction_text(self.tertiary_axis, self.tertiary_delta)
             parts.append(
-                f"{t_info.name_kr}은 {_fmt_signed(self.tertiary_delta)} ({t_direction})"
+                f"{p_info.name_kr} 쪽으로 {p_mag} 이동했어요 ({p_dir})"
             )
 
-        return ", ".join(parts) + "."
+        # secondary / tertiary — 같은 패턴, "따라가요" 보조 동사
+        for axis, delta in (
+            (self.secondary_axis, self.secondary_delta),
+            (self.tertiary_axis, self.tertiary_delta),
+        ):
+            direction, info = _direction_text(axis, delta)
+            mag = _magnitude_label(delta)
+            josa = _topic_josa(info.name_kr)
+            if mag is None:
+                parts.append(f"{info.name_kr}{josa} 거의 같이 가요")
+            else:
+                parts.append(
+                    f"{info.name_kr}{josa} {mag} 따라가요 ({direction})"
+                )
+
+        return ". ".join(parts) + "."
 
 
 def _direction_text(axis: AxisName, delta: float) -> tuple[str, AxisDefinition]:
@@ -225,8 +231,44 @@ def _direction_text(axis: AxisName, delta: float) -> tuple[str, AxisDefinition]:
 
 
 def _fmt_signed(x: float) -> str:
-    """0.30 / -0.15 형태. 3축 소수 둘째 자리 표기."""
+    """0.30 / -0.15 형태. 3축 소수 둘째 자리 표기.
+
+    유저 노출 narrative 에선 사용하지 않음 (숫자 노이즈) — 디버그 / 로그용 보존.
+    """
     return f"{x:+.2f}"
+
+
+def _magnitude_label(delta: float) -> Optional[str]:
+    """|delta| → 정성 magnitude 라벨. 숫자 미노출 narrative 용.
+
+    임계:
+      |Δ| < 0.05  → None  ("거의 같이" 분기)
+      < 0.10      → "살짝"
+      < 0.20      → "확실히"
+      그 이상      → "크게"
+    """
+    a = abs(delta)
+    if a < 0.05:
+        return None
+    if a < 0.10:
+        return "살짝"
+    if a < 0.20:
+        return "확실히"
+    return "크게"
+
+
+def _topic_josa(noun: str) -> str:
+    """한국어 topic 조사 자동 — 마지막 음절 종성 유무로 '은/는' 결정.
+
+    AXES name_kr (형태/부피/인상) 가 향후 변경되어도 안전. 한글 외 문자는 '은' 기본.
+    """
+    if not noun:
+        return "은"
+    last = noun[-1]
+    code = ord(last)
+    if 0xAC00 <= code <= 0xD7A3:
+        return "는" if (code - 0xAC00) % 28 == 0 else "은"
+    return "은"
 
 
 # ─────────────────────────────────────────────

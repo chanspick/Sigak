@@ -83,6 +83,7 @@ def run_aspiration_ig(
     user_posts: Optional[list[IgLatestPost]] = None,
     profile: Optional[UserTasteProfile] = None,
     user_name: Optional[str] = None,
+    user_analysis_snapshot: Optional[dict] = None,
 ) -> AspirationRunResult:
     """제3자 IG 핸들 → AspirationAnalysis + narrative.
 
@@ -177,6 +178,7 @@ def run_aspiration_ig(
         gap_vector=gap,
         profile=effective_profile,
         target_analysis_snapshot=target_snapshot_dump,
+        user_analysis_snapshot=user_analysis_snapshot,
         matched_trends=None,                 # routes 에서 KB hydrate (저장 후)
         user_name=user_name,
         photo_pairs=[p.model_dump() for p in pairs],
@@ -206,7 +208,12 @@ def run_aspiration_ig(
     from services.aspiration_engine_pinterest import (
         _hydrate_matched_trends_snapshot,
     )
-    matched_trends_snapshot = _hydrate_matched_trends_snapshot(matched_trend_ids)
+    matched_trends_snapshot = _hydrate_matched_trends_snapshot(
+        matched_trend_ids,
+        profile=effective_profile,
+        gap_vector=gap,
+        user_name=user_name,
+    )
 
     # 10. AspirationAnalysis 조립
     analysis = AspirationAnalysis(
@@ -219,7 +226,7 @@ def run_aspiration_ig(
         user_coordinate=user_coord,
         target_coordinate=target_coord,
         gap_vector=gap,
-        gap_narrative=gap.narrative(),
+        gap_narrative=(narrative.get("gap_summary") or gap.narrative()),
         photo_pairs=pairs_persisted,
         sia_overall_message=narrative["overall_message"],
         matched_trend_ids=matched_trend_ids,

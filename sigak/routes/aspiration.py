@@ -141,6 +141,10 @@ def create_aspiration_ig(
         raise HTTPException(500, "토큰 차감 중복 경합 — 재시도 해주세요.")
 
     # 엔진 실행 — Phase J5: profile (vault 5/5) + user_name 흘림
+    # Phase J6: 본인 IgFeedAnalysis 도 흘려 narrative 도출 근거 풀어쓰기 가능.
+    user_ig_analysis = (
+        vault.ig_feed_cache.get("analysis") if vault.ig_feed_cache else None
+    )
     result: AspirationRunResult = run_aspiration_ig(
         db,
         user_id=user["id"],
@@ -150,6 +154,7 @@ def create_aspiration_ig(
         user_posts=user_posts,
         profile=user_profile,
         user_name=vault.basic_info.name,
+        user_analysis_snapshot=user_ig_analysis,
     )
 
     # 실패 정책 — 수집 실패면 환불
@@ -249,6 +254,9 @@ def create_aspiration_pinterest(
         db.rollback()
         raise HTTPException(500, "토큰 차감 중복 경합 — 재시도 해주세요.")
 
+    user_ig_analysis = (
+        vault.ig_feed_cache.get("analysis") if vault.ig_feed_cache else None
+    )
     result = run_aspiration_pinterest(
         db,
         user_id=user["id"],
@@ -258,6 +266,7 @@ def create_aspiration_pinterest(
         user_posts=user_posts,
         profile=user_profile,
         user_name=vault.basic_info.name,
+        user_analysis_snapshot=user_ig_analysis,
     )
 
     if result.status != "completed" or result.analysis is None:

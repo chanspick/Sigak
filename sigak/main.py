@@ -1677,10 +1677,55 @@ async def run_analysis_legacy(user_id: str):
     print(f"[VAULT_CTX] user={user_id} len={len(vault_context)} preview={vault_context[:300]!r}")
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
-    report_id, _ = _run_analysis_pipeline(
+    report_id, report_dict = _run_analysis_pipeline(
         user_id, order, user_data, interview_data, analysis_data,
         vault_context=vault_context,
     )
+
+    # Phase A B-1 fix companion (2026-04-26): DBReport upsert.
+    # 기존 legacy analyze path 가 in-memory + disk 만 저장 → /api/v1/my/reports
+    # 가 DBReport query 라 새 report 미노출. payment confirm path 와 동일 패턴.
+    if _use_db():
+        db = get_db()
+        try:
+            # submit 가 방금 만든 가장 최근 DBOrder 회수 (FK 제약 충족)
+            db_order = (
+                db.query(DBOrder)
+                .filter(DBOrder.user_id == user_id)
+                .order_by(DBOrder.created_at.desc())
+                .first()
+            )
+            order_id_for_db = db_order.id if db_order else order["order_id"]
+
+            # report 중복 방지
+            existing = db.query(DBReport).filter(DBReport.id == report_id).first()
+            if not existing:
+                db.add(DBReport(
+                    id=report_id,
+                    user_id=user_id,
+                    order_id=order_id_for_db,
+                    access_level=order.get("tier", "standard"),
+                    report_data=report_dict.get("formatted"),
+                    raw_data={
+                        "current_coords": report_dict.get("current_coords"),
+                        "aspiration_coords": report_dict.get("aspiration_coords"),
+                        "gap": report_dict.get("gap"),
+                        "content": report_dict.get("content"),
+                    },
+                    created_at=datetime.utcnow(),
+                ))
+                if db_order:
+                    db_order.status = "completed"
+                    db_order.report_id = report_id
+                    db_order.completed_at = datetime.utcnow()
+                db.commit()
+                print(f"[DB] analyze: report={report_id} order={order_id_for_db} saved")
+        except Exception as e:
+            db.rollback()
+            print(f"[DB] analyze report save error: {e}")
+        finally:
+            db.close()
+
     return {"status": "reported", "report_id": report_id}
 
 

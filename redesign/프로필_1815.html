@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 프로필</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+/* ============================================================
+   BASE
+============================================================ */
+:root {
+  --bg: #F5F1EB;
+  --bg-soft: #EDE8DF;
+  --ink: #2D2D2D;
+  --ink-soft: #3D3730;
+  --ink-body: #4A4540;
+  --fog: #888888;
+  --mist: #D4CEC4;
+  --rule: #E5E0D7;
+  --ember: #b54b2b;
+  --ember-soft: #f0e0d6;
+  --ember-softer: #f8ede8;
+  --radius-pill: 100px;
+  --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: 'Pretendard Variable', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+::selection { background: var(--ember); color: var(--bg); }
+
+/* ============================================================
+   LOGO
+============================================================ */
+.brand-logo    { width: 22px; height: 22px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.brand-logo.sm { width: 16px; height: 16px; }
+
+/* ============================================================
+   PROFILE TOP NAV
+============================================================ */
+.profile-topnav {
+  padding: 28px 24px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  max-width: 480px; margin: 0 auto;
+}
+.profile-topnav-left  { font-family: 'Pretendard Variable', sans-serif; font-size: 13.5px; color: var(--ink-soft); font-weight: 500; cursor: pointer; flex: 1; }
+.profile-topnav-center { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 15px; letter-spacing: -0.005em; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; }
+.profile-topnav-right { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fog); letter-spacing: 0.1em; flex: 1; text-align: right; }
+
+/* ============================================================
+   PROFILE ME
+============================================================ */
+.profile-me { text-align: center; padding: 40px 24px 36px; max-width: 480px; margin: 0 auto; }
+.profile-avatar-lg {
+  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 18px;
+  background: radial-gradient(circle at 30% 30%, #ffffff, rgba(255,255,255,0.3) 55%, transparent 70%),
+              linear-gradient(135deg, #e8d9c8, #b8a58a);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.profile-handle { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--fog); text-transform: uppercase; margin-bottom: 6px; }
+.profile-name  { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 22px; color: var(--ink); letter-spacing: -0.018em; margin-bottom: 24px; }
+.profile-cta-sia {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 11px 22px; background: var(--ink); color: var(--bg);
+  border: none; border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; letter-spacing: -0.005em; transition: background 0.2s ease;
+}
+.profile-cta-sia:hover { background: var(--ember); }
+.profile-cta-sia .arrow { font-family: 'Noto Serif KR', serif; font-weight: 300; font-size: 14px; }
+
+/* ============================================================
+   TABS
+============================================================ */
+.tabs-wrap { max-width: 480px; margin: 0 auto; padding: 0 24px; border-bottom: 1px solid var(--rule); }
+.tabs { display: flex; gap: 32px; justify-content: center; }
+.tab {
+  font-family: 'Noto Serif KR', serif; font-size: 14.5px; font-weight: 500;
+  color: var(--fog); padding: 16px 0; cursor: pointer;
+  border-bottom: 1.5px solid transparent; margin-bottom: -1px;
+  transition: color 0.2s ease, border-color 0.2s ease; letter-spacing: -0.01em;
+  user-select: none;
+}
+.tab:hover { color: var(--ink-soft); }
+.tab.active { color: var(--ink); border-bottom-color: var(--ember); }
+
+/* ============================================================
+   TAB PANELS
+============================================================ */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeTab 0.22s ease; }
+@keyframes fadeTab { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* IG grid (피드) */
+.grid-wrap { max-width: 480px; margin: 28px auto 0; padding: 0 24px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.grid-cell { aspect-ratio: 1/1; position: relative; overflow: hidden; cursor: pointer; transition: transform 0.25s ease; }
+.grid-cell:hover { transform: scale(0.98); }
+.grid-cell:nth-child(1) { background: linear-gradient(135deg, #e8d9c8, #a89a82); }
+.grid-cell:nth-child(2) { background: linear-gradient(160deg, #f0e4d0, #b8a588); }
+.grid-cell:nth-child(3) { background: radial-gradient(circle at 60% 40%, rgba(181,75,43,0.2), transparent 60%), linear-gradient(200deg, #d5c3a8, #8a7f6d); }
+.grid-cell:nth-child(4) { background: linear-gradient(170deg, #e5d5b8, #a8957e); }
+.grid-cell:nth-child(5) { background: linear-gradient(135deg, #d4c6ae, #8a7f6d); }
+.grid-cell:nth-child(6) { background: linear-gradient(225deg, #c8b79a, #ebe3d1); }
+.grid-cell:nth-child(7) { background: linear-gradient(190deg, #b8a891, #7a7062); }
+.grid-cell:nth-child(8) { background: linear-gradient(145deg, #ebdec2, #b8a891); }
+.grid-cell:nth-child(9) { background: linear-gradient(175deg, #d4cab5, #9b8f77); }
+
+/* 개발중 / coming soon 카드 */
+.soon-card {
+  max-width: 440px; margin: 40px auto 0; padding: 0 24px;
+}
+.soon-inner {
+  background: var(--bg-soft);
+  border-radius: var(--radius-card);
+  padding: 48px 28px;
+  text-align: center;
+}
+.soon-emoji { font-size: 36px; margin-bottom: 14px; }
+.soon-text {
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 16px; color: var(--ink-body); line-height: 1.65;
+  letter-spacing: -0.005em;
+}
+.soon-sub {
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.18em; color: var(--fog);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   NEXT STEPS
+============================================================ */
+.nextsteps-wrap { max-width: 440px; margin: 60px auto 0; padding: 0 24px; }
+.nextsteps-head { padding-bottom: 20px; border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
+.nextsteps-title { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 20px; letter-spacing: -0.018em; color: var(--ink); }
+.nextsteps-title strong { font-weight: 700; }
+
+.nextstep {
+  display: grid; grid-template-columns: 44px 1fr auto;
+  gap: 14px; padding: 22px 0;
+  border-bottom: 1px solid var(--rule);
+  align-items: flex-start; cursor: pointer;
+  transition: padding-left 0.2s ease;
+}
+.nextstep:hover { padding-left: 6px; }
+.nextstep:last-child { border-bottom: none; }
+.nextstep-num { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--ember); letter-spacing: 0.06em; padding-top: 2px; }
+.nextstep-body { min-width: 0; }
+.nextstep-title { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 15px; color: var(--ink); letter-spacing: -0.013em; margin-bottom: 5px; }
+.nextstep-sub { font-family: 'Pretendard Variable', sans-serif; font-size: 12.5px; color: var(--ink-body); line-height: 1.55; letter-spacing: -0.005em; }
+.nextstep-dm { margin-top: 7px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--ember); letter-spacing: 0.04em; }
+.nextstep-badge {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+  letter-spacing: 0.1em; color: var(--ember); background: var(--ember-softer);
+  padding: 5px 10px; border-radius: var(--radius-pill); font-weight: 500;
+  text-transform: uppercase; white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+}
+.nextstep-badge.free { color: var(--fog); background: var(--bg-soft); }
+
+/* ============================================================
+   PROFILE FOOTER
+============================================================ */
+.profile-footer { padding: 60px 24px 72px; text-align: center; max-width: 480px; margin: 60px auto 0; border-top: 1px solid var(--rule); }
+.footer-brand { display: inline-flex; align-items: center; gap: 8px; font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 14px; letter-spacing: 0.03em; color: var(--ink-soft); margin-bottom: 12px; }
+.footer-meta { font-family: 'Pretendard Variable', sans-serif; font-size: 10.5px; color: var(--fog); line-height: 1.85; }
+.footer-links { margin: 18px 0; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.footer-links span { font-size: 11.5px; color: var(--ink-body); cursor: pointer; transition: color 0.2s ease; }
+.footer-links span:hover { color: var(--ember); }
+</style>
+</head>
+<body>
+
+<!-- SVG LOGO SYMBOL -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="sigak-logo" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="7" fill="#1a1a1a"/>
+    <g stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <line x1="20" y1="6" x2="20" y2="13"/>
+      <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z"/>
+      <circle cx="20" cy="19.5" r="2.6"/>
+    </g>
+    <path d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z" fill="#ffffff"/>
+  </symbol>
+</svg>
+
+<!-- ============================================================
+     TOP NAV
+============================================================ -->
+<div class="profile-topnav">
+  <span class="profile-topnav-left">← 뒤로</span>
+  <div class="profile-topnav-center">
+    <svg class="brand-logo sm"><use href="#sigak-logo"/></svg>
+    <span>sigak</span>
+  </div>
+  <span class="profile-topnav-right"></span>
+</div>
+
+<!-- ============================================================
+     PROFILE ME
+============================================================ -->
+<div class="profile-me">
+  <div class="profile-avatar-lg"></div>
+  <div class="profile-handle">@you_today</div>
+  <div class="profile-name">지현</div>
+
+</div>
+
+<!-- ============================================================
+     TABS
+============================================================ -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <div class="tab active" data-panel="tab-feed">피드</div>
+    <div class="tab" data-panel="tab-sigak">시각</div>
+    <div class="tab" data-panel="tab-change">변화</div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TAB PANELS
+============================================================ -->
+
+<!-- 피드 -->
+<div class="tab-panel active" id="tab-feed">
+  <div class="grid-wrap">
+    <div class="grid">
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+      <div class="grid-cell"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 시각 -->
+<div class="tab-panel" id="tab-sigak">
+  <div class="soon-card">
+    <div class="soon-inner">
+      <div class="soon-emoji">🛠️</div>
+      <div class="soon-text">개발중! 조금만 기다려요 ㅎㅎ</div>
+      <div class="soon-sub">coming soon</div>
+    </div>
+  </div>
+</div>
+
+<!-- 변화 -->
+<div class="tab-panel" id="tab-change">
+  <div class="soon-card">
+    <div class="soon-inner">
+      <div class="soon-emoji">🌱</div>
+      <div class="soon-text">coming soon..</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     NEXT STEPS
+============================================================ -->
+<div class="nextsteps-wrap">
+  <div class="nextsteps-head">
+    <div class="nextsteps-title">menu</div>
+  </div>
+
+  <div class="nextstep">
+    <div class="nextstep-num">01</div>
+    <div class="nextstep-body">
+      <div class="nextstep-title">피드 분석하기</div>
+      <div class="nextstep-sub">SIA와 대화하며 내 피드를 분석하고<br>추구미를 알려드려요</div>
+    </div>
+    <span class="nextstep-badge free">FREE</span>
+  </div>
+
+  <div class="nextstep">
+    <div class="nextstep-num">02</div>
+    <div class="nextstep-body">
+      <div class="nextstep-title">추구미 살펴보기</div>
+      <div class="nextstep-sub">추구미에 부합하는 인스타 계정 및 핀터레스트를<br>알려주시면 유사도와 개선점을 알려드려요</div>
+    </div>
+    <span class="nextstep-badge">🪙 20</span>
+  </div>
+
+  <div class="nextstep" id="nextstep-sigak">
+    <div class="nextstep-num">03</div>
+    <div class="nextstep-body">
+      <div class="nextstep-title">시각 분석하기</div>
+      <div class="nextstep-sub">내 얼굴형부터 퍼스널컬러까지!<br>집에서 보는 나만의 퍼스널 컨설팅</div>
+    </div>
+    <span class="nextstep-badge">🪙 30</span>
+  </div>
+
+  <div class="nextstep">
+    <div class="nextstep-num">04</div>
+    <div class="nextstep-body">
+      <div class="nextstep-title">소통하기</div>
+      <div class="nextstep-sub">불편한 점, 오류, 더 있었으면 하는 기능을<br>실시간으로 소통해요</div>
+      <div class="nextstep-dm">@sigak_official ← DM 24시간 내 답장!</div>
+    </div>
+  </div>
+
+  <div class="nextstep">
+    <div class="nextstep-num">05</div>
+    <div class="nextstep-body">
+      <div class="nextstep-title">이벤트 🎉</div>
+      <div class="nextstep-sub">분석하고 인스타에 @sigak_official 태그하고<br>스토리 올리면 토큰 30개 증정!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     FOOTER
+============================================================ -->
+<div class="profile-footer">
+  <div class="footer-brand">
+    <svg class="brand-logo sm"><use href="#sigak-logo"/></svg>
+    <span>sigak · 시각</span>
+  </div>
+  <div class="footer-links">
+    <span>계정 설정</span>
+    <span>토큰 내역</span>
+    <span>이용약관</span>
+    <span>로그아웃</span>
+  </div>
+  <div class="footer-meta">
+    © 2026 SIGAK · 주식회사 시각<br>
+    사업자등록번호 207-87-03690<br>
+    partner@sigak.asia
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   TAB SWITCHING — 자연스러운 페이드 전환
+============================================================ */
+function switchTab(panelId) {
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.classList.toggle('active', t.dataset.panel === panelId);
+  });
+  document.querySelectorAll('.tab-panel').forEach(function (p) {
+    p.classList.toggle('active', p.id === panelId);
+  });
+}
+
+document.querySelectorAll('.tab').forEach(function (tab) {
+  tab.addEventListener('click', function () { switchTab(tab.dataset.panel); });
+});
+
+/* 시각 분석하기 → 시각 탭으로 이동 */
+document.getElementById('nextstep-sigak').addEventListener('click', function () {
+  switchTab('tab-sigak');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+
+</body>
+</html>

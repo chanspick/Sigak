@@ -507,7 +507,7 @@ InsightFace 랜드마크에서 추출한 수치 데이터를 기반으로,
 }"""
 
 
-def interpret_face_structure(face_features: dict) -> dict:
+def interpret_face_structure(face_features: dict, vault_context: str = "") -> dict:
     """
     raw 얼굴 수치를 LLM으로 자연어 해석한다.
 
@@ -515,6 +515,10 @@ def interpret_face_structure(face_features: dict) -> dict:
         face_features: face.py에서 추출한 특징 dict
             jaw_angle, eye_tilt, cheekbone_prominence, lip_fullness,
             face_shape, symmetry_score, golden_ratio_score 등
+        vault_context (Phase B-2 — PI-REVIVE 2026-04-26):
+            services.vault_renderer.render_vault_context() 산출물.
+            비어있지 않으면 prompt 에 PRIMARY tone 입력으로 합류 →
+            overall_impression / feature_interpretations 가 유저 vault 발화 echo.
 
     Returns:
         {
@@ -524,9 +528,11 @@ def interpret_face_structure(face_features: dict) -> dict:
             "distinctive_points": [...]
         }
     """
-    user_prompt = f"""다음 얼굴 구조 수치를 자연어로 해석해주세요.
+    # Phase B-2 — vault_context 가 있으면 prompt 권위 입력으로 prepend
+    vault_block = _build_vault_block(vault_context)
+    has_vault = bool(vault_block)
 
-[얼굴 구조 데이터]
+    face_data_block = f"""[얼굴 구조 데이터]
 - 얼굴형: {face_features.get('face_shape', 'N/A')}
 - 턱선 각도: {face_features.get('jaw_angle', 'N/A')}° (낮을수록 날카로움, 높을수록 부드러움)
 - 광대 돌출도: {face_features.get('cheekbone_prominence', 'N/A')} (0~1, 높을수록 돌출)
@@ -544,11 +550,42 @@ def interpret_face_structure(face_features: dict) -> dict:
 - 대칭도: {face_features.get('symmetry_score', 'N/A')} (0~1, 1=완벽)
 - 황금비 근접도: {face_features.get('golden_ratio_score', 'N/A')} (0~1, 1=황금비)
 - 피부톤: {face_features.get('skin_tone', 'N/A')}
-- 피부 밝기: {face_features.get('skin_brightness', 'N/A')} (0~1)
+- 피부 밝기: {face_features.get('skin_brightness', 'N/A')} (0~1)"""
+
+    if has_vault:
+        # vault 가 PRIMARY tone source. 얼굴 데이터는 객관 사실 baseline.
+        user_prompt = f"""유저의 얼굴 구조를 자연어로 해석해주세요.
+{vault_block}
+{face_data_block}
+
+분석 가이드 (vault 통합):
+1. overall_impression (2-3문장):
+   - 유저의 vault 발화/추구 narrative 톤을 반영한 인상 묘사
+   - 예: 활동적/역동적 vault → "역동적인 분위기와 잘 어우러지는 둥근 얼굴..."
+   - 예: 차분/지적 vault → "차분하고 사려깊은 인상의 둥근 얼굴..."
+   - 객관 수치 (얼굴형, 대칭도) 는 그대로 반영. tone 만 vault echo.
+2. feature_interpretations: 각 feature 인상을 유저 lifestyle/추구 방향과 연결
+   - 예: 광대 → "활기를 만드는 입체감" (active vault) vs "지적인 윤곽" (intellectual vault)
+3. harmony_note: vault 톤 (페르소나 B 친근체) 으로 1문장
+4. distinctive_points: 3-4개. vault narrative 와 연결되는 포인트 우선
+
+규칙 보존:
+- 숫자/도/% 절대 X (system prompt 규칙 그대로)
+- "~경향이 있다" 등 hedging 금지
+- feature 키는 system prompt 목록에서만 선택
+
+JSON으로만 응답해주세요."""
+    else:
+        # vault 없음 — legacy path (verdict cache wrapper, etc)
+        user_prompt = f"""다음 얼굴 구조 수치를 자연어로 해석해주세요.
+
+{face_data_block}
 
 JSON으로만 응답해주세요."""
 
+    print(f"[FACE_INTERP_PROMPT] has_vault={has_vault} prompt_len={len(user_prompt)}")
     raw = _call_llm(FACE_INTERPRET_SYSTEM, user_prompt, max_tokens=1024)
+    print(f"[FACE_INTERP_RESULT] raw_len={len(raw)} preview={raw[:300]!r}")
 
     try:
         cleaned = raw.strip()

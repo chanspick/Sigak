@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 결제 완료</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+:root {
+  --bg: #F5F1EB; --bg-soft: #EDE8DF; --ink: #2D2D2D; --ink-soft: #3D3730;
+  --ink-body: #4A4540; --fog: #888888; --mist: #D4CEC4; --rule: #E5E0D7;
+  --ember: #b54b2b; --ember-softer: #f8ede8;
+  --radius-pill: 100px; --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; }
+body {
+  font-family: 'Pretendard Variable', -apple-system, sans-serif;
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+::selection { background: var(--ember); color: var(--bg); }
+
+/* 딤 배경 */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(45,45,45,0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+
+/* 바텀 시트 */
+.sheet {
+  background: var(--bg);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 28px 48px;
+  width: 100%; max-width: 480px;
+  animation: slideUp 0.32s cubic-bezier(0.34,1.2,0.64,1);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* 핸들 바 */
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--mist); margin: 0 auto 32px;
+}
+
+/* 아이콘 */
+.success-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 24px;
+}
+
+/* 타이틀 */
+.sheet-title {
+  font-family: 'Noto Serif KR', serif; font-size: 22px; font-weight: 700;
+  color: var(--ink); text-align: center; letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+.sheet-sub {
+  font-size: 13.5px; color: var(--fog); text-align: center;
+  letter-spacing: -0.005em; line-height: 1.6; margin-bottom: 32px;
+}
+
+/* 토큰 증가 표시 */
+.token-change {
+  background: var(--bg-soft); border: 1px solid var(--rule);
+  border-radius: var(--radius-card); padding: 20px 24px;
+  margin-bottom: 28px;
+}
+.token-change-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+}
+.token-change-row + .token-change-row {
+  border-top: 1px solid var(--rule);
+}
+.tc-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--fog);
+}
+.tc-value {
+  font-family: 'Noto Serif KR', serif; font-size: 16px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.015em;
+}
+.tc-value.plus { color: var(--ember); }
+.tc-value.total {
+  font-size: 20px;
+}
+
+/* 버튼 */
+.cta-primary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 17px 24px; background: var(--ink); color: var(--bg);
+  border: none; border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: -0.012em; cursor: pointer; transition: all 0.2s ease;
+}
+.cta-primary:hover { background: #000; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+
+<div class="overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+
+    <!-- 성공 아이콘 -->
+    <div class="success-icon">
+      <svg width="24" height="20" viewBox="0 0 24 20" fill="none">
+        <path d="M2 10L8.5 16.5L22 3" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <h2 class="sheet-title">충전 완료</h2>
+    <p class="sheet-sub">토큰이 계정에 추가됐어요.</p>
+
+    <!-- 토큰 변화 -->
+    <div class="token-change">
+      <div class="token-change-row">
+        <span class="tc-label">PLAN</span>
+        <span class="tc-value">STARTER · 100토큰</span>
+      </div>
+      <div class="token-change-row">
+        <span class="tc-label">ADDED</span>
+        <span class="tc-value plus">+ 100 토큰</span>
+      </div>
+      <div class="token-change-row">
+        <span class="tc-label">BALANCE</span>
+        <span class="tc-value total">370 토큰</span>
+      </div>
+    </div>
+
+    <button class="cta-primary">확인</button>
+  </div>
+</div>
+
+</body>
+</html>

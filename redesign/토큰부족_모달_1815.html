@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 토큰 부족</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+:root {
+  --bg: #F5F1EB; --bg-soft: #EDE8DF; --ink: #2D2D2D; --ink-soft: #3D3730;
+  --ink-body: #4A4540; --fog: #888888; --mist: #D4CEC4; --rule: #E5E0D7;
+  --ember: #b54b2b; --ember-softer: #f8ede8;
+  --radius-pill: 100px; --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; }
+body {
+  font-family: 'Pretendard Variable', -apple-system, sans-serif;
+  background: var(--bg); color: var(--ink); min-height: 100vh;
+}
+::selection { background: var(--ember); color: var(--bg); }
+
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(45,45,45,0.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet {
+  background: var(--bg); border-radius: 20px 20px 0 0;
+  padding: 12px 28px 48px; width: 100%; max-width: 480px;
+  animation: slideUp 0.32s cubic-bezier(0.34,1.2,0.64,1);
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--mist); margin: 0 auto 32px;
+}
+
+/* 경고 아이콘 */
+.warn-icon {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--ember-softer);
+  border: 1.5px solid #e8b4a6;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 24px;
+}
+
+.sheet-title {
+  font-family: 'Noto Serif KR', serif; font-size: 22px; font-weight: 700;
+  color: var(--ink); text-align: center; letter-spacing: -0.02em; margin-bottom: 8px;
+}
+.sheet-sub {
+  font-size: 13.5px; color: var(--fog); text-align: center;
+  letter-spacing: -0.005em; line-height: 1.6; margin-bottom: 28px;
+}
+
+/* 토큰 현황 */
+.token-status {
+  background: var(--bg-soft); border: 1px solid var(--rule);
+  border-radius: var(--radius-card); padding: 20px 24px; margin-bottom: 24px;
+}
+.ts-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+}
+.ts-row + .ts-row { border-top: 1px solid var(--rule); }
+.ts-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--fog);
+}
+.ts-value {
+  font-family: 'Noto Serif KR', serif; font-size: 16px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.015em;
+}
+.ts-value.short { color: var(--ember); }
+
+/* 부족 표시 바 */
+.shortage-bar {
+  background: var(--bg-soft); border: 1px solid var(--ember-softer);
+  border-radius: 10px; padding: 14px 18px; margin-bottom: 28px;
+  display: flex; align-items: center; gap: 10px;
+}
+.shortage-bar-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ember); flex-shrink: 0;
+}
+.shortage-bar-text {
+  font-size: 13px; color: var(--ember); letter-spacing: -0.005em;
+}
+
+/* 버튼 */
+.cta-primary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 17px 24px; background: var(--ink); color: var(--bg);
+  border: none; border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: -0.012em; cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px;
+}
+.cta-primary:hover { background: #000; transform: translateY(-1px); }
+
+.cta-secondary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 15px 24px; background: transparent; color: var(--fog);
+  border: 1.5px solid var(--rule); border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif; font-size: 14px; font-weight: 500;
+  letter-spacing: -0.01em; cursor: pointer; transition: all 0.2s ease;
+}
+.cta-secondary:hover { border-color: var(--mist); color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div class="overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+
+    <!-- 경고 아이콘 -->
+    <div class="warn-icon">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <path d="M11 7V12" stroke="#b54b2b" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="11" cy="15.5" r="1.2" fill="#b54b2b"/>
+        <path d="M9.27 3.5L1.5 17.5A2 2 0 003.23 20.5h15.54A2 2 0 0020.5 17.5L12.73 3.5a2 2 0 00-3.46 0Z" stroke="#b54b2b" stroke-width="1.8" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <h2 class="sheet-title">토큰이 부족해요</h2>
+    <p class="sheet-sub">이 기능을 사용하려면 토큰이 더 필요해요.</p>
+
+    <!-- 토큰 현황 -->
+    <div class="token-status">
+      <div class="ts-row">
+        <span class="ts-label">BALANCE</span>
+        <span class="ts-value">2 토큰</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-label">REQUIRED</span>
+        <span class="ts-value">20 토큰</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-label">SHORTAGE</span>
+        <span class="ts-value short">−18 토큰</span>
+      </div>
+    </div>
+
+    <!-- 부족 안내 -->
+    <div class="shortage-bar">
+      <div class="shortage-bar-dot"></div>
+      <span class="shortage-bar-text">최소 18 토큰을 충전하면 바로 이용할 수 있어요.</span>
+    </div>
+
+    <button class="cta-primary">토큰 충전하기 →</button>
+    <button class="cta-secondary">취소</button>
+  </div>
+</div>
+
+</body>
+</html>

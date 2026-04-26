@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 온보딩</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+/* ============================================================
+   BASE
+============================================================ */
+:root {
+  --bg: #F5F1EB;
+  --bg-soft: #EDE8DF;
+  --ink: #2D2D2D;
+  --ink-soft: #3D3730;
+  --ink-body: #4A4540;
+  --fog: #888888;
+  --mist: #D4CEC4;
+  --rule: #E5E0D7;
+  --ember: #b54b2b;
+  --ember-softer: #f8ede8;
+  --radius-pill: 100px;
+  --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: 'Pretendard Variable', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+::selection { background: var(--ember); color: var(--bg); }
+
+/* ============================================================
+   LOGO
+============================================================ */
+.brand-logo    { width: 22px; height: 22px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.brand-logo.sm { width: 16px; height: 16px; }
+
+/* ============================================================
+   TOP NAV
+============================================================ */
+.topnav {
+  padding: 28px 24px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  max-width: 480px; margin: 0 auto;
+}
+.topnav-left   { flex: 1; font-family: 'Pretendard Variable', sans-serif; font-size: 13.5px; color: var(--ink-soft); font-weight: 500; cursor: pointer; }
+.topnav-center { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 15px; letter-spacing: -0.005em; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; }
+.topnav-right  { flex: 1; text-align: right; }
+
+/* ============================================================
+   PAGE CONTENT
+============================================================ */
+.page-wrap { max-width: 440px; margin: 0 auto; padding: 48px 24px 80px; }
+
+/* Headline */
+.onboard-headline {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 24px; font-weight: 700;
+  color: var(--ink); margin-bottom: 8px; line-height: 1.4;
+  letter-spacing: -0.018em;
+}
+.onboard-sub {
+  font-size: 14px; color: var(--fog);
+  margin-bottom: 40px; line-height: 1.65;
+  letter-spacing: -0.005em;
+}
+
+/* ============================================================
+   FORM FIELDS
+============================================================ */
+.field { margin-bottom: 22px; }
+.field-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.12em; color: var(--fog);
+  text-transform: uppercase; margin-bottom: 8px; display: block;
+}
+
+/* Text input (Instagram handle) */
+.input-row {
+  display: flex; align-items: center;
+  border: 1px solid var(--rule); border-radius: 12px;
+  overflow: hidden; background: var(--bg-soft);
+  transition: border-color 0.2s ease;
+}
+.input-row:focus-within { border-color: var(--ember); }
+.input-at {
+  padding: 14px 10px 14px 14px;
+  font-size: 15px; color: var(--fog);
+  user-select: none; flex-shrink: 0;
+}
+.input-row input {
+  flex: 1; padding: 14px 14px 14px 0;
+  background: transparent; border: none; outline: none;
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 15px; color: var(--ink);
+}
+.input-row input::placeholder { color: var(--mist); }
+
+/* Gender segments */
+.seg-group { display: flex; gap: 10px; }
+.seg-btn {
+  flex: 1; padding: 13px 0;
+  border-radius: 12px;
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1.5px solid var(--rule); background: var(--bg-soft);
+  color: var(--fog);
+  transition: all 0.18s ease; letter-spacing: -0.008em;
+  text-align: center;
+}
+.seg-btn.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* Age dropdown */
+.select-wrap {
+  position: relative;
+  border: 1px solid var(--rule); border-radius: 12px;
+  overflow: hidden; background: var(--bg-soft);
+  transition: border-color 0.2s ease;
+}
+.select-wrap:focus-within { border-color: var(--ember); }
+.select-wrap select {
+  width: 100%;
+  padding: 14px 44px 14px 16px;
+  background: transparent; border: none; outline: none;
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 15px; color: var(--ink);
+  appearance: none; -webkit-appearance: none;
+  cursor: pointer;
+}
+.select-wrap select:invalid,
+.select-wrap select option:first-child { color: var(--mist); }
+/* chevron */
+.select-wrap::after {
+  content: '';
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  width: 10px; height: 10px;
+  border-right: 1.5px solid var(--fog); border-bottom: 1.5px solid var(--fog);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* ============================================================
+   CTA
+============================================================ */
+.cta-primary {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 17px 24px;
+  background: var(--ink); color: var(--bg);
+  border: none; border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: -0.012em; cursor: pointer; transition: all 0.2s ease;
+  margin-top: 40px;
+}
+.cta-primary:hover { background: #000; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+
+<!-- SVG LOGO SYMBOL -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="sigak-logo" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="7" fill="#1a1a1a"/>
+    <g stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <line x1="20" y1="6" x2="20" y2="13"/>
+      <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z"/>
+      <circle cx="20" cy="19.5" r="2.6"/>
+    </g>
+    <path d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z" fill="#ffffff"/>
+  </symbol>
+</svg>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <span class="topnav-left">← 뒤로</span>
+  <div class="topnav-center">
+    <svg class="brand-logo sm"><use href="#sigak-logo"/></svg>
+    <span>sigak</span>
+  </div>
+  <span class="topnav-right"></span>
+</div>
+
+<!-- PAGE CONTENT -->
+<div class="page-wrap">
+
+  <h2 class="onboard-headline">인스타 피드를 읽어올게요!</h2>
+  <p class="onboard-sub">나이와 성별을 알려주시면 더 정확히 분석할 수 있어요.</p>
+
+  <!-- Instagram handle -->
+  <div class="field">
+    <label class="field-label">INSTAGRAM HANDLE</label>
+    <div class="input-row">
+      <span class="input-at">@</span>
+      <input type="text" placeholder="instagram ID" autocomplete="off" autocapitalize="none" spellcheck="false" />
+    </div>
+  </div>
+
+  <!-- Gender -->
+  <div class="field">
+    <label class="field-label">GENDER</label>
+    <div class="seg-group">
+      <div class="seg-btn active">여성</div>
+      <div class="seg-btn">남성</div>
+      <div class="seg-btn">선택 안 함</div>
+    </div>
+  </div>
+
+  <!-- Age dropdown -->
+  <div class="field">
+    <label class="field-label">AGE</label>
+    <div class="select-wrap">
+      <select>
+        <option value="" disabled selected>나이를 선택해 주세요</option>
+        <option>16세</option>
+        <option>17세</option>
+        <option>18세</option>
+        <option>19세</option>
+        <option>20세</option>
+        <option>21세</option>
+        <option>22세</option>
+        <option>23세</option>
+        <option>24세</option>
+        <option>25세</option>
+        <option>26세</option>
+        <option>27세</option>
+        <option>28세</option>
+        <option>29세</option>
+        <option>30세</option>
+        <option>31세</option>
+        <option>32세</option>
+        <option>33세</option>
+        <option>34세</option>
+        <option>35세</option>
+        <option>36세</option>
+        <option>37세</option>
+        <option>38세</option>
+        <option>39세</option>
+        <option>40세</option>
+        <option>41세</option>
+        <option>42세</option>
+        <option>43세</option>
+        <option>44세</option>
+        <option>45세</option>
+        <option>46세</option>
+        <option>47세</option>
+        <option>48세</option>
+        <option>49세</option>
+        <option>50세 이상</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="cta-primary">다음 →</button>
+
+</div>
+
+<script>
+/* Gender segment toggle */
+document.querySelectorAll('.seg-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    btn.closest('.seg-group').querySelectorAll('.seg-btn').forEach(function (b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 토큰 충전</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+/* ============================================================
+   BASE
+============================================================ */
+:root {
+  --bg: #F5F1EB;
+  --bg-soft: #EDE8DF;
+  --ink: #2D2D2D;
+  --ink-soft: #3D3730;
+  --ink-body: #4A4540;
+  --fog: #888888;
+  --mist: #D4CEC4;
+  --rule: #E5E0D7;
+  --ember: #b54b2b;
+  --ember-softer: #f8ede8;
+  --radius-pill: 100px;
+  --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: 'Pretendard Variable', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+::selection { background: var(--ember); color: var(--bg); }
+
+/* ============================================================
+   BRAND LOGO
+============================================================ */
+.brand-logo    { width: 22px; height: 22px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.brand-logo.sm { width: 16px; height: 16px; }
+
+/* ============================================================
+   TOP NAV
+============================================================ */
+.topnav {
+  padding: 28px 24px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  max-width: 480px; margin: 0 auto;
+}
+.topnav-left   { flex: 1; font-family: 'Pretendard Variable', sans-serif; font-size: 13.5px; color: var(--ink-soft); font-weight: 500; cursor: pointer; }
+.topnav-center { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 15px; letter-spacing: -0.005em; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; }
+.topnav-right  { flex: 1; }
+
+/* ============================================================
+   PAGE WRAP
+============================================================ */
+.page-wrap { max-width: 440px; margin: 0 auto; padding: 44px 24px 100px; }
+
+/* ============================================================
+   HEADLINE
+============================================================ */
+.page-headline {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 32px; font-weight: 700;
+  color: var(--ink); line-height: 1.25;
+  letter-spacing: -0.025em;
+  margin-bottom: 36px;
+}
+.page-headline .period { color: var(--ember); }
+
+/* ============================================================
+   PLAN CARDS
+============================================================ */
+.plan-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 36px; }
+
+.plan-card {
+  border: 1.5px solid var(--rule);
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease;
+  background: var(--bg-soft);
+}
+.plan-card:hover { border-color: var(--mist); }
+.plan-card.selected {
+  background: var(--ink); border-color: var(--ink);
+}
+
+.plan-left {}
+.plan-tier-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.plan-tier {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fog);
+}
+.plan-card.selected .plan-tier { color: rgba(255,255,255,0.5); }
+
+.plan-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.06em;
+  font-weight: 500;
+}
+/* 첫 충전 badge */
+.plan-badge.first {
+  background: var(--ember-softer); color: var(--ember);
+}
+.plan-card.selected .plan-badge.first {
+  background: rgba(181,75,43,0.25); color: #f4b8a8;
+}
+/* 할인 badge */
+.plan-badge.discount {
+  background: var(--bg); color: var(--fog);
+  border: 1px solid var(--rule);
+}
+.plan-card.selected .plan-badge.discount {
+  background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6);
+  border-color: transparent;
+}
+
+.plan-token-row {
+  display: flex; align-items: baseline; gap: 5px;
+}
+.plan-token-num {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 26px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.018em; line-height: 1;
+}
+.plan-card.selected .plan-token-num { color: #fff; }
+.plan-token-unit {
+  font-size: 13px; color: var(--fog);
+  font-family: 'Pretendard Variable', sans-serif;
+}
+.plan-card.selected .plan-token-unit { color: rgba(255,255,255,0.5); }
+
+.plan-right { text-align: right; flex-shrink: 0; }
+.plan-price {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 18px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.015em;
+  margin-bottom: 4px;
+}
+.plan-card.selected .plan-price { color: #fff; }
+.plan-per {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.04em;
+  color: var(--fog);
+}
+.plan-card.selected .plan-per { color: rgba(255,255,255,0.4); }
+
+/* ============================================================
+   TERMS
+============================================================ */
+.terms-list { display: flex; flex-direction: column; gap: 0; margin-bottom: 28px; }
+
+.term-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--rule);
+  cursor: pointer;
+}
+.term-item:last-child { border-bottom: 1px solid var(--rule); }
+
+.term-checkbox {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 1.5px solid var(--mist); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.term-checkbox.checked {
+  background: var(--ink); border-color: var(--ink);
+}
+.term-checkbox svg { display: none; }
+.term-checkbox.checked svg { display: block; }
+
+.term-body { flex: 1; min-width: 0; }
+.term-label {
+  font-size: 13.5px; color: var(--ink-body);
+  letter-spacing: -0.008em; line-height: 1.4;
+  word-break: keep-all;
+}
+.term-required {
+  color: var(--ember); font-weight: 500; margin-right: 2px;
+}
+.term-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; letter-spacing: 0.06em;
+  color: var(--fog); flex-shrink: 0;
+  text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer; transition: color 0.2s ease;
+}
+.term-link:hover { color: var(--ink); }
+
+/* ============================================================
+   CTA
+============================================================ */
+.cta-primary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 17px 24px;
+  background: var(--mist); color: #fff;
+  border: none; border-radius: var(--radius-pill);
+  font-family: 'Pretendard Variable', sans-serif;
+  font-size: 15px; font-weight: 600;
+  letter-spacing: -0.012em; cursor: not-allowed;
+  transition: all 0.25s ease;
+}
+.cta-primary.ready {
+  background: var(--ink); cursor: pointer;
+}
+.cta-primary.ready:hover { background: #000; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+
+<!-- SVG DEFS -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="sigak-logo" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="7" fill="#1a1a1a"/>
+    <g stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <line x1="20" y1="6" x2="20" y2="13"/>
+      <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z"/>
+      <circle cx="20" cy="19.5" r="2.6"/>
+    </g>
+    <path d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z" fill="#ffffff"/>
+  </symbol>
+</svg>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <span class="topnav-left">← 뒤로</span>
+  <div class="topnav-center">
+    <svg class="brand-logo sm"><use href="#sigak-logo"/></svg>
+    <span>sigak</span>
+  </div>
+  <span class="topnav-right"></span>
+</div>
+
+<!-- PAGE WRAP -->
+<div class="page-wrap">
+
+  <h1 class="page-headline">토큰 충전<span class="period">.</span></h1>
+
+  <!-- PLAN CARDS -->
+  <div class="plan-list" id="planList">
+
+    <div class="plan-card selected" data-plan="starter">
+      <div class="plan-left">
+        <div class="plan-tier-row">
+          <span class="plan-tier">STARTER</span>
+        </div>
+        <div class="plan-token-row">
+          <span class="plan-token-num">100</span>
+          <span class="plan-token-unit">토큰</span>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="plan-price">₩10,000</div>
+        <div class="plan-per">토큰당 ₩100</div>
+      </div>
+    </div>
+
+    <div class="plan-card" data-plan="regular">
+      <div class="plan-left">
+        <div class="plan-tier-row">
+          <span class="plan-tier">REGULAR</span>
+          <span class="plan-badge discount">12% 할인</span>
+        </div>
+        <div class="plan-token-row">
+          <span class="plan-token-num">280</span>
+          <span class="plan-token-unit">토큰</span>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="plan-price">₩25,000</div>
+        <div class="plan-per">토큰당 ₩89</div>
+      </div>
+    </div>
+
+    <div class="plan-card" data-plan="pro">
+      <div class="plan-left">
+        <div class="plan-tier-row">
+          <span class="plan-tier">PRO</span>
+          <span class="plan-badge discount">17% 할인</span>
+        </div>
+        <div class="plan-token-row">
+          <span class="plan-token-num">600</span>
+          <span class="plan-token-unit">토큰</span>
+        </div>
+      </div>
+      <div class="plan-right">
+        <div class="plan-price">₩50,000</div>
+        <div class="plan-per">토큰당 ₩83</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TERMS -->
+  <div class="terms-list" id="termsList">
+
+    <div class="term-item" data-term="0">
+      <div class="term-checkbox" id="check0">
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="term-body">
+        <span class="term-label"><span class="term-required">[필수]</span> 결제 약관 및 환불 정책 동의</span>
+      </div>
+      <span class="term-link">전문</span>
+    </div>
+
+    <div class="term-item" data-term="1">
+      <div class="term-checkbox" id="check1">
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="term-body">
+        <span class="term-label"><span class="term-required">[필수]</span> 디지털 콘텐츠 청약 철회 제한 사유 확인</span>
+      </div>
+      <span class="term-link">전문</span>
+    </div>
+
+  </div>
+
+  <!-- CTA -->
+  <button class="cta-primary" id="ctaBtn">필수 동의 항목을 확인해주세요</button>
+
+</div>
+
+<script>
+/* ============================================================
+   PLAN SELECTION
+============================================================ */
+document.querySelectorAll('.plan-card').forEach(function(card) {
+  card.addEventListener('click', function() {
+    document.querySelectorAll('.plan-card').forEach(function(c) {
+      c.classList.remove('selected');
+    });
+    card.classList.add('selected');
+  });
+});
+
+/* ============================================================
+   TERMS + CTA
+============================================================ */
+var checked = [false, false];
+
+document.querySelectorAll('.term-item').forEach(function(item) {
+  item.addEventListener('click', function(e) {
+    if (e.target.classList.contains('term-link')) return;
+    var idx = parseInt(item.dataset.term);
+    checked[idx] = !checked[idx];
+    var box = document.getElementById('check' + idx);
+    box.classList.toggle('checked', checked[idx]);
+    updateCta();
+  });
+});
+
+function updateCta() {
+  var allChecked = checked.every(Boolean);
+  var btn = document.getElementById('ctaBtn');
+  btn.classList.toggle('ready', allChecked);
+  btn.textContent = allChecked ? '결제하기' : '필수 동의 항목을 확인해주세요';
+}
+</script>
+
+</body>
+</html>

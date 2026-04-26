@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGAK — 피드 분석</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;700&family=JetBrains+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css">
+<style>
+:root {
+  --bg: #F5F1EB; --bg-soft: #EDE8DF; --ink: #2D2D2D; --ink-soft: #3D3730;
+  --ink-body: #4A4540; --fog: #888888; --mist: #D4CEC4; --rule: #E5E0D7;
+  --ember: #b54b2b; --ember-softer: #f8ede8;
+  --radius-pill: 100px; --radius-card: 14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: 'Pretendard Variable', -apple-system, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+::selection { background: var(--ember); color: var(--bg); }
+
+.brand-logo.sm { width: 16px; height: 16px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+
+/* TOP NAV */
+.topnav {
+  padding: 28px 24px 24px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--rule); max-width: 480px; margin: 0 auto;
+}
+.topnav-left   { flex: 1; font-family: 'Pretendard Variable', sans-serif; font-size: 13.5px; color: var(--ink-soft); font-weight: 500; cursor: pointer; }
+.topnav-center { font-family: 'Noto Serif KR', serif; font-weight: 500; font-size: 15px; letter-spacing: -0.005em; color: var(--ink); display: inline-flex; align-items: center; gap: 7px; }
+.topnav-right  { flex: 1; display: flex; justify-content: flex-end; }
+.token-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--ink); color: var(--bg); border-radius: var(--radius-pill); padding: 5px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; }
+.token-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ember); flex-shrink: 0; }
+
+/* PAGE */
+.page-wrap { max-width: 440px; margin: 0 auto; padding: 0 24px 100px; }
+
+/* OVERVIEW */
+.overview { padding: 40px 0 0; }
+.result-date { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: 0.18em; color: var(--fog); margin-bottom: 16px; }
+.result-title { font-family: 'Noto Serif KR', serif; font-size: 34px; font-weight: 700; color: var(--ink); line-height: 1.2; letter-spacing: -0.025em; margin-bottom: 20px; }
+.result-title .period { color: var(--ember); }
+.result-subtitle { font-family: 'Noto Serif KR', serif; font-size: 18px; font-weight: 500; color: var(--ink); line-height: 1.5; letter-spacing: -0.015em; margin-bottom: 18px; word-break: keep-all; }
+.result-summary { font-size: 14px; color: var(--ink-body); line-height: 1.8; letter-spacing: -0.005em; word-break: keep-all; margin-bottom: 36px; }
+
+/* UPLOAD GRID */
+.upload-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fog); margin-bottom: 10px; }
+.upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border-radius: 10px; overflow: hidden; margin-bottom: 36px; }
+.upload-cell { aspect-ratio: 3/4; background: var(--bg-soft); display: flex; align-items: center; justify-content: center; }
+.upload-cell-num { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em; color: var(--mist); text-transform: uppercase; }
+
+/* SECTION LABELS */
+.section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fog); margin-bottom: 14px; display: block; }
+.section-label.ember { color: var(--ember); }
+
+/* VERDICT */
+.verdict-block { padding: 28px 0; border-top: 1px solid var(--rule); }
+.verdict-text { font-family: 'Noto Serif KR', serif; font-size: 15.5px; font-weight: 400; color: var(--ink); line-height: 1.85; letter-spacing: -0.01em; word-break: keep-all; }
+
+/* PHOTO NAV */
+.photo-nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-top: 1px solid var(--rule); margin-top: 4px; cursor: pointer; transition: padding-left 0.2s ease; }
+.photo-nav:hover { padding-left: 4px; }
+.photo-nav-label { font-family: 'Noto Serif KR', serif; font-size: 14px; font-weight: 500; color: var(--ink); }
+.photo-nav-right { display: flex; align-items: center; gap: 8px; }
+.photo-nav-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: var(--fog); }
+.photo-nav-arrow { color: var(--mist); font-size: 16px; }
+
+/* SECTION DIVIDER */
+.section-break { height: 1px; background: var(--rule); margin: 48px 0 40px; }
+
+/* PHOTO FRAME */
+.photo-frame { width: 100%; aspect-ratio: 3/4; background: var(--bg-soft); border-radius: var(--radius-card); border: 1px solid var(--rule); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+.photo-frame-inner { text-align: center; }
+.photo-frame-plus { font-size: 22px; color: var(--mist); line-height: 1; margin-bottom: 8px; }
+.photo-frame-tag { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mist); }
+
+/* PHOTO CONTENT */
+.photo-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--ember); margin-bottom: 12px; }
+.photo-analysis { font-family: 'Noto Serif KR', serif; font-size: 15.5px; font-weight: 400; color: var(--ink); line-height: 1.85; letter-spacing: -0.01em; word-break: keep-all; margin-bottom: 20px; }
+.improve-rule { border: none; border-top: 1px dashed var(--rule); margin-bottom: 16px; }
+.improve-text { font-size: 13.5px; color: var(--ink-body); line-height: 1.75; letter-spacing: -0.005em; word-break: keep-all; }
+
+/* DIRECTION */
+.direction-block { padding: 28px 0; border-top: 1px solid var(--rule); margin-top: 8px; }
+.direction-text { font-family: 'Noto Serif KR', serif; font-size: 15.5px; font-weight: 400; color: var(--ink); line-height: 1.85; letter-spacing: -0.01em; word-break: keep-all; }
+
+/* ACTION */
+.action-section { padding-top: 44px; border-top: 1px solid var(--rule); margin-top: 44px; }
+.action-text { font-family: 'Noto Serif KR', serif; font-size: 15.5px; font-weight: 400; color: var(--ink); line-height: 1.85; letter-spacing: -0.01em; word-break: keep-all; margin-bottom: 28px; }
+.reason-block { padding: 24px 0; border-top: 1px solid var(--rule); }
+.reason-text { font-size: 13.5px; color: var(--ink-body); line-height: 1.78; letter-spacing: -0.005em; word-break: keep-all; }
+
+/* METRICS */
+.metrics-section { padding: 24px 0; border-top: 1px solid var(--rule); }
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--radius-card); overflow: hidden; margin-top: 14px; }
+.metric-item { background: var(--bg-soft); padding: 18px 16px; }
+.metric-item.full { grid-column: 1 / -1; }
+.metric-label { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--fog); margin-bottom: 8px; }
+.metric-value { font-family: 'Noto Serif KR', serif; font-size: 16px; font-weight: 500; color: var(--ink); letter-spacing: -0.015em; line-height: 1.4; word-break: keep-all; }
+.metric-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 22px; color: var(--ember); font-weight: 500; }
+
+/* FOOTER */
+.page-footer { padding: 48px 0 0; border-top: 1px solid var(--rule); margin-top: 48px; }
+.footer-links { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.footer-links span { font-size: 11.5px; color: var(--ink-body); cursor: pointer; transition: color 0.2s ease; }
+.footer-links span:hover { color: var(--ember); }
+.footer-meta { font-family: 'Pretendard Variable', sans-serif; font-size: 10.5px; color: var(--fog); line-height: 1.9; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="sigak-logo" viewBox="0 0 40 40">
+    <rect width="40" height="40" rx="7" fill="#1a1a1a"/>
+    <g stroke="#ffffff" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <line x1="20" y1="6" x2="20" y2="13"/>
+      <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z"/>
+      <circle cx="20" cy="19.5" r="2.6"/>
+    </g>
+    <path d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z" fill="#ffffff"/>
+  </symbol>
+</svg>
+
+<div class="topnav">
+  <span class="topnav-left">← 뒤로</span>
+  <div class="topnav-center">
+    <svg class="brand-logo sm"><use href="#sigak-logo"/></svg>
+    <span>sigak</span>
+  </div>
+  <div class="topnav-right">
+    <div class="token-pill"><div class="token-pill-dot"></div><span>270</span></div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <div class="result-date">2026 · 04 · 26</div>
+    <h1 class="result-title">피드 분석<span class="period">.</span></h1>
+    <h2 class="result-subtitle">3장의 분위기가 각각 다른 궤도를<br>그리고 있습니다</h2>
+    <p class="result-summary">추구미는 선명하고 역동적인 이미지이나, 이번 3장은 웜 골든톤 야외 컷, 쿨 모노 스튜디오 컷, 뉴트럴 캐주얼 컷으로 각각의 색온도와 무드 결이 분산되어 있습니다. 일관된 미감을 원하는 방향과 실제 사진 사이에 부분적 갭이 작용하고 있습니다.</p>
+
+    <div class="upload-label">업로드 사진</div>
+    <div class="upload-grid">
+      <div class="upload-cell"><div class="upload-cell-num">01</div></div>
+      <div class="upload-cell"><div class="upload-cell-num">02</div></div>
+      <div class="upload-cell"><div class="upload-cell-num">03</div></div>
+    </div>
+
+    <div class="verdict-block">
+      <span class="section-label">판정</span>
+      <p class="verdict-text">추구미는 선명·강렬·역동이라는 일관된 키워드를 중심으로 구성되어 있습니다. 그러나 이번 3장을 병렬로 놓으면 황금빛 일몰의 따뜻한 톤, 쿨한 블랙 앤 베이지 스튜디오 톤, 올리브·화이트 뉴트럴 캐주얼 톤이 서로 다른 세 개의 분위기를 형성하고 있습니다. 색온도의 분산이 피드 전체의 시각적 일관성을 희석시키는 변수로 작용합니다. 특히 정면 포즈에 대한 불편함이 있는 상황에서 스튜디오 컷은 정면 단독 구도로 찍혀 있어 신체 언어와 구도 선택 간의 갭도 관찰됩니다.</p>
+    </div>
+
+    <div class="photo-nav" onclick="document.getElementById('p01').scrollIntoView({behavior:'smooth'})">
+      <span class="photo-nav-label">사진별 해석</span>
+      <div class="photo-nav-right">
+        <span class="photo-nav-count">3장</span>
+        <span class="photo-nav-arrow">›</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHOTO 01 -->
+  <div id="p01">
+    <div class="section-break"></div>
+    <div class="photo-frame">
+      <div class="photo-frame-inner">
+        <div class="photo-frame-plus">+</div>
+        <div class="photo-frame-tag">Photo 01</div>
+      </div>
+    </div>
+    <div class="photo-num">#01</div>
+    <p class="photo-analysis">야외 루프톱에서 웜 골든아워 빛을 받아 촬영된 컷입니다. 슬립 드레스의 크림 컬러와 일몰의 오렌지·핑크 톤이 맞물려 따뜻한 색감이 두드러지며, 측면 자세와 시선 처리가 역동적인 인상에 가장 근접하고 있습니다.</p>
+    <hr class="improve-rule">
+    <span class="section-label">개선</span>
+    <p class="improve-text">배경의 웜 앰비언트 빛이 얼굴에 직접 닿는 비율이 낮아 윤곽이 다소 뭉개지는 구간이 있습니다. 광원을 피사체 정면 약 15도 각도에서 받도록 위치를 조정하면 턱선이 보다 또렷하게 살아납니다.</p>
+  </div>
+
+  <!-- PHOTO 02 -->
+  <div id="p02">
+    <div class="section-break"></div>
+    <div class="photo-frame">
+      <div class="photo-frame-inner">
+        <div class="photo-frame-plus">+</div>
+        <div class="photo-frame-tag">Photo 02</div>
+      </div>
+    </div>
+    <div class="photo-num">#02</div>
+    <p class="photo-analysis">쿨 베이지 배경과 블랙 수트 조합으로 촬영된 스튜디오 컷입니다. 색감 자체의 대비는 선명하고 구도는 정돈되어 있으나, 정면 단독 구도가 적용되어 있습니다.</p>
+    <hr class="improve-rule">
+    <span class="section-label">개선</span>
+    <p class="improve-text">정면 포즈 특성상 좌우 어깨 라인이 수평으로 고정되어 무게감이 증가합니다. 상체를 카메라 기준 약 30도 비틀어 쿼터 각도로 전환하면 어깨 폭이 줄어들고 긴장감이 자연스럽게 분산됩니다.</p>
+  </div>
+
+  <!-- PHOTO 03 -->
+  <div id="p03">
+    <div class="section-break"></div>
+    <div class="photo-frame">
+      <div class="photo-frame-inner">
+        <div class="photo-frame-plus">+</div>
+        <div class="photo-frame-tag">Photo 03</div>
+      </div>
+    </div>
+    <div class="photo-num">#03</div>
+    <p class="photo-analysis">실내 미러 셀피 컷으로 화이트 탑과 올리브 카고 팬츠를 조합하고 있습니다. 뉴트럴 베이지 배경과 자연광 조합이 안정적이며, 전신 실루엣을 확인하기 용이한 구도입니다.</p>
+    <hr class="improve-rule">
+    <span class="section-label">개선</span>
+    <p class="improve-text">시선이 스마트폰 렌즈가 아닌 미러 중앙부를 향하고 있어 눈 방향이 약간 아래로 쏠립니다. 렌즈를 직접 응시하는 방식으로 전환하면 시선의 힘이 강해지고 역동적인 인상에 더 가까워집니다.</p>
+
+    <div class="direction-block">
+      <span class="section-label">방향</span>
+      <p class="direction-text">세 장의 색온도를 하나의 결로 통일하는 것이 우선 과제입니다. 쿨뮤트 또는 쿨비비드 계열 한 가지 기준 팔레트를 정하고 모든 컷이 그 안에서 수렴하도록 조율하면 피드 전체의 일관성이 높아집니다.</p>
+    </div>
+  </div>
+
+  <!-- 다음 행동 -->
+  <div class="action-section">
+    <span class="section-label ember">다음 행동</span>
+    <p class="action-text">정면 포즈에 대한 불편함을 해소하는 가장 빠른 방법은 상체를 카메라 기준 약 25~30도 비튼 쿼터 각도를 기본 포즈로 설정하는 것입니다. 이 각도는 턱선이 가장 선명하게 드러나는 구도이기도 합니다.</p>
+
+    <div class="reason-block">
+      <span class="section-label">이유</span>
+      <p class="reason-text">선명한 윤곽과 역동적인 움직임이라는 추구미는 측면 또는 쿼터 각도에서 가장 효과적으로 전달됩니다. 단색 쿨톤 배경 또는 쿨비비드 컬러 포인트 의상이 결합될 때 그 인상이 피드 전반에서도 일관되게 읽힙니다.</p>
+    </div>
+
+    <div class="metrics-section">
+      <span class="section-label">수치</span>
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-label">추구미와의 정합</div>
+          <div class="metric-value">부분 일치</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">채도 배수</div>
+          <div class="metric-value mono">×1.1</div>
+        </div>
+        <div class="metric-item full">
+          <div class="metric-label">지배 톤</div>
+          <div class="metric-value">혼합(웜/쿨/뉴트럴 분산) · 38%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="page-footer">
+    <div class="footer-links">
+      <span>이용약관</span><span>개인정보처리방침</span><span>환불정책</span>
+    </div>
+    <div class="footer-meta">
+      주식회사 시각 | 대표: 조찬영 | 사업자등록번호: 207-87-03690<br>
+      통신판매업신고번호: 제 2025-서울서대문-1006호<br>
+      주소: 서울특별시 서대문구 연세로 2나길 61, 1층 코워킹 스페이스<br>
+      02-6402-0025 · partner@sigak.asia<br>
+      © 2026 SIGAK. All rights reserved.
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

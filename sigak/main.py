@@ -924,7 +924,10 @@ def _run_analysis_pipeline(
         current_coords = {"shape": 0, "volume": 0, "age": 0}
 
     # Step 2: 얼굴 구조 해석 (LLM)
-    face_interpretation = interpret_face_structure(features) if features else {}
+    # Phase B-2 (PI-REVIVE 2026-04-26): vault_context 주입 → cover/face 섹션 vault tone 반영
+    face_interpretation = (
+        interpret_face_structure(features, vault_context=vault_context) if features else {}
+    )
     face_interpretation = sanitize_report_json(face_interpretation)
 
     # Step 3: 유형 매칭

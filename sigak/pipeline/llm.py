@@ -24,6 +24,24 @@ def _get_client():
     return anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
 
+def _build_vault_block(vault_context: str) -> str:
+    """vault_context 가 있으면 prompt 합류용 block 으로 wrap.
+
+    Phase A B-1 (PI-REVIVE 2026-04-26):
+      services.vault_renderer.render_vault_context() 산출물을 LLM prompt 의
+      가장 권위 있는 입력으로 합류. 빈 문자열이면 빈 string 반환 → prompt 변화 0.
+    """
+    s = (vault_context or "").strip()
+    if not s:
+        return ""
+    return (
+        "\n## 유저 vault context (Sia 대화 + 추구미 이력 + 원어)\n"
+        f"{s}\n"
+        "위 context 가 가장 권위 있는 입력이에요. interview dict 의 답변보다 우선\n"
+        "참고하되 height/weight/hair_texture 등 numeric/factual 은 interview 따름.\n"
+    )
+
+
 def _call_llm(system: str, user: str, max_tokens: int = 2048) -> str:
     import time
     settings = get_settings()
@@ -81,7 +99,11 @@ SIGAK 인상 유형 레퍼런스:
 }}"""
 
 
-def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
+def interpret_interview(
+    interview_data: dict,
+    gender: str = "female",
+    vault_context: str = "",
+) -> dict:
     """
     Parse interview responses into aspiration coordinates.
 
@@ -92,12 +114,21 @@ def interpret_interview(interview_data: dict, gender: str = "female") -> dict:
         "current_concerns": "너무 동안이라 진지해 보이고 싶다",
         ...
     }
+
+    vault_context (Phase A B-1 — PI-REVIVE 2026-04-26):
+        services.vault_renderer.render_vault_context() 산출물.
+        Sia 대화 + 추구미 이력 + 유저 원어 등 양질의 vault 데이터.
+        비어있지 않으면 prompt 가장 권위 있는 입력으로 합류.
+        height/weight 등 numeric/factual 은 interview_data 우선.
     """
     # 이미지 키워드: style_image_keywords(신규) 또는 style_keywords(레거시) 사용
     image_kw = interview_data.get('style_image_keywords') or interview_data.get('style_keywords', '없음')
 
-    user_prompt = f"""다음 인터뷰 응답에서 추구미 좌표를 산출해주세요.
+    # Phase A B-1 — vault_context 가 있으면 prompt 권위 입력으로 prepend
+    vault_block = _build_vault_block(vault_context)
 
+    user_prompt = f"""다음 인터뷰 응답에서 추구미 좌표를 산출해주세요.
+{vault_block}
 [추구 이미지]
 {interview_data.get('desired_image', '없음')}
 
@@ -258,8 +289,12 @@ def generate_report(action_spec, user_context: dict) -> str:
 
     personal_color = user_context.get("personal_color", "")
 
-    user_prompt = f"""{user_context.get('name', '')}님의 스타일링 추천을 설명해주세요.
+    # Phase A B-1 (2026-04-26) — vault_context 가 ctx 에 있으면 권위 입력으로 prepend.
+    # 시그니처는 그대로 (ctx dict 키 추가 방식). 기존 caller 모두 호환.
+    vault_block = _build_vault_block(user_context.get("vault_context", ""))
 
+    user_prompt = f"""{user_context.get('name', '')}님의 스타일링 추천을 설명해주세요.
+{vault_block}
 [매칭 유형] {prompt_payload['matched_type']}
 [주요 변화 방향] {prompt_payload['primary_change_direction']}
 [추구미 해석] {aspiration_summary}

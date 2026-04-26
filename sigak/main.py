@@ -899,10 +899,15 @@ def _run_analysis_pipeline(
     user_data: dict = None,
     interview_data: dict = None,
     analysis_data: dict = None,
+    vault_context: str = "",
 ) -> tuple:
     """
     기존 analyze의 Step 1~9 전체. 결제 확인된 order만 실행.
     Returns (report_id, report_dict) tuple.
+
+    vault_context (Phase A B-1 — PI-REVIVE 2026-04-26):
+        services.vault_renderer.render_vault_context() 산출물.
+        빈 문자열이면 LLM prompt 변화 0 (기존 동작 보존). caller 가 결정.
     """
     # 파라미터 우선, 폴백으로 인메모리 dict
     user = user_data or USERS.get(user_id, {})
@@ -932,7 +937,10 @@ def _run_analysis_pipeline(
     cluster_result = classify_user(user_coords=current_coords, gender=gender)
 
     # Step 6: 인터뷰 → 추구미 좌표 (LLM)
-    aspiration_result = interpret_interview(interview, gender=gender)
+    # Phase A B-1: vault_context 가 있으면 prompt 권위 입력으로 합류 (빈 문자열이면 변화 0)
+    aspiration_result = interpret_interview(
+        interview, gender=gender, vault_context=vault_context,
+    )
     aspiration_coords = aspiration_result.get("coordinates", {"shape": 0, "volume": 0, "age": 0})
 
     aspiration_similar = find_similar_types(user_embedding=None, user_coords=aspiration_coords, gender=gender, top_k=1)
@@ -985,6 +993,8 @@ def _run_analysis_pipeline(
         "personal_color": personal_color_label,
         "height": interview.get("height", ""),
         "weight": interview.get("weight", ""),
+        # Phase A B-1: 빈 문자열이면 prompt 합류 안 함 (기존 동작 보존)
+        "vault_context": vault_context,
     })
     report_content = parse_or_fallback(raw_report, action_spec)
     report_content = sanitize_report_json(report_content)  # LLM 출력 후처리 (금지 표현, 오탈자, 톤)
@@ -1604,6 +1614,10 @@ async def run_analysis_legacy(user_id: str):
     Multi-worker safe: disk 우선 read → 항상 최신 interview/analysis 사용.
     Worker process 메모리는 startup 시점 disk restore 한 stale 값이라
     /api/v1/submit (다른 worker) 직후 호출되면 OLD 데이터로 분석 위험.
+
+    Phase A B-1 (PI-REVIVE 2026-04-26):
+      vault → vault_renderer 한국어 LLM context 합류. 빈 vault 는 400 에러
+      (페르소나 B 톤). Sia 통과 = vault 보장 전제, fallback X.
     """
     user_data = _find_user(user_id)
     if not user_data:
@@ -1623,8 +1637,32 @@ async def run_analysis_legacy(user_id: str):
     if analysis_data:
         ANALYSES[user_id] = analysis_data
 
+    # Phase A B-1: vault load + render. DB 없거나 vault 부족 → 400 (페르소나 B 톤)
+    if not _use_db():
+        raise HTTPException(500, "DB 미연결로 vault load 불가")
+
+    from services.user_data_vault import load_vault
+    from services.vault_renderer import render_vault_context, vault_has_content
+
+    db = get_db()
+    try:
+        vault = load_vault(db, user_id)
+    finally:
+        db.close()
+
+    if not vault_has_content(vault):
+        raise HTTPException(
+            400,
+            "분석 데이터가 좀 부족한 것 같아요. 잠시 후 다시 시도해 주세요.",
+        )
+
+    vault_context = render_vault_context(vault)
+
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
-    report_id, _ = _run_analysis_pipeline(user_id, order, user_data, interview_data, analysis_data)
+    report_id, _ = _run_analysis_pipeline(
+        user_id, order, user_data, interview_data, analysis_data,
+        vault_context=vault_context,
+    )
     return {"status": "reported", "report_id": report_id}
 
 

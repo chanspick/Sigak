@@ -136,6 +136,23 @@ body {
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* ──────────────────────────────────────────────
+ * Modal bottom-sheet slide up (마케터 redesign/토큰부족_모달_1815.html 차용)
+ * TokenInsufficientModal / 결제완료 모달 등 bottom-sheet UI 공유.
+ * ────────────────────────────────────────────── */
+@keyframes sigak-modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sigak-modal-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.animate-modal-fade-in { animation: sigak-modal-fade-in 0.2s ease both; }
+.animate-modal-slide-up {
+  animation: sigak-modal-slide-up 0.32s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+}
+
+/* ──────────────────────────────────────────────
  * Loading 3-dot pulse (마케터 redesign/로딩_1815.html 차용)
  * /photo-upload analyze 단계 로딩 표시.
  * 0.22s / 0.44s 지연으로 3-dot stagger.

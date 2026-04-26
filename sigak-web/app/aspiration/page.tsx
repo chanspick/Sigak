@@ -40,6 +40,7 @@ import type {
 import { LoadingSlides } from "@/components/sia/LoadingSlides";
 import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
+import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
 
 const COST_ASPIRATION = 20;
 
@@ -77,6 +78,7 @@ export default function AspirationPage() {
   const [pinterestInput, setPinterestInput] = useState("");
   const [stage, setStage] = useState<Stage>("form");
   const [balance, setBalance] = useState<number | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
   const [errorBlock, setErrorBlock] = useState<{
     title: string;
     body: string;
@@ -114,14 +116,17 @@ export default function AspirationPage() {
   const pinterestValid = isPlausiblePinterestUrl(normalizedBoard);
 
   const lowBalance = balance !== null && balance < COST_ASPIRATION;
+  // CTA enabled = input valid 만. 잔액 부족은 모달로 안내 (마케터 패턴).
   const canStart =
-    stage === "form"
-    && balance !== null
-    && balance >= COST_ASPIRATION
-    && (tab === "ig" ? igValid : pinterestValid);
+    stage === "form" && (tab === "ig" ? igValid : pinterestValid);
 
   async function handleStart(): Promise<void> {
     if (!canStart) return;
+    // client-side 잔액 체크 — 부족 시 모달 노출 (server 호출 회피)
+    if (balance !== null && balance < COST_ASPIRATION) {
+      setShowTokenModal(true);
+      return;
+    }
     setErrorBlock(null);
     setStage("pending");
 
@@ -158,12 +163,9 @@ export default function AspirationPage() {
         return;
       }
       if (err.status === 402) {
-        setErrorBlock({
-          title: "토큰이 부족해요",
-          body: "추구미 분석은 한 번에 20개가 필요해요.",
-          action: { label: "토큰 충전하기", href: "/tokens/purchase" },
-        });
-        setStage("error");
+        // server-side 잔액 부족 (race condition) → 모달 노출
+        setShowTokenModal(true);
+        setStage("form");
         return;
       }
       if (err.status === 403) {
@@ -263,6 +265,15 @@ export default function AspirationPage() {
       />
 
       <SiteFooter />
+
+      {/* 토큰 부족 모달 (마케터 redesign/토큰부족_모달_1815.html) */}
+      <TokenInsufficientModal
+        open={showTokenModal}
+        balance={balance ?? 0}
+        required={COST_ASPIRATION}
+        onCharge={() => router.push("/tokens/purchase?intent=aspiration")}
+        onClose={() => setShowTokenModal(false)}
+      />
     </div>
   );
 }
@@ -717,16 +728,13 @@ function StickyCta({
 }) {
   const inputValid = tab === "ig" ? igValid : pinterestValid;
   const labelMain = "추구미 살펴보기 →";
+  // CTA disabled 시는 input 만 invalid 케이스. 잔액 부족은 모달이 처리.
   const labelDisabled =
     !inputValid
       ? tab === "ig"
         ? "Instagram 핸들을 입력해 주세요"
         : "Pinterest 보드 URL을 입력해 주세요"
-      : balance === null
-        ? "잔액 확인 중"
-        : lowBalance
-          ? "토큰이 부족해요"
-          : labelMain;
+      : labelMain;
 
   return (
     <div
@@ -740,22 +748,6 @@ function StickyCta({
         borderTop: "1px solid var(--color-line)",
       }}
     >
-      {lowBalance && (
-        <Link
-          href="/tokens/purchase"
-          className="font-sans"
-          style={{
-            display: "block",
-            textAlign: "center",
-            fontSize: 12,
-            color: "var(--color-ink)",
-            textDecoration: "underline",
-            marginBottom: 12,
-          }}
-        >
-          토큰 충전하러 가기
-        </Link>
-      )}
       <button
         type="button"
         onClick={onStart}

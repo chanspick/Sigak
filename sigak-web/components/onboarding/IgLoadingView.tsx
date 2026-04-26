@@ -16,7 +16,7 @@
  */
 
 import Image from "next/image";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { IgFetchStatus } from "@/lib/types/mvp";
 
@@ -39,11 +39,9 @@ export function IgLoadingView({
 }: IgLoadingViewProps) {
   const { status, previewUrls, username, analyzed, error, elapsedSeconds } = result;
 
-  const handleLabel = username ? `@${username}` : "피드";
-
   const heading = useMemo(
-    () => _headingFor(status, handleLabel, analyzed),
-    [status, handleLabel, analyzed],
+    () => _headingFor(status, username, analyzed),
+    [status, username, analyzed],
   );
   const subcopy = useMemo(
     () => _subcopyFor(status, elapsedSeconds),
@@ -139,31 +137,45 @@ function PreviewGrid({ urls }: { urls: string[] }) {
       data-testid="ig-preview-grid"
     >
       {gridUrls.map((url, idx) => (
-        <div
-          key={`${url.slice(0, 40)}-${idx}`}
-          style={{
-            aspectRatio: "1 / 1",
-            position: "relative",
-            overflow: "hidden",
-            background: "var(--color-line)",
-          }}
-        >
-          {/* Instagram CDN URL — Next.js Image next.config 외부 도메인 필요 */}
-          {/* safer: plain img 로 domain 제한 우회 */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url}
-            alt=""
-            loading="lazy"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
-          />
-        </div>
+        <PreviewCell key={`${url.slice(0, 40)}-${idx}`} url={url} />
       ))}
+    </div>
+  );
+}
+
+function PreviewCell({ url }: { url: string }) {
+  // 2026-04-26 fix: 본인 보고 — IG CDN expired/invalid URL 이 X-box 표시 → 신뢰도 ↓.
+  // 로딩 중/실패 시 이미지 숨김 (animate-pulse skeleton 유지).
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  return (
+    <div
+      style={{
+        aspectRatio: "1 / 1",
+        position: "relative",
+        overflow: "hidden",
+        background: "var(--color-line)",
+      }}
+      className={loaded || errored ? undefined : "animate-pulse-opacity"}
+    >
+      {!errored && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt=""
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 200ms ease",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -321,18 +333,19 @@ function ContinueCTA({
 
 function _headingFor(
   status: IgFetchStatus,
-  handleLabel: string,
+  username: string | null | undefined,
   analyzed: boolean,
 ): string {
+  // 2026-04-26 fix: username 없을 때 "피드님 피드 찾고 있어요" 어색한 표현 제거.
+  // username 있으면 "@yuni님 피드", 없으면 "피드" 단독.
+  const subject = username ? `@${username}님 피드` : "피드";
   switch (status) {
     case "pending":
-      return `${handleLabel}님 피드 찾고 있어요`;
+      return `${subject} 찾고 있어요`;
     case "pending_vision":
-      return `${handleLabel}님 피드를 살피고 있어요`;
+      return `${subject} 살피고 있어요`;
     case "success":
-      return analyzed
-        ? "다 봤어요"
-        : `${handleLabel}님 피드 읽었어요`;
+      return analyzed ? "다 봤어요" : `${subject} 읽었어요`;
     case "private":
       return "비공개 계정이네요";
     case "failed":

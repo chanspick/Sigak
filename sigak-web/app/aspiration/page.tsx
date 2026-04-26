@@ -585,18 +585,6 @@ function PinterestInputSection({
           Pinterest 보드 URL 형식으로 입력해 주세요.
         </p>
       )}
-      <p
-        className="font-sans"
-        style={{
-          margin: "9px 0 0",
-          fontSize: 12,
-          color: "var(--color-mute)",
-          lineHeight: 1.6,
-          letterSpacing: "-0.005em",
-        }}
-      >
-        Pinterest 채널은 곧 열어둘 예정이에요. 지금은 Instagram이 정확도가 더 높아요.
-      </p>
     </section>
   );
 }

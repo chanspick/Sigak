@@ -16,7 +16,9 @@ import { getReport, requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "./section-renderer";
 import { PaywallGate } from "./paywall-gate";
 import { ShareButtons } from "./share-buttons";
-import { CastingOptInBanner } from "./casting-opt-in-banner";
+// Phase B-6 (PI-REVIVE 2026-04-26): CastingOptInBanner import 제거.
+// 본인 결정: 캐스팅 풀 영역 리포트 하단에서 노출 X.
+// CastingOptInBanner 컴포넌트 자체는 보존 (v1.5+ 부활 가능).
 
 interface ReportViewerProps {
   initialReport: ReportData;
@@ -184,12 +186,8 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
         />
       </div>
 
-      {/* 캐스팅 풀 opt-in — full 리포트에서만 표시 */}
-      {report.access_level === "full" && report.user_id && (
-        <div className="py-8 border-t border-[var(--color-border)]">
-          <CastingOptInBanner userId={report.user_id} />
-        </div>
-      )}
+      {/* Phase B-6: 캐스팅 풀 opt-in 영역 제거 (본인 결정 2026-04-26).
+          CastingOptInBanner 컴포넌트 자체는 보존 — v1.5+ 부활 시 복원. */}
 
       {/* 리포트 하단 여백 */}
       <div className="h-10" />

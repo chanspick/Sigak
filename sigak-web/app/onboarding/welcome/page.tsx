@@ -12,7 +12,7 @@ import { getToken, logout } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe, saveConsent } from "@/lib/api/onboarding";
 import { ONBOARDING_STEPS } from "@/lib/constants/onboarding-steps";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type ConsentKey =
@@ -169,29 +169,31 @@ export default function OnboardingWelcomePage() {
         }}
       />
 
-      <main style={{ padding: "48px 28px 24px", flex: 1 }}>
-        {/* 헤드라인 */}
+      <main style={{ padding: "48px 24px 24px", flex: 1, maxWidth: 480, margin: "0 auto", width: "100%" }}>
+        {/* 헤드라인 — 마케터 정합 (24-26px 700 + period accent) */}
         <h1
           className="font-serif"
           style={{
-            fontSize: 34,
-            fontWeight: 400,
-            lineHeight: 1.3,
-            letterSpacing: "-0.01em",
+            fontSize: 28,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            letterSpacing: "-0.025em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          시작 전에.
+          시작 전에
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h1>
         <p
           className="font-sans"
           style={{
-            marginTop: 16,
-            fontSize: 13,
-            opacity: 0.5,
-            lineHeight: 1.6,
-            color: "var(--color-ink)",
+            marginTop: 12,
+            fontSize: 14,
+            color: "var(--color-mute)",
+            lineHeight: 1.65,
+            letterSpacing: "-0.005em",
           }}
         >
           네 걸음으로 기준을 설정합니다.
@@ -290,16 +292,38 @@ export default function OnboardingWelcomePage() {
         )}
       </main>
 
-      <div style={{ padding: "20px 28px 24px" }}>
-        <PrimaryButton
+      <div style={{ padding: "20px 24px 24px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
+        <button
+          type="button"
           onClick={handleSubmit}
           disabled={!allRequiredChecked || submitting}
-          disabledLabel={
-            submitting ? "저장 중..." : "필수 항목에 모두 동의해주세요"
-          }
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            width: "100%",
+            padding: "17px 24px",
+            background: !allRequiredChecked || submitting
+              ? "var(--color-line-strong)"
+              : "var(--color-ink)",
+            color: !allRequiredChecked || submitting ? "#fff" : "var(--color-paper)",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: !allRequiredChecked || submitting ? "not-allowed" : "pointer",
+            transition: "all 0.2s ease",
+          }}
         >
-          시작하기
-        </PrimaryButton>
+          {submitting
+            ? "저장 중..."
+            : !allRequiredChecked
+              ? "필수 항목에 모두 동의해주세요"
+              : "시작하기 →"}
+        </button>
       </div>
 
       {/* 사업자 정보 (PG 심사 필수) */}
@@ -321,6 +345,10 @@ interface ConsentRowProps {
 }
 
 function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: ConsentRowProps) {
+  // [필수] / [선택] 접두어 분리해서 ember 색 적용
+  const requiredMatch = label.match(/^\[필수\]\s*(.+)$/);
+  const optionalMatch = label.match(/^\[선택\]\s*(.+)$/);
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
       <button
@@ -332,21 +360,23 @@ function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: C
           width: 18,
           height: 18,
           flexShrink: 0,
-          border: checked ? "1px solid var(--color-ink)" : "1px solid rgba(0, 0, 0, 0.25)",
+          border: checked ? "1.5px solid var(--color-ink)" : "1.5px solid var(--color-line-strong)",
           background: checked ? "var(--color-ink)" : "transparent",
+          borderRadius: 4,
           cursor: "pointer",
           padding: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transition: "border-color 0.2s ease, background 0.2s ease",
         }}
       >
         {checked && (
           <svg width="10" height="8" viewBox="0 0 10 8" aria-hidden>
             <path
-              d="M1 4l3 3 5-6"
+              d="M1 4L3.5 6.5L9 1"
               stroke="var(--color-paper)"
-              strokeWidth="1.5"
+              strokeWidth="1.6"
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"
@@ -359,16 +389,32 @@ function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: C
         onClick={onToggle}
         className="font-sans"
         style={{
-          fontSize: strong ? 14 : 13,
+          fontSize: strong ? 14 : 13.5,
           fontWeight: strong ? 600 : 400,
-          letterSpacing: "-0.005em",
+          letterSpacing: "-0.008em",
           lineHeight: 1.5,
           cursor: "pointer",
           flex: 1,
           color: "var(--color-ink)",
+          opacity: strong ? 1 : 0.85,
+          wordBreak: "keep-all",
         }}
       >
-        {label}
+        {requiredMatch ? (
+          <>
+            <span style={{ color: "var(--color-danger)", fontWeight: 500, marginRight: 2 }}>
+              [필수]
+            </span>{" "}
+            {requiredMatch[1]}
+          </>
+        ) : optionalMatch ? (
+          <>
+            <span style={{ color: "var(--color-mute)", marginRight: 2 }}>[선택]</span>{" "}
+            {optionalMatch[1]}
+          </>
+        ) : (
+          label
+        )}
       </label>
 
       {termsAnchor && (
@@ -376,14 +422,14 @@ function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: C
           href={`/terms${termsAnchor}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-sans"
           style={{
-            fontSize: 11,
-            letterSpacing: "-0.005em",
-            opacity: 0.5,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            color: "var(--color-mute)",
             textDecoration: "underline",
             textUnderlineOffset: 2,
-            color: "var(--color-ink)",
+            flexShrink: 0,
           }}
         >
           전문
@@ -396,13 +442,12 @@ function ConsentRow({ checked, onToggle, label, strong = false, termsAnchor }: C
 function Label({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-sans uppercase"
+      className="uppercase"
       style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: "1.5px",
-        opacity: 0.4,
-        color: "var(--color-ink)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10,
+        letterSpacing: "0.12em",
+        color: "var(--color-mute)",
       }}
     >
       {children}
@@ -413,11 +458,12 @@ function Label({ children }: { children: React.ReactNode }) {
 function LabelRight({ children }: { children: React.ReactNode }) {
   return (
     <span
-      className="font-serif tabular-nums"
+      className="tabular-nums"
       style={{
-        fontSize: 14,
-        fontWeight: 400,
-        color: "var(--color-ink)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--color-mute-2)",
+        letterSpacing: "0.04em",
       }}
     >
       {children}

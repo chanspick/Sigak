@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { getToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe } from "@/lib/api/onboarding";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 
 export default function OnboardingCompletePage() {
   const router = useRouter();
@@ -52,46 +52,52 @@ export default function OnboardingCompletePage() {
     >
       <TopBar backTarget="/" />
 
-      {/* 본문 */}
+      {/* 본문 — 마케터 정합 (period accent + 700 + maxWidth 480) */}
       <section
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          padding: "0 28px",
+          padding: "0 24px",
+          maxWidth: 480,
+          margin: "0 auto",
+          width: "100%",
         }}
       >
         <h1
           className="font-serif"
           style={{
-            fontSize: 36,
-            fontWeight: 400,
-            lineHeight: 1.25,
-            letterSpacing: "-0.02em",
+            fontSize: 28,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            letterSpacing: "-0.025em",
             margin: 0,
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
         >
-          준비가<br />끝났습니다.
+          준비가<br />
+          끝났습니다
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h1>
         <p
           className="font-sans"
           style={{
-            marginTop: 20,
+            marginTop: 14,
             fontSize: 14,
             lineHeight: 1.7,
-            opacity: 0.6,
-            color: "var(--color-ink)",
+            color: "var(--color-mute)",
             letterSpacing: "-0.005em",
           }}
         >
-          사진 세 장이면 오늘의 한 장을<br />
+          사진 세 장이면 오늘의 한 장을
+          <br />
           골라드립니다.
         </p>
 
         {/* 4스텝 체크 */}
-        <ul style={{ marginTop: 40, padding: 0, listStyle: "none" }}>
+        <ul style={{ marginTop: 32, padding: 0, listStyle: "none" }}>
           {["체형", "얼굴", "추구미", "자기 인식"].map((t, i) => (
             <li
               key={t}
@@ -99,26 +105,28 @@ export default function OnboardingCompletePage() {
                 display: "flex",
                 alignItems: "baseline",
                 gap: 14,
-                padding: "11px 0",
-                borderBottom: i === 3 ? "none" : "1px solid rgba(0, 0, 0, 0.1)",
+                padding: "13px 0",
+                borderBottom: i === 3 ? "none" : "1px solid var(--color-line)",
               }}
             >
               <span
-                className="font-serif tabular-nums"
+                className="tabular-nums"
                 style={{
-                  fontSize: 14,
-                  fontWeight: 400,
-                  opacity: 0.4,
-                  color: "var(--color-ink)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--color-danger)",
+                  letterSpacing: "0.06em",
                 }}
               >
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span
-                className="font-sans"
+                className="font-serif"
                 style={{
-                  fontSize: 14,
-                  letterSpacing: "-0.005em",
+                  fontSize: 15,
+                  fontWeight: 500,
+                  letterSpacing: "-0.013em",
                   color: "var(--color-ink)",
                 }}
               >
@@ -126,13 +134,12 @@ export default function OnboardingCompletePage() {
               </span>
               <span style={{ flex: 1 }} />
               <span
-                className="font-sans uppercase"
+                className="uppercase"
                 style={{
+                  fontFamily: "var(--font-mono)",
                   fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "1.5px",
-                  opacity: 0.4,
-                  color: "var(--color-ink)",
+                  letterSpacing: "0.12em",
+                  color: "var(--color-mute)",
                 }}
               >
                 DONE
@@ -142,11 +149,32 @@ export default function OnboardingCompletePage() {
         </ul>
       </section>
 
-      {/* CTA */}
-      <div style={{ padding: "20px 28px 32px" }}>
-        <PrimaryButton onClick={() => router.push("/verdict/new")}>
-          사진 올리러 가기
-        </PrimaryButton>
+      {/* CTA — 마케터 pill */}
+      <div style={{ padding: "20px 24px 32px", maxWidth: 480, margin: "0 auto", width: "100%" }}>
+        <button
+          type="button"
+          onClick={() => router.push("/verdict/new")}
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            width: "100%",
+            padding: "17px 24px",
+            background: "var(--color-ink)",
+            color: "var(--color-paper)",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+        >
+          사진 올리러 가기 →
+        </button>
       </div>
     </div>
   );

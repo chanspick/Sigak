@@ -35,10 +35,14 @@ def _build_vault_block(vault_context: str) -> str:
     if not s:
         return ""
     return (
-        "\n## 유저 vault context (Sia 대화 + 추구미 이력 + 원어)\n"
+        "\n══════════════════════════════════════════════\n"
+        "## ★ PRIMARY ANALYSIS INPUT — 유저 vault 데이터\n"
+        "══════════════════════════════════════════════\n"
+        "아래는 유저가 SIGAK 에서 누적한 실 데이터 (Sia 대화 / 추구미 IG·Pinterest 분석 / 자기 표현 원어).\n"
+        "**이 데이터가 분석의 PRIMARY 근거입니다.** 좌표 산출 / 추구 방향 / 페르소나 톤 모두 여기서 출발.\n"
+        "유저 발화/원어/추구 narrative 를 그대로 활용하세요. 일반론 금지.\n\n"
         f"{s}\n"
-        "위 context 가 가장 권위 있는 입력이에요. interview dict 의 답변보다 우선\n"
-        "참고하되 height/weight/hair_texture 등 numeric/factual 은 interview 따름.\n"
+        "══════════════════════════════════════════════\n\n"
     )
 
 
@@ -126,9 +130,33 @@ def interpret_interview(
 
     # Phase A B-1 — vault_context 가 있으면 prompt 권위 입력으로 prepend
     vault_block = _build_vault_block(vault_context)
+    has_vault = bool(vault_block)
 
-    user_prompt = f"""다음 인터뷰 응답에서 추구미 좌표를 산출해주세요.
+    if has_vault:
+        # vault 가 PRIMARY → interview 는 보조 (대부분 비어있을 가능성)
+        user_prompt = f"""유저의 추구미 좌표를 산출해주세요.
 {vault_block}
+[보조 정보 — 위 vault 데이터가 부족할 때만 활용]
+- 추구 이미지: {interview_data.get('desired_image', '없음')}
+- 레퍼런스: {interview_data.get('reference_celebs', '없음')}
+- 이미지 키워드: {image_kw}
+- 현재 고민: {interview_data.get('current_concerns', '없음')}
+- 자기 인식: {interview_data.get('self_perception', '없음')}
+- 얼굴 고민: {interview_data.get('face_concerns', '없음')}
+- 체형: 키 {interview_data.get('height', '미입력')} / 체중 {interview_data.get('weight', '미입력')} / 어깨 {interview_data.get('shoulder_width', '미입력')} / 목 {interview_data.get('neck_length', '미입력')}
+- 메이크업: {interview_data.get('makeup_level', '없음')}
+
+분석 가이드:
+1. vault 의 유저 발화/원어/추구 narrative 를 PRIMARY 근거로 좌표 산출
+2. 추구미 분석 이력의 갭 벡터가 있으면 그 방향으로 aspiration_coords 이동
+3. interpretation 필드에 유저 원어를 1-2개 그대로 인용 (예: "유저가 '메시처럼 날렵하고 역동적' 인상을 추구")
+4. 보조 정보가 '없음' 이어도 vault 만으로 충분히 산출 가능
+
+JSON으로만 응답해주세요."""
+    else:
+        # vault 없음 — 옛 path (legacy users / fallback)
+        user_prompt = f"""다음 인터뷰 응답에서 추구미 좌표를 산출해주세요.
+
 [추구 이미지]
 {interview_data.get('desired_image', '없음')}
 
@@ -156,7 +184,12 @@ def interpret_interview(
 JSON으로만 응답해주세요."""
 
     system_prompt = _build_interview_system(gender)
+
+    # 진단 로깅 — vault block 합류 여부 + prompt 크기
+    print(f"[INTERPRET_PROMPT] has_vault={has_vault} prompt_len={len(user_prompt)} system_len={len(system_prompt)}")
+
     raw = _call_llm(system_prompt, user_prompt, max_tokens=512)
+    print(f"[INTERPRET_RESULT] raw_len={len(raw)} preview={raw[:300]!r}")
 
     # Parse JSON response
     try:
@@ -292,9 +325,12 @@ def generate_report(action_spec, user_context: dict) -> str:
     # Phase A B-1 (2026-04-26) — vault_context 가 ctx 에 있으면 권위 입력으로 prepend.
     # 시그니처는 그대로 (ctx dict 키 추가 방식). 기존 caller 모두 호환.
     vault_block = _build_vault_block(user_context.get("vault_context", ""))
+    has_vault = bool(vault_block)
 
     user_prompt = f"""{user_context.get('name', '')}님의 스타일링 추천을 설명해주세요.
 {vault_block}
+{('vault 데이터의 유저 원어/추구 narrative 를 summary 와 closing 에 직접 인용하세요. action_tips 의 description 도 일반론 대신 vault 의 구체 발화 반영.' if has_vault else '')}
+
 [매칭 유형] {prompt_payload['matched_type']}
 [주요 변화 방향] {prompt_payload['primary_change_direction']}
 [추구미 해석] {aspiration_summary}
@@ -319,7 +355,10 @@ def generate_report(action_spec, user_context: dict) -> str:
 
 JSON으로만 응답해주세요."""
 
-    return _call_llm(REPORT_SYSTEM_V2, user_prompt, max_tokens=1500)
+    print(f"[REPORT_PROMPT] has_vault={has_vault} prompt_len={len(user_prompt)}")
+    raw = _call_llm(REPORT_SYSTEM_V2, user_prompt, max_tokens=1500)
+    print(f"[REPORT_RESULT] raw_len={len(raw)} preview={raw[:300]!r}")
+    return raw
 
 
 # ─────────────────────────────────────────────

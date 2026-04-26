@@ -167,7 +167,7 @@ def create_aspiration_ig(
         db.commit()
         return AspirationStartResponse(
             analysis_id="",
-            status=result.status,  # type: ignore[arg-type]
+            status=result.status,
             analysis=None,
             token_balance=tokens_service.get_balance(db, user["id"]),
         )
@@ -278,7 +278,7 @@ def create_aspiration_pinterest(
         db.commit()
         return AspirationStartResponse(
             analysis_id="",
-            status=result.status,  # type: ignore[arg-type]
+            status=result.status,
             analysis=None,
             token_balance=tokens_service.get_balance(db, user["id"]),
         )

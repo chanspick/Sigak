@@ -125,7 +125,13 @@ class AspirationStartResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     analysis_id: str
-    status: Literal["completed", "failed_blocked", "failed_private", "failed_scrape"]
+    status: Literal[
+        "completed",
+        "failed_blocked",
+        "failed_private",
+        "failed_scrape",
+        "failed_skipped",   # invalid input / feature flag off — engine 4 케이스 모두 흡수
+    ]
     analysis: Optional[AspirationAnalysis] = None
     token_balance: int
 

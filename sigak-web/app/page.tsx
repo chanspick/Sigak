@@ -303,7 +303,7 @@ function LoggedInFeed() {
         <MenuStep
           num="01"
           title="피드 분석하기"
-          sub={"SIA와 대화하며 내 피드를 분석하고\n추구미를 알려드려요"}
+          sub={"올린 사진 중에 가장 잘 맞는 한 장을\n시각이 골라드려요"}
           href="/verdict/new"
         />
         <MenuStep

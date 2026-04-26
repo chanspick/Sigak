@@ -42,8 +42,22 @@ export default function DemoPage() {
           ))}
 
           {/* 공유 */}
-          <div className="py-10 border-t border-[var(--color-border)]">
-            <p className="text-xs text-center text-[var(--color-muted)] mb-4">
+          <div
+            style={{
+              padding: "40px 0",
+              borderTop: "1px solid var(--color-line)",
+            }}
+          >
+            <p
+              className="font-sans"
+              style={{
+                fontSize: 12.5,
+                textAlign: "center",
+                color: "var(--color-mute)",
+                marginBottom: 16,
+                letterSpacing: "-0.005em",
+              }}
+            >
               데모 리포트가 마음에 드셨나요? 공유해보세요
             </p>
             <ShareButtons
@@ -52,21 +66,74 @@ export default function DemoPage() {
             />
           </div>
 
-          {/* CTA */}
-          <section className="py-10 border-t border-[var(--color-border)]">
-            <div className="flex flex-col items-center gap-4">
-              <p className="text-2xl font-serif font-bold text-center leading-snug">
+          {/* CTA — 마케터 정합 (Noto Serif 24 700 + period accent + pill) */}
+          <section
+            style={{
+              padding: "40px 0",
+              borderTop: "1px solid var(--color-line)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 14,
+              }}
+            >
+              <h2
+                className="font-serif"
+                style={{
+                  margin: 0,
+                  fontSize: 24,
+                  fontWeight: 700,
+                  letterSpacing: "-0.022em",
+                  textAlign: "center",
+                  lineHeight: 1.42,
+                  color: "var(--color-ink)",
+                  wordBreak: "keep-all",
+                }}
+              >
                 나만의 리포트를 받아보세요
-              </p>
-              <p className="text-sm text-[var(--color-muted)] text-center max-w-xs">
-                사진 한 장으로 AI가 분석하는
+                <span style={{ color: "var(--color-danger)" }}>.</span>
+              </h2>
+              <p
+                className="font-sans"
+                style={{
+                  margin: 0,
+                  fontSize: 13.5,
+                  color: "var(--color-mute)",
+                  textAlign: "center",
+                  maxWidth: 320,
+                  lineHeight: 1.65,
+                  letterSpacing: "-0.005em",
+                }}
+              >
+                사진 한 장으로 시각이 분석하는
+                <br />
                 이목구비 비율 · 퍼스널컬러 · 맞춤 스타일링
               </p>
               <a
                 href="/sia"
-                className="inline-flex items-center justify-center px-8 py-3.5 text-lg font-medium bg-[var(--color-fg)] text-[var(--color-bg)] hover:opacity-90 transition-colors mt-2"
+                className="font-sans"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "15px 36px",
+                  background: "var(--color-ink)",
+                  color: "var(--color-paper)",
+                  border: "none",
+                  borderRadius: 100,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  letterSpacing: "-0.012em",
+                  textDecoration: "none",
+                  marginTop: 8,
+                }}
               >
-                분석 시작하기
+                분석 시작하기 →
               </a>
             </div>
           </section>

@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 
 import { getCurrentUser, getToken, logout } from "@/lib/auth";
 import { useTokenBalance } from "@/hooks/use-token-balance";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 export default function SettingsPage() {
@@ -89,83 +90,8 @@ export default function SettingsPage() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* TOP NAV — ← 뒤로 + sigak 중앙 + 토큰 pill */}
-      <header
-        style={{
-          padding: "28px 24px 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--color-line)",
-          maxWidth: 480,
-          margin: "0 auto",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          aria-label="뒤로"
-          className="font-sans"
-          style={{
-            flex: 1,
-            textAlign: "left",
-            fontSize: 13.5,
-            color: "var(--color-ink)",
-            opacity: 0.75,
-            fontWeight: 500,
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          ← 뒤로
-        </button>
-        <div
-          className="font-serif"
-          style={{
-            fontSize: 15,
-            fontWeight: 500,
-            letterSpacing: "-0.005em",
-            color: "var(--color-ink)",
-          }}
-        >
-          sigak
-        </div>
-        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
-          <button
-            type="button"
-            onClick={() => router.push("/tokens/purchase")}
-            aria-label="토큰 충전"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              background: "var(--color-ink)",
-              color: "var(--color-paper)",
-              borderRadius: 100,
-              padding: "5px 12px",
-              border: "none",
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: "0.04em",
-              cursor: "pointer",
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "var(--color-danger)",
-              }}
-            />
-            <span className="tabular-nums">{balance == null ? "—" : balance.toLocaleString()}</span>
-          </button>
-        </div>
-      </header>
+      {/* TOP NAV — TopBar 컴포넌트 사용 (홈 정합) */}
+      <TopBar backTarget="/" />
 
       {/* PROFILE 영역 — 56x56 아바타 (gradient fallback) + 이름 + 이메일 */}
       <section

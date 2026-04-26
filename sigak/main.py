@@ -1599,16 +1599,29 @@ async def upload_photos(user_id: str, files: list[UploadFile] = File(...)):
 
 @app.post("/api/v1/analyze/{user_id}")
 async def run_analysis_legacy(user_id: str):
-    """하위호환: 기존 프론트엔드에서 호출 가능."""
+    """하위호환: 기존 프론트엔드에서 호출 가능.
+
+    Multi-worker safe: disk 우선 read → 항상 최신 interview/analysis 사용.
+    Worker process 메모리는 startup 시점 disk restore 한 stale 값이라
+    /api/v1/submit (다른 worker) 직후 호출되면 OLD 데이터로 분석 위험.
+    """
     user_data = _find_user(user_id)
     if not user_data:
         raise HTTPException(404, "User not found")
 
-    interview_exists = user_id in INTERVIEWS
-    interview_data = INTERVIEWS.get(user_id, {})
-    analysis_data = ANALYSES.get(user_id)
-    if not interview_exists:
+    # 항상 disk 우선 (Worker startup 시점 vs submit 시점 race 회피)
+    disk_interview = _load_json(user_id, "interview.json")
+    disk_analysis = _load_json(user_id, "face_analysis.json")
+    interview_data = disk_interview or INTERVIEWS.get(user_id, {})
+    analysis_data = disk_analysis or ANALYSES.get(user_id)
+
+    if not interview_data:
         raise HTTPException(400, "Interview data not submitted yet")
+
+    # 후속 worker 호출 일관성 위해 in-memory cache 동기화
+    INTERVIEWS[user_id] = interview_data
+    if analysis_data:
+        ANALYSES[user_id] = analysis_data
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
     report_id, _ = _run_analysis_pipeline(user_id, order, user_data, interview_data, analysis_data)

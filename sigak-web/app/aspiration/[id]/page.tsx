@@ -31,7 +31,7 @@ import type {
   AspirationRecommendation,
   PhotoPair,
 } from "@/lib/types/aspiration";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { PrimaryButton, TopBar, SigakLoading } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 export default function AspirationResultPage() {
@@ -108,13 +108,8 @@ export default function AspirationResultPage() {
   }
 
   if (!analysis) {
-    return (
-      <div
-        style={{ minHeight: "100vh", background: "var(--color-paper)" }}
-        aria-busy
-        aria-label="결과를 불러오는 중"
-      />
-    );
+    // Phase B-8 (2026-04-27): 빈 div → SigakLoading (redesign/로딩_1815.html 통일)
+    return <SigakLoading message="결과를 불러오는 중이에요." hint="잠시만 기다려 주세요" />;
   }
 
   const targetLabel =

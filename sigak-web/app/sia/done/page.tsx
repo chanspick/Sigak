@@ -245,35 +245,7 @@ function VerdictUploadView() {
           padding: "44px 24px 80px",
         }}
       >
-        {/* Completion badge */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 7,
-            background: "rgba(0, 0, 0, 0.04)",
-            border: "1px solid var(--color-line)",
-            borderRadius: 100,
-            padding: "7px 14px",
-            fontFamily: "var(--font-mono, monospace)",
-            fontSize: 10.5,
-            letterSpacing: "0.12em",
-            color: "var(--color-mute)",
-            textTransform: "uppercase",
-            marginBottom: 20,
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: "#4CAF50",
-              flexShrink: 0,
-            }}
-          />
-          Sia · Done
-        </div>
+        {/* Phase B-7.2: Sia · Done oval badge 제거 (본인 피드백 — 좌상단 안 좋음) */}
 
         {/* Headline */}
         <h2

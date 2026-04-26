@@ -12,3 +12,4 @@ export type { PillOption } from "./pill-group";
 export { Medal, MedalLabel } from "./medal";
 export type { MedalTier } from "./medal";
 export { PrimaryButton } from "./primary-button";
+export { SigakLoading } from "./sigak-loading";

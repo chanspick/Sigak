@@ -268,9 +268,7 @@ function LoggedInFeed() {
           <AspirationGrid />
         </section>
       )}
-      {tab === "sigak" && (
-        <SoonCard emoji="🛠️" text="개발중! 조금만 기다려요 ㅎㅎ" sub="coming soon" />
-      )}
+      {tab === "sigak" && <PiEntryCard />}
       {tab === "change" && <SoonCard emoji="🌱" text="coming soon.." />}
 
       {/* MENU — 00 sia 대화 / 01 피드 분석 (verdict) / 02 추구미 살펴보기 */}
@@ -311,6 +309,12 @@ function LoggedInFeed() {
           title="추구미 살펴보기"
           sub={"추구미에 부합하는 인스타 계정 및 핀터레스트를\n알려주시면 유사도와 개선점을 알려드려요"}
           href="/aspiration"
+        />
+        <MenuStep
+          num="03"
+          title="시각 비밀 레포트"
+          sub="내 현재 위치와 액션플랜 알아보기"
+          href="/photo-upload"
         />
       </section>
 
@@ -393,7 +397,113 @@ function MenuStep({
 }
 
 // ─────────────────────────────────────────────
-//  SoonCard — 시각/변화 탭 placeholder
+//  PiEntryCard — 시각 탭. PI ("시각이 본 당신") 진입 카드.
+//  PI Revival v5 부활 후 BETA 5/15 까지 무료. 클릭 → /photo-upload.
+// ─────────────────────────────────────────────
+
+function PiEntryCard() {
+  return (
+    <section style={{ padding: "32px 24px 0", maxWidth: 480, margin: "0 auto" }}>
+      <div
+        style={{
+          background: "rgba(0, 0, 0, 0.04)",
+          borderRadius: 14,
+          padding: "44px 28px",
+          textAlign: "center",
+        }}
+      >
+        {/* SIGAK 로고 */}
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 40 40"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ marginBottom: 18 }}
+          aria-hidden
+        >
+          <rect width="40" height="40" rx="7" fill="#1a1a1a" />
+          <g stroke="#ffffff" strokeWidth="1.5" fill="none" strokeLinecap="round">
+            <line x1="20" y1="6" x2="20" y2="13" />
+            <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z" />
+            <circle cx="20" cy="19.5" r="2.6" />
+          </g>
+          <path
+            d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z"
+            fill="#ffffff"
+          />
+        </svg>
+
+        <h3
+          className="font-serif"
+          style={{
+            margin: 0,
+            fontSize: 20,
+            fontWeight: 500,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.018em",
+            marginBottom: 10,
+          }}
+        >
+          시각 비밀 레포트
+        </h3>
+        <p
+          className="font-sans"
+          style={{
+            margin: "0 0 26px",
+            fontSize: 13.5,
+            color: "var(--color-mute)",
+            lineHeight: 1.7,
+            letterSpacing: "-0.005em",
+            wordBreak: "keep-all",
+          }}
+        >
+          내 현재 위치와 다음 액션플랜을
+          <br />
+          시각이 직접 분석해드려요.
+        </p>
+
+        <Link
+          href="/photo-upload"
+          className="font-sans"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            width: "100%",
+            maxWidth: 280,
+            padding: "15px 24px",
+            background: "var(--color-ink)",
+            color: "var(--color-paper)",
+            border: "none",
+            borderRadius: 100,
+            fontSize: 14,
+            fontWeight: 600,
+            letterSpacing: "-0.012em",
+            textDecoration: "none",
+          }}
+        >
+          분석 시작하기 →
+        </Link>
+
+        <div
+          style={{
+            marginTop: 14,
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--color-mute)",
+            letterSpacing: "0.08em",
+          }}
+        >
+          BETA 기간 무료
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  SoonCard — 변화 탭 placeholder (Monthly v1.1+ 자리)
 // ─────────────────────────────────────────────
 
 function SoonCard({ emoji, text, sub }: { emoji: string; text: string; sub?: string }) {

@@ -251,7 +251,7 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
 from config import get_settings
 from pipeline.face import analyze_face
 from pipeline.coordinate import compute_coordinates, compute_gap, get_all_axis_labels
-from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure
+from pipeline.llm import interpret_interview, generate_report, parse_or_fallback, interpret_face_structure, explain_type_match
 from pipeline.action_spec import build_action_spec, build_overlay_plan
 from pipeline.hair_spec import build_hair_spec
 from pipeline.similarity import find_similar_types, select_teaser_type
@@ -952,6 +952,24 @@ def _run_analysis_pipeline(
     # Step 7: 갭
     gap = compute_gap(current_coords, aspiration_coords)
 
+    # Step 7.5: 유형 매칭 설명 LLM (Phase B-3, PI-REVIVE 2026-04-26)
+    # WHY THIS TYPE + STYLING DIRECTION 을 deterministic template 대신 LLM 동적 생성.
+    # vault_context 가 있으면 유저 lifestyle/추구 narrative 가 reasons 에 자연 echo.
+    type_match_explanation = None
+    if similar_types:
+        try:
+            type_match_explanation = explain_type_match(
+                top_type=similar_types[0],
+                current_coords=current_coords,
+                aspiration_coords=aspiration_coords,
+                gap=gap,
+                gender=gender,
+                vault_context=vault_context,
+            )
+        except Exception as e:
+            print(f"[TYPE_MATCH] explain_type_match 실패 (deterministic fallback): {e}")
+            type_match_explanation = None
+
     # Step 8: 액션 스펙
     top_type = similar_types[0] if similar_types else {"key": "type_2", "name_kr": "차갑지만 동안", "similarity": 0.5, "mode": "coord"}
     action_spec = build_action_spec(
@@ -1024,6 +1042,7 @@ def _run_analysis_pipeline(
         aspiration_coords=aspiration_coords, gap=gap, similar_types=similar_types,
         face_interpretation=face_interpretation, report_content=report_content,
         aspiration_interpretation=aspiration_result, aspiration_anchor=aspiration_anchor,
+        type_match_explanation=type_match_explanation,
     )
 
     # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).

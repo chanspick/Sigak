@@ -601,3 +601,126 @@ JSON으로만 응답해주세요."""
         }
 
     return result
+
+
+# ─────────────────────────────────────────────
+#  4. Type Match Explanation (Phase B-3)
+#     WHY THIS TYPE 3-5 bullets + STYLING DIRECTION 2-3 bullets
+# ─────────────────────────────────────────────
+
+TYPE_MATCH_SYSTEM = """당신은 SIGAK 유형 매칭 해설 전문가입니다.
+유저의 얼굴 구조 좌표와 매칭 유형 + 추구미 좌표 + vault 데이터를 종합해서,
+"왜 이 유형인지" + "이 유형 안에서 어떤 방향으로 스타일링할지" 를 설명합니다.
+
+톤:
+- 페르소나 B (친근 비서). "~네요" "~군요" 금지. "~예요" "~해요" 단정형.
+- 따뜻하고 직접적. hedging ("~경향이 있다", "~할 수 있어요") 절대 X.
+- 유저 vault 발화/lifestyle 이 있으면 그걸 reasons 에 자연스럽게 echo.
+
+출력 규칙:
+1. reasons (WHY THIS TYPE) — 3-5 bullets, 각 1-2문장
+   - 첫 bullet: 얼굴 구조 핵심 특징 + 유형 매칭 이유
+   - 둘째 bullet: 좌표 축 (shape/volume/age) 중 가장 강한 신호 설명
+   - 셋째 bullet: 추구미 방향 + 매칭 유형 정합 (gap 작으면 "이미 이 방향에 있음" / 크면 "이 유형에서 시작해서 이동")
+   - 4-5 bullet (옵션): vault 데이터 있으면 lifestyle/추구 narrative 와 유형 연결
+2. styling_tips (STYLING DIRECTION) — 2-3 bullets, 각 1-2문장
+   - 매칭 유형 안에서 어떤 변화를 줘야 할지 구체적 (벗어나지 X)
+   - 추구 방향에 맞는 zone (메이크업/그루밍 영역) 강조
+   - vault 의 lifestyle context 있으면 자연스럽게 통합 (예: 활동적 vault → "운동할 때도 무너지지 않는" 류)
+
+금지:
+- 좌표 숫자 (0.5, -0.3 등) 노출 금지
+- 일반론 ("자연스럽게", "조화롭게" 류 단독)
+- 영문 zone 키 (under_eye, jawline) — 한글로
+- 셀럽 이름 (우리 생성물에는 금지, 단 유저 vault 의 echo 는 OK — 예: 유저가 "메시처럼" 발화 → 인용)
+
+JSON으로만 응답:
+{
+  "reasons": ["bullet 1", "bullet 2", "bullet 3"],
+  "styling_tips": ["tip 1", "tip 2"]
+}"""
+
+
+def explain_type_match(
+    top_type: dict,
+    current_coords: dict,
+    aspiration_coords: dict,
+    gap: dict,
+    gender: str = "female",
+    vault_context: str = "",
+) -> dict:
+    """매칭 유형 설명 (WHY + STYLING) 을 LLM 으로 생성.
+
+    Phase B-3 (PI-REVIVE 2026-04-26):
+      기존 build_why_this_type / build_type_styling_tips 의 deterministic
+      template fallback 을 LLM 동적 생성으로 대체. vault_context 가 있으면
+      유저 lifestyle / 추구 narrative 가 reasons 에 자연 echo.
+
+    Args:
+        top_type: similar_types[0] (name_kr, type_id, similarity_pct, axis_delta)
+        current_coords: 현재 좌표 dict
+        aspiration_coords: 추구미 좌표 dict
+        gap: compute_gap 결과 (vector, primary_direction, magnitude)
+        gender: female / male
+        vault_context: render_vault_context() 산출물 (옵션)
+
+    Returns:
+        {"reasons": [str, ...], "styling_tips": [str, ...]}
+        파싱 실패 시 빈 list 반환 (caller 가 deterministic fallback).
+    """
+    type_name = top_type.get("name_kr", "알 수 없음")
+    similarity_pct = top_type.get("similarity_pct", 0)
+    axis_delta = top_type.get("axis_delta", {})
+
+    vault_block = _build_vault_block(vault_context)
+    has_vault = bool(vault_block)
+
+    gap_magnitude = gap.get("magnitude", 0) if gap else 0
+    primary_dir = gap.get("primary_direction", "shape") if gap else "shape"
+    gap_label = "작음 (이미 이 방향)" if gap_magnitude < 0.2 else (
+        "중간 (이 유형 안에서 변화)" if gap_magnitude < 0.5 else "큼 (이 유형 시작점)"
+    )
+
+    user_prompt = f"""유저 매칭 유형 + 추구 방향 + (vault 있으면) lifestyle 을 종합해서 reasons + styling_tips 산출.
+{vault_block}
+[매칭 유형] {type_name}
+[유사도] {similarity_pct}%
+[성별] {gender}
+
+[얼굴 좌표 축별 차이 (anchor 대비)]
+- shape: {axis_delta.get('shape', 0):+.2f} (음수=둥근 쪽, 양수=날카로운 쪽)
+- volume: {axis_delta.get('volume', 0):+.2f} (음수=섬세, 양수=뚜렷)
+- age: {axis_delta.get('age', 0):+.2f} (음수=어림, 양수=성숙)
+
+[추구 방향]
+- 현재 → 추구 갭 magnitude: {gap_magnitude:.2f} ({gap_label})
+- 가장 큰 변화 축: {primary_dir}
+- 현재 좌표: shape={current_coords.get('shape', 0):+.2f} volume={current_coords.get('volume', 0):+.2f} age={current_coords.get('age', 0):+.2f}
+- 추구 좌표: shape={aspiration_coords.get('shape', 0):+.2f} volume={aspiration_coords.get('volume', 0):+.2f} age={aspiration_coords.get('age', 0):+.2f}
+
+분석 가이드:
+- {('vault 의 유저 lifestyle/추구 narrative 가 PRIMARY. 좌표는 보조.' if has_vault else 'vault 없음 → 좌표 + 유형 정보로만 설명.')}
+- reasons 3-5 bullets, styling_tips 2-3 bullets.
+- 좌표 숫자 직접 노출 금지. "또렷한 골격", "차분한 부피" 등 자연어.
+
+JSON으로만 응답해주세요."""
+
+    print(f"[TYPE_MATCH_PROMPT] has_vault={has_vault} type={type_name} sim={similarity_pct}% gap={gap_magnitude:.2f}")
+
+    try:
+        raw = _call_llm(TYPE_MATCH_SYSTEM, user_prompt, max_tokens=600)
+        print(f"[TYPE_MATCH_RESULT] raw_len={len(raw)} preview={raw[:300]!r}")
+
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0]
+        result = json.loads(cleaned)
+        reasons = result.get("reasons", []) if isinstance(result, dict) else []
+        tips = result.get("styling_tips", []) if isinstance(result, dict) else []
+        return {
+            "reasons": [r for r in reasons if isinstance(r, str) and r.strip()],
+            "styling_tips": [t for t in tips if isinstance(t, str) and t.strip()],
+        }
+    except (json.JSONDecodeError, Exception) as e:
+        print(f"[TYPE_MATCH_FALLBACK] parse/call error: {e}")
+        return {"reasons": [], "styling_tips": []}

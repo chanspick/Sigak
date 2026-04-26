@@ -1282,8 +1282,19 @@ def build_why_this_type(current_type: str, match_score: float, axis_values: dict
     return bullets
 
 
-def _build_type_reference(similar_types: list[dict], report_content: dict, gap: dict = None) -> dict:
-    """type_reference 섹션 -- full 잠금."""
+def _build_type_reference(
+    similar_types: list[dict],
+    report_content: dict,
+    gap: dict = None,
+    type_match_explanation: dict | None = None,
+) -> dict:
+    """type_reference 섹션 -- full 잠금.
+
+    Phase B-3 (PI-REVIVE 2026-04-26):
+      type_match_explanation 가 dict 이고 reasons/styling_tips 비어있지
+      않으면 LLM 동적 생성 결과 PRIMARY 사용. 비어있으면 기존 deterministic
+      fallback (build_why_this_type / build_type_styling_tips) 그대로.
+    """
     if not similar_types:
         return {
             "id": "type_reference",
@@ -1305,24 +1316,33 @@ def _build_type_reference(similar_types: list[dict], report_content: dict, gap: 
     type_id = primary.get("type_id", 0)
     similarity_pct = primary.get("similarity_pct", 0)
 
-    # LLM 리포트에서 유형 비교 정보 추출
-    llm_similar = _safe_get(report_content, "similar_types", [])
-    reasons = []
-    styling_tips = []
-    if llm_similar:
-        first_llm = llm_similar[0] if isinstance(llm_similar, list) and llm_similar else {}
-        reasons = first_llm.get("reason", "").split(", ") if isinstance(first_llm.get("reason"), str) else []
-        if not reasons:
-            reasons = [first_llm.get("reason", "")] if first_llm.get("reason") else []
-        styling_insight = first_llm.get("styling_insight", "")
-        if styling_insight:
-            styling_tips.append(styling_insight)
+    # Phase B-3: LLM type_match_explanation PRIMARY (vault-aware)
+    reasons: list[str] = []
+    styling_tips: list[str] = []
+    if isinstance(type_match_explanation, dict):
+        llm_reasons = type_match_explanation.get("reasons", [])
+        llm_tips = type_match_explanation.get("styling_tips", [])
+        if isinstance(llm_reasons, list):
+            reasons = [r for r in llm_reasons if isinstance(r, str) and r.strip()]
+        if isinstance(llm_tips, list):
+            styling_tips = [t for t in llm_tips if isinstance(t, str) and t.strip()]
 
-    # bracket placeholder 감지 → deterministic fallback (1-6)
+    # 보조: 기존 generate_report 의 similar_types 영역 (placeholder 가능성)
+    if not reasons:
+        llm_similar = _safe_get(report_content, "similar_types", [])
+        if llm_similar:
+            first_llm = llm_similar[0] if isinstance(llm_similar, list) and llm_similar else {}
+            reasons = first_llm.get("reason", "").split(", ") if isinstance(first_llm.get("reason"), str) else []
+            if not reasons:
+                reasons = [first_llm.get("reason", "")] if first_llm.get("reason") else []
+            styling_insight = first_llm.get("styling_insight", "")
+            if styling_insight and not styling_tips:
+                styling_tips.append(styling_insight)
+
+    # bracket placeholder 감지 → deterministic fallback
     has_bracket = any("[" in r or "]" in r for r in reasons)
     if not reasons or has_bracket:
         match_score = similarity_pct / 100.0
-        # axis_delta: find_similar_types() 반환값에 포함 (유저↔앵커 축 차이)
         axis_values = primary.get("axis_delta", {})
         reasons = build_why_this_type(type_name, match_score, axis_values)
 
@@ -1494,6 +1514,7 @@ def format_report_for_frontend(
     report_content: dict,
     aspiration_interpretation: dict,
     aspiration_anchor: Optional[dict] = None,
+    type_match_explanation: Optional[dict] = None,
 ) -> dict:
     """
     파이프라인 분석 결과를 프론트엔드 ReportData 구조로 변환한다.
@@ -1549,7 +1570,7 @@ def format_report_for_frontend(
         ),
         _build_hair_recommendation(gap, report_content, gender=gender),
         _build_action_plan(gap, face_features, report_content, gender=gender),
-        _build_type_reference(similar_types, report_content, gap=gap),
+        _build_type_reference(similar_types, report_content, gap=gap, type_match_explanation=type_match_explanation),
         _build_trend_context(report_content, user_name=user_name, aspiration_coords=aspiration_coords),
     ]
 

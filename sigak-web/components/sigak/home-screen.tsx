@@ -9,9 +9,14 @@ import { useRouter } from "next/navigation";
 
 import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
+import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
+import { useTokenBalance } from "@/hooks/use-token-balance";
 import { createVerdictV2, MAX_PHOTOS, UX_MIN_PHOTOS } from "@/lib/api/verdicts";
 import { ApiError } from "@/lib/api/fetch";
 import { AnalyzingScreen } from "./analyzing-screen";
+
+// 2026-04-26 선결제 — 사진 장당 3 토큰. backend COST_VERDICT_V2_UNLOCK_PER_PHOTO 와 일치.
+const COST_PER_PHOTO = 3;
 
 // Analyzing 진행바가 POST 응답과 동기화되므로 별도 MIN 대기 불필요.
 // 빠른 응답 → 약 2.9초(climb 2.5s + snap 0.4s)에 완료.
@@ -24,11 +29,13 @@ interface UploadItem {
 
 export function HomeScreen() {
   const router = useRouter();
+  const { balance } = useTokenBalance();
   const [items, setItems] = useState<UploadItem[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisDone, setAnalysisDone] = useState(false);
   const verdictIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,22 +73,35 @@ export function HomeScreen() {
 
   async function handleStart() {
     if (items.length < UX_MIN_PHOTOS || analyzing) return;
+
+    // 선결제 — client-side 잔액 체크 (server 호출 회피)
+    const requiredCost = items.length * COST_PER_PHOTO;
+    if (balance !== null && balance < requiredCost) {
+      setShowTokenModal(true);
+      return;
+    }
+
     setAnalyzing(true);
     setAnalysisDone(false);
     verdictIdRef.current = null;
     setError(null);
 
     try {
-      // v2 cross-analysis 로 전환 — 응답에 preview(hook_line+reason_summary) 포함.
-      // full_content 는 /verdict/[id] 에서 10 토큰 unlock.
+      // v2 cross-analysis — 선결제: 생성 시점 토큰 차감 + full_unlocked=TRUE.
+      // /verdict/[id] 진입 시 즉시 풀 노출 (UnlockSection 자동 X).
       const response = await createVerdictV2(items.map((it) => it.file));
       verdictIdRef.current = response.verdict_id;
-      setAnalysisDone(true); // AnalyzingScreen이 90→100%로 snap 후 onFinish 호출
+      setAnalysisDone(true);
     } catch (e) {
       setAnalyzing(false);
       setAnalysisDone(false);
       if (e instanceof ApiError && e.status === 401) {
         router.replace("/auth/login");
+        return;
+      }
+      // 선결제 race condition — server-side 잔액 부족 (402)
+      if (e instanceof ApiError && e.status === 402) {
+        setShowTokenModal(true);
         return;
       }
       setError(
@@ -210,9 +230,40 @@ export function HomeScreen() {
             transition: "all 0.2s ease",
           }}
         >
-          {canStart ? "분석 시작하기 →" : "3장 이상 올려주세요 (최대 5장)"}
+          {canStart
+            ? `분석 시작하기 · ${items.length * COST_PER_PHOTO}토큰 →`
+            : "3장 이상 올려주세요 (최대 5장)"}
         </button>
+        {/* 선결제 비용 안내 */}
+        {canStart && (
+          <p
+            className="font-sans tabular-nums"
+            style={{
+              marginTop: 10,
+              textAlign: "center",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--color-mute)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            사진 {items.length}장 × {COST_PER_PHOTO}토큰
+          </p>
+        )}
       </div>
+
+      {/* 토큰 부족 모달 (선결제 잔액 체크 또는 402 에러) */}
+      <TokenInsufficientModal
+        open={showTokenModal}
+        balance={balance ?? 0}
+        required={items.length * COST_PER_PHOTO}
+        onCharge={() =>
+          router.push(
+            `/tokens/purchase?intent=verdict_v2&photos=${items.length}`,
+          )
+        }
+        onClose={() => setShowTokenModal(false)}
+      />
 
       {/* 사업자 정보 (PG 심사 필수) */}
       <SiteFooter />

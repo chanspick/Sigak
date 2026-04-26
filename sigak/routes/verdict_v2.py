@@ -117,10 +117,12 @@ async def create_verdict_v2(
     user: dict = Depends(get_current_user),
     db=Depends(db_session),
 ) -> CreateResponse:
-    """사진 3-10장 업로드 → Sonnet 4.6 분석 → verdict v2 row 생성.
+    """사진 3-5장 업로드 → 토큰 즉시 차감 → Sonnet 4.6 분석 → verdict v2 row 생성.
 
-    비용: 0 토큰 (preview 는 무료, full 은 /unlock 에서 10 토큰).
-    full_content 는 생성 시점에 미리 만들어 저장하되 full_unlocked=FALSE 로 gating.
+    2026-04-26 마케터 피드백: 선결제 흐름.
+      비용: 사진 장당 3 토큰 (3장=9, 4장=12, 5장=15) — 생성 시점 즉시 차감.
+      full_unlocked=TRUE 로 INSERT → /unlock 단계 자동 스킵. 결과 풀 노출.
+      잔액 부족 시 402 → frontend TokenInsufficientModal 노출.
     """
     if db is None:
         raise HTTPException(500, "DB unavailable")
@@ -133,6 +135,20 @@ async def create_verdict_v2(
     if len(photos) > MAX_PHOTOS:
         raise HTTPException(
             400, f"사진은 최대 {MAX_PHOTOS}장까지 업로드 가능합니다 (현재 {len(photos)}장).",
+        )
+
+    # 2. 선결제 — balance check (Sonnet 호출 전 fail-fast)
+    cost = tokens_service.COST_VERDICT_V2_UNLOCK_PER_PHOTO * len(photos)
+    balance = tokens_service.get_balance(db, user["id"])
+    if balance < cost:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error_code": "insufficient_balance",
+                "message": f"토큰이 부족해요 — 필요 {cost}, 보유 {balance}.",
+                "required": cost,
+                "balance": balance,
+            },
         )
 
     # 2. Photo read + content_type validation + 다운스케일 (Sonnet + R2 공통)
@@ -280,6 +296,7 @@ async def create_verdict_v2(
             photo_urls.append(None)
 
     # v1 NOT NULL columns 에 v2 sensible defaults
+    # 2026-04-26: full_unlocked=TRUE (선결제 — 생성 시점 차감 후 풀 노출)
     synthetic_photo_ids = [f"p_{verdict_id}_{i}" for i in range(len(photos))]
     db.execute(
         text(
@@ -291,7 +308,7 @@ async def create_verdict_v2(
             ") VALUES ("
             "  :id, :uid, :cc, :wp, CAST(:ranked AS jsonb), "
             "  NULL, FALSE, FALSE, '', "
-            "  TRUE, FALSE, CAST(:pc AS jsonb), CAST(:fc AS jsonb), "
+            "  TRUE, TRUE, CAST(:pc AS jsonb), CAST(:fc AS jsonb), "
             "  CAST(:ps AS jsonb), 'v2'"
             ")"
         ),
@@ -310,11 +327,37 @@ async def create_verdict_v2(
             ),
         },
     )
-    db.commit()
+
+    # 선결제 — token debit (idempotency_key=verdict_id, 같은 verdict 재차감 방지)
+    try:
+        new_balance = tokens_service.credit_tokens(
+            db,
+            user_id=user["id"],
+            amount=-cost,
+            kind=tokens_service.KIND_CONSUME_VERDICT_V2,
+            idempotency_key=verdict_id,
+            reference_id=verdict_id,
+            reference_type="verdict_v2",
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "verdict v2 token debit failed: verdict_id=%s user_id=%s cost=%d",
+            verdict_id, user["id"], cost,
+        )
+        # verdict INSERT 도 함께 rollback — 사용자에게 "다시 시도" 안내
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "token_debit_failed",
+                "message": "토큰 차감 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.",
+            },
+        )
 
     logger.info(
-        "verdict v2 created: verdict_id=%s user_id=%s photos=%d",
-        verdict_id, user["id"], len(photos),
+        "verdict v2 prepaid: verdict_id=%s user=%s photos=%d cost=%d new_balance=%d",
+        verdict_id, user["id"], len(photos), cost, new_balance,
     )
 
     best_fit_idx = _resolve_best_fit_index(result.preview, result.full_content)
@@ -322,7 +365,8 @@ async def create_verdict_v2(
         verdict_id=verdict_id,
         version="v2",
         preview=result.preview,
-        full_unlocked=False,
+        # 2026-04-26 선결제 — 생성 시점에 이미 unlock. frontend GET 시 즉시 풀 노출.
+        full_unlocked=True,
         photo_count=len(photos),
         photo_urls=photo_urls,
         best_fit_photo_url=_best_fit_url(photo_urls, best_fit_idx),

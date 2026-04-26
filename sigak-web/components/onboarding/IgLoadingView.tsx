@@ -56,35 +56,38 @@ export function IgLoadingView({
       <main
         className="flex-1 overflow-hidden min-h-0"
         style={{
-          paddingLeft: 20,
-          paddingRight: 20,
-          paddingTop: 80,
-          paddingBottom: 40,
+          padding: "80px 24px 40px",
+          maxWidth: 480,
+          margin: "0 auto",
+          width: "100%",
         }}
       >
-        {/* 본문 상단 카피 */}
+        {/* 본문 상단 카피 — 마케터 정합 (24px 700 + period accent) */}
         <h1
           className="font-serif"
           style={{
             margin: 0,
-            fontSize: 22,
-            fontWeight: 400,
-            lineHeight: 1.35,
-            letterSpacing: "-0.01em",
+            fontSize: 24,
+            fontWeight: 700,
+            lineHeight: 1.42,
+            letterSpacing: "-0.022em",
             color: "var(--color-ink)",
+            wordBreak: "keep-all",
           }}
           data-testid="ig-loading-heading"
         >
           {heading}
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h1>
         <p
           className="font-sans"
           style={{
-            margin: "12px 0 0",
-            fontSize: 13,
-            lineHeight: 1.6,
+            margin: "10px 0 0",
+            fontSize: 14,
+            lineHeight: 1.65,
             letterSpacing: "-0.005em",
             color: "var(--color-mute)",
+            wordBreak: "keep-all",
           }}
           data-testid="ig-loading-subcopy"
         >
@@ -245,9 +248,10 @@ function ErrorBanner({
     <div
       style={{
         marginTop: 32,
-        padding: "14px 16px",
-        background: "rgba(163, 45, 45, 0.08)",
-        border: "1px solid rgba(163, 45, 45, 0.25)",
+        padding: "16px 18px",
+        background: "rgba(163, 45, 45, 0.06)",
+        border: "1px solid rgba(163, 45, 45, 0.2)",
+        borderRadius: 14,
       }}
       data-testid="ig-error-banner"
     >
@@ -255,8 +259,8 @@ function ErrorBanner({
         className="font-sans"
         style={{
           margin: 0,
-          fontSize: 13,
-          lineHeight: 1.5,
+          fontSize: 13.5,
+          lineHeight: 1.6,
           letterSpacing: "-0.005em",
           color: "var(--color-danger)",
         }}
@@ -269,16 +273,16 @@ function ErrorBanner({
           onClick={onRetry}
           className="font-sans"
           style={{
-            marginTop: 12,
+            marginTop: 14,
             background: "transparent",
             color: "var(--color-danger)",
-            border: "1px solid var(--color-danger)",
-            padding: "8px 16px",
-            fontSize: 12,
+            border: "1.5px solid var(--color-danger)",
+            padding: "10px 22px",
+            fontSize: 13,
             fontWeight: 600,
-            letterSpacing: "0.3px",
+            letterSpacing: "-0.005em",
             cursor: "pointer",
-            borderRadius: 0,
+            borderRadius: 100,
           }}
         >
           다시 시도
@@ -308,14 +312,14 @@ function ContinueCTA({
         className="font-sans"
         style={{
           width: "100%",
-          height: 48,
+          padding: "17px 24px",
           background: "var(--color-ink)",
           color: "var(--color-paper)",
           border: "none",
-          borderRadius: 0,
-          fontSize: 14,
+          borderRadius: 100,
+          fontSize: 15,
           fontWeight: 600,
-          letterSpacing: "0.3px",
+          letterSpacing: "-0.012em",
           cursor: "pointer",
         }}
         data-testid="ig-continue-cta"

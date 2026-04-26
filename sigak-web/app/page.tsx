@@ -301,19 +301,19 @@ function LoggedInFeed() {
         <MenuStep
           num="01"
           title="피드 분석하기"
-          sub={"올린 사진 중에 가장 잘 맞는 한 장을\n시각이 골라드려요"}
+          sub={"올린 사진 중에 가장 잘 맞는 한 장을\n시각이 골라드려요."}
           href="/verdict/new"
         />
         <MenuStep
           num="02"
           title="추구미 살펴보기"
-          sub={"추구미에 부합하는 인스타 계정 및 핀터레스트를\n알려주시면 유사도와 개선점을 알려드려요"}
+          sub={"추구미에 부합하는 인스타 계정 및 핀터레스트를\n알려주시면 유사도와 개선점을 알려드려요."}
           href="/aspiration"
         />
         <MenuStep
           num="03"
           title="시각 비밀 레포트"
-          sub="내 현재 위치와 액션플랜 알아보기"
+          sub="내 현재 위치와 액션플랜을 알려드려요."
           href="/photo-upload"
         />
       </section>
@@ -765,8 +765,14 @@ const CHAT_DEMO_MESSAGES: Array<{ side: "ai" | "user"; text: string; delay: numb
   { side: "user", delay: 6650, text: "맞아요 그래서 잘 안 입어요" },
   { side: "ai",   delay: 7300, text: "본인 쿨톤이라 새하얀 흰색은 얼굴이 떠요\n근데 아이보리나 오프화이트는 잘 받으실 거예요" },
 ];
+// 마케터 redesign/랜딩_1815.html JS 와 100% 일치:
+//   PAUSE 2500ms (마지막 메시지 후 대기)
+//   FADE  350ms  (메시지 페이드아웃 transition .35s ease)
+//   AFTER 360ms reset + 600ms restart = 960ms (다음 cycle 까지)
+//   총 cycle 길이 = lastDelay (7300) + PAUSE + AFTER = 10760ms (~10.76초)
 const CHAT_DEMO_PAUSE = 2500;
-const CHAT_DEMO_FADE = 400;
+const CHAT_DEMO_FADE = 350;
+const CHAT_DEMO_AFTER_FADE = 960;
 
 function ChatDemo() {
   const [visibleCount, setVisibleCount] = useState(0);
@@ -790,7 +796,7 @@ function ChatDemo() {
     timers.push(
       setTimeout(
         () => setCycleKey((k) => k + 1),
-        lastDelay + CHAT_DEMO_PAUSE + CHAT_DEMO_FADE + 200,
+        lastDelay + CHAT_DEMO_PAUSE + CHAT_DEMO_AFTER_FADE,
       ),
     );
 
@@ -836,7 +842,8 @@ function ChatDemo() {
               key={`${cycleKey}-${i}`}
               style={{
                 alignSelf: isAi ? "flex-start" : "flex-end",
-                maxWidth: isAi ? "82%" : "78%",
+                // 마케터 정합: AI 78% / User 74%
+                maxWidth: isAi ? "78%" : "74%",
                 background: isAi ? "var(--color-bubble-ai)" : "var(--color-bubble-user)",
                 color: isAi ? "var(--color-ink)" : "var(--color-paper)",
                 borderRadius: isAi ? "20px 20px 20px 5px" : "20px 20px 5px 20px",
@@ -847,6 +854,7 @@ function ChatDemo() {
                 flexShrink: 0,
                 opacity: visible ? 1 : 0,
                 transform: visible ? "scale(1)" : "scale(0.87)",
+                // 마케터 정합: .28s spring (cubic-bezier 0.34, 1.45, 0.64, 1)
                 transition:
                   "opacity 280ms cubic-bezier(0.34, 1.45, 0.64, 1), transform 280ms cubic-bezier(0.34, 1.45, 0.64, 1)",
               }}

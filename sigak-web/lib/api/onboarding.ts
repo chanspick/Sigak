@@ -73,6 +73,36 @@ export function getIgStatus(): Promise<IgStatusResponse> {
 }
 
 // ─────────────────────────────────────────────
+//  Update IG (운영 단계 — /profile/edit)
+// ─────────────────────────────────────────────
+
+export interface IgUpdateRequest {
+  /** null/빈 문자열 허용 — 기존 핸들 제거 + cache 비움 */
+  ig_handle: string | null;
+}
+
+export interface IgUpdateResponse {
+  ig_handle: string | null;
+  ig_fetch_status: "pending" | "skipped";
+}
+
+/**
+ * 본인 IG 핸들만 변경. essentials 이후 운영 단계.
+ *
+ * - 기존 cache 폐기 + 새 핸들로 BackgroundTask Apify + Vision fetch 시작
+ * - ig_handle null/"" 시: handle 제거 + cache NULL (오염 회복 path)
+ * - response.ig_fetch_status === "pending" 면 /onboarding/ig-loading 재사용 가능
+ */
+export function updateIgHandle(
+  body: IgUpdateRequest,
+): Promise<IgUpdateResponse> {
+  return authFetch<IgUpdateResponse>("/api/v1/onboarding/update-ig", {
+    method: "POST",
+    json: body,
+  });
+}
+
+// ─────────────────────────────────────────────
 //  Consent (v2.0)
 // ─────────────────────────────────────────────
 

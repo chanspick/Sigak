@@ -409,6 +409,99 @@ def _grant_essentials_tokens(db, *, user_id: str) -> None:
 
 
 # ─────────────────────────────────────────────
+#  POST /update-ig — 본인 IG 핸들 재설정 (essentials 이후 운영 단계)
+# ─────────────────────────────────────────────
+
+
+class IgUpdateRequest(BaseModel):
+    """프로필 페이지에서 IG 핸들만 변경. gender/birth_date 손대지 X."""
+
+    ig_handle: Optional[str] = Field(default=None, max_length=50)
+
+
+class IgUpdateResponse(BaseModel):
+    ig_handle: Optional[str]
+    ig_fetch_status: Literal["pending", "skipped"]
+
+
+@router.post("/update-ig", response_model=IgUpdateResponse)
+def update_ig(
+    body: IgUpdateRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+    db=Depends(db_session),
+):
+    """본인 IG 핸들 재설정. essentials 이후 운영 단계용.
+
+    동작:
+      1. ig_handle normalize (None / "" 모두 허용 — 핸들 제거 가능)
+      2. users + user_profiles 의 ig_handle update
+      3. ig_handle 있으면 ig_fetch_status='pending' + BackgroundTask 비동기 fetch
+      4. ig_handle 비우면 ig_fetch_status='skipped' + ig_feed_cache NULL 처리
+
+    추구미 분석 path 가 vault.ig_feed_cache.latest_posts 를 사용하므로,
+    오염되거나 만료된 cache 를 새 핸들로 갱신 가능.
+    """
+    if db is None:
+        raise HTTPException(500, "DB unavailable")
+
+    ig_handle = _normalize_ig_handle(body.ig_handle)
+
+    # 1. users 테이블 IG 만 update
+    db.execute(
+        text("UPDATE users SET ig_handle = :ig WHERE id = :uid"),
+        {"ig": ig_handle, "uid": user["id"]},
+    )
+
+    # 2. user_profiles upsert — handle 비우면 cache 도 비움 (오염 회복 path).
+    if ig_handle:
+        db.execute(
+            text(
+                "UPDATE user_profiles SET "
+                "  ig_handle = :ig, "
+                "  ig_fetch_status = 'pending', "
+                "  updated_at = NOW() "
+                "WHERE user_id = :uid"
+            ),
+            {"ig": ig_handle, "uid": user["id"]},
+        )
+    else:
+        db.execute(
+            text(
+                "UPDATE user_profiles SET "
+                "  ig_handle = NULL, "
+                "  ig_fetch_status = 'skipped', "
+                "  ig_feed_cache = NULL, "
+                "  updated_at = NOW() "
+                "WHERE user_id = :uid"
+            ),
+            {"uid": user["id"]},
+        )
+
+    db.commit()
+
+    # 3. 비동기 fetch — handle 있을 때만
+    ig_fetch_signal: Literal["pending", "skipped"] = "skipped"
+    if ig_handle:
+        background_tasks.add_task(
+            _run_ig_fetch_job,
+            user_id=user["id"],
+            ig_handle=ig_handle,
+        )
+        ig_fetch_signal = "pending"
+
+    logger.info(
+        "ig_handle updated: user_id=%s new_handle=%r status=%s",
+        user["id"], ig_handle, ig_fetch_signal,
+    )
+
+    return IgUpdateResponse(
+        ig_handle=ig_handle,
+        ig_fetch_status=ig_fetch_signal,
+    )
+
+
+# ─────────────────────────────────────────────
 #  GET /ig-status — 프론트 대기 화면 폴링 엔드포인트
 # ─────────────────────────────────────────────
 

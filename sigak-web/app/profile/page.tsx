@@ -8,8 +8,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { ApiError } from "@/lib/api/fetch";
-import { resetOnboarding } from "@/lib/api/onboarding";
 import { getCurrentUser, getToken, logout } from "@/lib/auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { useTokenBalance } from "@/hooks/use-token-balance";
@@ -28,8 +26,7 @@ export default function ProfilePage() {
     kakaoId: string;
   } | null>(null);
 
-  const [resetting, setResetting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -46,29 +43,6 @@ export default function ProfilePage() {
       });
     }
   }, [router]);
-
-  async function handleResetOnboarding() {
-    if (resetting) return;
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "온보딩을 처음부터 다시 진행하시겠어요?\n기존 답변은 자동 불러와집니다.",
-      );
-      if (!ok) return;
-    }
-    setResetting(true);
-    setError(null);
-    try {
-      await resetOnboarding();
-      router.push("/onboarding/welcome");
-    } catch (e) {
-      setResetting(false);
-      if (e instanceof ApiError && e.status === 401) {
-        router.replace("/auth/login");
-        return;
-      }
-      setError(e instanceof Error ? e.message : "초기화 실패");
-    }
-  }
 
   function handleLogout() {
     if (typeof window !== "undefined") {
@@ -238,11 +212,10 @@ export default function ProfilePage() {
 
       {/* 설정 리스트 */}
       <section style={{ padding: "8px 0 0" }}>
-        <SettingRow
-          label="시각 재설정"
-          sublabel="체형·얼굴·추구미 답변을 다시 입력해 SIGAK의 판정 기준을 업데이트합니다."
-          onClick={handleResetOnboarding}
-          busy={resetting}
+        <SettingLink
+          label="내 정보 수정"
+          sublabel="등록한 인스타그램이 바뀌었거나, 분석 결과가 본인 결과 어긋날 때 여기서 다시 맞춰주세요."
+          href="/profile/edit"
         />
         <SettingLink label="이용약관" href="/terms#tos" />
         <SettingLink label="개인정보처리방침" href="/terms#privacy" />
@@ -382,7 +355,15 @@ function SettingRow({
   );
 }
 
-function SettingLink({ label, href }: { label: string; href: string }) {
+function SettingLink({
+  label,
+  href,
+  sublabel,
+}: {
+  label: string;
+  href: string;
+  sublabel?: string;
+}) {
   return (
     <Link
       href={href}
@@ -395,10 +376,34 @@ function SettingLink({ label, href }: { label: string; href: string }) {
         letterSpacing: "-0.005em",
         color: "var(--color-ink)",
         textDecoration: "none",
+        alignItems: sublabel ? "flex-start" : "center",
       }}
     >
-      <span style={{ flex: 1 }}>{label}</span>
-      <span style={{ opacity: 0.3, fontSize: 14 }}>›</span>
+      <span
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: sublabel ? 4 : 0,
+        }}
+      >
+        <span style={{ fontSize: 14, color: "var(--color-ink)" }}>{label}</span>
+        {sublabel && (
+          <span
+            className="font-sans"
+            style={{
+              fontSize: 11,
+              lineHeight: 1.55,
+              opacity: 0.5,
+              color: "var(--color-ink)",
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {sublabel}
+          </span>
+        )}
+      </span>
+      <span style={{ opacity: 0.3, fontSize: 14, marginLeft: 10 }}>›</span>
     </Link>
   );
 }

@@ -126,26 +126,29 @@ export default function ProfileEditPage() {
           </p>
         </header>
 
-        {/* 현재 핸들 카드 — 큰 글자로 표시 (read only) */}
-        <section style={{ marginBottom: 24 }}>
+        {/* 현재 핸들 카드 — 큰 글자로 표시 (read only). 새 입력 박스와 크기 통일. */}
+        <section style={{ marginBottom: 22 }}>
           <Label>현재 핸들</Label>
           <div
             style={{
               marginTop: 8,
-              padding: "18px 22px",
+              padding: "16px 18px",
+              minHeight: 56,
+              display: "flex",
+              alignItems: "center",
               background: "rgba(0, 0, 0, 0.04)",
-              border: "1px solid var(--color-line)",
-              borderRadius: 14,
+              border: "1.5px solid var(--color-line-strong)",
+              borderRadius: 12,
             }}
           >
             <p
               className="font-serif tabular-nums"
               style={{
                 margin: 0,
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: 500,
                 color: currentIg ? "var(--color-ink)" : "var(--color-mute-2)",
-                letterSpacing: "-0.018em",
+                letterSpacing: "-0.015em",
                 wordBreak: "break-all",
               }}
             >
@@ -154,7 +157,7 @@ export default function ProfileEditPage() {
           </div>
         </section>
 
-        {/* 새 핸들 입력 — input form */}
+        {/* 새 핸들 입력 — input form (현재 핸들 박스와 같은 크기) */}
         <section style={{ marginBottom: 28 }}>
           <Label>새 핸들로 변경</Label>
           <div
@@ -162,7 +165,8 @@ export default function ProfileEditPage() {
               marginTop: 8,
               display: "flex",
               alignItems: "center",
-              border: "1px solid var(--color-line-strong)",
+              minHeight: 56,
+              border: "1.5px solid var(--color-line-strong)",
               borderRadius: 12,
               overflow: "hidden",
               background: "rgba(0, 0, 0, 0.04)",
@@ -173,7 +177,7 @@ export default function ProfileEditPage() {
             <span
               className="font-sans"
               style={{
-                padding: "14px 10px 14px 14px",
+                padding: "0 8px 0 18px",
                 fontSize: 15,
                 color: "var(--color-mute-2)",
                 userSelect: "none",
@@ -195,13 +199,14 @@ export default function ProfileEditPage() {
               className="font-sans"
               style={{
                 flex: 1,
-                padding: "14px 14px 14px 0",
+                padding: "0 18px 0 0",
                 background: "transparent",
                 border: "none",
                 outline: "none",
                 fontSize: 15,
                 color: "var(--color-ink)",
                 letterSpacing: "-0.005em",
+                minHeight: 56,
               }}
             />
           </div>

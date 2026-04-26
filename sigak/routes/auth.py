@@ -90,6 +90,9 @@ class MeResponse(BaseModel):
     consent_completed: bool
     essentials_completed: bool
     onboarding_completed: bool
+    # 2026-04-26 fix: /profile/edit 가 현재 핸들 표시용으로 사용.
+    # null = 등록된 IG 핸들 없음.
+    ig_handle: Optional[str] = None
 
 
 @router.get("/me", response_model=MeResponse)
@@ -106,10 +109,11 @@ def get_me(
     consent_completed = False
     essentials_completed = False
     onboarding_completed = False
+    ig_handle: Optional[str] = None
     if db is not None:
         row = db.execute(
             text(
-                "SELECT consent_completed, onboarding_completed, birth_date "
+                "SELECT consent_completed, onboarding_completed, birth_date, ig_handle "
                 "FROM users WHERE id = :uid"
             ),
             {"uid": user["id"]},
@@ -118,6 +122,7 @@ def get_me(
             consent_completed = bool(row.consent_completed)
             onboarding_completed = bool(row.onboarding_completed)
             essentials_completed = row.birth_date is not None
+            ig_handle = row.ig_handle if row.ig_handle else None
 
     return MeResponse(
         id=user["id"],
@@ -128,6 +133,7 @@ def get_me(
         consent_completed=consent_completed,
         essentials_completed=essentials_completed,
         onboarding_completed=onboarding_completed,
+        ig_handle=ig_handle,
     )
 
 

@@ -522,35 +522,70 @@ def _run_pi_b_pipeline(
     *,
     baseline_r2_key: str,
     gender: Optional[str],
+    user_id: str,
 ) -> tuple[Optional[dict], Optional[dict], list, list]:
     """PI-B 호출 (face features + 좌표 + anchor matching).
 
-    PI-B 모듈은 별도 인스턴스가 작성. 모듈 미존재 시 빈 결과 fallback —
-    PI-A v1 이 None / [] 입력을 받아도 적절히 처리하도록 설계됨.
+    PI-REVIVE 2026-04-26: 잘못된 모듈명 (pi_b_engine 부재) → pi_face_pipeline
+    재배선. R2 baseline fetch → analyze_baseline_photo (InsightFace + CLIP +
+    coord + anchor) → tuple 변환.
+
+    실패 시 (R2 부재 / 얼굴 미검출 / CLIP 실패) 빈 결과 fallback. PI-A v1 이
+    None / [] 입력 받으면 neutral fallback (5천원 가치 미달 영역, 본인 인지).
 
     Returns:
-      (face_features, coord_3axis, matched_celebs, matched_types)
+      (face_features, coord_3axis_dict, matched_celebs, matched_types)
     """
-    try:
-        from services.pi_b_engine import compute_face_and_anchors  # type: ignore[import-not-found]
-    except ImportError:
-        logger.debug("pi_b_engine not yet available — PI-B step skipped")
+    if not baseline_r2_key:
+        logger.debug("PI-B skipped — baseline_r2_key empty user=%s", user_id)
         return (None, None, [], [])
 
+    # R2 fetch baseline 사진 (bytes)
     try:
-        result = compute_face_and_anchors(
-            baseline_r2_key=baseline_r2_key,
-            gender=gender,
-        )
+        from services import r2_client
+        photo_bytes = r2_client.get_bytes(baseline_r2_key)
     except Exception:
-        logger.exception("PI-B pipeline failed — returning empty")
+        logger.exception(
+            "PI-B R2 fetch failed user=%s key=%s", user_id, baseline_r2_key,
+        )
         return (None, None, [], [])
+    if not photo_bytes:
+        logger.warning(
+            "PI-B baseline photo empty user=%s key=%s", user_id, baseline_r2_key,
+        )
+        return (None, None, [], [])
+
+    # face pipeline 호출 (face.py + clip.py + coordinate.py + similarity.py)
+    try:
+        from services.pi_face_pipeline import (
+            PIFaceError,
+            analyze_baseline_photo,
+        )
+        result = analyze_baseline_photo(
+            photo_bytes,
+            gender=(gender or "female"),  # type: ignore[arg-type]
+            user_id=user_id,
+            persist_to_r2=False,  # baseline 이미 영구. 재저장 X.
+        )
+    except PIFaceError as e:
+        logger.warning("PI-B face pipeline failed user=%s reason=%s", user_id, e)
+        return (None, None, [], [])
+    except Exception:
+        logger.exception("PI-B unexpected failure user=%s", user_id)
+        return (None, None, [], [])
+
+    # PiFaceResult → tuple. coord_3axis = VisualCoordinate → dict.
+    try:
+        coord_dict = result.coord_3axis.model_dump(mode="json")
+    except Exception:
+        logger.exception("PI-B coord_3axis dump failed user=%s", user_id)
+        coord_dict = None
 
     return (
-        getattr(result, "face_features", None),
-        getattr(result, "coord_3axis", None),
-        list(getattr(result, "matched_celebs", None) or []),
-        list(getattr(result, "matched_types", None) or []),
+        dict(result.face_features),
+        coord_dict,
+        list(result.matched_celebs or []),
+        list(result.matched_types or []),
     )
 
 
@@ -612,7 +647,7 @@ def _call_pi_engine_safely(
     )
 
     face_features, coord_3axis, matched_celebs, matched_types = _run_pi_b_pipeline(
-        baseline_r2_key=baseline_r2_key or "", gender=gender,
+        baseline_r2_key=baseline_r2_key or "", gender=gender, user_id=user_id,
     )
     matched_trends, methodology_reasons = _run_pi_c_pipeline(
         coord_3axis=coord_3axis, gender=gender, face_features=face_features,

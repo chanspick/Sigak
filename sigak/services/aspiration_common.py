@@ -124,23 +124,57 @@ def select_photo_pairs(
     v2 (Sonnet cross-analysis) — stub writer 호출 폐기. PhotoPair 는
     URL 만 채워진 빈 shell. ``aspiration_engine_sonnet.compose_aspiration_v2``
     결과의 ``photo_pair_comments[i]`` 가 호출자에서 ``pair_comment`` 에 채워짐.
-    ``user_sia_comment`` / ``target_sia_comment`` 는 schemas default ""
-    유지 (v1.5 호환만, 새 프론트는 사용 X).
 
     MVP 전략:
       - user_posts 에서 display_url 있는 것 중 앞 max_pairs 장
       - target_posts 에서 display_url 있는 것 중 앞 max_pairs 장
-      - 1:1 인덱스 매칭. Phase 후속에서 Sonnet Vision 세밀 매칭 가능.
+      - 1:1 인덱스 매칭
+
+    가드 (v2.1):
+      - vault.ig_feed_cache 오염 감지 — user_urls 와 target_urls 가 동일 set
+        이면 페어 0 반환 + warning log (본인 IG 사진 자리에 추구미 사진 노출
+        회귀 방지).
+      - user_urls 와 target_urls 첫 prefix 같으면 (R2 / CDN 같은 도메인 의심)
+        info log (정상 케이스도 있어 차단은 X).
     """
     user_urls = [p.display_url for p in user_posts if p.display_url][:max_pairs]
     target_urls = [p.display_url for p in target_posts if p.display_url][:max_pairs]
 
+    logger.info(
+        "select_photo_pairs: user_n=%d target_n=%d "
+        "user_first=%r target_first=%r",
+        len(user_urls), len(target_urls),
+        user_urls[0][:80] if user_urls else None,
+        target_urls[0][:80] if target_urls else None,
+    )
+
+    # 가드 1 — 동일 set 오염 (본인 vault 가 추구미 데이터로 채워진 케이스)
+    if user_urls and target_urls and set(user_urls) == set(target_urls):
+        logger.warning(
+            "select_photo_pairs: user_urls == target_urls (vault contamination?). "
+            "Returning empty pairs. user_first=%r",
+            user_urls[0][:80],
+        )
+        return []
+
     n = min(len(user_urls), len(target_urls))
     if n < 1:
+        logger.warning(
+            "select_photo_pairs: insufficient pairs (user=%d target=%d) — "
+            "returning empty. 본인 IG essentials 미완 또는 vault.latest_posts 비어있음 가능.",
+            len(user_urls), len(target_urls),
+        )
         return []
 
     pairs: list[PhotoPair] = []
     for i in range(n):
+        # 가드 2 — 같은 페어 안에서 user == target URL 이면 skip (개별 페어 단위)
+        if user_urls[i] == target_urls[i]:
+            logger.warning(
+                "select_photo_pairs: pair %d user==target URL — skipping. url=%r",
+                i, user_urls[i][:80],
+            )
+            continue
         pairs.append(PhotoPair(
             user_photo_url=user_urls[i],
             target_photo_url=target_urls[i],

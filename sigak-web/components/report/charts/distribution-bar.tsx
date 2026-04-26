@@ -53,7 +53,7 @@ export function DistributionBar({
             "C165,25 180,26 198,26",
           ].join(" ")}
           fill="none"
-          stroke="var(--color-border)"
+          stroke="var(--color-line)"
           strokeWidth="0.5"
           opacity="0.5"
         />
@@ -64,7 +64,7 @@ export function DistributionBar({
           y1="22"
           x2="194"
           y2="22"
-          stroke="var(--color-border)"
+          stroke="var(--color-line)"
           strokeWidth="2"
           strokeLinecap="round"
         />

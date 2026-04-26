@@ -187,7 +187,7 @@ function CastingProfileModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--color-line)]">
           <span className="text-xs font-bold tracking-[3px]">프로필</span>
           <button
             onClick={onClose}
@@ -199,7 +199,7 @@ function CastingProfileModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-5 h-5 border-2 border-[var(--color-border)] border-t-[var(--color-fg)] animate-spin" />
+            <div className="w-5 h-5 border-2 border-[var(--color-line)] border-t-[var(--color-fg)] animate-spin" />
           </div>
         ) : detail ? (
           <div className="px-6 py-5">
@@ -255,7 +255,7 @@ function CastingProfileModal({
             </div>
 
             {/* 매칭 요청 */}
-            <div className="border-t border-[var(--color-border)] pt-5">
+            <div className="border-t border-[var(--color-line)] pt-5">
               <span className="text-[10px] font-medium tracking-[2px] text-[var(--color-muted)] uppercase">
                 매칭 요청
               </span>
@@ -279,7 +279,7 @@ function CastingProfileModal({
                       type="text"
                       value={agencyName}
                       onChange={(e) => setAgencyName(e.target.value)}
-                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors"
+                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-line)] outline-none focus:border-[var(--color-fg)] transition-colors"
                     />
                   </div>
                   <div>
@@ -290,7 +290,7 @@ function CastingProfileModal({
                       type="text"
                       value={purpose}
                       onChange={(e) => setPurpose(e.target.value)}
-                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors"
+                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-line)] outline-none focus:border-[var(--color-fg)] transition-colors"
                     />
                   </div>
                   <div>
@@ -302,7 +302,7 @@ function CastingProfileModal({
                       value={fee}
                       onChange={(e) => setFee(e.target.value)}
                       placeholder="₩"
-                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors"
+                      className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-line)] outline-none focus:border-[var(--color-fg)] transition-colors"
                     />
                   </div>
                   <button
@@ -460,7 +460,7 @@ export function CastingPool() {
             value={keyInput}
             onChange={(e) => setKeyInput(e.target.value)}
             placeholder="관리자 키를 입력하세요"
-            className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-border)] outline-none focus:border-[var(--color-fg)] transition-colors mb-3"
+            className="w-full h-10 px-3 text-[13px] bg-transparent border border-[var(--color-line)] outline-none focus:border-[var(--color-fg)] transition-colors mb-3"
           />
 
           {authError && (
@@ -517,7 +517,7 @@ export function CastingPool() {
                   className={`px-3 py-1.5 text-[11px] font-medium tracking-[0.5px] border transition-colors cursor-pointer ${
                     matchFilter === f.key
                       ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-[var(--color-bg)]"
-                      : "border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-fg)]"
+                      : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-fg)]"
                   }`}
                 >
                   {f.label}
@@ -527,7 +527,7 @@ export function CastingPool() {
 
             {matchLoading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="w-5 h-5 border-2 border-[var(--color-border)] border-t-[var(--color-fg)] animate-spin" />
+                <div className="w-5 h-5 border-2 border-[var(--color-line)] border-t-[var(--color-fg)] animate-spin" />
               </div>
             ) : matches.filter((m) => matchFilter === "all" || m.response === matchFilter).length === 0 ? (
               <div className="text-center py-20 text-[12px] text-[var(--color-muted)]">
@@ -538,7 +538,7 @@ export function CastingPool() {
                 {matches
                   .filter((m) => matchFilter === "all" || m.response === matchFilter)
                   .map((m) => (
-                    <div key={m.notification_id} className="border border-[var(--color-border)] px-5 py-4">
+                    <div key={m.notification_id} className="border border-[var(--color-line)] px-5 py-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[13px] font-medium">{m.user_name || m.user_id.slice(0, 8)}</span>
                         <span className={`text-[10px] font-bold tracking-[1px] px-2 py-0.5 ${
@@ -574,7 +574,7 @@ export function CastingPool() {
           <select
             value={faceShape}
             onChange={(e) => setFaceShape(e.target.value)}
-            className="h-9 px-3 text-[12px] bg-transparent border border-[var(--color-border)] outline-none cursor-pointer appearance-none pr-8"
+            className="h-9 px-3 text-[12px] bg-transparent border border-[var(--color-line)] outline-none cursor-pointer appearance-none pr-8"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E")`,
               backgroundRepeat: "no-repeat",
@@ -596,7 +596,7 @@ export function CastingPool() {
         {/* 로딩 */}
         {loading && (
           <div className="flex items-center justify-center py-20">
-            <div className="w-5 h-5 border-2 border-[var(--color-border)] border-t-[var(--color-fg)] animate-spin" />
+            <div className="w-5 h-5 border-2 border-[var(--color-line)] border-t-[var(--color-fg)] animate-spin" />
           </div>
         )}
 
@@ -616,7 +616,7 @@ export function CastingPool() {
               <button
                 key={user.user_id}
                 onClick={() => setSelectedUserId(user.user_id)}
-                className="w-full text-left border border-[var(--color-border)] bg-transparent px-5 py-4 hover:border-[var(--color-fg)] transition-colors cursor-pointer"
+                className="w-full text-left border border-[var(--color-line)] bg-transparent px-5 py-4 hover:border-[var(--color-fg)] transition-colors cursor-pointer"
               >
                 <div className="flex gap-4">
                   {/* 썸네일 */}

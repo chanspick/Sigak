@@ -393,7 +393,7 @@ function Section({ id, title }: { id?: string; title: string }) {
       style={{
         fontSize: 18,
         fontWeight: 700,
-        borderColor: "var(--color-border)",
+        borderColor: "var(--color-line)",
         letterSpacing: "-0.005em",
       }}
     >
@@ -473,7 +473,7 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
                 className="border-b px-3 py-2 text-left font-sans"
                 style={{
                   fontWeight: 600,
-                  borderColor: "var(--color-border)",
+                  borderColor: "var(--color-line)",
                   background: "rgba(15,15,14,0.02)",
                   letterSpacing: "-0.005em",
                 }}
@@ -491,7 +491,7 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
                   key={j}
                   className="border-b px-3 py-2 font-sans"
                   style={{
-                    borderColor: "var(--color-border)",
+                    borderColor: "var(--color-line)",
                     opacity: 0.82,
                     lineHeight: 1.6,
                     letterSpacing: "-0.005em",
@@ -509,6 +509,6 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
 }
 
 function Hr() {
-  return <hr className="my-10" style={{ borderColor: "var(--color-border)" }} />;
+  return <hr className="my-10" style={{ borderColor: "var(--color-line)" }} />;
 }
 

@@ -26,7 +26,7 @@ export function Cover({ content }: CoverProps) {
   const showEdition = !!tierLabels[content.tier]; // standard / 미정의 tier 는 미노출
 
   return (
-    <section className="pt-16 pb-12 border-b border-[var(--color-border)]">
+    <section className="pt-16 pb-12 border-b border-[var(--color-line)]">
       {/* 서비스 로고 마크 */}
       <div className="flex items-center gap-2 mb-10">
         <div className="w-6 h-6 bg-[var(--color-fg)] rounded-full" />

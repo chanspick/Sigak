@@ -13,9 +13,9 @@ interface ExecutiveSummaryProps {
 // 핵심 요약 — 에디토리얼 풀아웃 스타일
 export function ExecutiveSummary({ content }: ExecutiveSummaryProps) {
   return (
-    <section className="py-12 border-b border-[var(--color-border)]">
+    <section className="py-12 border-b border-[var(--color-line)]">
       {/* 대형 따옴표 장식 */}
-      <span className="block text-6xl font-serif leading-none text-[var(--color-border)] select-none mb-2">
+      <span className="block text-6xl font-serif leading-none text-[var(--color-line)] select-none mb-2">
         &ldquo;
       </span>
       {/* 요약 텍스트 */}

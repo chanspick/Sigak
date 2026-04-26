@@ -143,14 +143,14 @@ export function GapScatterPlot({
           const isCenter = step === 0;
           return (
             <g key={step}>
-              <line x1={posX} y1={padT} x2={posX} y2={H - padB} stroke="var(--color-border)" strokeWidth={isCenter ? "0.75" : "0.3"} strokeDasharray={isCenter ? "none" : "1.5,3"} opacity={isCenter ? 0.6 : 0.35} />
-              <line x1={padL} y1={posY} x2={W - padR} y2={posY} stroke="var(--color-border)" strokeWidth={isCenter ? "0.75" : "0.3"} strokeDasharray={isCenter ? "none" : "1.5,3"} opacity={isCenter ? 0.6 : 0.35} />
+              <line x1={posX} y1={padT} x2={posX} y2={H - padB} stroke="var(--color-line)" strokeWidth={isCenter ? "0.75" : "0.3"} strokeDasharray={isCenter ? "none" : "1.5,3"} opacity={isCenter ? 0.6 : 0.35} />
+              <line x1={padL} y1={posY} x2={W - padR} y2={posY} stroke="var(--color-line)" strokeWidth={isCenter ? "0.75" : "0.3"} strokeDasharray={isCenter ? "none" : "1.5,3"} opacity={isCenter ? 0.6 : 0.35} />
             </g>
           );
         })}
 
         {/* 외곽 프레임 */}
-        <rect x={padL} y={padT} width={plotW} height={plotH} fill="none" stroke="var(--color-border)" strokeWidth="0.75" />
+        <rect x={padL} y={padT} width={plotW} height={plotH} fill="none" stroke="var(--color-line)" strokeWidth="0.75" />
 
         {/* ─── X축 라벨 (하단) ─── */}
         <text x={padL} y={H - padB + 18} fontSize="10" fill="var(--color-muted)" textAnchor="start" opacity="0.6">{x_axis.low}</text>

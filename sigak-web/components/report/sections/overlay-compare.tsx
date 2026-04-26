@@ -170,7 +170,7 @@ export function OverlayCompare({
           After
         </span>
         <div className="flex-1 relative h-6 flex items-center">
-          <div className="absolute left-0 right-0 h-px bg-[var(--color-border)]" />
+          <div className="absolute left-0 right-0 h-px bg-[var(--color-line)]" />
           <div
             className="absolute left-0 h-px bg-[var(--color-fg)]"
             style={{
@@ -215,7 +215,7 @@ export function OverlayCompare({
               className={`px-3 py-1 rounded-full text-[11px] font-normal tracking-[0.02em] ${
                 tag.priority === "핵심 포인트" || tag.priority === "HIGH"
                   ? "bg-[var(--color-fg)] text-[var(--color-bg)]"
-                  : "border border-[var(--color-border)] text-[var(--color-muted)]"
+                  : "border border-[var(--color-line)] text-[var(--color-muted)]"
               }`}
             >
               {tag.label}

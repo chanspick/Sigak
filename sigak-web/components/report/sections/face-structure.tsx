@@ -90,7 +90,7 @@ function FaceShapeIcon({ shape }: { shape: string }) {
         stroke="currentColor"
         strokeWidth="0.5"
         strokeDasharray="2,3"
-        className="text-[var(--color-border)]"
+        className="text-[var(--color-line)]"
       />
       <line
         x1="25"
@@ -100,7 +100,7 @@ function FaceShapeIcon({ shape }: { shape: string }) {
         stroke="currentColor"
         strokeWidth="0.5"
         strokeDasharray="2,3"
-        className="text-[var(--color-border)]"
+        className="text-[var(--color-line)]"
       />
     </svg>
   );
@@ -118,7 +118,7 @@ function stripPercentileText(text: string): string {
 // 얼굴 구조 분석 — 프리미엄 레이아웃 (FREE + STANDARD 통합)
 export function FaceStructure({ content, locked }: FaceStructureProps) {
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
         FACE STRUCTURE
@@ -163,7 +163,7 @@ export function FaceStructure({ content, locked }: FaceStructureProps) {
           {content.feature_interpretations.map((fi, idx) => (
             <div
               key={fi.feature}
-              className={`py-5 ${idx < (content.feature_interpretations?.length ?? 0) - 1 ? "border-b border-[var(--color-border)] border-opacity-40" : ""}`}
+              className={`py-5 ${idx < (content.feature_interpretations?.length ?? 0) - 1 ? "border-b border-[var(--color-line)] border-opacity-40" : ""}`}
             >
               {/* 라벨 */}
               <div className="mb-2">
@@ -221,7 +221,7 @@ export function FaceStructure({ content, locked }: FaceStructureProps) {
 
       {/* ─── 조화 노트 ─── */}
       {content.harmony_note && (
-        <div className={`pt-5 border-t border-[var(--color-border)] ${locked ? "select-none relative" : ""}`}>
+        <div className={`pt-5 border-t border-[var(--color-line)] ${locked ? "select-none relative" : ""}`}>
           <p className="text-[13px] italic text-[var(--color-muted)] leading-relaxed">
             {content.harmony_note}
           </p>

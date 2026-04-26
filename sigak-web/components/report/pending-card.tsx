@@ -28,7 +28,7 @@ export function PendingCard({ requestedAt }: PendingCardProps) {
   }, [requestedAt]);
 
   return (
-    <div className="flex flex-col items-center gap-3 py-8 px-6 border border-[var(--color-border)] rounded-lg max-w-sm mx-auto">
+    <div className="flex flex-col items-center gap-3 py-8 px-6 border border-[var(--color-line)] rounded-lg max-w-sm mx-auto">
       {/* 펄스 인디케이터 */}
       <div className="relative flex items-center justify-center">
         <span className="absolute w-8 h-8 rounded-full bg-[var(--color-fg)] opacity-10 animate-ping" />

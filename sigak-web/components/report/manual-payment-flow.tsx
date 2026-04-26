@@ -21,7 +21,7 @@ export function ManualPaymentFlow({
   onComplete,
 }: ManualPaymentFlowProps) {
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-6 max-w-sm mx-auto">
+    <div className="border border-[var(--color-line)] rounded-lg p-6 max-w-sm mx-auto">
       {/* 결제 안내 헤더 */}
       <h3 className="text-lg font-bold mb-1 text-center">
         {paywall.label}
@@ -33,7 +33,7 @@ export function ManualPaymentFlow({
       )}
 
       {/* 계좌 정보 영역 */}
-      <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-4 mb-6">
+      <div className="bg-[var(--color-bg)] border border-[var(--color-line)] rounded-lg p-4 mb-6">
         <div className="flex flex-col gap-2 text-sm">
           {/* 은행명 */}
           <div className="flex justify-between">
@@ -51,7 +51,7 @@ export function ManualPaymentFlow({
             <span className="font-medium">{paymentAccount.holder}</span>
           </div>
           {/* 금액 */}
-          <div className="flex justify-between border-t border-[var(--color-border)] pt-2 mt-1">
+          <div className="flex justify-between border-t border-[var(--color-line)] pt-2 mt-1">
             <span className="text-[var(--color-muted)]">금액</span>
             <span className="font-bold text-base">
               {paywall.original_price && (

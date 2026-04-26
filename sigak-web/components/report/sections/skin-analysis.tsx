@@ -48,7 +48,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
   const hasGuide = content.lip_direction || content.cheek_direction || content.eye_direction || content.foundation_guide;
 
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         PERSONAL COLOR
@@ -57,7 +57,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
       {/* 피부색 샘플 + 타입 */}
       <div className="flex items-center gap-4 mb-8">
         <div
-          className="w-14 h-14 rounded-full border-2 border-[var(--color-border)] shadow-sm shrink-0"
+          className="w-14 h-14 rounded-full border-2 border-[var(--color-line)] shadow-sm shrink-0"
           style={{ backgroundColor: content.hex_sample || "#D4A574" }}
         />
         <div>
@@ -94,7 +94,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
                       <div className="flex items-center gap-2">
                         <span className="text-[13px] font-medium">{c.name}</span>
                         {c.usage && (
-                          <span className="text-[9px] px-1.5 py-0.5 border border-[var(--color-border)] text-[var(--color-muted)]">
+                          <span className="text-[9px] px-1.5 py-0.5 border border-[var(--color-line)] text-[var(--color-muted)]">
                             {c.usage}
                           </span>
                         )}
@@ -113,7 +113,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
           {okay.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-[10px] font-bold tracking-[2px] uppercase px-2 py-0.5 border border-[var(--color-border)]">
+                <span className="text-[10px] font-bold tracking-[2px] uppercase px-2 py-0.5 border border-[var(--color-line)]">
                   OK
                 </span>
                 <span className="text-[11px] text-[var(--color-muted)]">활용할 수 있는 색</span>
@@ -122,14 +122,14 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
                 {okay.map((c) => (
                   <div key={c.name} className="flex items-start gap-3">
                     <div
-                      className="w-10 h-10 rounded-full border border-[var(--color-border)] shadow-sm shrink-0 mt-0.5"
+                      className="w-10 h-10 rounded-full border border-[var(--color-line)] shadow-sm shrink-0 mt-0.5"
                       style={{ backgroundColor: c.hex }}
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-[13px] font-medium">{c.name}</span>
                         {c.usage && (
-                          <span className="text-[9px] px-1.5 py-0.5 border border-[var(--color-border)] text-[var(--color-muted)]">
+                          <span className="text-[9px] px-1.5 py-0.5 border border-[var(--color-line)] text-[var(--color-muted)]">
                             {c.usage}
                           </span>
                         )}
@@ -157,7 +157,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
                 {avoid.map((c) => (
                   <div key={c.name} className="flex items-start gap-3 opacity-60">
                     <div
-                      className="w-10 h-10 rounded-full border border-[var(--color-border)] shadow-sm shrink-0 mt-0.5"
+                      className="w-10 h-10 rounded-full border border-[var(--color-line)] shadow-sm shrink-0 mt-0.5"
                       style={{ backgroundColor: c.hex }}
                     />
                     <div className="min-w-0">
@@ -174,7 +174,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
 
           {/* ── 컬러 활용 가이드 ── */}
           {hasGuide && (
-            <div className="mb-8 border-t border-[var(--color-border)] pt-6">
+            <div className="mb-8 border-t border-[var(--color-line)] pt-6">
               <h3 className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-4">
                 컬러 활용 가이드
               </h3>
@@ -197,7 +197,7 @@ export function SkinAnalysis({ content, locked }: SkinAnalysisProps) {
 
           {/* ── 추천 헤어컬러 ── */}
           {hairColors.length > 0 && (
-            <div className="border-t border-[var(--color-border)] pt-6">
+            <div className="border-t border-[var(--color-line)] pt-6">
               <h3 className="text-[10px] font-bold tracking-[2px] uppercase text-[var(--color-muted)] mb-4">
                 추천 헤어컬러
               </h3>

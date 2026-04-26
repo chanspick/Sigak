@@ -47,8 +47,8 @@ interface TrendContextProps {
 // 정합도 배지 스타일
 function getAlignmentStyle(alignment: string): string {
   if (alignment === "aligned") return "bg-[var(--color-fg)] text-[var(--color-bg)]";
-  if (alignment === "divergent") return "border border-[var(--color-border)] text-[var(--color-muted)]";
-  return "border border-[var(--color-border)] text-[var(--color-fg)]";
+  if (alignment === "divergent") return "border border-[var(--color-line)] text-[var(--color-muted)]";
+  return "border border-[var(--color-line)] text-[var(--color-fg)]";
 }
 
 export function TrendContext({ content, locked }: TrendContextProps) {
@@ -57,7 +57,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
   // v1 폴백: 기존 trends 배열 렌더링
   if (!isV2 && content.trends) {
     return (
-      <section className="py-10 border-b border-[var(--color-border)]">
+      <section className="py-10 border-b border-[var(--color-line)]">
         <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
           TREND CONTEXT
         </h2>
@@ -82,7 +82,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
   const makeupTrends = content.makeup_trends ?? [];
 
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)]">
@@ -104,7 +104,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
 
           {/* 무드 매칭 + 정합도 */}
           {mood && (
-            <div className="p-4 border border-[var(--color-border)] rounded-lg mb-6">
+            <div className="p-4 border border-[var(--color-line)] rounded-lg mb-6">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold tracking-[1.5px] uppercase text-[var(--color-muted)]">
@@ -128,7 +128,7 @@ export function TrendContext({ content, locked }: TrendContextProps) {
                 {mood.keywords.map((kw) => (
                   <span
                     key={kw}
-                    className="px-2 py-0.5 text-[11px] border border-[var(--color-border)] text-[var(--color-muted)] rounded-full"
+                    className="px-2 py-0.5 text-[11px] border border-[var(--color-line)] text-[var(--color-muted)] rounded-full"
                   >
                     {kw}
                   </span>
@@ -182,11 +182,11 @@ export function TrendContext({ content, locked }: TrendContextProps) {
               </p>
               <div className="flex flex-col gap-4">
                 {makeupTrends.map((mt) => (
-                  <div key={mt.zone} className="pb-4 border-b border-[var(--color-border)] last:border-0 last:pb-0">
+                  <div key={mt.zone} className="pb-4 border-b border-[var(--color-line)] last:border-0 last:pb-0">
                     <span className="text-[13px] font-semibold">{mt.zone_kr}</span>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {mt.rising.map((r, i) => (
-                        <span key={i} className="text-[12px] px-2 py-0.5 border border-[var(--color-border)] rounded-full">
+                        <span key={i} className="text-[12px] px-2 py-0.5 border border-[var(--color-line)] rounded-full">
                           {r}
                         </span>
                       ))}

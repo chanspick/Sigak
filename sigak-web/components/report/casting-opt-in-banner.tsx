@@ -47,7 +47,7 @@ export function CastingOptInBanner({ userId }: CastingOptInBannerProps) {
   // 로딩 중 — 높이 유지용 placeholder
   if (status === "loading") {
     return (
-      <div className="py-10 px-6 border border-[var(--color-border)]">
+      <div className="py-10 px-6 border border-[var(--color-line)]">
         <div className="animate-pulse">
           <div className="h-3 w-24 bg-black/[0.06] mb-4" />
           <div className="h-6 w-64 bg-black/[0.06] mb-2" />
@@ -62,7 +62,7 @@ export function CastingOptInBanner({ userId }: CastingOptInBannerProps) {
 
   if (status === "opted_in") {
     return (
-      <div className="py-8 px-6 border border-[var(--color-border)] text-center">
+      <div className="py-8 px-6 border border-[var(--color-line)] text-center">
         <p className="text-sm font-semibold">캐스팅 풀에 등록되어 있습니다</p>
         <p className="text-xs text-[var(--color-muted)] mt-1">
           매칭 파트너가 회원님의 프로필을 검색할 수 있습니다
@@ -72,7 +72,7 @@ export function CastingOptInBanner({ userId }: CastingOptInBannerProps) {
   }
 
   return (
-    <div className="py-10 px-6 border border-[var(--color-border)]">
+    <div className="py-10 px-6 border border-[var(--color-line)]">
       {/* 헤더 */}
       <p className="text-xs font-semibold tracking-[4px] uppercase text-[var(--color-muted)] mb-4">
         CASTING POOL

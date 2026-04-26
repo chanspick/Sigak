@@ -33,7 +33,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
   const mainImageSrc = typeIdToImg(content.type_id);
 
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         TYPE MATCH
@@ -42,7 +42,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
       {/* 메인 매칭: 이미지 + 라벨 — 항상 선명 */}
       <div className="flex gap-6 mb-6">
         {/* AI 유형 이미지 */}
-        <div className="shrink-0 w-28 h-36 md:w-36 md:h-44 relative rounded-lg overflow-hidden bg-[var(--color-border)]">
+        <div className="shrink-0 w-28 h-36 md:w-36 md:h-44 relative rounded-lg overflow-hidden bg-[var(--color-line)]">
           <Image
             src={mainImageSrc}
             alt={`${content.type_name} 유형 레퍼런스`}
@@ -62,7 +62,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
           </p>
           {/* 유사도 */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+            <div className="flex-1 h-2 bg-[var(--color-line)] rounded-full overflow-hidden">
               <div
                 className="h-full bg-[var(--color-fg)] rounded-full transition-all duration-700"
                 style={{ width: `${content.similarity}%` }}
@@ -116,7 +116,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
 
           {/* Runner-ups — 미니 이미지 + 바 */}
           {content.runner_ups && content.runner_ups.length > 0 && (
-            <div className="pt-6 border-t border-[var(--color-border)]">
+            <div className="pt-6 border-t border-[var(--color-line)]">
               <h3 className="text-xs font-semibold tracking-[2px] uppercase text-[var(--color-muted)] mb-4">
                 ALSO SIMILAR
               </h3>
@@ -127,7 +127,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
                     className="flex items-center gap-3"
                   >
                     {/* 미니 이미지 */}
-                    <div className="shrink-0 w-10 h-10 relative rounded-full overflow-hidden bg-[var(--color-border)]">
+                    <div className="shrink-0 w-10 h-10 relative rounded-full overflow-hidden bg-[var(--color-line)]">
                       <Image
                         src={typeIdToImg(ru.type_id)}
                         alt={ru.type_name}
@@ -140,7 +140,7 @@ export function TypeReference({ content, locked }: TypeReferenceProps) {
                       {ru.type_name}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-16 h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                      <div className="w-16 h-1.5 bg-[var(--color-line)] rounded-full overflow-hidden">
                         <div
                           className="h-full bg-[var(--color-muted)] rounded-full"
                           style={{ width: `${ru.similarity}%` }}

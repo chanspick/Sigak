@@ -73,7 +73,7 @@ function getDifficultyStyle(difficulty: string): string {
   if (difficulty.includes("큰")) {
     return "bg-[var(--color-fg)] text-[var(--color-bg)]";
   }
-  return "border border-[var(--color-border)] text-[var(--color-muted)]";
+  return "border border-[var(--color-line)] text-[var(--color-muted)]";
 }
 
 // -1~+1 범위를 0~100% 위치로 변환
@@ -125,8 +125,8 @@ function MiniAxisRow({
       )}
 
       {/* 바 */}
-      <div className="flex-1 relative h-[2px] bg-[var(--color-border)] rounded-full">
-        <div className="absolute left-1/2 top-1/2 -translate-x-px -translate-y-1/2 w-[1px] h-[6px] bg-[var(--color-border)] opacity-60" />
+      <div className="flex-1 relative h-[2px] bg-[var(--color-line)] rounded-full">
+        <div className="absolute left-1/2 top-1/2 -translate-x-px -translate-y-1/2 w-[1px] h-[6px] bg-[var(--color-line)] opacity-60" />
         {delta > 0.05 && (
           <div
             className="absolute h-[2px] bg-[var(--color-fg)] opacity-15 rounded-full"
@@ -164,7 +164,7 @@ function DirectionCard({ item }: { item: DirectionItem }) {
   const barWidth = Math.abs(toPos - fromPos);
 
   return (
-    <div className="p-4 border border-[var(--color-border)] rounded-lg">
+    <div className="p-4 border border-[var(--color-line)] rounded-lg">
       {/* 상단: 축 라벨 + 난이도 배지 */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
@@ -197,7 +197,7 @@ function DirectionCard({ item }: { item: DirectionItem }) {
 
       {/* 레인지 바: from→to */}
       <div className="mb-3">
-        <div className="relative h-[3px] bg-[var(--color-border)] rounded-full">
+        <div className="relative h-[3px] bg-[var(--color-line)] rounded-full">
           <div
             className="absolute h-full bg-[var(--color-fg)] rounded-full opacity-20"
             style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
@@ -236,7 +236,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
   const aspirationImg = typeIdToImg(content.aspiration_type_id);
 
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
         GAP ANALYSIS
@@ -247,7 +247,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         {/* 현재 유형 */}
         <div className="flex flex-col items-center gap-2 flex-1">
           {currentImg && (
-            <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-border)]">
+            <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-line)]">
               <Image
                 src={currentImg}
                 alt={content.current_type}
@@ -267,9 +267,9 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
 
         {/* 화살표 + 갭 크기 — 미니멀 */}
         <div className="flex flex-col items-center gap-1 shrink-0 px-2">
-          <div className="w-10 md:w-14 h-px bg-[var(--color-border)]" />
+          <div className="w-10 md:w-14 h-px bg-[var(--color-line)]" />
           <span className="text-[var(--color-muted)] text-sm">&rarr;</span>
-          <div className="w-10 md:w-14 h-px bg-[var(--color-border)]" />
+          <div className="w-10 md:w-14 h-px bg-[var(--color-line)]" />
           <span className="text-[9px] text-[var(--color-muted)] mt-1 tracking-[0.5px]">
             {content.gap_difficulty}
           </span>
@@ -278,7 +278,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         {/* 추구 유형 */}
         <div className="flex flex-col items-center gap-2 flex-1">
           {aspirationImg && (
-            <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-border)] ring-2 ring-[var(--color-fg)]">
+            <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-line)] ring-2 ring-[var(--color-fg)]">
               <Image
                 src={aspirationImg}
                 alt={content.aspiration_type}
@@ -312,7 +312,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
       </div>
 
       {/* ─── 갭 오버뷰 카드: 산점도 + 3축 미니 비교 ─── */}
-      <div className="mb-8 p-5 border border-[var(--color-border)] rounded-lg">
+      <div className="mb-8 p-5 border border-[var(--color-line)] rounded-lg">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)]">
             GAP OVERVIEW
@@ -456,7 +456,7 @@ function AspirationReferenceCard({ entry }: { entry: AspirationReference }) {
   })();
 
   return (
-    <div className="p-4 border border-[var(--color-border)] rounded-lg">
+    <div className="p-4 border border-[var(--color-line)] rounded-lg">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold tracking-[1px] uppercase text-[var(--color-muted)]">

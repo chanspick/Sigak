@@ -281,7 +281,7 @@ export function QuestionnaireForm({
 
           {/* 에러 메시지 */}
           {submitError && (
-            <div className="mb-4 p-4 border border-[var(--color-border)] text-[13px] leading-relaxed">
+            <div className="mb-4 p-4 border border-[var(--color-line)] text-[13px] leading-relaxed">
               <p className="mb-2">{submitError}</p>
               <button
                 type="button"

@@ -143,7 +143,7 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
       ))}
 
       {/* 2. 공유 버튼 */}
-      <div className="py-8 border-b border-[var(--color-border)]">
+      <div className="py-8 border-b border-[var(--color-line)]">
         <ShareButtons
           title={`${userName}님의 시각 리포트`}
           description={summaryText.length > 80 ? summaryText.slice(0, 80) + "..." : summaryText}
@@ -162,7 +162,7 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
               return (
                 <div
                   key={section.id}
-                  className="flex items-start gap-4 py-4 border-b border-[var(--color-border)]"
+                  className="flex items-start gap-4 py-4 border-b border-[var(--color-line)]"
                 >
                   <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)] mt-2 shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -193,7 +193,7 @@ export function OverviewContent({ report, reportId }: OverviewContentProps) {
       )}
 
       {/* 4. CTA */}
-      <section className="py-10 border-t border-[var(--color-border)]">
+      <section className="py-10 border-t border-[var(--color-line)]">
         {isFullPaid ? (
           <div className="flex flex-col items-center gap-4">
             <p className="text-sm text-[var(--color-muted)]">

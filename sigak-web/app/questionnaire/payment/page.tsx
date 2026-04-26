@@ -36,7 +36,7 @@ function PaymentContent() {
         </div>
 
         {/* 결제 정보 카드 */}
-        <div className="border border-[var(--color-border)] p-5 mb-6">
+        <div className="border border-[var(--color-line)] p-5 mb-6">
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex justify-between">
               <span className="text-[var(--color-muted)]">은행</span>
@@ -50,7 +50,7 @@ function PaymentContent() {
               <span className="text-[var(--color-muted)]">예금주</span>
               <span className="font-medium">{holder}</span>
             </div>
-            <div className="flex justify-between border-t border-[var(--color-border)] pt-3 mt-1">
+            <div className="flex justify-between border-t border-[var(--color-line)] pt-3 mt-1">
               <span className="text-[var(--color-muted)]">금액</span>
               <span className="font-bold text-lg">{formattedAmount}</span>
             </div>
@@ -73,14 +73,14 @@ function PaymentContent() {
               navigator.clipboard.writeText(account.replace(/-/g, ""));
               alert("계좌번호가 복사되었습니다. 은행 앱에서 붙여넣기로 입력해주세요.");
             }}
-            className="flex items-center justify-center w-full py-3 text-sm font-semibold border border-[var(--color-border)] hover:bg-[var(--color-surface)] transition-all"
+            className="flex items-center justify-center w-full py-3 text-sm font-semibold border border-[var(--color-line)] hover:bg-[var(--color-surface)] transition-all"
           >
             계좌번호 복사하기
           </button>
         </div>
 
         {/* 안내 */}
-        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-center">
+        <div className="bg-[var(--color-surface)] border border-[var(--color-line)] p-4 text-center">
           <p className="text-sm font-medium mb-1">
             송금 후 기다려 주세요
           </p>

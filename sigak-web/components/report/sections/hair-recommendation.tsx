@@ -15,7 +15,7 @@ export function HairRecommendation({ content, locked }: HairRecommendationProps)
   const hasCombos = top_combos.length > 0;
 
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         HAIR RECOMMENDATION
@@ -23,7 +23,7 @@ export function HairRecommendation({ content, locked }: HairRecommendationProps)
 
       {/* 치트키 — 항상 표시 */}
       {cheat_sheet && (
-        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-4 mb-8">
+        <div className="bg-[var(--color-surface)] border border-[var(--color-line)] rounded-lg p-4 mb-8">
           <p className="text-xs font-semibold tracking-[2px] uppercase text-[var(--color-muted)] mb-2">
             치트키
           </p>

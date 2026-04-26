@@ -176,7 +176,7 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
       ))}
 
       {/* 리포트 하단 — 공유 버튼 */}
-      <div className="py-10 border-t border-[var(--color-border)]">
+      <div className="py-10 border-t border-[var(--color-line)]">
         <p className="text-xs text-center text-[var(--color-muted)] mb-4">
           리포트가 마음에 드셨나요? 친구에게 공유해보세요
         </p>

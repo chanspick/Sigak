@@ -52,7 +52,7 @@ export function CumulativeProgressBar({
 
       {/* 누적 바 — 8px 높이로 프리미엄 느낌 */}
       <div className="relative">
-        <div className="w-full h-[8px] bg-[var(--color-border)] rounded-full overflow-hidden flex">
+        <div className="w-full h-[8px] bg-[var(--color-line)] rounded-full overflow-hidden flex">
           {segmentsWithPercent.map((seg, idx) => (
             <div
               key={seg.label}

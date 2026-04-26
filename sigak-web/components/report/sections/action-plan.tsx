@@ -67,7 +67,7 @@ function getPriorityBadge(priority: string): {
   // 보너스 / LOW / 기타
   return {
     className:
-      "border border-[var(--color-border)] text-[var(--color-muted)] px-2.5 py-0.5 text-[11px] font-semibold rounded-full",
+      "border border-[var(--color-line)] text-[var(--color-muted)] px-2.5 py-0.5 text-[11px] font-semibold rounded-full",
     label: priority === "LOW" ? "보너스" : priority || "보너스",
   };
 }
@@ -83,7 +83,7 @@ function localizeCategory(category: string): string {
 // 실행 가이드 — 우선순위 배지 + 액션 + 팁
 export function ActionPlan({ content, locked }: ActionPlanProps) {
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         ACTION PLAN

@@ -119,7 +119,7 @@ export function TossPaymentFlow({
 
   if (error) {
     return (
-      <div className="border border-[var(--color-border)] rounded-lg p-6 max-w-sm mx-auto text-center">
+      <div className="border border-[var(--color-line)] rounded-lg p-6 max-w-sm mx-auto text-center">
         <p className="text-sm text-red-500 mb-4">{error}</p>
         <Button variant="primary" size="md" onClick={() => window.location.reload()}>
           다시 시도

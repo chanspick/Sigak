@@ -144,8 +144,8 @@ export function NotificationBell() {
 
       {/* 드롭다운 */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] max-w-80 bg-[var(--color-bg)] border border-[var(--color-border)] shadow-lg z-[150] max-h-96 overflow-y-auto">
-          <div className="px-4 py-3 border-b border-[var(--color-border)] flex justify-between items-center">
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] max-w-80 bg-[var(--color-bg)] border border-[var(--color-line)] shadow-lg z-[150] max-h-96 overflow-y-auto">
+          <div className="px-4 py-3 border-b border-[var(--color-line)] flex justify-between items-center">
             <span className="text-sm font-semibold text-[var(--color-fg)]">알림</span>
             {unreadCount > 0 && (
               <button
@@ -166,7 +166,7 @@ export function NotificationBell() {
               <button
                 key={notif.id}
                 onClick={() => handleClick(notif)}
-                className={`w-full px-4 py-3 text-left border-b border-[var(--color-border)] hover:bg-black/[0.03] transition-colors ${
+                className={`w-full px-4 py-3 text-left border-b border-[var(--color-line)] hover:bg-black/[0.03] transition-colors ${
                   notif.is_read ? "opacity-50" : ""
                 }`}
               >

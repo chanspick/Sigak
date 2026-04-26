@@ -22,7 +22,7 @@ interface CoordinateMapProps {
 // 미감 좌표계 - 4축 분석 결과를 시각적으로 표시
 export function CoordinateMap({ content, locked }: CoordinateMapProps) {
   return (
-    <section className="py-10 border-b border-[var(--color-border)]">
+    <section className="py-10 border-b border-[var(--color-line)]">
       {/* 섹션 헤더 */}
       <h2 className="text-xs font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-6">
         COORDINATE MAP
@@ -33,7 +33,7 @@ export function CoordinateMap({ content, locked }: CoordinateMapProps) {
         {content.axes.map((axis) => (
           <span
             key={axis}
-            className="px-3 py-1 text-xs font-medium tracking-[1px] border border-[var(--color-border)] rounded-full"
+            className="px-3 py-1 text-xs font-medium tracking-[1px] border border-[var(--color-line)] rounded-full"
           >
             {axis}
           </span>
@@ -48,7 +48,7 @@ export function CoordinateMap({ content, locked }: CoordinateMapProps) {
             {content.axes.map((axis, idx) => (
               <div
                 key={axis}
-                className="p-4 border border-[var(--color-border)] rounded-lg"
+                className="p-4 border border-[var(--color-line)] rounded-lg"
               >
                 {/* 축 라벨 + 설명 */}
                 <p className="text-xs text-[var(--color-muted)] mb-0.5">
@@ -60,7 +60,7 @@ export function CoordinateMap({ content, locked }: CoordinateMapProps) {
                   </p>
                 )}
                 {/* 현재 위치 바 */}
-                <div className="h-2 bg-[var(--color-border)] rounded-full mb-2 overflow-hidden">
+                <div className="h-2 bg-[var(--color-line)] rounded-full mb-2 overflow-hidden">
                   <div
                     className="h-full bg-[var(--color-fg)] rounded-full transition-all duration-500"
                     style={{ width: `${(content.position[idx] ?? 0) * 100}%` }}

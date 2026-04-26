@@ -33,7 +33,7 @@ import {
 } from "@/lib/api/best_shot";
 import type { BestShotInitResponse } from "@/lib/types/best_shot";
 import { LoadingSlides } from "@/components/sia/LoadingSlides";
-import { PrimaryButton, TopBar } from "@/components/ui/sigak";
+import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 const COST_BEST_SHOT = 30;
@@ -376,18 +376,21 @@ export default function BestShotPage() {
 
 function Header({ balance, fileCount }: { balance: number | null; fileCount: number }) {
   return (
-    <header style={{ marginBottom: 24 }}>
+    <header style={{ marginBottom: 28 }}>
       <h1
         className="font-serif"
         style={{
           margin: 0,
-          fontSize: 28,
-          fontWeight: 400,
-          letterSpacing: "-0.01em",
-          lineHeight: 1.25,
+          fontSize: 24,
+          fontWeight: 700,
+          letterSpacing: "-0.022em",
+          lineHeight: 1.42,
+          color: "var(--color-ink)",
+          wordBreak: "keep-all",
         }}
       >
         Best Shot
+        <span style={{ color: "var(--color-danger)" }}>.</span>
       </h1>
       <p
         className="font-sans"
@@ -662,14 +665,12 @@ function StickyCta({
           토큰 충전하러 가기
         </Link>
       )}
-      <PrimaryButton
-        type="button"
+      <PillCta
         onClick={onStart}
         disabled={!ready || stage === "init_pending"}
-        disabledLabel={labelDisabled}
       >
-        {labelMain}
-      </PrimaryButton>
+        {!ready || stage === "init_pending" ? labelDisabled : labelMain}
+      </PillCta>
     </div>
   );
 }
@@ -691,11 +692,13 @@ function UploadProgress({
         style={{
           margin: 0,
           fontSize: 22,
-          fontWeight: 400,
-          letterSpacing: "-0.01em",
+          fontWeight: 700,
+          letterSpacing: "-0.022em",
+          color: "var(--color-ink)",
         }}
       >
         사진을 올리는 중이에요
+        <span style={{ color: "var(--color-danger)" }}>.</span>
       </p>
       <p
         className="font-sans tabular-nums"
@@ -849,12 +852,14 @@ function StrengthWarningModal({
           className="font-serif"
           style={{
             margin: 0,
-            fontSize: 20,
-            fontWeight: 400,
-            letterSpacing: "-0.01em",
+            fontSize: 22,
+            fontWeight: 700,
+            letterSpacing: "-0.022em",
+            color: "var(--color-ink)",
           }}
         >
           잠깐만요
+          <span style={{ color: "var(--color-danger)" }}>.</span>
         </h2>
         <p
           className="font-sans"
@@ -881,21 +886,21 @@ function StrengthWarningModal({
           시각이 본 당신 또는 추구미 분석을 한두 번 해보고 다시 오시면 더 정확해져요.
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <PrimaryButton type="button" onClick={onProceed}>
-            그래도 진행하기
-          </PrimaryButton>
+          <PillCta onClick={onProceed}>그래도 진행하기</PillCta>
           <button
             type="button"
             onClick={onCancel}
             className="font-sans"
             style={{
               background: "transparent",
-              border: "1px solid rgba(0,0,0,0.25)",
-              height: 48,
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: "0.3px",
+              border: "1.5px solid var(--color-line)",
+              padding: "14px 16px",
+              borderRadius: 100,
+              fontSize: 14,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
               cursor: "pointer",
+              color: "var(--color-mute)",
             }}
           >
             나중에 다시
@@ -903,5 +908,46 @@ function StrengthWarningModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  PillCta — 마케터 pill (PrimaryButton 대체)
+// ─────────────────────────────────────────────
+
+function PillCta({
+  onClick,
+  disabled,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="font-sans"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        padding: "17px 24px",
+        background: disabled ? "var(--color-line-strong)" : "var(--color-ink)",
+        color: disabled ? "#fff" : "var(--color-paper)",
+        border: "none",
+        borderRadius: 100,
+        fontSize: 15,
+        fontWeight: 600,
+        letterSpacing: "-0.012em",
+        cursor: disabled ? "not-allowed" : "pointer",
+        transition: "all 0.2s ease",
+      }}
+    >
+      {children}
+    </button>
   );
 }

@@ -273,7 +273,7 @@ function LoggedInFeed() {
       )}
       {tab === "change" && <SoonCard emoji="🌱" text="coming soon.." />}
 
-      {/* MENU — 01 / 02 (03~05 본인 카피 후 추가) */}
+      {/* MENU — 00 sia 대화 / 01 피드 분석 (verdict) / 02 추구미 살펴보기 */}
       <section style={{ padding: "44px 24px 0", maxWidth: 480, margin: "0 auto" }}>
         <div
           style={{
@@ -295,18 +295,21 @@ function LoggedInFeed() {
           </div>
         </div>
         <MenuStep
+          num="00"
+          title="sia와 대화하기"
+          sub={"나보다 내 추구미를 더 잘아는 sia와 다시 대화하고\n내 추구미를 정확하게 짚어요."}
+          href="/sia"
+        />
+        <MenuStep
           num="01"
           title="피드 분석하기"
           sub={"SIA와 대화하며 내 피드를 분석하고\n추구미를 알려드려요"}
-          badge="FREE"
-          badgeMuted
-          href="/sia"
+          href="/verdict/new"
         />
         <MenuStep
           num="02"
           title="추구미 살펴보기"
           sub={"추구미에 부합하는 인스타 계정 및 핀터레스트를\n알려주시면 유사도와 개선점을 알려드려요"}
-          badge="🪙 20"
           href="/aspiration"
         />
       </section>
@@ -325,15 +328,11 @@ function MenuStep({
   num,
   title,
   sub,
-  badge,
-  badgeMuted,
   href,
 }: {
   num: string;
   title: string;
   sub: string;
-  badge: string;
-  badgeMuted?: boolean;
   href: string;
 }) {
   return (
@@ -341,7 +340,7 @@ function MenuStep({
       href={href}
       style={{
         display: "grid",
-        gridTemplateColumns: "44px 1fr auto",
+        gridTemplateColumns: "44px 1fr",
         gap: 14,
         padding: "22px 0",
         borderBottom: "1px solid var(--color-line)",
@@ -389,25 +388,6 @@ function MenuStep({
           {sub}
         </div>
       </div>
-      <span
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10.5,
-          letterSpacing: "0.1em",
-          color: badgeMuted ? "var(--color-mute)" : "var(--color-danger)",
-          background: badgeMuted ? "rgba(0, 0, 0, 0.05)" : "rgba(181, 75, 43, 0.08)",
-          padding: "5px 10px",
-          borderRadius: 100,
-          fontWeight: 500,
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-          marginTop: 2,
-          alignSelf: "flex-start",
-        }}
-      >
-        {badge}
-      </span>
     </Link>
   );
 }

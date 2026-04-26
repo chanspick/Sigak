@@ -1,19 +1,20 @@
-// SIGAK MVP v1.2 (D-6 revised) — / (피드 or 비로그인 랜딩)
+// SIGAK MVP v1.2 — / (홈 = 마케터 프로필 디자인 / 비로그인 랜딩)
 //
-// 로그인 + 가드 통과 → FeedTopBar + VerdictGrid
-// 비로그인 → 심플 랜딩. /auth/login 경유 없이 직접 Kakao OAuth 트리거.
+// IA (2026-04-26 정합):
+//   - 로그인 + 가드 통과 → 마케터 프로필 디자인 (3탭 + menu)
+//   - 비로그인 → 마케터 랜딩 (Hero + ChatDemo + NumList + Voices + CTA)
+//   - /profile (별도) = 마케터 설정 디자인 (계정 / 약관 / 로그아웃)
 "use client";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
-import { getToken } from "@/lib/auth";
+import { useTokenBalance } from "@/hooks/use-token-balance";
+import { getCurrentUser, getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
 import { TopBar } from "@/components/ui/sigak";
-import { FeedShell } from "@/components/sigak/feed-shell";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
-import { AspirationGrid } from "@/components/sigak/aspiration-grid";
-import { FeatureCards } from "@/components/sigak/feature-cards";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
@@ -39,16 +40,43 @@ export default function RootPage() {
 }
 
 // ─────────────────────────────────────────────
-//  로그인 + 가드 통과 시 피드
+//  로그인 + 가드 통과 시 홈 (= 마케터 프로필 디자인)
+//
+//  구조: HomeTopNav (sigak + 토큰 pill) → me (아바타+이름+이메일)
+//        → 3탭 (피드/시각/변화) → menu (01/02) → SiteFooter
+//
+//  ACCOUNT 영역 (약관 / 로그아웃 / 계정 탈퇴) 은 /profile (설정) 로 분리.
 // ─────────────────────────────────────────────
 
+type HomeTab = "feed" | "sigak" | "change";
+
 function LoggedInFeed() {
+  const router = useRouter();
   const { status } = useOnboardingGuard();
-  const [verdictCount, setVerdictCount] = useState<number | null>(null);
+  const { balance } = useTokenBalance();
+
+  const [tab, setTab] = useState<HomeTab>("feed");
+  const [profile, setProfile] = useState<{
+    name: string;
+    email: string;
+    profileImage: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const u = getCurrentUser();
+    if (u) {
+      setProfile({
+        name: u.name || "",
+        email: u.email || "",
+        profileImage: u.profileImage || "",
+      });
+    }
+  }, []);
 
   if (status !== "ready") {
     return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
   }
+
   return (
     <div
       style={{
@@ -58,13 +86,373 @@ function LoggedInFeed() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      <FeedShell verdictCount={verdictCount}>
-        <VerdictGrid onTotalChange={setVerdictCount} />
-        <AspirationGrid />
-        <FeatureCards />
-      </FeedShell>
+      {/* HomeTopNav — sigak 중앙 + 토큰 pill 우측 + /profile 진입 좌측 */}
+      <header
+        style={{
+          padding: "28px 24px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid var(--color-line)",
+          maxWidth: 480,
+          margin: "0 auto",
+        }}
+      >
+        <Link
+          href="/profile"
+          aria-label="설정"
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            color: "var(--color-ink)",
+            opacity: 0.55,
+            textDecoration: "none",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </Link>
+        <div
+          className="font-serif"
+          style={{
+            fontSize: 15,
+            fontWeight: 500,
+            letterSpacing: "-0.005em",
+            color: "var(--color-ink)",
+          }}
+        >
+          sigak
+        </div>
+        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={() => router.push("/tokens/purchase")}
+            aria-label="토큰 충전"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--color-ink)",
+              color: "var(--color-paper)",
+              borderRadius: 100,
+              padding: "5px 12px",
+              border: "none",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: "0.04em",
+              cursor: "pointer",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "var(--color-danger)",
+              }}
+            />
+            <span className="tabular-nums">{balance == null ? "—" : balance.toLocaleString()}</span>
+          </button>
+        </div>
+      </header>
+
+      {/* PROFILE ME */}
+      <section style={{ padding: "32px 24px 28px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            margin: "0 auto 16px",
+            overflow: "hidden",
+            background: profile?.profileImage
+              ? "transparent"
+              : "linear-gradient(135deg, #e8d9c8, #b8a58a)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+          }}
+        >
+          {profile?.profileImage && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={profile.profileImage}
+              alt=""
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            />
+          )}
+        </div>
+        <div
+          className="font-serif"
+          style={{
+            fontSize: 22,
+            fontWeight: 500,
+            letterSpacing: "-0.018em",
+            color: "var(--color-ink)",
+            marginBottom: 6,
+          }}
+        >
+          {profile?.name || "익명"}
+        </div>
+        {profile?.email && (
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--color-mute)",
+              letterSpacing: "0.02em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              padding: "0 24px",
+            }}
+          >
+            {profile.email}
+          </div>
+        )}
+      </section>
+
+      {/* TABS */}
+      <nav
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 32,
+          padding: "0 24px",
+          borderBottom: "1px solid var(--color-line)",
+          maxWidth: 480,
+          margin: "0 auto",
+        }}
+      >
+        {[
+          { key: "feed", label: "피드" },
+          { key: "sigak", label: "시각" },
+          { key: "change", label: "변화" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key as HomeTab)}
+            className="font-serif"
+            style={{
+              padding: "16px 0",
+              fontSize: 14.5,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
+              color: tab === t.key ? "var(--color-ink)" : "var(--color-mute)",
+              background: "transparent",
+              border: "none",
+              borderBottom:
+                tab === t.key
+                  ? "1.5px solid var(--color-danger)"
+                  : "1.5px solid transparent",
+              marginBottom: -1,
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* TAB CONTENT */}
+      {tab === "feed" && (
+        <section style={{ padding: "20px 0 0" }}>
+          <VerdictGrid />
+        </section>
+      )}
+      {tab === "sigak" && (
+        <SoonCard emoji="🛠️" text="개발중! 조금만 기다려요 ㅎㅎ" sub="coming soon" />
+      )}
+      {tab === "change" && <SoonCard emoji="🌱" text="coming soon.." />}
+
+      {/* MENU — 01 / 02 (03~05 본인 카피 후 추가) */}
+      <section style={{ padding: "44px 24px 0", maxWidth: 480, margin: "0 auto" }}>
+        <div
+          style={{
+            paddingBottom: 16,
+            borderBottom: "1px solid var(--color-line)",
+            marginBottom: 4,
+          }}
+        >
+          <div
+            className="font-serif"
+            style={{
+              fontSize: 20,
+              fontWeight: 500,
+              letterSpacing: "-0.018em",
+              color: "var(--color-ink)",
+            }}
+          >
+            menu
+          </div>
+        </div>
+        <MenuStep
+          num="01"
+          title="피드 분석하기"
+          sub={"SIA와 대화하며 내 피드를 분석하고\n추구미를 알려드려요"}
+          badge="FREE"
+          badgeMuted
+          href="/sia"
+        />
+        <MenuStep
+          num="02"
+          title="추구미 살펴보기"
+          sub={"추구미에 부합하는 인스타 계정 및 핀터레스트를\n알려주시면 유사도와 개선점을 알려드려요"}
+          badge="🪙 20"
+          href="/aspiration"
+        />
+      </section>
+
+      <div style={{ height: 60 }} />
       <SiteFooter />
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  MenuStep — 마케터 nextstep 스타일 (홈 + /profile 공유 가능)
+// ─────────────────────────────────────────────
+
+function MenuStep({
+  num,
+  title,
+  sub,
+  badge,
+  badgeMuted,
+  href,
+}: {
+  num: string;
+  title: string;
+  sub: string;
+  badge: string;
+  badgeMuted?: boolean;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "44px 1fr auto",
+        gap: 14,
+        padding: "22px 0",
+        borderBottom: "1px solid var(--color-line)",
+        alignItems: "flex-start",
+        textDecoration: "none",
+        color: "var(--color-ink)",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--color-danger)",
+          letterSpacing: "0.06em",
+          paddingTop: 2,
+        }}
+      >
+        {num}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div
+          className="font-serif"
+          style={{
+            fontSize: 15,
+            fontWeight: 500,
+            color: "var(--color-ink)",
+            letterSpacing: "-0.013em",
+            marginBottom: 5,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          className="font-sans"
+          style={{
+            fontSize: 12.5,
+            color: "var(--color-mute)",
+            lineHeight: 1.55,
+            letterSpacing: "-0.005em",
+            wordBreak: "keep-all",
+            whiteSpace: "pre-line",
+          }}
+        >
+          {sub}
+        </div>
+      </div>
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10.5,
+          letterSpacing: "0.1em",
+          color: badgeMuted ? "var(--color-mute)" : "var(--color-danger)",
+          background: badgeMuted ? "rgba(0, 0, 0, 0.05)" : "rgba(181, 75, 43, 0.08)",
+          padding: "5px 10px",
+          borderRadius: 100,
+          fontWeight: 500,
+          textTransform: "uppercase",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          marginTop: 2,
+          alignSelf: "flex-start",
+        }}
+      >
+        {badge}
+      </span>
+    </Link>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  SoonCard — 시각/변화 탭 placeholder
+// ─────────────────────────────────────────────
+
+function SoonCard({ emoji, text, sub }: { emoji: string; text: string; sub?: string }) {
+  return (
+    <section style={{ padding: "32px 24px 0", maxWidth: 480, margin: "0 auto" }}>
+      <div
+        style={{
+          background: "rgba(0, 0, 0, 0.04)",
+          borderRadius: 14,
+          padding: "48px 28px",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 36, marginBottom: 14 }}>{emoji}</div>
+        <div
+          className="font-sans"
+          style={{
+            fontSize: 16,
+            color: "var(--color-ink)",
+            opacity: 0.75,
+            lineHeight: 1.65,
+            letterSpacing: "-0.005em",
+            marginBottom: sub ? 8 : 0,
+          }}
+        >
+          {text}
+        </div>
+        {sub && (
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              color: "var(--color-mute)",
+              textTransform: "uppercase",
+            }}
+          >
+            {sub}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

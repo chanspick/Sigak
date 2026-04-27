@@ -830,9 +830,9 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
     if analysis_data:
         ANALYSES.setdefault(user_id, analysis_data)
 
-    # AI 파이프라인 실행
+    # AI 파이프라인 실행 (LLM raw R2 영구 저장 wrapper)
     try:
-        report_id, report_dict = _run_analysis_pipeline(
+        report_id, report_dict = _run_analysis_pipeline_with_raw_capture(
             user_id, order, user_data, interview_data, analysis_data
         )
     except Exception as e:
@@ -926,6 +926,68 @@ async def confirm_order(order_id: str, data: ConfirmRequest):
         "report_id": report_id,
         "report_url": report_url,
     }
+
+
+def _run_analysis_pipeline_with_raw_capture(
+    user_id: str,
+    *args,
+    **kwargs,
+) -> tuple:
+    """_run_analysis_pipeline 의 wrapper — LLM raw 응답 R2 영구 저장.
+
+    데이터 기업 원칙 (재현 불가능한 LLM 출력 영구 보존). 옛 SIGAK_V3 PI 의
+    5+ LLM 호출 (interpret_face_structure / interpret_interview /
+    explain_type_match / narrate_gap_analysis / generate_report / sia_finale ...) 의
+    원시 응답을 contextvar 기반 capture 로 일괄 수집 → R2 put (dead-letter aware).
+
+    R2 key: users/{user_id}/reports/{report_id}/llm_raw/all.json
+    실패 시 r2_persistence dead-letter 가 raw bytes 보존.
+
+    Returns: (report_id, report_dict) 동일. report_dict["_meta"]["raw_llm_r2_key"]
+      주입 (R2 저장 성공 시).
+    """
+    from pipeline.llm import llm_raw_capture
+    from services import r2_client as _r2c
+    from services import r2_persistence as _r2p
+
+    with llm_raw_capture() as raws:
+        report_id, report_dict = _run_analysis_pipeline(user_id, *args, **kwargs)
+
+    # raw 일괄 R2 저장 — 영구 보존 (dead-letter aware).
+    if raws and report_id:
+        r2_key = _r2c.pi_llm_raw_key(user_id, report_id, "all")
+        try:
+            payload = json.dumps(
+                {
+                    "captured_at": datetime.utcnow().isoformat() + "Z",
+                    "report_id": report_id,
+                    "user_id": user_id,
+                    "response_count": len(raws),
+                    "responses": raws,
+                },
+                ensure_ascii=False,
+                default=str,
+            ).encode("utf-8")
+            _, durable = _r2p.put_bytes_durable_isolated(
+                user_id=user_id,
+                purpose="pi_llm_raw",
+                r2_key=r2_key,
+                data=payload,
+                content_type="application/json",
+            )
+            if isinstance(report_dict, dict):
+                _meta = report_dict.setdefault("_meta", {})
+                if isinstance(_meta, dict):
+                    _meta["raw_llm_r2_key"] = r2_key
+                    _meta["raw_llm_response_count"] = len(raws)
+                    _meta["raw_llm_durable"] = bool(durable)
+        except Exception as _persist_err:
+            print(
+                f"[PI_RAW_CRITICAL] user={user_id} report={report_id} "
+                f"err={_persist_err} — raw 손실 위험"
+            )
+
+    return report_id, report_dict
 
 
 def _run_analysis_pipeline(
@@ -1830,7 +1892,8 @@ async def run_analysis_legacy(user_id: str):
     print(f"[FINALE_INPUT] phrases={len(finale_phrases)} verdicts={len(finale_verdict_history)}")
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
-    report_id, report_dict = _run_analysis_pipeline(
+    # LLM raw R2 영구 저장 wrapper — 데이터 기업 원칙
+    report_id, report_dict = _run_analysis_pipeline_with_raw_capture(
         user_id, order, user_data, interview_data, analysis_data,
         vault_context=vault_context,
         vault_aspiration_history=vault_aspiration_history,

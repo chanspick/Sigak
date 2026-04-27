@@ -5,14 +5,54 @@ Uses Claude API to:
 1. Parse natural language aspirations → aspiration coordinates
 2. Generate personalized PI report narrative
 """
+import contextlib
+import contextvars
 import json
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Iterator, Optional
 import anthropic
 
 from config import get_settings
 from pipeline.similarity import get_type_reference_prompt, load_anchors
 from pipeline.face_comparison import format_comparison_for_report
 from pipeline.cluster import format_cluster_for_report
+
+
+# ─────────────────────────────────────────────
+#  LLM raw capture (데이터 기업 원칙 — LLM 출력 영구 보존)
+# ─────────────────────────────────────────────
+#
+# 옛 SIGAK_V3 PI 는 _call_llm 으로 5+ 호출 (face / interview / type_match /
+# gap_narration / finale). 각 raw 응답은 재현 불가능한 LLM 출력이라 영구
+# 보존 대상. caller 가 with llm_raw_capture() 로 감싸면 그 안의 모든 _call_llm
+# 호출의 raw text 가 list 에 자동 누적됨. 끝나면 caller 가 R2 dead-letter aware
+# put 으로 영구 저장.
+
+_llm_raw_capture: contextvars.ContextVar[Optional[list]] = contextvars.ContextVar(
+    "_llm_raw_capture", default=None,
+)
+
+
+@contextlib.contextmanager
+def llm_raw_capture() -> Iterator[list[dict]]:
+    """이 컨텍스트 안의 _call_llm raw 응답을 list 에 누적.
+
+    Yield 되는 list 의 각 항목:
+      {"captured_at": ISO8601, "raw": "<response text>", "system_excerpt": "...",
+       "input_excerpt": "..."}
+
+    caller 예시:
+      with llm_raw_capture() as raws:
+          interpret_face_structure(...)
+          interpret_interview(...)
+      # raws 에 호출 순서대로 dict 누적.
+    """
+    captured: list[dict] = []
+    token = _llm_raw_capture.set(captured)
+    try:
+        yield captured
+    finally:
+        _llm_raw_capture.reset(token)
 
 
 # ─────────────────────────────────────────────
@@ -58,7 +98,23 @@ def _call_llm(system: str, user: str, max_tokens: int = 2048) -> str:
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
-            return response.content[0].text
+            text = response.content[0].text
+            # 데이터 기업 원칙 — raw 응답 영구 보존 hook.
+            # caller 가 with llm_raw_capture() 안에서 호출하면 자동 누적.
+            capture = _llm_raw_capture.get()
+            if capture is not None:
+                capture.append({
+                    "captured_at": datetime.now(timezone.utc).isoformat(),
+                    "raw": text,
+                    # system / input 의 식별용 앞 200자 (재구성 디버깅).
+                    # 풀 프롬프트는 prompt 코드에 있어 재현 가능 — 출력만 영구.
+                    "system_excerpt": (system or "")[:200],
+                    "input_excerpt": (user or "")[:200],
+                    "model": settings.llm_model,
+                    "max_tokens": max_tokens,
+                    "attempt": attempt + 1,
+                })
+            return text
         except Exception as e:
             err_type = type(e).__name__
             print(f"[LLM] attempt {attempt+1} failed: {err_type}: {e}")

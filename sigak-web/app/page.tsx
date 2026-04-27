@@ -362,11 +362,7 @@ function LoggedInFeed() {
         <MenuStep
           num="03"
           title="시각 비밀 레포트"
-          sub={
-            latestReportId
-              ? "이미 받은 레포트가 있어요. 다시 받으려면 50 토큰이 필요해요."
-              : "내 현재 위치와 액션플랜을 알려드려요."
-          }
+          sub="내 현재 위치와 액션플랜을 알려드려요."
           href={latestReportId ? `/report/${encodeURIComponent(latestReportId)}/full` : "/photo-upload"}
         />
       </section>

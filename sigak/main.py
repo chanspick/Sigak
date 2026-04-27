@@ -1347,16 +1347,26 @@ def _is_pi_beta_free() -> bool:
 
 @app.get("/api/v1/report/{report_id}")
 async def get_report(report_id: str):
-    """리포트 조회. report_id 또는 user_id로 접근 가능."""
-    report = REPORTS.get(report_id)
+    """리포트 조회. report_id 또는 user_id로 접근 가능.
 
-    # DB에서 조회 (report_id → user_id 순서)
-    if not report and _use_db():
+    우선순위 (2026-04-27 정정 — multi-worker stale 회귀 차단):
+      1. DB (가장 신뢰. backfill / 새 데이터 즉시 반영)
+      2. 디스크 (DB 미연결 시)
+      3. 인메모리 REPORTS (multi-worker 환경 stale 위험. 마지막)
+
+    기존엔 인메모리 우선이어서 worker 의 디스크 restore 시점 옛 데이터가
+    DB 의 신선한 데이터보다 우선 노출됐음 (예: backfill 로 sia_finale 가
+    DB 에 추가됐는데 인메모리는 그대로 → /full 페이지에 finale 카드 미렌더).
+    """
+    report = None
+
+    # 1. DB 우선
+    if _use_db():
         db = get_db()
         try:
             db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
             if not db_report:
-                # user_id로도 시도
+                # user_id로도 시도 (옛 호환)
                 db_report = db.query(DBReport).filter(DBReport.user_id == report_id).first()
             if db_report:
                 report = {
@@ -1376,20 +1386,19 @@ async def get_report(report_id: str):
         finally:
             db.close()
 
-    # 디스크 fallback: report_id 디렉터리 안의 report.json (옛 user_id 단위 폴더 호환)
+    # 2. 디스크 fallback
     if not report:
         disk_report = _load_json(report_id, "report.json")
         if disk_report and "id" in disk_report:
-            # 디스크에서 발견 시 진짜 report id 와 호출 id 가 동일한지 검증.
-            # 동일하지 않으면 (호출 id == user_id 케이스) 인메모리 캐시에 등록은
-            # 하지만 응답은 그 report 그대로 반환 (옛 호환).
             if disk_report["id"] == report_id:
-                REPORTS[disk_report["id"]] = disk_report
                 report = disk_report
             else:
-                # 호출 id ≠ disk report id — user_id 단위 폴더에서 옛 report 발견.
-                # 정확한 매칭이 아니므로 캐시에 잘못 박지 말고 그대로 반환만 (옛 호환).
+                # 호출 id ≠ disk report id — user_id 단위 폴더에서 옛 report 발견
                 report = disk_report
+
+    # 3. 인메모리 fallback (multi-worker stale 위험 — 마지막)
+    if not report:
+        report = REPORTS.get(report_id)
 
     # ORDERS fallback 제거 (2026-04-27 — 잘못된 매핑 차단):
     # 기존 로직은 ORDERS.values() 중 report_id 매칭 entry 의 user_id 로

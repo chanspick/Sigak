@@ -2,7 +2,9 @@
 //
 // /vision 탭 (홈 시각 탭) 카드 — 안내 텍스트 + "내 레포트 보기" 버튼 자리를
 // 대체. headline + lead_paragraph 2~3줄 truncate + "— sia" 시그.
-// 카드 전체 클릭 영역 → /report/{id}/note (Card 1 hero hero 페이지).
+// 카드 전체 클릭 → /report/{id}/full (자세한 분석 페이지). 그 페이지의
+// 하단 (공유하기 위) 에 Card 1 hero + Card 2 4-step 모두 노출.
+// (2026-04-27 통합: /note 별개 페이지 폐기 후 /full 단일 페이지로 통일.)
 
 "use client";
 
@@ -21,7 +23,7 @@ export function FinalePreviewCard({
 }: FinalePreviewCardProps) {
   return (
     <Link
-      href={`/report/${encodeURIComponent(reportId)}/note`}
+      href={`/report/${encodeURIComponent(reportId)}/full`}
       aria-label="시각 비밀 레포트 — 자세히 보기"
       className="block rounded-[14px] no-underline transition-all duration-200 hover:opacity-95"
       style={{

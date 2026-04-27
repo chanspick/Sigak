@@ -16,6 +16,7 @@ import { getReport, requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "./section-renderer";
 import { PaywallGate } from "./paywall-gate";
 import { ShareButtons } from "./share-buttons";
+import { FinaleHeroCard } from "@/components/finale/FinaleHeroCard";
 import { FinaleStepsCard } from "@/components/finale/FinaleStepsCard";
 // Phase B-6 (PI-REVIVE 2026-04-26): CastingOptInBanner import 제거.
 // 본인 결정: 캐스팅 풀 영역 리포트 하단에서 노출 X.
@@ -176,8 +177,16 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
         </div>
       ))}
 
-      {/* SPEC-PI-FINALE-001 Card 2 — 4-step (디저트). 공유하기 위에 위치.
-          report.sia_finale 미존재 시 컴포넌트 자체가 null 반환 (graceful). */}
+      {/* SPEC-PI-FINALE-001 — Card 1 hero + Card 2 4-step. 공유하기 위에 위치.
+          /report/[id]/note 폐기 후 통합 (2026-04-27): 자세한 분석 다음에
+          Card 1 → Card 2 → 공유하기 순. report.sia_finale 미존재 시
+          두 컴포넌트 모두 null 반환 (graceful — 백필 전 레거시). */}
+      {report.sia_finale && (
+        <FinaleHeroCard
+          headline={report.sia_finale.headline}
+          leadParagraph={report.sia_finale.lead_paragraph}
+        />
+      )}
       <FinaleStepsCard finale={report.sia_finale} />
 
       {/* 리포트 하단 — 공유 버튼 */}

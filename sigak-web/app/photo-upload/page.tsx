@@ -42,6 +42,10 @@ function PhotoUploadContent() {
   const router = useRouter();
   const params = useSearchParams();
   const fromSession = params.get("from_session");
+  // 2026-04-27: ?regenerate=1 = 2회차+ PI 갱신. 50토큰 정책.
+  // TODO(backend): /api/v1/submit + /api/v1/analyze 호출 전 토큰 차감 + 잔액 검증.
+  // 현재는 frontend stub 만 — query 만 인지하고 헤더 카피만 분기 (실 차감 미구현).
+  const isRegenerate = params.get("regenerate") === "1";
 
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -204,7 +208,7 @@ function PhotoUploadContent() {
             opacity: 0.4,
           }}
         >
-          PHOTO
+          {isRegenerate ? "PHOTO · 갱신 · 50토큰" : "PHOTO"}
         </span>
         <h1
           className="font-serif"

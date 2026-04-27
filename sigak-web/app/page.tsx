@@ -17,6 +17,11 @@ import { TopBar, SigakLoading } from "@/components/ui/sigak";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
 import { AspirationGrid } from "@/components/sigak/aspiration-grid";
 import { SiteFooter } from "@/components/sigak/site-footer";
+import { ApiError } from "@/lib/api/fetch";
+import { getMyReports } from "@/lib/api/client";
+
+// PI 재생성 비용 — 1회차 무료 (BETA), 2회차+ 50토큰
+const PI_REGENERATE_COST = 50;
 
 type RootPhase = "loading" | "logged_out" | "logged_in";
 
@@ -63,6 +68,10 @@ function LoggedInFeed() {
     profileImage: string;
   } | null>(null);
 
+  // 최신 PI 레포트 ID — 있으면 PiEntryCard / menu 03 가 /report/{id}/full 로 이동.
+  // null = 없음 (1회차) / undefined = 로딩 중.
+  const [latestReportId, setLatestReportId] = useState<string | null | undefined>(undefined);
+
   useEffect(() => {
     const u = getCurrentUser();
     if (u) {
@@ -72,6 +81,45 @@ function LoggedInFeed() {
         profileImage: u.profileImage || "",
       });
     }
+  }, []);
+
+  // 최신 PI 레포트 fetch (옛 SIGAK_V3 system 정합 — vision-view.tsx 와 동일)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const userId =
+        typeof window !== "undefined" ? localStorage.getItem("sigak_user_id") : null;
+      if (!userId) {
+        if (!cancelled) setLatestReportId(null);
+        return;
+      }
+      try {
+        const data = await getMyReports(userId);
+        if (cancelled) return;
+        if (!data.reports || data.reports.length === 0) {
+          setLatestReportId(null);
+          return;
+        }
+        // created_at 내림차순으로 정렬해서 최신 1건
+        const sorted = [...data.reports].sort((a, b) => {
+          const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return tb - ta;
+        });
+        setLatestReportId(sorted[0]?.id ?? null);
+      } catch (e) {
+        if (cancelled) return;
+        // 401 / 네트워크 오류 / 백엔드 미응답 — 조용히 null 처리 (UX 차단 방지)
+        if (e instanceof ApiError && e.status === 401) {
+          setLatestReportId(null);
+          return;
+        }
+        setLatestReportId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (status !== "ready") {
@@ -269,7 +317,7 @@ function LoggedInFeed() {
           <AspirationGrid />
         </section>
       )}
-      {tab === "sigak" && <PiEntryCard />}
+      {tab === "sigak" && <PiEntryCard latestReportId={latestReportId} />}
       {tab === "change" && <SoonCard emoji="🌱" text="coming soon.." />}
 
       {/* MENU — 00 sia 대화 / 01 피드 분석 (verdict) / 02 추구미 살펴보기 */}
@@ -314,8 +362,12 @@ function LoggedInFeed() {
         <MenuStep
           num="03"
           title="시각 비밀 레포트"
-          sub="내 현재 위치와 액션플랜을 알려드려요."
-          href="/photo-upload"
+          sub={
+            latestReportId
+              ? "이미 받은 레포트가 있어요. 다시 받으려면 50 토큰이 필요해요."
+              : "내 현재 위치와 액션플랜을 알려드려요."
+          }
+          href={latestReportId ? `/report/${encodeURIComponent(latestReportId)}/full` : "/photo-upload"}
         />
       </section>
 
@@ -399,15 +451,28 @@ function MenuStep({
 
 // ─────────────────────────────────────────────
 //  PiEntryCard — 시각 탭. PI ("시각이 본 당신") 진입 카드.
-//  PI Revival v5 부활 후 BETA 5/15 까지 무료. 클릭 → /photo-upload.
+//
+//  분기 (2026-04-27 비용 정책):
+//    - latestReportId === undefined: 로딩 중 (스켈레톤)
+//    - latestReportId === null: 1회차 (무료) → /photo-upload
+//    - latestReportId !== null: 2회차+ → /report/{id}/full + 50토큰 갱신 보조 CTA
 // ─────────────────────────────────────────────
 
-function PiEntryCard() {
+function PiEntryCard({
+  latestReportId,
+}: {
+  latestReportId: string | null | undefined;
+}) {
+  const hasReport = !!latestReportId;
+  const reportHref = latestReportId
+    ? `/report/${encodeURIComponent(latestReportId)}/full`
+    : "/photo-upload";
+
   return (
     <section style={{ padding: "32px 24px 0", maxWidth: 480, margin: "0 auto" }}>
       <div
         style={{
-          background: "rgba(0, 0, 0, 0.04)",
+          background: "rgba(45, 45, 45, 0.04)",
           borderRadius: 14,
           padding: "44px 28px",
           textAlign: "center",
@@ -458,13 +523,23 @@ function PiEntryCard() {
             wordBreak: "keep-all",
           }}
         >
-          내 현재 위치와 다음 액션플랜을
-          <br />
-          시각이 직접 분석해드려요.
+          {hasReport ? (
+            <>
+              이미 받은 레포트가 있어요.
+              <br />
+              지금 보거나, 갱신할 수 있어요.
+            </>
+          ) : (
+            <>
+              내 현재 위치와 다음 액션플랜을
+              <br />
+              시각이 직접 분석해드려요.
+            </>
+          )}
         </p>
 
         <Link
-          href="/photo-upload"
+          href={reportHref}
           className="font-sans"
           style={{
             display: "inline-flex",
@@ -484,20 +559,57 @@ function PiEntryCard() {
             textDecoration: "none",
           }}
         >
-          분석 시작하기 →
+          {hasReport ? "내 레포트 보기 →" : "분석 시작하기 →"}
         </Link>
 
-        <div
-          style={{
-            marginTop: 14,
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--color-mute)",
-            letterSpacing: "0.08em",
-          }}
-        >
-          BETA 기간 무료
-        </div>
+        {hasReport ? (
+          <Link
+            href="/photo-upload?regenerate=1"
+            className="font-sans"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              marginTop: 10,
+              width: "100%",
+              maxWidth: 280,
+              padding: "13px 24px",
+              background: "transparent",
+              color: "var(--color-mute)",
+              border: "1.5px solid var(--color-line)",
+              borderRadius: 100,
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: "-0.005em",
+              textDecoration: "none",
+            }}
+          >
+            사진 다시 올려서 갱신하기
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10.5,
+                letterSpacing: "0.04em",
+                color: "var(--color-ember)",
+              }}
+            >
+              · {PI_REGENERATE_COST}토큰
+            </span>
+          </Link>
+        ) : (
+          <div
+            style={{
+              marginTop: 14,
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--color-mute)",
+              letterSpacing: "0.08em",
+            }}
+          >
+            BETA 기간 무료
+          </div>
+        )}
       </div>
     </section>
   );

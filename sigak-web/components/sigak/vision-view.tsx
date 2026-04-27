@@ -275,7 +275,7 @@ function MyReportsBlock({ report }: { report: MyReport }) {
         }}
       >
         <Link
-          href="/photo-upload"
+          href="/photo-upload?regenerate=1"
           className="font-sans"
           style={{
             display: "flex",
@@ -283,6 +283,7 @@ function MyReportsBlock({ report }: { report: MyReport }) {
             padding: "15px 24px",
             alignItems: "center",
             justifyContent: "center",
+            gap: 6,
             background: "transparent",
             color: "var(--color-mute)",
             border: "1.5px solid var(--color-line)",
@@ -293,7 +294,17 @@ function MyReportsBlock({ report }: { report: MyReport }) {
             textDecoration: "none",
           }}
         >
-          사진 다시 올려서 새로 받기
+          사진 다시 올려서 갱신하기
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              letterSpacing: "0.04em",
+              color: "var(--color-ember)",
+            }}
+          >
+            · 50토큰
+          </span>
         </Link>
       </div>
     </section>

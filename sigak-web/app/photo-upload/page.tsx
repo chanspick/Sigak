@@ -31,7 +31,9 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { SigakLoading, TopBar } from "@/components/ui/sigak";
 import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
+import { MaleBetaComingSoon } from "@/components/sigak/male-beta-coming-soon";
 import { useTokenBalance } from "@/hooks/use-token-balance";
+import { useMaleBetaBlock } from "@/hooks/use-male-beta-block";
 
 const MAX_PHOTOS = 3;
 // PI 갱신 비용 (2회차+). 1회차는 BETA 무료.
@@ -53,6 +55,8 @@ function PhotoUploadContent() {
   const isRegenerate = params.get("regenerate") === "1";
 
   const { balance } = useTokenBalance();
+  // 남성 v1.1 베타 차단 (2026-04-27) — male 풀 미정합 영역
+  const { checking: genderChecking, blocked: maleBlocked } = useMaleBetaBlock();
 
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -183,12 +187,11 @@ function PhotoUploadContent() {
           return;
         }
         if (err.status === 409) {
-          // 남성 v1.1 차단 가드 (2026-04-27) — male PI 풀 미정합 영역
-          // backend HTTPException(409, "...남성...v1.1...") detail 그대로 노출.
+          // 남성 v1.1 차단 안전망 (2026-04-27)
+          // 보통 useMaleBetaBlock 으로 진입 차단되지만 race / 가드 누락 시 fallback.
           setError(
             err.message ||
-            "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. " +
-            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+            "남성 회원님들을 위한 시각 비밀 레포트는 준비중입니다.",
           );
           return;
         }
@@ -200,6 +203,14 @@ function PhotoUploadContent() {
       }
     }
   }, [photos, router, fromSession, isRegenerate, balance]);
+
+  // 남성 v1.1 베타 차단 — gender 확인 중에는 로딩, male 이면 안내 화면
+  if (genderChecking) {
+    return <SigakLoading message="" />;
+  }
+  if (maleBlocked) {
+    return <MaleBetaComingSoon featureName="시각 비밀 레포트" />;
+  }
 
   // 진행 중 — SigakLoading 단일 표준 (2026-04-27 마케터 1815 정합)
   if (submitting) {

@@ -125,6 +125,10 @@ export interface AuthMeV2Response {
   consent_completed: boolean;
   essentials_completed: boolean;
   onboarding_completed: boolean;
+  /** 2026-04-27: male v1.1 차단 UI 분기용. 권위 = user_profiles.gender. NULL/비표준 시 null. */
+  gender?: "female" | "male" | null;
+  /** /profile/edit 가 현재 핸들 표시용으로 사용. null = 등록된 IG 핸들 없음. */
+  ig_handle?: string | null;
 }
 
 // ─────────────────────────────────────────────

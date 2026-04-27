@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
+import { useMaleBetaBlock } from "@/hooks/use-male-beta-block";
 import { ApiError, api } from "@/lib/api/fetch";
 import {
   createIgAspiration,
@@ -41,6 +42,7 @@ import { LoadingSlides } from "@/components/sia/LoadingSlides";
 import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
+import { MaleBetaComingSoon } from "@/components/sigak/male-beta-coming-soon";
 
 const COST_ASPIRATION = 20;
 
@@ -72,6 +74,8 @@ const FAILURE_COPY: Record<
 export default function AspirationPage() {
   const router = useRouter();
   const { status: guardStatus } = useOnboardingGuard();
+  // 남성 v1.1 베타 차단 (2026-04-27) — male 풀 미정합 영역
+  const { checking: genderChecking, blocked: maleBlocked } = useMaleBetaBlock();
 
   const [tab, setTab] = useState<Tab>("ig");
   const [igInput, setIgInput] = useState("");
@@ -199,14 +203,19 @@ export default function AspirationPage() {
     setStage("error");
   }
 
-  // ── 가드 대기
-  if (guardStatus !== "ready") {
+  // ── 가드 대기 (onboarding + gender 체크)
+  if (guardStatus !== "ready" || genderChecking) {
     return (
       <div
         style={{ minHeight: "100vh", background: "var(--color-paper)" }}
         aria-hidden
       />
     );
+  }
+
+  // 남성 v1.1 차단 — 추구미 분석 풀 미정합 영역
+  if (maleBlocked) {
+    return <MaleBetaComingSoon featureName="추구미 분석" />;
   }
 
   if (stage === "pending") {

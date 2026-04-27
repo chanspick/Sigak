@@ -1159,8 +1159,7 @@ def unlock_pi_v3(
     if (vault.basic_info.gender or "") == "male":
         raise HTTPException(
             409,
-            "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. "
-            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+            "남성 회원님들을 위한 시각 비밀 레포트는 준비중입니다.",
         )
 
     # 토큰 차감 (1분 idempotency)

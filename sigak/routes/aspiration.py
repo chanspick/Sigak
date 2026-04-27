@@ -93,8 +93,7 @@ def create_aspiration_ig(
     if (vault.basic_info.gender or "") == "male":
         raise HTTPException(
             409,
-            "남성 회원님을 위한 추구미 분석은 v1.1 에 정식 공개됩니다. "
-            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+            "남성 회원님들을 위한 추구미 분석은 준비중입니다.",
         )
 
     # STEP 5g — 본인 IG 핸들 차단 (자기 자신 분석 방지)
@@ -249,8 +248,7 @@ def create_aspiration_pinterest(
     if (vault.basic_info.gender or "") == "male":
         raise HTTPException(
             409,
-            "남성 회원님을 위한 추구미 분석은 v1.1 에 정식 공개됩니다. "
-            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+            "남성 회원님들을 위한 추구미 분석은 준비중입니다.",
         )
 
     user_profile = vault.get_user_taste_profile()

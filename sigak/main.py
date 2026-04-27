@@ -149,10 +149,7 @@ def _restore_stores():
 # v1.1 마일스톤에서 남성 풀 정합 완료 시 가드 제거.
 # DB users.gender 가 권위 — 인메모리 / 디스크 / silent female default 사용 X.
 
-_MALE_BETA_BLOCK_MESSAGE = (
-    "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. "
-    "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요."
-)
+_MALE_BETA_BLOCK_MESSAGE = "남성 회원님들을 위한 시각 비밀 레포트는 준비중입니다."
 
 
 def _is_male_user_db(user_id: str) -> bool:

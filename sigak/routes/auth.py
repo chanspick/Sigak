@@ -96,6 +96,9 @@ class MeResponse(BaseModel):
     # 2026-04-26 fix: /profile/edit 가 현재 핸들 표시용으로 사용.
     # null = 등록된 IG 핸들 없음.
     ig_handle: Optional[str] = None
+    # 2026-04-27: 프론트 male v1.1 차단 UI 분기용. 권위 = user_profiles.gender
+    # (vault 와 동일 source). NULL/미설정 시 None — UI 가 통과 처리.
+    gender: Optional[str] = None
 
 
 @router.get("/me", response_model=MeResponse)
@@ -113,6 +116,7 @@ def get_me(
     essentials_completed = False
     onboarding_completed = False
     ig_handle: Optional[str] = None
+    gender: Optional[str] = None
     if db is not None:
         # ig_handle 의 신뢰 source 우선순위 (3-tier fallback):
         #   1) user_profiles.ig_handle           — 분석 path (vault) 가 보는 값
@@ -123,11 +127,14 @@ def get_me(
         #                                            있으면 회복 가능.
         # essentials 와 update-ig 가 (1)+(2) dual-write 하지만 partial write /
         # v1→v2 마이그레이션으로 어긋난 경우, (3) 으로 자가 회복.
+        # gender 는 vault 권위 = user_profiles.gender 우선. fallback users.gender.
         row = db.execute(
             text(
                 "SELECT u.consent_completed, u.onboarding_completed, u.birth_date, "
                 "       u.ig_handle AS u_ig, "
+                "       u.gender    AS u_gender, "
                 "       p.ig_handle AS p_ig, "
+                "       p.gender    AS p_gender, "
                 "       (p.ig_feed_cache #>> '{profile_basics,username}') AS cache_ig "
                 "FROM users u "
                 "LEFT JOIN user_profiles p ON p.user_id = u.id "
@@ -145,6 +152,9 @@ def get_me(
                 or (row.u_ig or None)
                 or (row.cache_ig or None)
             )
+            # gender — vault 권위 (p.gender) 우선, fallback users.gender. 비표준은 None.
+            _g = (row.p_gender or row.u_gender or "").strip() or None
+            gender = _g if _g in ("female", "male") else None
             # 어디서 회복됐는지 진단용 한 줄 — 두 dual-write 컬럼이 어긋났거나
             # cache 로만 회복한 케이스를 식별 (정합 모니터링).
             if ig_handle is None:
@@ -169,6 +179,7 @@ def get_me(
         essentials_completed=essentials_completed,
         onboarding_completed=onboarding_completed,
         ig_handle=ig_handle,
+        gender=gender,
     )
 
 

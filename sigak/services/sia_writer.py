@@ -1504,12 +1504,39 @@ def generate_finale(
             last_error = f"numeric: {numeric_violations}"
             continue
 
-        # 통과
-        result = finale.model_dump()
+        # 한국어 자연성 검증 — typo 발견 시 재시도 trigger
+        from services.text_normalization import (
+            find_korean_typos,
+            normalize_dict_strings,
+        )
+        finale_dump = finale.model_dump()
+        all_text_blob = " ".join(
+            v for v in finale_dump.values() if isinstance(v, str)
+        )
+        typos = find_korean_typos(all_text_blob)
+        if typos and attempt < max_retries:
+            logger.warning(
+                "finale Korean typos (attempt %d): %s — retrying",
+                attempt + 1, typos[:5],
+            )
+            last_error = f"typos: {typos[:3]}"
+            continue
+
+        # 통과 — 마지막 시도면 typo 있어도 정정 후 반환 (fallback 회피)
+        result = finale_dump
+        if typos:
+            logger.warning(
+                "finale typos persisted after retries — auto-normalizing: %s",
+                typos[:5],
+            )
+            result = normalize_dict_strings(result)
+
+        # 안전망 — 정상 통과 케이스도 normalization 한 번 적용 (false positive 0)
+        result = normalize_dict_strings(result)
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         logger.info(
             "finale generated OK (attempt %d, headline=%r)",
-            attempt + 1, finale.headline[:40],
+            attempt + 1, result.get("headline", "")[:40],
         )
         return result
 

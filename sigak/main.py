@@ -232,14 +232,22 @@ def _build_sia_finale_preview(formatted_report: Optional[dict]) -> Optional[dict
 
     /api/v1/my/reports 응답 페이로드 경량화: full payload 대신 headline + lead 200자.
     finale 미존재 (백필 전) → None 반환 (응답에서 sia_finale_preview 키 누락).
+
+    옛 PI 의 DB 저장 finale 에 한국어 typo 있어도 응답 시점에 정정 (사용자
+    신뢰도 보호). DB 는 그대로 — 다음 PI 갱신 시 정정된 채로 저장.
     """
     if not isinstance(formatted_report, dict):
         return None
     finale = formatted_report.get("sia_finale")
     if not isinstance(finale, dict):
         return None
-    headline = finale.get("headline") or ""
-    lead = finale.get("lead_paragraph") or ""
+    try:
+        from services.text_normalization import normalize_korean_text
+        headline = normalize_korean_text(finale.get("headline") or "")
+        lead = normalize_korean_text(finale.get("lead_paragraph") or "")
+    except Exception:
+        headline = finale.get("headline") or ""
+        lead = finale.get("lead_paragraph") or ""
     preview = lead[:200].rstrip()
     if len(lead) > 200:
         preview += "…"
@@ -1305,6 +1313,16 @@ def _run_analysis_pipeline(
     # 저장
     from dataclasses import asdict
     report_id = str(uuid.uuid4())
+    # 한국어 자연성 정정 — LLM 출력의 어미 결합 오류 / typo 일괄 정리.
+    # 사용자 신뢰도 직결 (예: "있이에요" → "있어요", "쿠울톤" → "쿨톤").
+    # _sanitize 직전에 적용 (numpy 변환과 별개 — text 정정만).
+    try:
+        from services.text_normalization import normalize_dict_strings
+        formatted_report = normalize_dict_strings(formatted_report)
+    except Exception as _norm_err:
+        # 정정 실패는 PI 생성 자체를 막지 않음.
+        print(f"[KOREAN_NORMALIZE_ERROR] user={user_id} {_norm_err}")
+
     report = {
         "id": report_id,
         "user_id": user_id,
@@ -1413,6 +1431,13 @@ async def get_report(report_id: str):
 
     if "formatted" in report:
         response = {**report["formatted"]}
+        # 한국어 typo 응답 시점 정정 — 옛 PI 의 DB 저장 데이터에 typo 있어도
+        # 사용자 화면에는 정정된 텍스트 노출 (신뢰도 보호). DB 는 비파괴.
+        try:
+            from services.text_normalization import normalize_dict_strings
+            response = normalize_dict_strings(response)
+        except Exception:
+            pass
         # PI-REVIVE Phase 5 (2026-04-26): BETA 무료 기간 = paywall 우회.
         # access="full" 강제 → 모든 section.locked=False, paywall 블록 자동 생략.
         if _is_pi_beta_free():
@@ -2996,6 +3021,14 @@ async def get_report_finale(report_id: str):
     if not _use_db():
         raise HTTPException(503, "DB 미연결")
 
+    # 한국어 typo 응답 정정 helper (옛 PI 데이터 보호)
+    def _normalize_finale(f: dict) -> dict:
+        try:
+            from services.text_normalization import normalize_dict_strings
+            return normalize_dict_strings(f)
+        except Exception:
+            return f
+
     # 1) 캐시 히트
     db = get_db()
     try:
@@ -3005,7 +3038,7 @@ async def get_report_finale(report_id: str):
         report_data = db_report.report_data or {}
         finale = report_data.get("sia_finale") if isinstance(report_data, dict) else None
         if isinstance(finale, dict):
-            return {"report_id": report_id, "sia_finale": finale}
+            return {"report_id": report_id, "sia_finale": _normalize_finale(finale)}
     finally:
         db.close()
 
@@ -3013,7 +3046,7 @@ async def get_report_finale(report_id: str):
     finale = _backfill_finale(report_id)
     if not finale:
         raise HTTPException(500, "마무리 한 마디 생성에 실패했어요. 잠시 후 다시 시도해 주세요.")
-    return {"report_id": report_id, "sia_finale": finale}
+    return {"report_id": report_id, "sia_finale": _normalize_finale(finale)}
 
 
 # ─────────────────────────────────────────────

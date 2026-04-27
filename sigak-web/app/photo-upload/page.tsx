@@ -30,8 +30,12 @@ import {
 } from "@/lib/api/client";
 import { getCurrentUser } from "@/lib/auth";
 import { SigakLoading, TopBar } from "@/components/ui/sigak";
+import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
+import { useTokenBalance } from "@/hooks/use-token-balance";
 
 const MAX_PHOTOS = 3;
+// PI 갱신 비용 (2회차+). 1회차는 BETA 무료.
+const COST_PI_REGENERATE = 50;
 
 interface PhotoEntry {
   url: string;
@@ -43,14 +47,18 @@ function PhotoUploadContent() {
   const params = useSearchParams();
   const fromSession = params.get("from_session");
   // 2026-04-27: ?regenerate=1 = 2회차+ PI 갱신. 50토큰 정책.
-  // TODO(backend): /api/v1/submit + /api/v1/analyze 호출 전 토큰 차감 + 잔액 검증.
-  // 현재는 frontend stub 만 — query 만 인지하고 헤더 카피만 분기 (실 차감 미구현).
+  // TODO(backend): /api/v1/submit + /api/v1/analyze 호출 시 regenerate=1 받으면
+  //   서버에서도 50토큰 차감 + race condition 검증. 현재는 frontend client-side
+  //   잔액 가드만 (race 시 server 402 fallback 패턴 — aspiration 정합).
   const isRegenerate = params.get("regenerate") === "1";
+
+  const { balance } = useTokenBalance();
 
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState<"idle" | "submit" | "analyze">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const replaceIdxRef = useRef<number | null>(null);
 
@@ -121,6 +129,14 @@ function PhotoUploadContent() {
       return;
     }
 
+    // 선결제 가드 (2회차+ 갱신만): client-side 잔액 검증 → 부족 시 모달.
+    // server 402 race condition 은 catch 블록에서 동일 모달로 fallback.
+    // (aspiration 정합 패턴)
+    if (isRegenerate && balance !== null && balance < COST_PI_REGENERATE) {
+      setShowTokenModal(true);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     setStage("submit");
@@ -161,6 +177,11 @@ function PhotoUploadContent() {
           router.replace("/");
           return;
         }
+        if (err.status === 402) {
+          // server 잔액 부족 (race condition) → 모달 노출 (client check 통과 후 충돌 케이스)
+          setShowTokenModal(true);
+          return;
+        }
         setError(err.message);
       } else if (err instanceof Error) {
         setError(err.message);
@@ -168,7 +189,7 @@ function PhotoUploadContent() {
         setError("제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
       }
     }
-  }, [photos, router, fromSession]);
+  }, [photos, router, fromSession, isRegenerate, balance]);
 
   // 진행 중 — SigakLoading 단일 표준 (2026-04-27 마케터 1815 정합)
   if (submitting) {
@@ -480,6 +501,16 @@ function PhotoUploadContent() {
         </button>
       </div>
     </main>
+    {/* PI 갱신 잔액 부족 모달 (2회차+ 50토큰 정책) */}
+    <TokenInsufficientModal
+      open={showTokenModal}
+      balance={balance ?? 0}
+      required={COST_PI_REGENERATE}
+      onCharge={() => router.push("/tokens/purchase?intent=pi_regenerate")}
+      onClose={() => setShowTokenModal(false)}
+      title="시각 비밀 레포트 갱신"
+      sub={`갱신에는 ${COST_PI_REGENERATE} 토큰이 필요해요.`}
+    />
     </>
   );
 }

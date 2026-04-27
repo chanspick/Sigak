@@ -14,6 +14,7 @@ The legacy ``GET /auth/me?user_id=X`` in main.py stays for backward compat
 during the frontend migration window. Refactor backlog #3 tracks removal.
 """
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -26,6 +27,8 @@ from db import User as DBUser
 from deps import db_session, get_current_user
 from services.auth import issue_jwt
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -111,15 +114,21 @@ def get_me(
     onboarding_completed = False
     ig_handle: Optional[str] = None
     if db is not None:
-        # ig_handle 은 users 와 user_profiles 두 테이블에 dual-write 되지만
-        # v1 → v2 마이그레이션 / partial write 로 두 컬럼이 어긋난 케이스가
-        # 있다. 분석 path (vault → aspiration/PI) 는 user_profiles.ig_handle
-        # 을 신뢰하므로 그쪽을 우선 노출. /profile/edit 표시가 실제 분석에
-        # 쓰이는 핸들과 일치하도록 정합.
+        # ig_handle 의 신뢰 source 우선순위 (3-tier fallback):
+        #   1) user_profiles.ig_handle           — 분석 path (vault) 가 보는 값
+        #   2) users.ig_handle                   — v1/legacy primary, dual-write
+        #   3) ig_feed_cache.profile_basics.username
+        #                                         — Apify 가 실제 fetch 한 핸들.
+        #                                            컬럼이 NULL 이어도 cache 가
+        #                                            있으면 회복 가능.
+        # essentials 와 update-ig 가 (1)+(2) dual-write 하지만 partial write /
+        # v1→v2 마이그레이션으로 어긋난 경우, (3) 으로 자가 회복.
         row = db.execute(
             text(
                 "SELECT u.consent_completed, u.onboarding_completed, u.birth_date, "
-                "       COALESCE(p.ig_handle, u.ig_handle) AS ig_handle "
+                "       u.ig_handle AS u_ig, "
+                "       p.ig_handle AS p_ig, "
+                "       (p.ig_feed_cache #>> '{profile_basics,username}') AS cache_ig "
                 "FROM users u "
                 "LEFT JOIN user_profiles p ON p.user_id = u.id "
                 "WHERE u.id = :uid"
@@ -130,7 +139,25 @@ def get_me(
             consent_completed = bool(row.consent_completed)
             onboarding_completed = bool(row.onboarding_completed)
             essentials_completed = row.birth_date is not None
-            ig_handle = row.ig_handle if row.ig_handle else None
+            # 3-tier fallback
+            ig_handle = (
+                (row.p_ig or None)
+                or (row.u_ig or None)
+                or (row.cache_ig or None)
+            )
+            # 어디서 회복됐는지 진단용 한 줄 — 두 dual-write 컬럼이 어긋났거나
+            # cache 로만 회복한 케이스를 식별 (정합 모니터링).
+            if ig_handle is None:
+                logger.info(
+                    "[me] ig_handle absent: user=%s u_ig=%r p_ig=%r cache_ig=%r",
+                    user["id"], row.u_ig, row.p_ig, row.cache_ig,
+                )
+            elif (row.p_ig != row.u_ig) or (row.p_ig is None and ig_handle):
+                logger.info(
+                    "[me] ig_handle mismatch — recovered via fallback: "
+                    "user=%s u_ig=%r p_ig=%r cache_ig=%r resolved=%r",
+                    user["id"], row.u_ig, row.p_ig, row.cache_ig, ig_handle,
+                )
 
     return MeResponse(
         id=user["id"],

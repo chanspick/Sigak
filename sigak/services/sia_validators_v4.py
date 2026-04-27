@@ -1,4 +1,11 @@
-"""Sia validator v4 — 페르소나 B + 메시지 단위 규칙 (Phase H3, 14 타입 확정판).
+"""Sia validator v4 — 페르소나 C + 메시지 단위 규칙 (Phase H3, 14 타입 확정판).
+
+페르소나 C "겸손한 경력 디자이너 친구" 전환 (2026-04-27) 에 따른 신규 차단:
+  A-21 자기과시·자존심 어휘 hard reject — "직설적으로 말씀드릴게요",
+       "사실은 ~인 거", "제가 보기엔", "본질은 ~", "분명히/확실히" 등
+  A-22 닫힌 어미 hard reject — `~한 편이세요?`, `~이시잖아요?`,
+       `~가봐요?`, `~이신 것 같은데`, `~으시죠?`, `~잖아요?` 등
+       네/아니오 답이 가능하거나 동의 강요하는 모든 어미
 
 SPEC 출처: .moai/specs/SPEC-SIA/
   - 세션 #4 v2 §5.2 (A-1~A-8 base + §5.2 drop-in)
@@ -7,6 +14,7 @@ SPEC 출처: .moai/specs/SPEC-SIA/
   - 세션 #7 §2.8 (C6 draft 검증 — 평가 직접 답변 금지)
   - 세션 #7 §3.8 (C7 draft 검증 — 위로형/전면 부정 금지)
   - 세션 #7 §8.3 (check_haiku_naturalness — 분석 jargon + 어색 종결)
+  - 페르소나 C 전환 (2026-04-27) — A-21 자기과시 / A-22 닫힌 어미
 
 규칙 요약 (기존 유지):
   A-1  전역 금지 어미 + §5.2 확장
@@ -276,6 +284,9 @@ def find_violations_v4(
     m_errors.extend(check_a20_abstract_praise(text))
     m_errors.extend(check_a18_length(text))
     m_errors.extend(check_markdown_markup(text))
+    # A-21/A-22 hard reject (페르소나 C 전환)
+    m_errors.extend(check_a21_self_promotion(text))
+    m_errors.extend(check_a22_closed_endings(text))
 
     m_warnings: list[str] = []
     m_warnings.extend(check_a18_length_warning(text))
@@ -775,6 +786,98 @@ def check_markdown_markup(draft: str) -> list[str]:
     return errors
 
 
+# ─────────────────────────────────────────────
+#  A-21 자기과시·자존심 어휘 hard reject (페르소나 C 전환, 2026-04-27)
+#
+#  소비자 FGI: "직설적으로 말씀드릴게요" / "사실은 ~인 거" / "제가 보기엔" /
+#  "본질은 ~" / "분명히/확실히" 류가 "MZ 사원 자존심" / "통찰 자랑" 으로
+#  체감됨. 페르소나 C "겸손한 경력 디자이너" 정신과 정면 충돌 → 전수 차단.
+# ─────────────────────────────────────────────
+
+_A21_SELF_PROMOTION_PATTERNS = [
+    # 가식 직설
+    re.compile(r"직설적으로\s*(말씀\s*드릴|말씀드릴|말할|얘기)"),
+    re.compile(r"솔직히\s*(말해|말씀)"),
+    # 재프레임 단정
+    re.compile(r"사실은\s*[가-힣]+인\s*거"),
+    re.compile(r"본질은\s*[가-힣]"),
+    re.compile(r"본질이\s*[가-힣]"),
+    # 자기 권위 호명
+    re.compile(r"제가\s*보기엔"),
+    re.compile(r"제가\s*본\s*바"),
+    # 단정 강도
+    re.compile(r"(?<![\w가-힣])분명히\s*[가-힣]"),
+    re.compile(r"(?<![\w가-힣])확실히\s*[가-힣]"),
+    re.compile(r"(?<![\w가-힣])명백히\s*[가-힣]"),
+    # 통찰 자랑
+    re.compile(r"그게\s*핵심"),
+]
+
+
+def check_a21_self_promotion(draft: str) -> list[str]:
+    """A-21 — 자기과시·자존심 톤 hard reject (페르소나 C 전환).
+
+    유저가 "MZ 사원 자존심" / "통찰 자랑" 으로 체감하는 어휘 차단.
+    대안: 본 것을 담담히 진술 + 유저에게 풀어달라는 열린 질문.
+    """
+    errors: list[str] = []
+    for pat in _A21_SELF_PROMOTION_PATTERNS:
+        m = pat.search(draft)
+        if m:
+            errors.append(f"A-21: 자기과시 어휘 금지 — '{m.group(0)}'")
+    return errors
+
+
+# ─────────────────────────────────────────────
+#  A-22 닫힌 어미 hard reject (페르소나 C 전환, 2026-04-27)
+#
+#  네/아니오 답이 가능하거나 동의를 강요하는 모든 어미 차단.
+#  페르소나 B 시절 핵심 무기 (`~가봐요?`, `~이시잖아요?`, `~한 편이세요?`)
+#  가 소비자에게 "잘못 번역된 MBTI 검사" / "맞추려고 함" 으로 체감됨.
+#  대안: 유저 원어 반사 + 구체 관찰 + 열린 질문 3단 구조 (base.md A-22).
+# ─────────────────────────────────────────────
+
+_A22_CLOSED_ENDING_PATTERNS = [
+    # ~편이세요? / ~편이신가요? (카테고라이징 — MBTI 톤 핵심).
+    # "X한 편이세요" 외에도 "좋아하시는 편이세요" / "쓰시는 편이세요" 등
+    # 다양한 활용형 모두 차단 — "편이세요?" 자체가 닫힌 카테고라이징 신호.
+    re.compile(r"편이세요\s*\?"),
+    re.compile(r"편이신가요\s*\?"),
+    re.compile(r"편이신지\s*\?"),
+    # ~이시잖아요? / ~이신 거잖아요? / ~잖아요? (닫힌 동의 유도)
+    re.compile(r"이시잖아요\s*\?"),
+    re.compile(r"이신\s*거잖아요\s*\?"),
+    re.compile(r"잖아요\s*\?"),
+    # ~가봐요? / ~이신가봐요? (추정 반문 — B 무기)
+    re.compile(r"가\s*봐요\s*\?"),
+    re.compile(r"가봐요\s*\?"),
+    re.compile(r"이신가봐요\s*\?"),
+    # ~이신 것 같은데 / ~이신 것 같 (단정 추측)
+    re.compile(r"이신\s*것\s*같은데"),
+    re.compile(r"이신\s*것\s*같"),
+    # ~으시죠? / ~시죠? (동의 강요)
+    re.compile(r"으시죠\s*\?"),
+    re.compile(r"(?<![\w가-힣])시죠\s*\?"),
+]
+
+
+def check_a22_closed_endings(draft: str) -> list[str]:
+    """A-22 — 닫힌 어미 hard reject (페르소나 C 전환).
+
+    "~한 편이세요?" / "~이시잖아요?" / "~가봐요?" / "~이신 것 같은데" 등
+    네/아니오 단답이 가능하거나 동의를 강요하는 어미 전면 차단.
+
+    EMPATHY 결합 출력 (is_combined=True) 의 secondary 문장에서도 차단 —
+    페르소나 C 에서는 어떤 컨텍스트에서도 닫힌 어미 사용 X.
+    """
+    errors: list[str] = []
+    for pat in _A22_CLOSED_ENDING_PATTERNS:
+        m = pat.search(draft)
+        if m:
+            errors.append(f"A-22: 닫힌 어미 금지 — '{m.group(0).strip()}'")
+    return errors
+
+
 def check_cross_turn_rules(
     draft: str, msg_type: MsgType, state: ConversationState,
 ) -> tuple[list[str], list[str]]:
@@ -881,6 +984,9 @@ def validate(
     result.warnings.extend(check_a18_length_warning(draft))
     # 마크다운 강조 hard reject (프론트 별 하나도 X)
     result.errors.extend(check_markdown_markup(draft))
+    # A-21 자기과시 / A-22 닫힌 어미 hard reject — 페르소나 C 전환
+    result.errors.extend(check_a21_self_promotion(draft))
+    result.errors.extend(check_a22_closed_endings(draft))
 
     if state is not None:
         ce, cw = check_cross_turn_rules(draft, msg_type, state)

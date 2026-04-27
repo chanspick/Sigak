@@ -369,22 +369,34 @@ def materialize_ig_vision_raw_to_r2(
     """본인 IG essentials 의 Sonnet Vision raw 를 R2 ig_snapshots/{ts}/vision_raw.json 저장.
 
     추구미 영역과 별도 prefix — ig_snapshots 디렉터리 안. PII 격리 동일.
+
+    데이터 기업 원칙: R2 put 실패 시 r2_persistence dead-letter 로 raw bytes
+    보존. 이 함수가 None 반환 = R2 미저장 (caller 는 r2_vision_raw_key=None
+    유지). dead-letter 에서 운영자/cron retry 가능.
     """
     if not vision_raw_text:
         return None
-    from services import r2_client
+    from services import r2_client, r2_persistence
 
     key = r2_client.ig_snapshot_vision_raw_key(user_id, snapshot_ts)
+    payload = json.dumps(
+        {
+            "raw": vision_raw_text,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "char_length": len(vision_raw_text),
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
     try:
-        payload = json.dumps(
-            {
-                "raw": vision_raw_text,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
-                "char_length": len(vision_raw_text),
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
-        r2_client.put_bytes(key, payload, content_type="application/json")
+        _, durable = r2_persistence.put_bytes_durable_isolated(
+            user_id=user_id,
+            purpose="ig_vision_raw",
+            r2_key=key,
+            data=payload,
+            content_type="application/json",
+        )
+        if not durable:
+            return None
     except Exception:
         logger.exception("ig_vision_raw R2 put failed: key=%s", key)
         return None

@@ -394,24 +394,56 @@ def _upload_snapshot_photo_to_r2(
     snapshot_ts: str,
     index: int,
 ) -> Optional[str]:
-    """IG CDN 이미지 1장 → R2 put → public URL. 실패 시 None."""
+    """IG CDN 이미지 1장 → R2 put → public URL.
+
+    데이터 기업 원칙 (raw 손실 0):
+      - R2 put 실패 시 services.r2_persistence dead-letter 로 raw bytes 보존.
+      - 이 함수가 None 반환 = R2 에 아직 없음 (dead-letter 또는 bytes fetch 실패).
+        호출처는 그 사진 1장만 CDN URL 유지 (24-48h 후 만료 가능) — 단,
+        raw bytes 자체는 dead-letter 에 보존되어 운영자/cron retry 가능.
+
+      bytes fetch 실패 (IG CDN 4xx/5xx/timeout) 는 영구 손실 — IG 측 이슈로
+      재현 불가. 이는 정책 한계.
+    """
     if not src_url:
         return None
-    from services import r2_client
+    from services import r2_client, r2_persistence
 
     key = r2_client.ig_snapshot_photo_key(user_id, snapshot_ts, index)
     try:
         resp = http_client.get(src_url)
         resp.raise_for_status()
-        content_type = (
-            resp.headers.get("content-type", "image/jpeg")
-            .split(";")[0]
-            .strip()
-            .lower()
+    except Exception:
+        # IG CDN fetch 실패 — bytes 자체를 못 받았으므로 dead-letter 도 불가.
+        # 이 케이스는 정책 한계 (raw 가 외부에서 안 오는 것).
+        logger.exception(
+            "[ig_snapshot] CDN fetch failed (raw 미수령): user=%s key=%s",
+            user_id, key,
         )
-        if not content_type.startswith("image/"):
-            content_type = "image/jpeg"
-        r2_client.put_bytes(key, resp.content, content_type=content_type)
+        return None
+
+    content_type = (
+        resp.headers.get("content-type", "image/jpeg")
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
+    if not content_type.startswith("image/"):
+        content_type = "image/jpeg"
+
+    try:
+        _, durable = r2_persistence.put_bytes_durable_isolated(
+            user_id=user_id,
+            purpose="ig_snapshot",
+            r2_key=key,
+            data=resp.content,
+            content_type=content_type,
+            src_url=src_url,
+        )
+        if not durable:
+            # dead-letter 에는 들어갔지만 R2 엔 아직 없음 — caller 는 이 사진의
+            # display_url 을 R2 URL 로 못 바꿈. CDN URL 유지가 최선.
+            return None
     except Exception:
         logger.exception("IG snapshot R2 put failed: key=%s", key)
         return None

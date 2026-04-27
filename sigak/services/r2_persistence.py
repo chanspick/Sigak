@@ -123,6 +123,54 @@ def put_bytes_durable(
             ) from ie
 
 
+def put_bytes_durable_isolated(
+    *,
+    user_id: str,
+    purpose: str,
+    r2_key: str,
+    data: bytes,
+    content_type: str = "application/octet-stream",
+    src_url: Optional[str] = None,
+    bucket: Optional[str] = None,
+    retries: int = 3,
+) -> tuple[str, bool]:
+    """db session 없이 호출 가능 — 내부 SessionLocal 사용.
+
+    BackgroundTask 내부 / 깊은 호출 chain 처럼 caller 가 db 를 갖고 있지
+    않을 때 사용. dead-letter 이슈 발생 시 자체 트랜잭션으로 INSERT + commit.
+
+    Returns: (r2_key, durable_in_r2) — put_bytes_durable 와 동일 의미.
+    """
+    from db import SessionLocal  # 지연 import — 모듈 import cycle 회피
+
+    db = SessionLocal()
+    try:
+        key, durable = put_bytes_durable(
+            db,
+            user_id=user_id,
+            purpose=purpose,
+            r2_key=r2_key,
+            data=data,
+            content_type=content_type,
+            src_url=src_url,
+            bucket=bucket,
+            retries=retries,
+        )
+        db.commit()
+        return key, durable
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
 def retry_dead_letter(
     db,
     *,

@@ -901,6 +901,8 @@ def _run_analysis_pipeline(
     analysis_data: dict = None,
     vault_context: str = "",
     vault_aspiration_history: Optional[list] = None,
+    user_original_phrases: Optional[list] = None,
+    verdict_history: Optional[list] = None,
 ) -> tuple:
     # gap_narration 은 함수 내부 Step 7.6 에서 산출 → format_report 에 전달
     # (시그니처는 caller-side 에서 설정 안함)
@@ -914,6 +916,11 @@ def _run_analysis_pipeline(
     vault_aspiration_history (Phase B-4 — PI-REVIVE 2026-04-26):
         vault.aspiration_history list (AspirationHistoryEntry 또는 dict).
         None/빈 list 면 GAP 섹션의 aspiration_references 빈 list (UI 미렌더).
+    user_original_phrases (SPEC-PI-FINALE-001 — 2026-04-27):
+        vault.user_taste_profile.user_original_phrases — Sia 대화에서 모은 유저 발화.
+        Sia Finale 의 lead_paragraph 자연 인용용 ("어떻게 알았지" 효과). None 가능.
+    verdict_history (SPEC-PI-FINALE-001 — 2026-04-27):
+        Verdict 누적 history. Sia Finale 종합용. None/빈 list 가능.
     """
     # 파라미터 우선, 폴백으로 인메모리 dict
     user = user_data or USERS.get(user_id, {})
@@ -1068,6 +1075,46 @@ def _run_analysis_pipeline(
         vault_aspiration_history=vault_aspiration_history,
         gap_narration=gap_narration,
     )
+
+    # Step 10.7: Sia Finale (SPEC-PI-FINALE-001, 2026-04-27)
+    # 8 input 종합 → Sonnet 1회 → 6 필드 JSON. formatted_report["sia_finale"] 에 첨부.
+    # 실패 시 fallback (예외 raise 안 함). 백필 흐름이 사후 처리.
+    try:
+        from services.sia_writer import generate_finale
+
+        # formatted_report 의 sections 에서 face/skin 컨텐츠 추출
+        _sections = formatted_report.get("sections", []) if isinstance(formatted_report, dict) else []
+        _section_by_id = {s.get("id"): s.get("content", {}) for s in _sections if isinstance(s, dict)}
+
+        finale_inputs = {
+            "face_structure": _section_by_id.get("face_structure"),
+            "skin": _section_by_id.get("skin_analysis"),
+            "type_match": {
+                "primary": similar_types[0] if similar_types else None,
+                "alternatives": similar_types[1:3] if len(similar_types) > 1 else [],
+            },
+            "gap_analysis": {
+                "summary": gap.get("summary") if isinstance(gap, dict) else None,
+                "primary_shift_kr": gap.get("primary_shift_kr") if isinstance(gap, dict) else None,
+                "narration": gap_narration,
+                "current_coords": current_coords,
+                "aspiration_coords": aspiration_coords,
+            },
+            "aspiration_history": vault_aspiration_history or [],
+            "verdict_history": verdict_history or [],
+            "user_original_phrases": user_original_phrases or [],
+            "action_plan": report_content.get("action_tips") if isinstance(report_content, dict) else None,
+        }
+
+        sia_finale = generate_finale(
+            user_data={"name": user["name"], "gender": gender},
+            finale_inputs=finale_inputs,
+        )
+        formatted_report["sia_finale"] = sia_finale
+        print(f"[FINALE_OK] user={user_id} headline={sia_finale.get('headline', '')[:40]!r}")
+    except Exception as _finale_err:
+        # finale 실패는 PI 레포트 자체를 막지 않음. 백필 흐름이 다음 진입 시 처리.
+        print(f"[FINALE_GEN_ERROR] user={user_id} {_finale_err}")
 
     # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).
     # if overlay_image_url:
@@ -1729,15 +1776,31 @@ async def run_analysis_legacy(user_id: str):
     except Exception:
         vault_aspiration_history = []
 
+    # SPEC-PI-FINALE-001 (2026-04-27): user_original_phrases + verdict_history 추출
+    finale_phrases: list = []
+    finale_verdict_history: list = []
+    try:
+        profile_obj = getattr(vault, "user_taste_profile", None)
+        if profile_obj and hasattr(profile_obj, "user_original_phrases"):
+            finale_phrases = list(profile_obj.user_original_phrases or [])
+        user_history_obj = getattr(vault, "user_history", None)
+        if user_history_obj and hasattr(user_history_obj, "verdict_history"):
+            finale_verdict_history = list(getattr(user_history_obj, "verdict_history", None) or [])
+    except Exception as _e:
+        print(f"[FINALE_INPUT_EXTRACT] failed: {_e}")
+
     # Phase A B-1 진단 로깅 — vault_context 길이 + 첫 300자 preview
     print(f"[VAULT_CTX] user={user_id} len={len(vault_context)} preview={vault_context[:300]!r}")
     print(f"[VAULT_ASP_HIST] user={user_id} count={len(vault_aspiration_history)}")
+    print(f"[FINALE_INPUT] phrases={len(finale_phrases)} verdicts={len(finale_verdict_history)}")
 
     order = {"order_id": f"ord_{uuid.uuid4().hex[:12]}", "user_id": user_id, "tier": user_data.get("tier", "full"), "amount": 0, "status": "pending_payment"}
     report_id, report_dict = _run_analysis_pipeline(
         user_id, order, user_data, interview_data, analysis_data,
         vault_context=vault_context,
         vault_aspiration_history=vault_aspiration_history,
+        user_original_phrases=finale_phrases,
+        verdict_history=finale_verdict_history,
     )
 
     # Phase A B-1 fix companion (2026-04-26): DBReport upsert.

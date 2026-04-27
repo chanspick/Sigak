@@ -1376,20 +1376,28 @@ async def get_report(report_id: str):
         finally:
             db.close()
 
-    if not report:
-        # order_id로 찾기 (인메모리 폴백)
-        for o in ORDERS.values():
-            if o.get("report_id") == report_id:
-                report = REPORTS.get(o["user_id"])
-                break
-
-    # 디스크 fallback: report_id가 user_id인 경우
+    # 디스크 fallback: report_id 디렉터리 안의 report.json (옛 user_id 단위 폴더 호환)
     if not report:
         disk_report = _load_json(report_id, "report.json")
         if disk_report and "id" in disk_report:
-            REPORTS[disk_report["id"]] = disk_report
-            REPORTS[report_id] = disk_report
-            report = disk_report
+            # 디스크에서 발견 시 진짜 report id 와 호출 id 가 동일한지 검증.
+            # 동일하지 않으면 (호출 id == user_id 케이스) 인메모리 캐시에 등록은
+            # 하지만 응답은 그 report 그대로 반환 (옛 호환).
+            if disk_report["id"] == report_id:
+                REPORTS[disk_report["id"]] = disk_report
+                report = disk_report
+            else:
+                # 호출 id ≠ disk report id — user_id 단위 폴더에서 옛 report 발견.
+                # 정확한 매칭이 아니므로 캐시에 잘못 박지 말고 그대로 반환만 (옛 호환).
+                report = disk_report
+
+    # ORDERS fallback 제거 (2026-04-27 — 잘못된 매핑 차단):
+    # 기존 로직은 ORDERS.values() 중 report_id 매칭 entry 의 user_id 로
+    # REPORTS 인메모리 dict 를 조회 → 새 PI report id 로 호출했는데 그
+    # user 의 옛 report 를 반환하는 버그. multi-worker 환경에선 인메모리
+    # 자체가 stale. ORDERS fallback 제거 → 못 찾으면 명확히 404.
+    # → 옛 report 가 잘못 노출되는 회귀 차단. 진짜 데이터 유실은 DB
+    # INSERT path 또는 디스크 직접 조회로 별도 fix.
 
     if not report:
         raise HTTPException(404, "리포트를 찾을 수 없습니다")

@@ -104,9 +104,9 @@ function MiniAxisRow({
   const delta = Math.abs(aspirationScore - currentScore);
 
   return (
-    <div className="flex items-center gap-2">
-      {/* 축 라벨 + 설명 — 고정 폭 */}
-      <div className="w-[56px] shrink-0 text-right">
+    <div className="flex items-center gap-2 min-w-0">
+      {/* 축 라벨 + 설명 — 고정 폭 (한글 break-keep 으로 단어 단위 줄바꿈) */}
+      <div className="w-[56px] shrink-0 text-right break-keep">
         <span className="text-[11px] text-[var(--color-muted)] tracking-[0.5px] block">
           {label}
         </span>
@@ -119,13 +119,13 @@ function MiniAxisRow({
 
       {/* 좌 라벨 */}
       {labelLow && (
-        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-right opacity-60">
+        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-right opacity-60 break-keep">
           {labelLow}
         </span>
       )}
 
       {/* 바 */}
-      <div className="flex-1 relative h-[2px] bg-[var(--color-line)] rounded-full">
+      <div className="flex-1 relative h-[2px] bg-[var(--color-line)] rounded-full min-w-0">
         <div className="absolute left-1/2 top-1/2 -translate-x-px -translate-y-1/2 w-[1px] h-[6px] bg-[var(--color-line)] opacity-60" />
         {delta > 0.05 && (
           <div
@@ -148,7 +148,7 @@ function MiniAxisRow({
 
       {/* 우 라벨 */}
       {labelHigh && (
-        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-left opacity-60">
+        <span className="text-[8px] text-[var(--color-muted)] w-[36px] shrink-0 text-left opacity-60 break-keep">
           {labelHigh}
         </span>
       )}
@@ -164,7 +164,7 @@ function DirectionCard({ item }: { item: DirectionItem }) {
   const barWidth = Math.abs(toPos - fromPos);
 
   return (
-    <div className="p-4 border border-[var(--color-line)] rounded-lg">
+    <div className="p-4 border border-[var(--color-line)] rounded-lg min-w-0 overflow-hidden">
       {/* 상단: 축 라벨 + 난이도 배지 */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ function DirectionCard({ item }: { item: DirectionItem }) {
       </div>
 
       {/* 추천 텍스트 */}
-      <p className="text-[13px] leading-relaxed">{item.recommendation}</p>
+      <p className="text-[13px] leading-relaxed break-keep">{item.recommendation}</p>
     </div>
   );
 }
@@ -236,16 +236,16 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
   const aspirationImg = typeIdToImg(content.aspiration_type_id);
 
   return (
-    <section className="py-10 border-b border-[var(--color-line)]">
+    <section className="py-10 border-b border-[var(--color-line)] min-w-0">
       {/* 섹션 헤더 */}
       <h2 className="text-[11px] font-semibold tracking-[3px] uppercase text-[var(--color-muted)] mb-8">
         GAP ANALYSIS
       </h2>
 
       {/* ─── 현재 → 추구 비주얼 카드 ─── */}
-      <div className="flex items-start gap-4 mb-8">
+      <div className="flex items-start gap-4 mb-8 min-w-0">
         {/* 현재 유형 */}
-        <div className="flex flex-col items-center gap-2 flex-1">
+        <div className="flex flex-col items-center gap-2 flex-1 min-w-0 break-keep">
           {currentImg && (
             <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-line)]">
               <Image
@@ -276,7 +276,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         </div>
 
         {/* 추구 유형 */}
-        <div className="flex flex-col items-center gap-2 flex-1">
+        <div className="flex flex-col items-center gap-2 flex-1 min-w-0 break-keep">
           {aspirationImg && (
             <div className="w-16 h-20 md:w-20 md:h-24 relative rounded-lg overflow-hidden bg-[var(--color-line)] ring-2 ring-[var(--color-fg)]">
               <Image
@@ -312,7 +312,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
       </div>
 
       {/* ─── 갭 오버뷰 카드: 산점도 + 3축 미니 비교 ─── */}
-      <div className="mb-8 p-5 border border-[var(--color-line)] rounded-lg">
+      <div className="mb-8 p-5 border border-[var(--color-line)] rounded-lg overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[11px] font-semibold tracking-[2px] uppercase text-[var(--color-muted)]">
             GAP OVERVIEW
@@ -330,10 +330,10 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
         </p>
 
         {/* 2단 레이아웃: 산점도(좌) + 미니 비교(우) — 모바일은 스택 */}
-        <div className="flex flex-col md:flex-row gap-6 items-start">
+        <div className="flex flex-col md:flex-row gap-6 items-start min-w-0">
           {/* 산점도 */}
           {content.aesthetic_map && (
-            <div className="w-full md:w-auto md:shrink-0">
+            <div className="w-full md:w-auto md:shrink-0 min-w-0">
               <GapScatterPlot
                 aestheticMap={content.aesthetic_map}
                 gapMagnitude={content.gap_magnitude}
@@ -342,7 +342,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
           )}
 
           {/* 3축 미니 비교 바 */}
-          <div className="w-full md:flex-1 md:pt-4">
+          <div className="w-full md:flex-1 md:pt-4 min-w-0">
             {/* 범례 */}
             <div className="flex items-center gap-4 mb-3 text-[9px] tracking-[0.5px] text-[var(--color-muted)]">
               <div className="flex items-center gap-1">
@@ -379,7 +379,7 @@ export function GapAnalysis({ content, locked }: GapAnalysisProps) {
       </div>
 
       {/* ─── 갭 요약 ─── */}
-      <p className="text-[15px] leading-relaxed font-serif mb-8">
+      <p className="text-[15px] leading-relaxed font-serif mb-8 break-keep">
         {content.gap_summary}
       </p>
 

@@ -136,6 +136,44 @@ def _restore_stores():
     print(f"[RESTORE] 복원 완료: {restored}")
 
 
+# ─────────────────────────────────────────────
+#  male v1.1 차단 가드 (2026-04-27)
+# ─────────────────────────────────────────────
+#
+# 베타 기간 male PI/aspiration 풀 미정합 영역 차단:
+#   - hair_styles.py HAIR_STYLES 24개 전부 female-only (male-pipeline-audit.md)
+#   - hair_spec.py:424 build_hair_spec(gender) gender 파라미터 미사용
+#   - action_spec / LLM prompt male 분기 부재
+#   - cluster_labels.json female-only / celeb male 0개
+#
+# v1.1 마일스톤에서 남성 풀 정합 완료 시 가드 제거.
+# DB users.gender 가 권위 — 인메모리 / 디스크 / silent female default 사용 X.
+
+_MALE_BETA_BLOCK_MESSAGE = (
+    "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. "
+    "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요."
+)
+
+
+def _is_male_user_db(user_id: str) -> bool:
+    """DB users.gender == 'male' 엄격 체크.
+
+    인메모리 USERS / 디스크 user.json fallback 사용 X (stale 가능).
+    silent female default 적용 X — DB 가 명시 'male' 이어야 True.
+    DB 미사용 / 조회 실패 시 False (보수 — 차단 안 함).
+    """
+    if not _use_db():
+        return False
+    db = get_db()
+    try:
+        db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        return bool(db_user and db_user.gender == "male")
+    except Exception:
+        return False
+    finally:
+        db.close()
+
+
 def _find_user(user_id: str) -> dict | None:
     """유저를 모든 저장소에서 조회: 인메모리 → DB → 디스크."""
     # 1. 인메모리
@@ -496,6 +534,10 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
         submit_data = SubmitRequest.model_validate_json(data) if data else SubmitRequest(name="익명", phone="")
     except Exception:
         raise HTTPException(400, "질문지를 좀 더 자세히 작성해주세요")
+
+    # 남성 v1.1 차단 가드 (2026-04-27) — male PI 풀 미정합 영역
+    if submit_data.user_id and _is_male_user_db(submit_data.user_id):
+        raise HTTPException(409, _MALE_BETA_BLOCK_MESSAGE)
 
     # 기존 유저 재사용 (통합 조회: DB → 인메모리 → 디스크)
     existing_user = False
@@ -1823,6 +1865,10 @@ async def run_analysis_legacy(user_id: str):
     user_data = _find_user(user_id)
     if not user_data:
         raise HTTPException(404, "User not found")
+
+    # 남성 v1.1 차단 가드 (2026-04-27) — male PI 풀 미정합 영역
+    if _is_male_user_db(user_id):
+        raise HTTPException(409, _MALE_BETA_BLOCK_MESSAGE)
 
     # 항상 disk 우선 (Worker startup 시점 vs submit 시점 race 회피)
     disk_interview = _load_json(user_id, "interview.json")

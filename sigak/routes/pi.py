@@ -1154,6 +1154,15 @@ def unlock_pi_v3(
             "시각이 본 나 리포트를 여시려면 온보딩이 먼저 필요합니다.",
         )
 
+    # 남성 v1.1 차단 가드 (2026-04-27) — male PI 풀 미정합 영역
+    # vault.basic_info.gender 권위. None / 비표준 값은 통과 (silent female default 아님).
+    if (vault.basic_info.gender or "") == "male":
+        raise HTTPException(
+            409,
+            "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. "
+            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+        )
+
     # 토큰 차감 (1분 idempotency)
     balance_after = _debit_v3_unlock(db, user_id)
 

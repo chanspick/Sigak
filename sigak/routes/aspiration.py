@@ -89,6 +89,14 @@ def create_aspiration_ig(
     if vault is None:
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
 
+    # 남성 v1.1 차단 가드 (2026-04-27) — male aspiration 풀 미정합 영역
+    if (vault.basic_info.gender or "") == "male":
+        raise HTTPException(
+            409,
+            "남성 회원님을 위한 추구미 분석은 v1.1 에 정식 공개됩니다. "
+            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+        )
+
     # STEP 5g — 본인 IG 핸들 차단 (자기 자신 분석 방지)
     _own_handle = (vault.basic_info.ig_handle or "").strip().lstrip("@").lower()
     if _own_handle and handle == _own_handle:
@@ -236,6 +244,15 @@ def create_aspiration_pinterest(
     vault = load_vault(db, user["id"])
     if vault is None:
         raise HTTPException(409, "onboarding 이 완료돼야 추구미 분석이 가능합니다.")
+
+    # 남성 v1.1 차단 가드 (2026-04-27) — male aspiration 풀 미정합 영역
+    if (vault.basic_info.gender or "") == "male":
+        raise HTTPException(
+            409,
+            "남성 회원님을 위한 추구미 분석은 v1.1 에 정식 공개됩니다. "
+            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+        )
+
     user_profile = vault.get_user_taste_profile()
 
     # STEP 5g — Sia 대화 미완 (current_position None) 차단

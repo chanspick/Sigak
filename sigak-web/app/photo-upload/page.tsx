@@ -182,6 +182,16 @@ function PhotoUploadContent() {
           setShowTokenModal(true);
           return;
         }
+        if (err.status === 409) {
+          // 남성 v1.1 차단 가드 (2026-04-27) — male PI 풀 미정합 영역
+          // backend HTTPException(409, "...남성...v1.1...") detail 그대로 노출.
+          setError(
+            err.message ||
+            "남성 회원님을 위한 PI 리포트는 v1.1 에 정식 공개됩니다. " +
+            "데이터 자산 정합 작업 중이라 베타 기간 미리 보여드리지 못해 죄송해요.",
+          );
+          return;
+        }
         setError(err.message);
       } else if (err instanceof Error) {
         setError(err.message);

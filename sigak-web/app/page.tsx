@@ -19,6 +19,7 @@ import { AspirationGrid } from "@/components/sigak/aspiration-grid";
 import { SiteFooter } from "@/components/sigak/site-footer";
 import { ApiError } from "@/lib/api/fetch";
 import { getMyReports } from "@/lib/api/client";
+import { FinalePreviewCard } from "@/components/finale/FinalePreviewCard";
 
 // PI 재생성 비용 — 1회차 무료 (BETA), 2회차+ 50토큰
 const PI_REGENERATE_COST = 50;
@@ -68,9 +69,15 @@ function LoggedInFeed() {
     profileImage: string;
   } | null>(null);
 
-  // 최신 PI 레포트 ID — 있으면 PiEntryCard / menu 03 가 /report/{id}/full 로 이동.
+  // 최신 PI 레포트 ID — 있으면 PiEntryCard / menu 03 가 /report/{id}/note 로 이동.
   // null = 없음 (1회차) / undefined = 로딩 중.
   const [latestReportId, setLatestReportId] = useState<string | null | undefined>(undefined);
+  // SPEC-PI-FINALE-001: 최신 레포트의 finale preview (있으면 카드 표시).
+  // null = 없음 (백필 전 레거시) / undefined = 로딩 중.
+  const [latestFinalePreview, setLatestFinalePreview] = useState<{
+    headline: string;
+    lead_paragraph_preview: string;
+  } | null | undefined>(undefined);
 
   useEffect(() => {
     const u = getCurrentUser();
@@ -98,6 +105,7 @@ function LoggedInFeed() {
         if (cancelled) return;
         if (!data.reports || data.reports.length === 0) {
           setLatestReportId(null);
+          setLatestFinalePreview(null);
           return;
         }
         // created_at 내림차순으로 정렬해서 최신 1건
@@ -106,15 +114,19 @@ function LoggedInFeed() {
           const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
           return tb - ta;
         });
-        setLatestReportId(sorted[0]?.id ?? null);
+        const latest = sorted[0];
+        setLatestReportId(latest?.id ?? null);
+        setLatestFinalePreview(latest?.sia_finale_preview ?? null);
       } catch (e) {
         if (cancelled) return;
         // 401 / 네트워크 오류 / 백엔드 미응답 — 조용히 null 처리 (UX 차단 방지)
         if (e instanceof ApiError && e.status === 401) {
           setLatestReportId(null);
+          setLatestFinalePreview(null);
           return;
         }
         setLatestReportId(null);
+        setLatestFinalePreview(null);
       }
     })();
     return () => {
@@ -317,7 +329,12 @@ function LoggedInFeed() {
           <AspirationGrid />
         </section>
       )}
-      {tab === "sigak" && <PiEntryCard latestReportId={latestReportId} />}
+      {tab === "sigak" && (
+        <PiEntryCard
+          latestReportId={latestReportId}
+          finalePreview={latestFinalePreview}
+        />
+      )}
       {tab === "change" && <SoonCard emoji="🌱" text="coming soon.." />}
 
       {/* MENU — 00 sia 대화 / 01 피드 분석 (verdict) / 02 추구미 살펴보기 */}
@@ -362,8 +379,12 @@ function LoggedInFeed() {
         <MenuStep
           num="03"
           title="시각 비밀 레포트"
-          sub="내 현재 위치와 액션플랜을 알려드려요."
-          href={latestReportId ? `/report/${encodeURIComponent(latestReportId)}/full` : "/photo-upload"}
+          sub={
+            latestReportId
+              ? "Sia 가 정리한 마무리 한 마디부터 보여드려요."
+              : "내 현재 위치와 액션플랜을 알려드려요."
+          }
+          href={latestReportId ? `/report/${encodeURIComponent(latestReportId)}/note` : "/photo-upload"}
         />
       </section>
 
@@ -448,18 +469,77 @@ function MenuStep({
 // ─────────────────────────────────────────────
 //  PiEntryCard — 시각 탭. PI ("시각이 본 당신") 진입 카드.
 //
-//  분기 (2026-04-27 비용 정책):
-//    - latestReportId === undefined: 로딩 중 (스켈레톤)
+//  SPEC-PI-FINALE-001 (2026-04-27) 분기:
+//    - latestReportId === undefined: 로딩 중
 //    - latestReportId === null: 1회차 (무료) → /photo-upload
-//    - latestReportId !== null: 2회차+ → /report/{id}/full + 50토큰 갱신 보조 CTA
+//    - latestReportId !== null + finale_preview 있음: <FinalePreviewCard /> →
+//      클릭 → /report/{id}/note (Card 1 hero)
+//    - latestReportId !== null + finale_preview 없음: 옛 안내 카드 (백필 전 fallback)
+//      → 클릭 → /report/{id}/full
+//    어느 경우든 50토큰 갱신 보조 CTA 는 hasReport=true 시 노출.
 // ─────────────────────────────────────────────
 
 function PiEntryCard({
   latestReportId,
+  finalePreview,
 }: {
   latestReportId: string | null | undefined;
+  finalePreview: {
+    headline: string;
+    lead_paragraph_preview: string;
+  } | null | undefined;
 }) {
   const hasReport = !!latestReportId;
+  const hasFinale = !!(finalePreview && latestReportId);
+
+  // finale 있음 → FinalePreviewCard (마케터 의도)
+  if (hasFinale) {
+    return (
+      <section style={{ padding: "32px 24px 0", maxWidth: 480, margin: "0 auto" }}>
+        <FinalePreviewCard
+          reportId={latestReportId!}
+          headline={finalePreview!.headline}
+          leadPreview={finalePreview!.lead_paragraph_preview}
+        />
+        {/* 50토큰 갱신 보조 CTA — 본 위치에만 노출 (홈 시각 탭 단일 위치 정책) */}
+        <Link
+          href="/photo-upload?regenerate=1"
+          className="font-sans"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            marginTop: 14,
+            width: "100%",
+            padding: "13px 24px",
+            background: "transparent",
+            color: "var(--color-mute)",
+            border: "1.5px solid var(--color-line)",
+            borderRadius: 100,
+            fontSize: 13,
+            fontWeight: 500,
+            letterSpacing: "-0.005em",
+            textDecoration: "none",
+          }}
+        >
+          사진 다시 올려서 갱신하기
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              letterSpacing: "0.04em",
+              color: "var(--color-ember)",
+            }}
+          >
+            · {PI_REGENERATE_COST}토큰
+          </span>
+        </Link>
+      </section>
+    );
+  }
+
+  // finale 없음 (백필 전 레거시 또는 1회차) → 옛 안내 카드 fallback
   const reportHref = latestReportId
     ? `/report/${encodeURIComponent(latestReportId)}/full`
     : "/photo-upload";

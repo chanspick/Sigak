@@ -286,13 +286,47 @@ export async function requestUpgrade(
   return handleResponse(response);
 }
 
-/** 내 리포트 목록 조회 (GET /api/v1/my/reports?user_id=xxx) */
+/** SPEC-PI-FINALE-001: my/reports 응답 항목 type. sia_finale_preview 는 백필 전 누락 가능. */
+export interface MyReportsItem {
+  id: string;
+  access_level: string;
+  created_at: string;
+  url: string;
+  sia_finale_preview?: {
+    headline: string;
+    lead_paragraph_preview: string;
+  };
+}
+
+/** 내 리포트 목록 조회 (GET /api/v1/my/reports?user_id=xxx). E4: sia_finale_preview 포함. */
 export async function getMyReports(
   userId: string,
-): Promise<{ reports: Array<{ id: string; access_level: string; created_at: string; url: string }> }> {
+): Promise<{ reports: MyReportsItem[] }> {
   const response = await fetch(`${API_URL}/api/v1/my/reports?user_id=${userId}`, {
     headers: COMMON_HEADERS,
   });
+  return handleResponse(response);
+}
+
+/** SPEC-PI-FINALE-001 (E2/AC2): 풀 finale 조회 + 미존재 시 자동 백필. */
+export async function getReportFinale(
+  reportId: string,
+): Promise<{
+  report_id: string;
+  sia_finale: {
+    headline: string;
+    lead_paragraph: string;
+    step_1_observation: string;
+    step_2_interpretation: string;
+    step_3_diagnosis: string;
+    step_4_closing: string;
+    generated_at?: string;
+  };
+}> {
+  const response = await fetch(
+    `${API_URL}/api/v1/reports/${encodeURIComponent(reportId)}/finale`,
+    { headers: COMMON_HEADERS },
+  );
   return handleResponse(response);
 }
 

@@ -87,10 +87,11 @@ function LoggedInFeed() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* HomeTopNav — sigak 중앙 + 토큰 pill 우측 + /profile 진입 좌측 */}
+      {/* HomeTopNav — sigak 중앙 + 토큰 pill 우측 + /profile 진입 좌측
+         padding 20px 24px = TopBar 컴포넌트와 동일 (다른 페이지 정합) */}
       <header
         style={{
-          padding: "28px 24px 24px",
+          padding: "20px 24px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",

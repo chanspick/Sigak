@@ -11,7 +11,8 @@ import { SkinAnalysis } from "./sections/skin-analysis";
 import { CoordinateMap } from "./sections/coordinate-map";
 
 import { GapAnalysis } from "./sections/gap-analysis";
-import { HairRecommendation } from "./sections/hair-recommendation";
+// 2026-04-27 마케터 결정 — hair_recommendation 섹션 미렌더. 부활 시 import 복원 + case 의 return null 제거.
+// import { HairRecommendation } from "./sections/hair-recommendation";
 import { ActionPlan } from "./sections/action-plan";
 import { TypeReference } from "./sections/type-reference";
 
@@ -70,12 +71,10 @@ export function SectionRenderer({ section, accessLevel }: SectionRendererProps) 
         />
       );
     case "hair_recommendation":
-      return (
-        <HairRecommendation
-          content={content as Parameters<typeof HairRecommendation>[0]["content"]}
-          locked={locked}
-        />
-      );
+      // 2026-04-27 마케터 결정: PI 레포트에서 hair_recommendation 섹션 숨김
+      // ("단 너무 무의미"). 컴포넌트 + 데이터는 보존 — UI 만 미렌더.
+      // 부활하려면 본 case 의 return null 만 제거.
+      return null;
     case "action_plan":
       return (
         <ActionPlan

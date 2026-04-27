@@ -111,10 +111,18 @@ def get_me(
     onboarding_completed = False
     ig_handle: Optional[str] = None
     if db is not None:
+        # ig_handle 은 users 와 user_profiles 두 테이블에 dual-write 되지만
+        # v1 → v2 마이그레이션 / partial write 로 두 컬럼이 어긋난 케이스가
+        # 있다. 분석 path (vault → aspiration/PI) 는 user_profiles.ig_handle
+        # 을 신뢰하므로 그쪽을 우선 노출. /profile/edit 표시가 실제 분석에
+        # 쓰이는 핸들과 일치하도록 정합.
         row = db.execute(
             text(
-                "SELECT consent_completed, onboarding_completed, birth_date, ig_handle "
-                "FROM users WHERE id = :uid"
+                "SELECT u.consent_completed, u.onboarding_completed, u.birth_date, "
+                "       COALESCE(p.ig_handle, u.ig_handle) AS ig_handle "
+                "FROM users u "
+                "LEFT JOIN user_profiles p ON p.user_id = u.id "
+                "WHERE u.id = :uid"
             ),
             {"uid": user["id"]},
         ).first()

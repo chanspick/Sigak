@@ -25,9 +25,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingSlides } from "@/components/sia/LoadingSlides";
 import { AnalyzingScreen } from "@/components/sigak/analyzing-screen";
 import { TokenInsufficientModal } from "@/components/sigak/token-insufficient-modal";
+import { TopBar } from "@/components/ui/sigak/top-bar";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 import {
   createVerdictV2,
+  listVerdicts,
   MIN_PHOTOS,
   MAX_PHOTOS,
 } from "@/lib/api/verdicts";
@@ -46,14 +48,35 @@ function DoneContent() {
   const params = useSearchParams();
   const reportId = params.get("report");
   const [slidesDone, setSlidesDone] = useState(false);
+  // 2026-04-27: 초회(verdict 이력 0)에만 구매유도 CTA 노출.
+  // 2회차+ Sia 종료는 슬라이드/업로드 스킵하고 홈으로.
+  const [gateChecked, setGateChecked] = useState(false);
 
   useEffect(() => {
     if (!reportId) {
       router.replace("/");
+      return;
     }
+    let cancelled = false;
+    listVerdicts(1, 0)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.total > 0) {
+          router.replace("/");
+        } else {
+          setGateChecked(true);
+        }
+      })
+      .catch(() => {
+        // 네트워크 실패 시 CTA 노출 (덜 나쁜 fallback)
+        if (!cancelled) setGateChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [reportId, router]);
 
-  if (!reportId) {
+  if (!reportId || !gateChecked) {
     return (
       <div
         style={{ minHeight: "100vh", background: "var(--color-paper)" }}
@@ -202,38 +225,8 @@ function VerdictUploadView() {
         flexDirection: "column",
       }}
     >
-      {/* Top nav — 중앙 SIGAK (TopBar 정합) */}
-      <nav
-        style={{
-          height: 52,
-          background: "var(--color-ink)",
-          color: "var(--color-paper)",
-          flexShrink: 0,
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <span
-            className="font-sans"
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: "6px",
-              color: "var(--color-paper)",
-            }}
-          >
-            SIGAK
-          </span>
-        </div>
-      </nav>
+      {/* Top nav — 홈 기준 공통 TopBar (뒤로가기 없음) */}
+      <TopBar />
 
       {/* Page content */}
       <section

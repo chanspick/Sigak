@@ -604,19 +604,25 @@ def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
         analyzed_cache, vision_raw = ig_scraper.attach_vision_analysis(preview_cache)
 
         # 3.5. STEP 2 — R2 영구 저장 + latest_posts display_url 교체
+        # 데이터 기업 원칙: R2 put 실패 → r2_persistence dead-letter 가 raw bytes
+        # 영구 보존. 이 except 는 DeadLetterPersistError (R2 + dead-letter 모두
+        # 실패한 진짜 위급 케이스) 만 잡힘. 일반 R2 일시 장애는 dead-letter 로
+        # 흡수되어 여기로 안 옴.
         try:
             analyzed_cache = ig_scraper.materialize_snapshot_to_r2(
                 analyzed_cache, user_id=user_id,
             )
         except Exception:
-            logger.exception(
-                "ig_fetch job: R2 materialize failed user=%s — keeping CDN URLs",
+            logger.critical(
+                "ig_fetch job: R2 materialize CRITICAL (dead-letter 도 실패?) "
+                "user=%s — raw 손실 위험. 운영자 호출 필요.",
                 user_id,
             )
 
         # 3.6. v1.5 — 본인 IG Vision Sonnet raw R2 분리 저장 (LLM 격리)
         # PII 위험으로 DB 직접 저장 금지. R2 키 참조만 cache.r2_vision_raw_key.
         # 메타분석 시 R2 fetch 로만 활용 (Sia / 다른 prompt 에 절대 안 들어감).
+        # 데이터 기업 원칙: R2 put 실패 → dead-letter 보존 (위와 동일).
         if vision_raw:
             try:
                 from services.aspiration_common import (
@@ -631,9 +637,10 @@ def _run_ig_fetch_job(user_id: str, ig_handle: str) -> None:
                         "r2_vision_raw_key": r2_vision_key,
                     })
             except Exception:
-                logger.exception(
-                    "ig_fetch job: vision_raw R2 persist failed user=%s "
-                    "(분석은 정상 진행)", user_id,
+                logger.critical(
+                    "ig_fetch job: vision_raw CRITICAL (dead-letter 도 실패?) "
+                    "user=%s — raw 손실 위험. 운영자 호출 필요.",
+                    user_id,
                 )
 
         # 4. 최종 flush (success) — Vision 성공/실패 무관 scope=full 이면 success

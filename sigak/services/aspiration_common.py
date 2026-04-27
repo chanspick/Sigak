@@ -245,25 +245,47 @@ def _upload_target_to_r2(
 ) -> Optional[str]:
     """단일 추구미 타깃 이미지 다운로드 → R2 저장 → public URL 반환.
 
-    실패 시 None — caller 는 원본 URL 유지.
+    데이터 기업 원칙: R2 put 실패 시 r2_persistence dead-letter 로 raw bytes
+    보존. 실패 시 None — caller 는 원본 URL 유지 (24-48h 후 만료 가능).
+    raw 자체는 dead-letter 에 살아있어 재시도 가능.
+
+    bytes fetch 자체 실패 (외부 CDN 4xx/5xx) 는 raw 미수령 → 정책 한계.
     """
     if not src_url:
         return None
-    from services import r2_client
+    from services import r2_client, r2_persistence
 
     key = r2_client.aspiration_target_photo_key(user_id, analysis_id, index)
     try:
         resp = http_client.get(src_url)
         resp.raise_for_status()
-        content_type = (
-            resp.headers.get("content-type", "image/jpeg")
-            .split(";")[0]
-            .strip()
-            .lower()
+    except Exception:
+        logger.exception(
+            "[aspiration_target] CDN fetch failed (raw 미수령): user=%s key=%s",
+            user_id, key,
         )
-        if not content_type.startswith("image/"):
-            content_type = "image/jpeg"
-        r2_client.put_bytes(key, resp.content, content_type=content_type)
+        return None
+
+    content_type = (
+        resp.headers.get("content-type", "image/jpeg")
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
+    if not content_type.startswith("image/"):
+        content_type = "image/jpeg"
+
+    try:
+        _, durable = r2_persistence.put_bytes_durable_isolated(
+            user_id=user_id,
+            purpose="aspiration_target_photo",
+            r2_key=key,
+            data=resp.content,
+            content_type=content_type,
+            src_url=src_url,
+        )
+        if not durable:
+            return None
     except Exception:
         logger.exception("aspiration target R2 put failed: key=%s", key)
         return None
@@ -301,20 +323,28 @@ def materialize_apify_raw_to_r2(
     """
     if not raw_items:
         return None
-    from services import r2_client
+    from services import r2_client, r2_persistence
 
     key = r2_client.aspiration_apify_raw_key(user_id, analysis_id)
+    payload = json.dumps(
+        {
+            "items": raw_items,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "item_count": len(raw_items),
+        },
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
     try:
-        payload = json.dumps(
-            {
-                "items": raw_items,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
-                "item_count": len(raw_items),
-            },
-            ensure_ascii=False,
-            default=str,
-        ).encode("utf-8")
-        r2_client.put_bytes(key, payload, content_type="application/json")
+        _, durable = r2_persistence.put_bytes_durable_isolated(
+            user_id=user_id,
+            purpose="aspiration_apify_raw",
+            r2_key=key,
+            data=payload,
+            content_type="application/json",
+        )
+        if not durable:
+            return None
     except Exception:
         logger.exception("apify_raw R2 put failed: key=%s", key)
         return None
@@ -337,22 +367,32 @@ def materialize_vision_raw_to_r2(
 
     Returns:
       R2 public URL (성공) 또는 None.
+
+    데이터 기업 원칙: R2 put 실패 시 dead-letter 보존.
     """
     if not vision_raw_text:
         return None
-    from services import r2_client
+    from services import r2_client, r2_persistence
 
     key = r2_client.aspiration_vision_raw_key(user_id, analysis_id)
+    payload = json.dumps(
+        {
+            "raw": vision_raw_text,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "char_length": len(vision_raw_text),
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
     try:
-        payload = json.dumps(
-            {
-                "raw": vision_raw_text,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
-                "char_length": len(vision_raw_text),
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
-        r2_client.put_bytes(key, payload, content_type="application/json")
+        _, durable = r2_persistence.put_bytes_durable_isolated(
+            user_id=user_id,
+            purpose="aspiration_vision_raw",
+            r2_key=key,
+            data=payload,
+            content_type="application/json",
+        )
+        if not durable:
+            return None
     except Exception:
         logger.exception("vision_raw R2 put failed: key=%s", key)
         return None

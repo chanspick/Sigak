@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -214,6 +215,48 @@ def put_bytes(
     full.parent.mkdir(parents=True, exist_ok=True)
     full.write_bytes(data)
     return key
+
+
+def put_bytes_with_retry(
+    key: str,
+    data: bytes,
+    *,
+    bucket: Optional[str] = None,
+    content_type: str = "application/octet-stream",
+    retries: int = 3,
+    backoff_seconds: float = 1.0,
+) -> str:
+    """put_bytes 를 retry 와 함께. 모두 실패 시 R2Error raise.
+
+    데이터 기업 원칙: 일시 장애 (network blip / 5xx) 회복 + 그래도 실패 시
+    호출처가 dead-letter (services.r2_persistence) 로 보존하도록 raise.
+
+    Args:
+      retries: 시도 횟수 (기본 3회). 1회 = retry 없음.
+      backoff_seconds: 첫 backoff. 매 실패마다 2배 (exponential).
+
+    Returns: 성공 시 저장된 key.
+    Raises: R2Error — retries 회 모두 실패.
+    """
+    last_exc: Optional[Exception] = None
+    delay = backoff_seconds
+    for attempt in range(1, max(retries, 1) + 1):
+        try:
+            return put_bytes(
+                key, data, bucket=bucket, content_type=content_type,
+            )
+        except Exception as e:  # R2Error 포함 모든 예외
+            last_exc = e
+            logger.warning(
+                "[r2_client] put attempt %d/%d failed key=%s err=%s",
+                attempt, retries, key, e,
+            )
+            if attempt < retries:
+                time.sleep(delay)
+                delay *= 2
+    raise R2Error(
+        f"put_bytes_with_retry failed after {retries} attempts: {key}: {last_exc}"
+    ) from last_exc
 
 
 def get_bytes(key: str, *, bucket: Optional[str] = None) -> bytes:

@@ -594,11 +594,13 @@ async def submit(data: str = Form(""), files: list[UploadFile] = File(...)):
         try:
             if existing_user:
                 # 기존 카카오 유저: tier/status만 업데이트 (kakao_id 보존)
+                # gender 갱신 금지 — onboarding/essentials 가 유일한 권위 경로.
+                # photo-upload 의 옛 SIGAK_V1 잔재 gender 필드가 본인 male 을
+                # female 로 침식하던 사고 차단 (2026-04-27).
                 db_user = db.query(DBUser).filter(DBUser.id == user_id).first()
                 if db_user:
                     db_user.tier = tier
                     db_user.status = "pending_payment"
-                    db_user.gender = submit_data.gender
                     if submit_data.name and submit_data.name != "익명":
                         db_user.name = submit_data.name
                     if submit_data.phone:

@@ -146,12 +146,12 @@ function PhotoUploadContent() {
 
       // Phase 1: /api/v1/submit — 사진 + 최소 interview JSON 저장
       // Sia 대화 결과는 신 vault 에 별도 저장됨. 옛 main.py 는 자체 INTERVIEWS dict 사용.
-      // 최소 필드 (name / gender / tier) 만 전달, 나머지는 옵션이라 누락 OK.
+      // gender 필드 절대 전달 금지 — onboarding/essentials 가 유일한 권위 경로.
+      // 옛 SIGAK_V1 시대 hardcode "female" 이 본인 male 을 침식하던 사고 차단 (2026-04-27).
       const submitResult = await submitAll(
         {
           user_id: user.userId,
           name: user.name || "익명",
-          gender: "female",
           tier: "standard",
           ...(fromSession ? { sia_session_id: fromSession } : {}),
         },

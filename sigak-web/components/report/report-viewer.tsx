@@ -16,6 +16,7 @@ import { getReport, requestUpgrade } from "@/lib/api/client";
 import { SectionRenderer } from "./section-renderer";
 import { PaywallGate } from "./paywall-gate";
 import { ShareButtons } from "./share-buttons";
+import { FinaleStepsCard } from "@/components/finale/FinaleStepsCard";
 // Phase B-6 (PI-REVIVE 2026-04-26): CastingOptInBanner import 제거.
 // 본인 결정: 캐스팅 풀 영역 리포트 하단에서 노출 X.
 // CastingOptInBanner 컴포넌트 자체는 보존 (v1.5+ 부활 가능).
@@ -174,6 +175,10 @@ export function ReportViewer({ initialReport }: ReportViewerProps) {
           )}
         </div>
       ))}
+
+      {/* SPEC-PI-FINALE-001 Card 2 — 4-step (디저트). 공유하기 위에 위치.
+          report.sia_finale 미존재 시 컴포넌트 자체가 null 반환 (graceful). */}
+      <FinaleStepsCard finale={report.sia_finale} />
 
       {/* 리포트 하단 — 공유 버튼 */}
       <div className="py-10 border-t border-[var(--color-line)]">

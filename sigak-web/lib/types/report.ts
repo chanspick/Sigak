@@ -66,6 +66,23 @@ export interface ReportSection {
   teaser?: { headline?: string; categories?: string[] } | null;
 }
 
+/**
+ * Sia Finale — SPEC-PI-FINALE-001
+ *
+ * PI 레포트 끝에 들어갈 Sia 페르소나 B 톤 종합 마무리 (6 필드).
+ * - Card 1 = headline + lead_paragraph
+ * - Card 2 = 4 step (관찰 / 해석 / 진단 / 다음 한 걸음)
+ */
+export interface SiaFinale {
+  headline: string;
+  lead_paragraph: string;
+  step_1_observation: string;
+  step_2_interpretation: string;
+  step_3_diagnosis: string;
+  step_4_closing: string;
+  generated_at?: string;
+}
+
 export interface ReportData {
   id: string;
   user_id?: string;
@@ -75,6 +92,8 @@ export interface ReportData {
   sections: ReportSection[];
   paywall?: Partial<Record<UnlockLevel, PaywallTier>>;
   payment_account?: PaymentAccount;
+  /** SPEC-PI-FINALE-001: 종합 마무리. 백필 전 레거시 레포트는 누락 가능. */
+  sia_finale?: SiaFinale;
 }
 
 export interface PaywallTier {

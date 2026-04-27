@@ -1213,7 +1213,12 @@ def _run_analysis_pipeline(
         print(f"[FINALE_OK] user={user_id} headline={sia_finale.get('headline', '')[:40]!r}")
     except Exception as _finale_err:
         # finale 실패는 PI 레포트 자체를 막지 않음. 백필 흐름이 다음 진입 시 처리.
-        print(f"[FINALE_GEN_ERROR] user={user_id} {_finale_err}")
+        # traceback 까지 출력 — silent skip 이지만 진단 가능하도록.
+        print(
+            f"[FINALE_GEN_ERROR] user={user_id} "
+            f"type={type(_finale_err).__name__} err={_finale_err}\n"
+            f"{traceback.format_exc()}"
+        )
 
     # 오버레이 URL 삽입 — Phase B-2.5 비활성 (overlay_image_url 항상 None).
     # if overlay_image_url:
@@ -2886,7 +2891,11 @@ def _backfill_finale(report_id: str) -> Optional[dict]:
 
         return sia_finale
     except Exception as e:
-        print(f"[FINALE_BACKFILL_ERROR] {e}")
+        # traceback 까지 출력 — 운영 진단 (silent fail 회피).
+        print(
+            f"[FINALE_BACKFILL_ERROR] report={report_id} "
+            f"type={type(e).__name__} err={e}\n{traceback.format_exc()}"
+        )
         return None
     finally:
         db.close()

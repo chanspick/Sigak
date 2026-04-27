@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
 import { getMyReports } from "@/lib/api/client";
+import { SigakLoading } from "@/components/ui/sigak";
 
 interface MyReport {
   id: string;
@@ -97,23 +98,7 @@ export function VisionView() {
 // ─────────────────────────────────────────────
 
 function LoadingPlaceholder() {
-  return (
-    <div
-      style={{
-        minHeight: "40vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: 0.3,
-        fontSize: 12,
-        fontFamily: "var(--font-sans)",
-        color: "var(--color-ink)",
-      }}
-      aria-busy
-    >
-      불러오는 중...
-    </div>
-  );
+  return <SigakLoading message="불러오는 중이에요" embedded />;
 }
 
 function ErrorBlock({ message }: { message: string }) {

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { HomeScreen } from "@/components/sigak/home-screen";
+import { SigakLoading } from "@/components/ui/sigak";
 import { getToken } from "@/lib/auth";
 import { ApiError } from "@/lib/api/fetch";
 import { getMe } from "@/lib/api/onboarding";
@@ -45,7 +46,7 @@ export default function VerdictNewPage() {
   }, [router]);
 
   if (!ready) {
-    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
+    return <SigakLoading message="잠시만요" hint="" />;
   }
 
   return <HomeScreen />;

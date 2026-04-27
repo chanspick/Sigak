@@ -9,7 +9,7 @@
  * 구조:
  *   - SIGAK 로고 60x60 (검정 배경 + 흰색 디테일)
  *   - message (Pretendard 16px, line-height 1.7)
- *   - 3-dot pulse 애니메이션 (var(--color-danger))
+ *   - 3-dot pulse 애니메이션 (var(--color-ember))
  *   - hint (Pretendard 12px, mute color)
  *
  * 토큰: globals.css (var(--color-paper) / --color-ink / --color-mute / --color-danger).
@@ -25,38 +25,49 @@ interface SigakLoadingProps {
   hint?: string;
   /** aria-label override (스크린리더). 기본: message */
   ariaLabel?: string;
+  /**
+   * 임베드 모드 — FeedShell 등 부모 컨테이너 안에 들어가는 로딩 표시.
+   * minHeight: 40vh, 로고 40px, hint 기본값 "" (없음).
+   * default: false (full-page, minHeight: 100vh).
+   */
+  embedded?: boolean;
 }
 
 export function SigakLoading({
   message = "잠시만요, 분석중이에요.",
-  hint = "최대 30초 정도 걸릴 수 있어요",
+  hint,
   ariaLabel,
+  embedded = false,
 }: SigakLoadingProps = {}) {
+  const resolvedHint = hint ?? (embedded ? "" : "최대 30초 정도 걸릴 수 있어요");
+  const logoSize = embedded ? 40 : 60;
+  const minHeight = embedded ? "40vh" : "100vh";
+  const padding = embedded ? "32px 24px" : "40px 28px";
   return (
     <main
       role="status"
       aria-live="polite"
       aria-label={ariaLabel ?? message}
       style={{
-        minHeight: "100vh",
+        minHeight,
         background: "var(--color-paper)",
         color: "var(--color-ink)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px 28px",
+        padding,
         textAlign: "center",
       }}
       aria-busy
     >
-      {/* SIGAK 로고 60x60 (redesign/로딩_1815.html 정합) */}
+      {/* SIGAK 로고 (redesign/로딩_1815.html 정합 — full 60px / embedded 40px) */}
       <svg
-        width="60"
-        height="60"
+        width={logoSize}
+        height={logoSize}
         viewBox="0 0 40 40"
         xmlns="http://www.w3.org/2000/svg"
-        style={{ marginBottom: 40 }}
+        style={{ marginBottom: embedded ? 24 : 40 }}
         aria-hidden
       >
         <rect width="40" height="40" rx="7" fill="#1a1a1a" />
@@ -104,7 +115,7 @@ export function SigakLoading({
             width: 7,
             height: 7,
             borderRadius: "50%",
-            background: "var(--color-danger)",
+            background: "var(--color-ember)",
           }}
         />
         <span
@@ -113,7 +124,7 @@ export function SigakLoading({
             width: 7,
             height: 7,
             borderRadius: "50%",
-            background: "var(--color-danger)",
+            background: "var(--color-ember)",
           }}
         />
         <span
@@ -122,13 +133,13 @@ export function SigakLoading({
             width: 7,
             height: 7,
             borderRadius: "50%",
-            background: "var(--color-danger)",
+            background: "var(--color-ember)",
           }}
         />
       </div>
 
       {/* Hint */}
-      {hint && (
+      {resolvedHint && (
         <p
           className="font-sans"
           style={{
@@ -138,7 +149,7 @@ export function SigakLoading({
             margin: 0,
           }}
         >
-          {hint}
+          {resolvedHint}
         </p>
       )}
     </main>

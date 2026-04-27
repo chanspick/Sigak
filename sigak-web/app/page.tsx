@@ -13,7 +13,7 @@ import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 import { getCurrentUser, getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
-import { TopBar } from "@/components/ui/sigak";
+import { TopBar, SigakLoading } from "@/components/ui/sigak";
 import { VerdictGrid } from "@/components/sigak/verdict-grid";
 import { AspirationGrid } from "@/components/sigak/aspiration-grid";
 import { SiteFooter } from "@/components/sigak/site-footer";
@@ -30,7 +30,7 @@ export default function RootPage() {
   }, []);
 
   if (phase === "loading") {
-    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
+    return <SigakLoading message="잠시만요" hint="" />;
   }
 
   if (phase === "logged_out") {
@@ -75,7 +75,7 @@ function LoggedInFeed() {
   }, []);
 
   if (status !== "ready") {
-    return <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />;
+    return <SigakLoading message="잠시만요" hint="" />;
   }
 
   return (

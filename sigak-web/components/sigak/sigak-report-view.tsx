@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
 import { getSigakReport, releaseSigakReport } from "@/lib/api/sigak-report";
+import { SigakLoading } from "@/components/ui/sigak";
 import type {
   ChugumiCoords,
   OnboardingData,
@@ -114,13 +115,9 @@ export function SigakReportView() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          opacity: 0.3,
-          fontSize: 12,
-          fontFamily: "var(--font-sans)",
-          color: "var(--color-ink)",
         }}
       >
-        불러오는 중...
+        <SigakLoading message="불러오는 중이에요" embedded />
       </div>
     );
   }

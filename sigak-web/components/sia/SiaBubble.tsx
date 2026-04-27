@@ -3,9 +3,9 @@
  *
  * 디자인 출처: chat_design/ui_kits/sia/index.html `.b.ai` / `.me .b` / `.list-line`
  *
- * Variants:
- *   sia  : 좌측 정렬, 연회색 배경 (#F4F4F5), 하단 좌측 각진 꼬리 (radius 4)
- *   user : 우측 정렬, 진한 네이비 (#111827) + 흰 텍스트, 하단 우측 각진 꼬리
+ * Variants (마케터 랜딩_1815 ChatDemo 정합):
+ *   sia  : 좌측 정렬, cream 배경 (--color-bubble-ai = #FAF6F0), 하단 좌측 각진 꼬리
+ *   user : 우측 정렬, warm dark (--color-bubble-user = #2D2D2D) + 흰 텍스트
  *   list : sia variant + white-space pre-wrap 으로 하이픈 리스트 보존 렌더
  *
  * Max width 규칙 (D6 스펙):
@@ -29,11 +29,11 @@ const BASE =
 /** variant 별 정적 클래스. Tailwind JIT 가 purge 안 하도록 명시 전개. */
 const VARIANT_CLASS: Record<SiaBubbleVariant, string> = {
   sia:
-    "self-start bg-[var(--color-bubble-ai)] text-black " +
+    "self-start bg-[var(--color-bubble-ai)] text-[var(--color-ink)] " +
     "rounded-tl-[16px] rounded-tr-[16px] rounded-br-[16px] rounded-bl-[4px] " +
     "max-w-[85%]",
   list:
-    "self-start bg-[var(--color-bubble-ai)] text-black " +
+    "self-start bg-[var(--color-bubble-ai)] text-[var(--color-ink)] " +
     "rounded-tl-[16px] rounded-tr-[16px] rounded-br-[16px] rounded-bl-[4px] " +
     "max-w-[85%] whitespace-pre-wrap",
   user:

@@ -1,32 +1,49 @@
 @import "tailwindcss";
 
 /* ──────────────────────────────────────────────
- * SIGAK 디자인 토큰 (MVP v1.2 — 웜 베이지 + 블랙 브랜딩)
+ * SIGAK 디자인 토큰 (MVP v1.2 — 마케터 redesign 1815 정합, 2026-04-27)
  *
- * 기존 sage/medal 팔레트 전면 제거. BG는 #F3F0EB(웜 베이지), ink는 순수 블랙.
- * 레거시 스크린은 CSS 변수만 참조하므로 변수명 유지 → 자동 전환.
+ * v2.1 → v2.2: 흑백 모노톤 → 웜 베이지 + warm dark.
+ *   - `#000000` (pure black) → `#2D2D2D` (warm dark, 마케터 --ink)
+ *   - `#F3F0EB` → `#F5F1EB` (조금 더 warm)
+ *   - rgba(0,0,0,...) → rgba(45,45,45,...) (잉크 톤 정합)
+ *   - 마케터 redesign 12개 HTML 의 --bg/--ink/--ember 등 통일 매핑
  * ────────────────────────────────────────────── */
 @theme {
-  /* 레거시 호환 (값만 새 브랜딩으로) */
-  --color-bg: #F3F0EB;
-  --color-fg: #000000;
-  --color-accent: #000000;
-  --color-muted: rgba(0, 0, 0, 0.55);
-  --color-danger: #A32D2D;
-  --color-border: rgba(0, 0, 0, 0.15);
-  --color-blur-bg: rgba(243, 240, 235, 0.7);
+  /* ── 배경 계열 ────────────────────────── */
+  --color-bg: #F5F1EB;            /* 마케터 --bg (warm beige) */
+  --color-paper: #F5F1EB;         /* 동일 */
+  --color-bg-soft: #EDE8DF;       /* 마케터 --bg-soft (section / card) */
+  --color-blur-bg: rgba(245, 241, 235, 0.7);
 
-  /* MVP v1.2 신규 팔레트 — 흑백 + 베이지 단일 체계 */
-  --color-paper: #F3F0EB;
-  --color-ink: #000000;
-  --color-line: rgba(0, 0, 0, 0.1);
-  --color-line-strong: rgba(0, 0, 0, 0.15);
-  --color-mute: rgba(0, 0, 0, 0.55);
-  --color-mute-2: rgba(0, 0, 0, 0.4);
+  /* ── 잉크 계열 (warm dark — 순수 #000 폐기) ── */
+  --color-fg: #2D2D2D;            /* 마케터 --ink */
+  --color-ink: #2D2D2D;           /* 동일 */
+  --color-accent: #2D2D2D;        /* CTA / 강조 */
+  --color-ink-soft: #3D3730;      /* 마케터 --ink-soft (subhead) */
+  --color-ink-body: #4A4540;      /* 마케터 --ink-body (body copy) */
 
-  /* Sia 대화 버블 (D6) */
-  --color-bubble-ai: #F4F4F5;
-  --color-bubble-user: #111827;
+  /* ── 그레이 계열 ────────────────────────── */
+  --color-fog: #888888;           /* 마케터 --fog (hint / placeholder) */
+  --color-mist: #D4CEC4;          /* 마케터 --mist (disabled bg / soft border) */
+  --color-rule: #E5E0D7;          /* 마케터 --rule (divider) */
+
+  /* ── line / mute — warm dark 기반 ─────── */
+  --color-muted: rgba(45, 45, 45, 0.55);
+  --color-mute: rgba(45, 45, 45, 0.55);
+  --color-mute-2: rgba(45, 45, 45, 0.4);
+  --color-border: rgba(45, 45, 45, 0.15);
+  --color-line: rgba(45, 45, 45, 0.1);
+  --color-line-strong: rgba(45, 45, 45, 0.15);
+
+  /* ── 액센트 ────────────────────────────── */
+  --color-danger: #A32D2D;        /* 실 에러 상태 (banner / 검증 실패) — 보존 */
+  --color-ember: #b54b2b;         /* 마케터 --ember (decorative accent — period dot, loading dots, terracotta CTA) */
+  --color-ember-softer: #f8ede8;  /* 마케터 --ember-softer (ember 배경) */
+
+  /* ── Sia 대화 버블 (마케터 랜딩_1815 ChatDemo 정합) ── */
+  --color-bubble-ai: #FAF6F0;     /* was #F4F4F5 (cool gray) → cream warm */
+  --color-bubble-user: #2D2D2D;   /* was #111827 (slate-900) → 마케터 ink 와 통일 */
 
   /* 폰트 — Serif 승격 */
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;

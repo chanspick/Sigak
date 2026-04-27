@@ -77,7 +77,7 @@ export function IgLoadingView({
           data-testid="ig-loading-heading"
         >
           {heading}
-          <span style={{ color: "var(--color-danger)" }}>.</span>
+          <span style={{ color: "var(--color-ember)" }}>.</span>
         </h1>
         <p
           className="font-sans"

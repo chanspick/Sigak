@@ -109,12 +109,12 @@ export function SiaInputDock({
         rows={1}
         placeholder={placeholderText}
         aria-label="Sia에게 답하기"
-        className="flex-1 resize-none rounded-[22px] bg-[#F4F4F5] px-[16px] py-[11px] text-[14px] leading-[1.5] text-black outline-none placeholder:text-black/40 disabled:opacity-60"
+        className="flex-1 resize-none rounded-[22px] bg-[var(--color-bubble-ai)] px-[16px] py-[11px] text-[14px] leading-[1.5] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink)]/40 disabled:opacity-60"
         style={{
           minHeight: MIN_HEIGHT_PX,
           maxHeight: MAX_HEIGHT_PX,
           letterSpacing: "-0.005em",
-          caretColor: "#000",
+          caretColor: "var(--color-ink)",
         }}
       />
       <button

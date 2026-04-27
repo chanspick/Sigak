@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/verdicts";
 import { ResultScreen } from "@/components/sigak/result-screen";
 import { VerdictV2Screen } from "@/components/sigak/verdict-v2-screen";
+import { SigakLoading } from "@/components/ui/sigak";
 import type { VerdictResponse } from "@/lib/types/mvp";
 import type { VerdictV2GetResponse } from "@/lib/types/verdict_v2";
 
@@ -156,7 +157,7 @@ export default function VerdictPage() {
   }
 
   if (!loaded) {
-    return <div className="min-h-screen bg-paper" aria-busy aria-label="로딩 중" />;
+    return <SigakLoading message="결과를 불러오는 중이에요" hint="잠시만 기다려 주세요" />;
   }
 
   if (loaded.kind === "v2") {

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 import { ApiError } from "@/lib/api/fetch";
 import { getChange } from "@/lib/api/change";
+import { SigakLoading } from "@/components/ui/sigak";
 import type { ChangeEntry, ChangeResponse } from "@/lib/types/mvp";
 
 const MIN_ENTRIES_FOR_CHART = 3;
@@ -59,17 +60,12 @@ export function ChangeView() {
     return (
       <div
         style={{
-          minHeight: "40vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          opacity: 0.3,
-          fontSize: 12,
-          fontFamily: "var(--font-sans)",
-          color: "var(--color-ink)",
         }}
       >
-        불러오는 중...
+        <SigakLoading message="불러오는 중이에요" embedded />
       </div>
     );
   }
@@ -147,7 +143,7 @@ function ChangeEmpty({ count }: { count: number }) {
         매달 15일,
         <br />
         당신의 결을 정리해드려요
-        <span style={{ color: "var(--color-danger)" }}>.</span>
+        <span style={{ color: "var(--color-ember)" }}>.</span>
       </h2>
       <p
         className="font-sans"

@@ -158,7 +158,7 @@ export function HomeScreen() {
         >
           올린 사진 중에<br />
           한 장 골라드려요
-          <span style={{ color: "var(--color-danger)" }}>.</span>
+          <span style={{ color: "var(--color-ember)" }}>.</span>
         </h1>
         <p
           className="font-sans"

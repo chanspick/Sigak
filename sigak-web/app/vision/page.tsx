@@ -4,6 +4,7 @@
 "use client";
 
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
+import { SigakLoading } from "@/components/ui/sigak";
 import { FeedShell } from "@/components/sigak/feed-shell";
 import { VisionView } from "@/components/sigak/vision-view";
 import { SiteFooter } from "@/components/sigak/site-footer";
@@ -12,9 +13,7 @@ export default function VisionPage() {
   const { status } = useOnboardingGuard();
 
   if (status !== "ready") {
-    return (
-      <div style={{ minHeight: "100vh", background: "var(--color-paper)" }} aria-busy />
-    );
+    return <SigakLoading message="잠시만요" hint="" />;
   }
 
   return (

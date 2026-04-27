@@ -255,7 +255,7 @@ function EndConfirmModal({ onConfirm, onCancel }: EndConfirmModalProps) {
           }}
         >
           여기까지 할까요
-          <span style={{ color: "var(--color-danger)" }}>?</span>
+          <span style={{ color: "var(--color-ember)" }}>?</span>
         </h2>
         <p
           className="font-sans"

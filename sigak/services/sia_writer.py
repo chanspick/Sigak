@@ -1272,6 +1272,28 @@ _FINALE_SYSTEM_PROMPT = """당신은 SIGAK 의 미감 분석 페르소나 'Sia' 
 """
 
 
+def _finale_json_default(obj):
+    """json.dumps default — Pydantic 모델 / datetime 등 직렬화 fallback.
+
+    finale_inputs 의 aspiration_history / verdict_history 가 vault 에서
+    AspirationHistoryEntry / VerdictHistoryEntry Pydantic 모델 list 로 흘러옴.
+    json.dumps 가 raw 모델 직렬화 못 해서 TypeError 던지던 케이스 차단.
+    """
+    if hasattr(obj, "model_dump"):
+        try:
+            return obj.model_dump(mode="json")
+        except Exception:
+            pass
+    if hasattr(obj, "dict"):  # pydantic v1 호환
+        try:
+            return obj.dict()
+        except Exception:
+            pass
+    if hasattr(obj, "isoformat"):  # datetime / date
+        return obj.isoformat()
+    return str(obj)
+
+
 def _build_finale_user_prompt(
     *,
     user_data: dict,
@@ -1294,37 +1316,51 @@ def _build_finale_user_prompt(
     face = finale_inputs.get("face_structure")
     if face:
         sections.append("[1. 얼굴 구조]")
-        sections.append(json.dumps(face, ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            face, ensure_ascii=False, indent=2, default=_finale_json_default,
+        ))
 
     # 2. Skin
     skin = finale_inputs.get("skin")
     if skin:
         sections.append("[2. 피부/스킨]")
-        sections.append(json.dumps(skin, ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            skin, ensure_ascii=False, indent=2, default=_finale_json_default,
+        ))
 
     # 3. Type Match
     type_match = finale_inputs.get("type_match")
     if type_match:
         sections.append("[3. 8-타입 매칭]")
-        sections.append(json.dumps(type_match, ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            type_match, ensure_ascii=False, indent=2, default=_finale_json_default,
+        ))
 
     # 4. Gap Analysis
     gap = finale_inputs.get("gap_analysis")
     if gap:
         sections.append("[4. 추구미 갭]")
-        sections.append(json.dumps(gap, ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            gap, ensure_ascii=False, indent=2, default=_finale_json_default,
+        ))
 
-    # 5. 누적 추구미
+    # 5. 누적 추구미 — AspirationHistoryEntry Pydantic 모델 list 가능
     asp_hist = finale_inputs.get("aspiration_history") or []
     if asp_hist:
         sections.append(f"[5. 누적 추구미 분석 ({len(asp_hist)} 건)]")
-        sections.append(json.dumps(asp_hist[:5], ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            asp_hist[:5], ensure_ascii=False, indent=2,
+            default=_finale_json_default,
+        ))
 
-    # 6. Verdict 누적
+    # 6. Verdict 누적 — VerdictHistoryEntry Pydantic 모델 list 가능
     vdc = finale_inputs.get("verdict_history") or []
     if vdc:
         sections.append(f"[6. 피드 분석 누적 ({len(vdc)} 건)]")
-        sections.append(json.dumps(vdc[:5], ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            vdc[:5], ensure_ascii=False, indent=2,
+            default=_finale_json_default,
+        ))
 
     # 7. Sia 대화 — 유저 본인 발화 (인용 권장)
     phrases = finale_inputs.get("user_original_phrases") or []
@@ -1340,7 +1376,9 @@ def _build_finale_user_prompt(
     action = finale_inputs.get("action_plan")
     if action:
         sections.append("[8. 실행 가이드]")
-        sections.append(json.dumps(action, ensure_ascii=False, indent=2))
+        sections.append(json.dumps(
+            action, ensure_ascii=False, indent=2, default=_finale_json_default,
+        ))
 
     sections.append(
         "\n---\n위 8개 데이터를 모두 종합해서 6 필드 JSON 만 응답하세요. "

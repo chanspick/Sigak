@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { SiteFooter } from "@/components/sigak/site-footer";
+import { RefundTopNav } from "./refund-top-nav";
 
 // SIGAK MVP v2.1 (2026-04-24) 환불규정.
 // v2 BM 3단 구조 반영: 토큰 팩 구매 + 기능별 해제(진단 10/PI 50/변화 무료).
@@ -262,77 +262,6 @@ export default function RefundPage() {
       {/* 사업자 정보 (PG 심사 필수) */}
       <SiteFooter />
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  RefundTopNav — /refund 전용 sticky 상단
-// ─────────────────────────────────────────────
-
-function RefundTopNav() {
-  return (
-    <nav
-      className="sticky top-0 z-[100]"
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        height: 52,
-        background: "var(--color-ink)",
-        color: "var(--color-paper)",
-      }}
-    >
-      {/* Left — 홈 Link */}
-      <Link
-        href="/"
-        aria-label="홈"
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: 52,
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <svg width="10" height="16" viewBox="0 0 10 16" aria-hidden>
-          <path
-            d="M8 1L1 8l7 7"
-            stroke="var(--color-paper)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-            opacity="0.85"
-          />
-        </svg>
-      </Link>
-
-      <div
-        style={{
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Link
-          href="/"
-          className="font-sans"
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: "6px",
-            color: "var(--color-paper)",
-            textDecoration: "none",
-          }}
-        >
-          SIGAK
-        </Link>
-      </div>
-    </nav>
   );
 }
 

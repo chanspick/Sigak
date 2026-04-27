@@ -474,38 +474,6 @@ function PhotoUploadContent() {
             ? "사진을 1장 이상 올려주세요"
             : "정밀 분석 시작하기 →"}
         </button>
-        <p
-          className="font-sans"
-          style={{
-            textAlign: "center",
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            letterSpacing: "0.08em",
-            color: "var(--color-mute)",
-            marginTop: 10,
-            minHeight: 16,
-          }}
-        >
-          BETA 기간 무료
-        </p>
-        <a
-          href="/"
-          className="font-sans"
-          style={{
-            display: "block",
-            height: 44,
-            lineHeight: "44px",
-            textAlign: "center",
-            fontSize: 13,
-            fontWeight: 500,
-            letterSpacing: "0.3px",
-            color: "var(--color-mute)",
-            textDecoration: "none",
-            marginTop: 4,
-          }}
-        >
-          나중에 (홈으로)
-        </a>
       </div>
     </main>
     </>

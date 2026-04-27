@@ -192,6 +192,28 @@ def _find_all_user_ids(user_id: str) -> list[str]:
     return list(user_ids)
 
 
+def _build_sia_finale_preview(formatted_report: Optional[dict]) -> Optional[dict]:
+    """SPEC-PI-FINALE-001 — formatted_report["sia_finale"] → preview dict.
+
+    /api/v1/my/reports 응답 페이로드 경량화: full payload 대신 headline + lead 200자.
+    finale 미존재 (백필 전) → None 반환 (응답에서 sia_finale_preview 키 누락).
+    """
+    if not isinstance(formatted_report, dict):
+        return None
+    finale = formatted_report.get("sia_finale")
+    if not isinstance(finale, dict):
+        return None
+    headline = finale.get("headline") or ""
+    lead = finale.get("lead_paragraph") or ""
+    preview = lead[:200].rstrip()
+    if len(lead) > 200:
+        preview += "…"
+    return {
+        "headline": headline,
+        "lead_paragraph_preview": preview,
+    }
+
+
 def _find_reports_for_user(user_id: str) -> list[dict]:
     """유저의 리포트를 모든 저장소에서 조회. kakao_id 기반 병합."""
     # 같은 카카오 계정의 모든 user_id 수집
@@ -210,12 +232,17 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
             for r in db_reports:
                 if r.id not in seen_ids:
                     seen_ids.add(r.id)
-                    reports_list.append({
+                    entry = {
                         "id": r.id,
                         "access_level": r.access_level,
                         "created_at": r.created_at.isoformat() + "Z" if r.created_at else "",
                         "url": f"/report/{r.id}",
-                    })
+                    }
+                    # SPEC-PI-FINALE-001 (E4): sia_finale_preview 첨부
+                    finale_preview = _build_sia_finale_preview(r.report_data)
+                    if finale_preview:
+                        entry["sia_finale_preview"] = finale_preview
+                    reports_list.append(entry)
         except Exception as e:
             print(f"[FIND_REPORTS] DB error: {e}")
         finally:
@@ -226,12 +253,16 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
         for rid, r in REPORTS.items():
             if r.get("user_id") in all_ids and rid not in all_ids and rid not in seen_ids:
                 seen_ids.add(rid)
-                reports_list.append({
+                entry = {
                     "id": rid,
                     "access_level": r.get("access_level", "standard"),
                     "created_at": r.get("created_at", ""),
                     "url": f"/report/{rid}",
-                })
+                }
+                finale_preview = _build_sia_finale_preview(r.get("formatted"))
+                if finale_preview:
+                    entry["sia_finale_preview"] = finale_preview
+                reports_list.append(entry)
 
     # 3. 디스크 fallback
     if not reports_list:
@@ -239,12 +270,16 @@ def _find_reports_for_user(user_id: str) -> list[dict]:
             report_data = _load_json(uid, "report.json")
             if report_data and "id" in report_data and report_data["id"] not in seen_ids:
                 seen_ids.add(report_data["id"])
-                reports_list.append({
+                entry = {
                     "id": report_data["id"],
                     "access_level": report_data.get("access_level", "standard"),
                     "created_at": report_data.get("created_at", ""),
                     "url": f"/report/{report_data['id']}",
-                })
+                }
+                finale_preview = _build_sia_finale_preview(report_data.get("formatted"))
+                if finale_preview:
+                    entry["sia_finale_preview"] = finale_preview
+                reports_list.append(entry)
     return reports_list
 
 
@@ -2654,8 +2689,174 @@ async def mark_all_read(user_id: str):
 
 @app.get("/api/v1/my/reports")
 async def get_my_reports(user_id: str):
-    """로그인한 유저의 리포트 목록 조회."""
+    """로그인한 유저의 리포트 목록 조회.
+
+    SPEC-PI-FINALE-001 (E4): 각 리포트 항목에 sia_finale_preview 포함
+    (있을 때만; 백필 전 레거시 레포트는 누락).
+    """
     return {"reports": _find_reports_for_user(user_id)}
+
+
+# ─────────────────────────────────────────────
+#  Sia Finale — SPEC-PI-FINALE-001
+#
+#  GET /api/v1/reports/{report_id}/finale
+#  - 풀 6 필드 finale 응답
+#  - 미존재 시 자동 백필 (Sonnet 1회 무료, 영구 저장)
+# ─────────────────────────────────────────────
+
+
+def _backfill_finale(report_id: str) -> Optional[dict]:
+    """기존 DBReport 의 finale 미존재 시 inline 생성 + 영구 저장.
+
+    SPEC-PI-FINALE-001 AC2: Sonnet 1회 무료, 캐시 히트 (재호출 시 미발생).
+    실패 시 None (caller 가 fallback 응답 결정).
+    """
+    if not _use_db():
+        return None
+
+    db = get_db()
+    try:
+        db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+        if not db_report:
+            return None
+
+        # 이미 있으면 그대로 반환 (race condition 방지)
+        report_data = db_report.report_data or {}
+        if isinstance(report_data, dict) and isinstance(report_data.get("sia_finale"), dict):
+            return report_data["sia_finale"]
+
+        user_id = db_report.user_id
+        raw_data = db_report.raw_data or {}
+
+        # vault 로드 (phrases / aspiration_history / verdict_history)
+        finale_phrases: list = []
+        finale_aspiration: list = []
+        finale_verdict: list = []
+        try:
+            from services.user_data_vault import load_vault
+            vault = load_vault(db, user_id)
+            profile_obj = getattr(vault, "user_taste_profile", None)
+            if profile_obj and hasattr(profile_obj, "user_original_phrases"):
+                finale_phrases = list(profile_obj.user_original_phrases or [])
+            finale_aspiration = list(getattr(vault, "aspiration_history", None) or [])
+            user_history_obj = getattr(vault, "user_history", None)
+            if user_history_obj and hasattr(user_history_obj, "verdict_history"):
+                finale_verdict = list(getattr(user_history_obj, "verdict_history", None) or [])
+        except Exception as e:
+            print(f"[FINALE_BACKFILL] vault load failed (non-fatal): {e}")
+
+        # formatted_report sections 에서 face/skin 추출
+        sections = report_data.get("sections", []) if isinstance(report_data, dict) else []
+        section_by_id = {
+            s.get("id"): s.get("content", {})
+            for s in sections if isinstance(s, dict)
+        }
+
+        # raw_data 에서 좌표/gap/content 추출
+        current_coords = raw_data.get("current_coords") if isinstance(raw_data, dict) else None
+        aspiration_coords = raw_data.get("aspiration_coords") if isinstance(raw_data, dict) else None
+        gap = raw_data.get("gap") if isinstance(raw_data, dict) else None
+        content = raw_data.get("content") if isinstance(raw_data, dict) else None
+
+        # type_match — formatted_report 의 type_reference section content 활용
+        type_ref = section_by_id.get("type_reference") or {}
+        type_match_data = {
+            "primary": {
+                "name_kr": type_ref.get("matched_label"),
+                "similarity": type_ref.get("matched_similarity"),
+            },
+            "alternatives": type_ref.get("alternatives", []),
+        }
+
+        finale_inputs = {
+            "face_structure": section_by_id.get("face_structure"),
+            "skin": section_by_id.get("skin_analysis"),
+            "type_match": type_match_data,
+            "gap_analysis": {
+                "summary": gap.get("summary") if isinstance(gap, dict) else None,
+                "primary_shift_kr": gap.get("primary_shift_kr") if isinstance(gap, dict) else None,
+                "current_coords": current_coords,
+                "aspiration_coords": aspiration_coords,
+            },
+            "aspiration_history": finale_aspiration,
+            "verdict_history": finale_verdict,
+            "user_original_phrases": finale_phrases,
+            "action_plan": content.get("action_tips") if isinstance(content, dict) else None,
+        }
+
+        # user 데이터
+        user_data_inputs = {
+            "name": (USERS.get(user_id) or {}).get("name") or "당신",
+            "gender": (raw_data.get("gender") if isinstance(raw_data, dict) else None) or "미정",
+        }
+
+        from services.sia_writer import generate_finale
+        sia_finale = generate_finale(
+            user_data=user_data_inputs,
+            finale_inputs=finale_inputs,
+        )
+
+        # DB 영구 저장 (race condition 방지를 위해 다시 조회)
+        try:
+            fresh_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+            if not fresh_report:
+                return sia_finale
+            fresh_data = fresh_report.report_data or {}
+            if not isinstance(fresh_data, dict):
+                return sia_finale
+            # race: 다른 요청이 먼저 백필했으면 그 결과 우선
+            if isinstance(fresh_data.get("sia_finale"), dict):
+                return fresh_data["sia_finale"]
+            fresh_data["sia_finale"] = sia_finale
+            fresh_report.report_data = fresh_data
+            # JSONB 변경 감지 위해 명시 flag (SQLAlchemy mutable 이슈 회피)
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(fresh_report, "report_data")
+            db.commit()
+            print(f"[FINALE_BACKFILL_OK] report={report_id} headline={sia_finale.get('headline', '')[:40]!r}")
+        except Exception as e:
+            print(f"[FINALE_BACKFILL_PERSIST_ERROR] {e}")
+            db.rollback()
+
+        return sia_finale
+    except Exception as e:
+        print(f"[FINALE_BACKFILL_ERROR] {e}")
+        return None
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/reports/{report_id}/finale")
+async def get_report_finale(report_id: str):
+    """SPEC-PI-FINALE-001 — Sia Finale 풀 6 필드 응답 + 자동 백필.
+
+    Flow:
+      1. DB 조회. report_data["sia_finale"] 존재 → 그대로 응답
+      2. 미존재 → _backfill_finale() 호출 (Sonnet 1회 무료, 영구 저장)
+      3. 백필도 실패 → 404
+    """
+    if not _use_db():
+        raise HTTPException(503, "DB 미연결")
+
+    # 1) 캐시 히트
+    db = get_db()
+    try:
+        db_report = db.query(DBReport).filter(DBReport.id == report_id).first()
+        if not db_report:
+            raise HTTPException(404, "리포트를 찾을 수 없어요")
+        report_data = db_report.report_data or {}
+        finale = report_data.get("sia_finale") if isinstance(report_data, dict) else None
+        if isinstance(finale, dict):
+            return {"report_id": report_id, "sia_finale": finale}
+    finally:
+        db.close()
+
+    # 2) 백필
+    finale = _backfill_finale(report_id)
+    if not finale:
+        raise HTTPException(500, "마무리 한 마디 생성에 실패했어요. 잠시 후 다시 시도해 주세요.")
+    return {"report_id": report_id, "sia_finale": finale}
 
 
 # ─────────────────────────────────────────────

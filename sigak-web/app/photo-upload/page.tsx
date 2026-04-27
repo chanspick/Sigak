@@ -29,6 +29,7 @@ import {
   submitAll,
 } from "@/lib/api/client";
 import { getCurrentUser } from "@/lib/auth";
+import { SigakLoading, TopBar } from "@/components/ui/sigak";
 
 const MAX_PHOTOS = 3;
 
@@ -165,123 +166,25 @@ function PhotoUploadContent() {
     }
   }, [photos, router, fromSession]);
 
-  // 진행 중 화면 — 마케터 redesign/로딩_1815.html 차용 (dotPulse + 로고 + 서브 힌트)
+  // 진행 중 — SigakLoading 단일 표준 (2026-04-27 마케터 1815 정합)
   if (submitting) {
-    return (
+    return <SigakLoading message="sia가 피드를 분석중이에요." />;
+  }
+
+  return (
+    <>
+      <TopBar backTarget="/" />
       <main
+        className="animate-fade-in"
         style={{
-          minHeight: "100vh",
+          minHeight: "calc(100vh - 64px)",
           background: "var(--color-paper)",
           color: "var(--color-ink)",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px 28px",
-          textAlign: "center",
+          padding: "32px 28px 40px",
         }}
-        aria-busy
       >
-        {/* SIGAK 로고 60x60 */}
-        <svg
-          width="60"
-          height="60"
-          viewBox="0 0 40 40"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{ marginBottom: 40 }}
-          aria-hidden
-        >
-          <rect width="40" height="40" rx="7" fill="#1a1a1a" />
-          <g stroke="#ffffff" strokeWidth="1.5" fill="none" strokeLinecap="round">
-            <line x1="20" y1="6" x2="20" y2="13" />
-            <path d="M 6 19.5 Q 20 11.5 34 19.5 Q 20 27.5 6 19.5 Z" />
-            <circle cx="20" cy="19.5" r="2.6" />
-          </g>
-          <path
-            d="M 20 22.5 C 18.4 25, 17.4 28, 17.4 30 C 17.4 31.9, 18.6 32.8, 20 32.8 C 21.4 32.8, 22.6 31.9, 22.6 30 C 22.6 28, 21.6 25, 20 22.5 Z"
-            fill="#ffffff"
-          />
-        </svg>
-
-        <p
-          className="font-sans"
-          style={{
-            fontSize: 16,
-            color: "var(--color-ink)",
-            opacity: 0.75,
-            lineHeight: 1.7,
-            letterSpacing: "-0.005em",
-            marginBottom: 28,
-          }}
-        >
-          sia가 피드를 분석중이에요.
-        </p>
-
-        {/* dot-pulse 3-dot */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            marginBottom: 36,
-          }}
-          aria-hidden
-        >
-          <span
-            className="animate-dot-pulse"
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--color-danger)",
-            }}
-          />
-          <span
-            className="animate-dot-pulse-delay-1"
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--color-danger)",
-            }}
-          />
-          <span
-            className="animate-dot-pulse-delay-2"
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "var(--color-danger)",
-            }}
-          />
-        </div>
-
-        <p
-          className="font-sans"
-          style={{
-            fontSize: 12,
-            color: "var(--color-mute)",
-            letterSpacing: "-0.003em",
-          }}
-        >
-          최대 30초 정도 걸릴 수 있어요
-        </p>
-      </main>
-    );
-  }
-
-  return (
-    <main
-      className="animate-fade-in"
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-paper)",
-        color: "var(--color-ink)",
-        display: "flex",
-        flexDirection: "column",
-        padding: "60px 28px 40px",
-      }}
-    >
       <section
         style={{
           flex: 1,
@@ -495,7 +398,7 @@ function PhotoUploadContent() {
                 height: 8,
                 borderRadius: "50%",
                 background:
-                  i < photos.length ? "var(--color-danger)" : "var(--color-line-strong)",
+                  i < photos.length ? "var(--color-ember)" : "var(--color-line-strong)",
                 transition: "background 0.2s ease",
               }}
             />
@@ -605,19 +508,13 @@ function PhotoUploadContent() {
         </a>
       </div>
     </main>
+    </>
   );
 }
 
 export default function PhotoUploadPage() {
   return (
-    <Suspense
-      fallback={
-        <div
-          style={{ minHeight: "100vh", background: "var(--color-paper)" }}
-          aria-hidden
-        />
-      }
-    >
+    <Suspense fallback={<SigakLoading message="잠시만요" hint="" />}>
       <PhotoUploadContent />
     </Suspense>
   );

@@ -58,22 +58,24 @@ _OPENING_VARIANTS: tuple[str, ...] = (
     "{user_name}님 올리신 사진들 같이 봤어요",
 )
 
-# META_REBUTTAL (§8.2) — 세션 1회. 질문 종결 (~이잖아요?)
+# META_REBUTTAL (§8.2) — 세션 1회. 페르소나 C: 원어 반사 + 담담한 진술 + 열린 질문.
+# B 시절 `~이잖아요?` 종결 (닫힌 동의 유도) → C 는 본인 손에서 나온 사실 진술 + 풀어달라는 열린 질문.
 _META_REBUTTAL_VARIANTS: tuple[str, ...] = (
-    '{user_name}님 "{user_meta_raw}" 라고 하시는데, 그거랑 별개로 피드에 올리신 건 {user_name}님이 고르신 거잖아요?',
-    '{user_name}님 "{user_meta_raw}" 이 말씀도 맞아요. 근데 제가 본 건 이 피드고, 피드 고른 사람은 {user_name}님이잖아요?',
-    '{user_name}님 "{user_meta_raw}" 라는 점은 인정해요. 그래도 여기 올린 스무 장은 {user_name}님이 골라 올리신 거잖아요?',
-    '{user_name}님 "{user_meta_raw}" 말씀 맞는데요, 지금 제가 보고 있는 건 {user_name}님이 직접 올린 피드잖아요?',
-    '{user_name}님 "{user_meta_raw}" 걱정하시는 건 이해해요. 근데 피드 자체는 {user_name}님 손에서 나온 거잖아요?',
+    '{user_name}님 "{user_meta_raw}" 라고 하셨는데, 그래도 이 피드 스무 장은 본인이 골라 올리신 거예요. 그 고름이 어떤 결인지 풀어주실래요?',
+    '{user_name}님 "{user_meta_raw}" 그 말씀도 들었어요. 근데 제가 보는 건 이 피드고, 이건 본인 손에서 나온 거예요. 어떤 마음으로 올리셨어요?',
+    '{user_name}님 "{user_meta_raw}" 그 부분은 받아둘게요. 그래도 여기 올라온 스무 장은 본인이 직접 고른 거예요. 그 고름의 결, 어떻게 일어나요?',
+    '{user_name}님 "{user_meta_raw}" 그 말씀이 있는 거랑 별개로, 지금 제가 보고 있는 건 본인이 올린 피드예요. 이 피드 안에서 본인이 보이는 부분 어디예요?',
+    '{user_name}님 "{user_meta_raw}" 그 마음 알겠어요. 근데 피드 자체는 본인 손에서 나온 거예요. 어떤 순간에 올리고 싶어지세요?',
 )
 
-# EVIDENCE_DEFENSE (§8.3) — 세션 1회. 질문 종결
+# EVIDENCE_DEFENSE (§8.3) — 세션 1회. 페르소나 C: 자기 권위 호명 제거 + 담담한 서술 종결.
+# B 시절 "저 이거 직접 세어봤어요" / `~이잖아요?` → C 는 "피드 안에 이미 있다" 담담한 진술.
 _EVIDENCE_DEFENSE_VARIANTS: tuple[str, ...] = (
-    "{user_name}님 {observation_evidence} 이건 세지 않아도 피드 열어보면 바로 보이잖아요?",
-    "{user_name}님 {observation_evidence} 저 이거 직접 세어봤어요. 다시 확인하셔도 같은 숫자일 거잖아요?",
-    "{user_name}님 {observation_evidence} 이 부분은 피드 자체가 증거잖아요?",
-    "{user_name}님 {observation_evidence} 이건 제 추측이 아니라 피드에 그대로 나와 있는 거잖아요?",
-    "{user_name}님 {observation_evidence} 이건 올리신 사진 자체가 말해주는 거잖아요?",
+    "{user_name}님 {observation_evidence} 이건 피드에 그대로 있는 거예요. 다시 같이 보면 같은 게 보일 거예요",
+    "{user_name}님 {observation_evidence} 이건 추측이 아니라 피드에 나와 있는 그대로예요",
+    "{user_name}님 {observation_evidence} 이 부분은 피드 자체가 보여주는 거예요",
+    "{user_name}님 {observation_evidence} 이건 올리신 사진들이 그대로 말해주는 거예요",
+    "{user_name}님 {observation_evidence} 이건 제가 만든 게 아니라 피드 안에 이미 있는 거예요",
 )
 
 # SOFT_WALKBACK (§8.4) — 평가 없는 설명체. 서술 종결.
@@ -135,12 +137,13 @@ _RANGE_LIMIT_SEVERE_VARIANTS: tuple[str, ...] = (
 # ─────────────────────────────────────────────
 
 # RANGE_DISCLOSURE reaffirm 모드 — 막막함 토로 / 평가요청+막막함우세. 사업 존재 재선언.
+# 페르소나 C: `~잖아요` 제거. 담담한 진술 종결. 자기 권위 ("보여드릴/읽어드릴") 약화.
 _RANGE_REAFFIRM_VARIANTS: tuple[str, ...] = (
-    "근데 {user_name}님, 막막한 마음 풀어보려고 제가 온 거니까 이렇게 자세히 말씀해주실수록 더 정확하게 같이 볼 수 있어요",
-    "{user_name}님 그 막막함 풀어드리려고 제가 있는 거예요. 지금처럼 솔직하게 꺼내주시면 더 또렷하게 보여드릴 수 있어요",
-    "{user_name}님, 막막하실수록 제가 도와드리려고 온 거예요. 그러니까 편하게 말씀해주셔도 돼요",
-    "그 막막함 같이 풀어보려고 제가 온 거잖아요 {user_name}님. 자세히 말씀해주실수록 제가 더 정확하게 읽어드릴 수 있어요",
-    "{user_name}님, 그 답답함 같이 정리해보려고 제가 들어온 거예요. 지금 같이 꺼내놓으시면 더 또렷하게 잡힐 거예요",
+    "{user_name}님, 막막한 마음 같이 풀어보려고 제가 온 거예요. 자세히 말씀해주실수록 같이 더 정확하게 볼 수 있어요",
+    "{user_name}님 그 막막함 같이 풀어보려고 있는 거예요. 솔직하게 꺼내주시면 같이 더 또렷하게 볼 수 있어요",
+    "{user_name}님, 막막하실수록 같이 풀어보려고 온 거예요. 편하게 말씀해주셔도 돼요",
+    "그 막막함 같이 풀어보려고 제가 온 거예요 {user_name}님. 자세히 말씀해주실수록 같이 더 정확하게 볼 수 있어요",
+    "{user_name}님, 그 답답함 같이 정리해보려고 들어온 거예요. 같이 꺼내놓으시면 더 또렷하게 잡힐 거예요",
 )
 
 

@@ -2918,27 +2918,50 @@ def _backfill_finale(report_id: str) -> Optional[dict]:
             finale_inputs=finale_inputs,
         )
 
-        # DB 영구 저장 (race condition 방지를 위해 다시 조회)
+        # DB 영구 저장 — 명시적 UPDATE SQL (SQLAlchemy JSONB mutation 감지 우회).
+        # flag_modified + ORM.commit 패턴은 dict in-place mutation 을 SQLAlchemy
+        # 가 감지 못 하는 케이스가 있어 commit 이 no-op 으로 끝나는 회귀 발생.
+        # → text() UPDATE 로 명시적 SET 해서 확실히 row 갱신.
         try:
-            fresh_report = db.query(DBReport).filter(DBReport.id == report_id).first()
-            if not fresh_report:
+            from sqlalchemy import text
+            # race: 다시 조회해서 다른 요청이 이미 백필했는지 확인
+            row = db.execute(
+                text("SELECT report_data FROM reports WHERE id = :id"),
+                {"id": report_id},
+            ).first()
+            if not row:
                 return sia_finale
-            fresh_data = fresh_report.report_data or {}
+            fresh_data = row.report_data or {}
             if not isinstance(fresh_data, dict):
-                return sia_finale
-            # race: 다른 요청이 먼저 백필했으면 그 결과 우선
+                fresh_data = {}
             if isinstance(fresh_data.get("sia_finale"), dict):
+                # 다른 요청이 먼저 백필. 그 결과 우선 반환.
                 return fresh_data["sia_finale"]
+            # finale 박고 명시적 UPDATE
             fresh_data["sia_finale"] = sia_finale
-            fresh_report.report_data = fresh_data
-            # JSONB 변경 감지 위해 명시 flag (SQLAlchemy mutable 이슈 회피)
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(fresh_report, "report_data")
+            result = db.execute(
+                text(
+                    "UPDATE reports SET report_data = CAST(:rd AS jsonb) "
+                    "WHERE id = :id"
+                ),
+                {"rd": json.dumps(fresh_data, ensure_ascii=False, default=str),
+                 "id": report_id},
+            )
             db.commit()
-            print(f"[FINALE_BACKFILL_OK] report={report_id} headline={sia_finale.get('headline', '')[:40]!r}")
+            print(
+                f"[FINALE_BACKFILL_OK] report={report_id} "
+                f"rowcount={result.rowcount} "
+                f"headline={sia_finale.get('headline', '')[:40]!r}"
+            )
         except Exception as e:
-            print(f"[FINALE_BACKFILL_PERSIST_ERROR] {e}")
-            db.rollback()
+            print(
+                f"[FINALE_BACKFILL_PERSIST_ERROR] report={report_id} "
+                f"type={type(e).__name__} err={e}\n{traceback.format_exc()}"
+            )
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
         return sia_finale
     except Exception as e:

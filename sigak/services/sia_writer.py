@@ -1124,3 +1124,358 @@ def set_sia_writer(writer: SiaWriter) -> None:
 def use_haiku_writer() -> None:
     """운영 환경 초기화 — 기본 writer 를 HaikuSiaWriter 로 교체."""
     set_sia_writer(HaikuSiaWriter())
+
+
+# ─────────────────────────────────────────────
+#  Sia Finale — SPEC-PI-FINALE-001
+#
+#  PI 레포트 끝의 종합 마무리. Sonnet 1회 호출 → 6 필드 JSON.
+#  Card 1 (headline + lead_paragraph) + Card 2 (4-step) 데이터 소스.
+#  페르소나 B 친밀체 + ~이에요 톤. 1000~1500자 총합.
+# ─────────────────────────────────────────────
+
+
+# Sia 친밀체 어미 검증 — finale 은 Sia 1인칭 친밀체 (PI 분석체와 다름)
+_FINALE_BAD_ENDINGS = (
+    "더라구요",          # CLAUDE.md 4e2b225 폐기
+    "네요.", "네요!", "네요?", "네요\n",
+    "군요.", "군요!", "군요?", "군요\n",
+    "같아요", "같습니다",
+    "것 같",
+    "수 있습니다", "수 있어요",
+)
+
+# 데이터 숫자 노출 차단 — "0.42 좌표" 같은 표현 금지
+_NUMERIC_LEAK_PATTERNS = [
+    re.compile(r"\b0\.\d{2,}"),                # 0.42, 0.123 등
+    re.compile(r"\b-0\.\d+"),                  # -0.5 등
+    re.compile(r"좌표\s*[0-9.]+"),             # "좌표 0.5"
+    re.compile(r"type_\d+"),                   # type_3 같은 내부 ID
+    re.compile(r"trend_id|trend_[a-z_0-9]+"),  # trend ID 노출
+]
+
+
+# 폴백 카피 — Sonnet 모든 재시도 실패 시 사용 (페르소나 B + Hard Rules 통과)
+FALLBACK_FINALE: dict = {
+    "headline": "오늘의 좌표, 시각이 잡아드렸어요.",
+    "lead_paragraph": (
+        "이번 분석에서 가장 또렷하게 보였던 건 당신 본인의 결이에요. "
+        "지금 자리에서 추구하는 쪽으로 옮겨가는 길이 생각보다 가깝게 잡혀요. "
+        "조금 더 쓰시면 더 정교해질 거예요. 우선 이번 분석으로 길을 잡아두시면 좋아요."
+    ),
+    "step_1_observation": (
+        "정면 사진과 대화에서 모은 데이터를 같이 봤어요. "
+        "골격, 분위기, 인상의 결이 일관되게 한 방향으로 모여 있어요. "
+        "본인이 모르고 계셨을 만한 강점이 분명히 있어요."
+    ),
+    "step_2_interpretation": (
+        "이건 약점이 아니라 시그니처예요. "
+        "지금의 결을 살리면서 추구하는 인상에 가깝게 다가갈 수 있어요. "
+        "출발점이 좋은 편이에요."
+    ),
+    "step_3_diagnosis": (
+        "추구하는 쪽으로 가려면 한 축에 집중하시는 게 효과적이에요. "
+        "여러 군데 손대기보다 가장 가까운 거리부터 좁히세요. "
+        "다음 분석에서 변화가 분명하게 보일 거예요."
+    ),
+    "step_4_closing": (
+        "오늘 길은 잡혔어요. 이제 한 걸음씩 옮겨가시면 돼요. "
+        "다음 번엔 어떤 결이 될지 시각이 또 봐드릴게요."
+    ),
+}
+
+
+def _check_finale_persona_b(finale: "SiaFinale") -> list[str]:
+    """페르소나 B 친밀체 어미 검증. 위반 1개 이상이면 list 에 사유 적재."""
+    out: list[str] = []
+    fields = (
+        ("headline", finale.headline),
+        ("lead_paragraph", finale.lead_paragraph),
+        ("step_1_observation", finale.step_1_observation),
+        ("step_2_interpretation", finale.step_2_interpretation),
+        ("step_3_diagnosis", finale.step_3_diagnosis),
+        ("step_4_closing", finale.step_4_closing),
+    )
+    for name, text in fields:
+        for ending in _FINALE_BAD_ENDINGS:
+            if ending in text:
+                out.append(f"{name}: 금지 어미 '{ending}'")
+                break
+    return out
+
+
+def _check_finale_numeric_leak(finale: "SiaFinale") -> list[str]:
+    """데이터 숫자/내부 ID 본문 노출 차단."""
+    out: list[str] = []
+    fields = (
+        ("headline", finale.headline),
+        ("lead_paragraph", finale.lead_paragraph),
+        ("step_1_observation", finale.step_1_observation),
+        ("step_2_interpretation", finale.step_2_interpretation),
+        ("step_3_diagnosis", finale.step_3_diagnosis),
+        ("step_4_closing", finale.step_4_closing),
+    )
+    for name, text in fields:
+        for pattern in _NUMERIC_LEAK_PATTERNS:
+            if pattern.search(text):
+                out.append(f"{name}: 숫자/ID 노출 ({pattern.pattern})")
+                break
+    return out
+
+
+def _strip_json_fence(text: str) -> str:
+    """Sonnet 이 ```json ... ``` 래핑하면 제거."""
+    t = text.strip()
+    if t.startswith("```"):
+        lines = t.split("\n")
+        if len(lines) > 1:
+            lines = lines[1:]
+        while lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        t = "\n".join(lines).strip()
+    return t
+
+
+_FINALE_SYSTEM_PROMPT = """당신은 SIGAK 의 미감 분석 페르소나 'Sia' 입니다. 페르소나 B (간파하는 친근 비서).
+유저의 PI(개인 시각 정체성) 레포트 마지막에 들어갈 종합 마무리를 작성합니다.
+
+## 톤 규칙 (HARD)
+- 허용 어미: ~이에요 / ~이신 것 같은데 / ~으시죠? / ~이시잖아요 / ~습니다
+- 금지 어미: ~네요 / ~군요 / ~같아요 / ~같습니다 / ~것 같 / ~수 있습니다 / ~더라구요
+- 호칭: '당신' 으로 일관 사용
+- 한국어. 영어 표현 최소화 (필요한 고유명사만).
+
+## 컨텐츠 규칙 (HARD)
+- 좌표 숫자 (예 "0.42") / 내부 type_id / trend_id 본문에 노출 금지
+- 마크다운 (**굵게**, _기울임_, # 헤딩) 금지 — 순수 텍스트
+- 영업 어휘 ('지금 구매', '한정 할인', '전문가') 금지
+- 추상 칭찬 ('완벽해요', '환상적이에요', '대단해요') 금지
+- 데이터에서 추론 가능한 사실만 서술. 거짓 추측 금지.
+
+## 출력 형식 (반드시 6 필드 JSON, 다른 텍스트 X)
+```json
+{
+  "headline": "<8~50자, 시그니처 한 줄. 듣고 싶은 말, 강한 인상>",
+  "lead_paragraph": "<150~350자, 핵심 단락. OBSERVATION+INTERPRETATION 융합. 유저 본인 발화 자연 인용 가능>",
+  "step_1_observation": "<120~250자, '관찰' — 시각이 본 것. 데이터 근거.>",
+  "step_2_interpretation": "<120~250자, '해석' — 그게 의미하는 것. 재프레임/강점.>",
+  "step_3_diagnosis": "<150~350자, '진단' — 추구미 가는 길. 핵심 1-2개로 압축.>",
+  "step_4_closing": "<80~200자, '다음 한 걸음' — action_plan 1개로 매듭. 격려.>"
+}
+```
+
+## 결 (마케터 의도)
+- 파인 다이닝 디저트. 식사 끝의 인상적인 마무리.
+- 듣고 싶은 말 해주는 결. 다정함 + 정교함.
+- 단정짓지 않고 짚어주는 톤.
+- 1000~1500자 총합. 모바일 1~2화면.
+"""
+
+
+def _build_finale_user_prompt(
+    *,
+    user_data: dict,
+    finale_inputs: dict,
+) -> str:
+    """8 input 데이터 → user prompt 한국어 자연어 풀어쓰기.
+
+    finale_inputs 키:
+      face_structure, skin, type_match, gap_analysis,
+      aspiration_history, verdict_history, user_original_phrases, action_plan
+    각 값은 dict 또는 list. None 이면 해당 섹션 생략.
+    """
+    user_name = (user_data or {}).get("name") or "당신"
+    gender = (user_data or {}).get("gender") or "미정"
+
+    sections: list[str] = []
+    sections.append(f"[유저 기본]\n이름: {user_name}\n성별: {gender}")
+
+    # 1. 얼굴 구조
+    face = finale_inputs.get("face_structure")
+    if face:
+        sections.append("[1. 얼굴 구조]")
+        sections.append(json.dumps(face, ensure_ascii=False, indent=2))
+
+    # 2. Skin
+    skin = finale_inputs.get("skin")
+    if skin:
+        sections.append("[2. 피부/스킨]")
+        sections.append(json.dumps(skin, ensure_ascii=False, indent=2))
+
+    # 3. Type Match
+    type_match = finale_inputs.get("type_match")
+    if type_match:
+        sections.append("[3. 8-타입 매칭]")
+        sections.append(json.dumps(type_match, ensure_ascii=False, indent=2))
+
+    # 4. Gap Analysis
+    gap = finale_inputs.get("gap_analysis")
+    if gap:
+        sections.append("[4. 추구미 갭]")
+        sections.append(json.dumps(gap, ensure_ascii=False, indent=2))
+
+    # 5. 누적 추구미
+    asp_hist = finale_inputs.get("aspiration_history") or []
+    if asp_hist:
+        sections.append(f"[5. 누적 추구미 분석 ({len(asp_hist)} 건)]")
+        sections.append(json.dumps(asp_hist[:5], ensure_ascii=False, indent=2))
+
+    # 6. Verdict 누적
+    vdc = finale_inputs.get("verdict_history") or []
+    if vdc:
+        sections.append(f"[6. 피드 분석 누적 ({len(vdc)} 건)]")
+        sections.append(json.dumps(vdc[:5], ensure_ascii=False, indent=2))
+
+    # 7. Sia 대화 — 유저 본인 발화 (인용 권장)
+    phrases = finale_inputs.get("user_original_phrases") or []
+    if phrases:
+        sections.append("[7. 유저 본인 발화 (Sia 대화에서)]")
+        for p in phrases[:8]:
+            sections.append(f"- \"{p}\"")
+        sections.append(
+            "위 발화 중 1개 이하를 lead_paragraph 에 자연스럽게 인용하세요."
+        )
+
+    # 8. Action Plan
+    action = finale_inputs.get("action_plan")
+    if action:
+        sections.append("[8. 실행 가이드]")
+        sections.append(json.dumps(action, ensure_ascii=False, indent=2))
+
+    sections.append(
+        "\n---\n위 8개 데이터를 모두 종합해서 6 필드 JSON 만 응답하세요. "
+        "JSON 외 다른 텍스트 (설명, 머리말, 마크다운 코드블록) 금지."
+    )
+
+    return "\n\n".join(sections)
+
+
+def generate_finale(
+    *,
+    user_data: dict,
+    finale_inputs: dict,
+    max_retries: int = 2,
+) -> dict:
+    """Sia Finale 생성 — Sonnet 1회 호출. SPEC-PI-FINALE-001.
+
+    Args:
+        user_data: {"name": str, "gender": str}
+        finale_inputs: 8 input dict (face_structure, skin, type_match,
+            gap_analysis, aspiration_history, verdict_history,
+            user_original_phrases, action_plan).
+            None/빈 값은 해당 섹션 자동 생략.
+        max_retries: 페르소나/JSON 검증 실패 시 동일 프롬프트 재시도 횟수.
+
+    Returns:
+        SiaFinale 6 필드 dict + generated_at ISO datetime.
+        모든 재시도 실패 시 FALLBACK_FINALE 반환 (예외 raise 안 함).
+    """
+    # lazy import (config / anthropic 모듈 의존성 우회)
+    from datetime import datetime, timezone
+
+    from schemas.sia_finale import SiaFinale
+
+    try:
+        import anthropic
+        from config import get_settings
+        from services.sia_llm import _get_client
+    except Exception as e:
+        logger.warning("finale deps unavailable — fallback (%s)", e)
+        result = dict(FALLBACK_FINALE)
+        result["generated_at"] = datetime.now(timezone.utc).isoformat()
+        return result
+
+    try:
+        settings = get_settings()
+        if not getattr(settings, "anthropic_api_key", None):
+            logger.warning("ANTHROPIC_API_KEY not configured — finale fallback")
+            result = dict(FALLBACK_FINALE)
+            result["generated_at"] = datetime.now(timezone.utc).isoformat()
+            return result
+        client = _get_client()
+    except Exception:
+        logger.warning("finale client init failed — fallback", exc_info=True)
+        result = dict(FALLBACK_FINALE)
+        result["generated_at"] = datetime.now(timezone.utc).isoformat()
+        return result
+
+    user_prompt = _build_finale_user_prompt(
+        user_data=user_data, finale_inputs=finale_inputs,
+    )
+
+    last_error: Optional[str] = None
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.messages.create(
+                model=settings.anthropic_model_sonnet,
+                max_tokens=2048,
+                system=_FINALE_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+        except anthropic.APIError as e:
+            logger.warning("finale API error (attempt %d): %s", attempt + 1, e)
+            last_error = f"api: {e}"
+            continue
+        except Exception as e:
+            logger.warning("finale unknown error (attempt %d): %s", attempt + 1, e)
+            last_error = f"unknown: {e}"
+            continue
+
+        if not response.content:
+            last_error = "empty response"
+            continue
+        text_blocks = [b.text for b in response.content if b.type == "text"]
+        text = "\n".join(text_blocks).strip()
+        if not text:
+            last_error = "no text block"
+            continue
+
+        text = _strip_json_fence(text)
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.warning("finale JSON parse fail (attempt %d): %s", attempt + 1, e)
+            last_error = f"json: {e}"
+            continue
+
+        try:
+            finale = SiaFinale(**data)
+        except Exception as e:
+            logger.warning("finale schema fail (attempt %d): %s", attempt + 1, e)
+            last_error = f"schema: {e}"
+            continue
+
+        # 페르소나 B 어미 검증
+        persona_violations = _check_finale_persona_b(finale)
+        if persona_violations:
+            logger.warning(
+                "finale persona violations (attempt %d): %s",
+                attempt + 1, persona_violations,
+            )
+            last_error = f"persona: {persona_violations}"
+            continue
+
+        # 데이터 숫자 노출 검사
+        numeric_violations = _check_finale_numeric_leak(finale)
+        if numeric_violations:
+            logger.warning(
+                "finale numeric leak (attempt %d): %s",
+                attempt + 1, numeric_violations,
+            )
+            last_error = f"numeric: {numeric_violations}"
+            continue
+
+        # 통과
+        result = finale.model_dump()
+        result["generated_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info(
+            "finale generated OK (attempt %d, headline=%r)",
+            attempt + 1, finale.headline[:40],
+        )
+        return result
+
+    logger.error("finale all retries failed — fallback. last=%s", last_error)
+    result = dict(FALLBACK_FINALE)
+    result["generated_at"] = datetime.now(timezone.utc).isoformat()
+    return result

@@ -13,9 +13,11 @@
  *   - query ?from_session={sessionId}  옵션, Sia session reference (현재 미사용)
  *   - localStorage `sigak_user_id`  필수 (Kakao 로그인)
  *
- * 페르소나 B 톤:
- *   - "정면 사진 한 장 보여주세요"
- *   - "얼굴이 또렷하게 잡히는 사진이면 돼요. 화장은 안 하셔도 분석 가능해요."
+ * 안내 톤 (테스터 피드백 2026-04-27):
+ *   - 헤드: "정면 사진 한 장 보여주세요"
+ *   - 본문: "얼굴이 또렷하게 잡히는 사진이면 돼요."
+ *   - 정확도 가이드 (강조): 정면 / 자연광 / 화장 없음 3 조건. 옵션이 아닌
+ *     권장. 얼굴형·피부톤 분석 정확도 직결.
  */
 
 "use client";
@@ -276,9 +278,66 @@ function PhotoUploadContent() {
           }}
         >
           얼굴이 또렷하게 잡히는 사진이면 돼요.
-          <br />
-          화장은 안 하셔도 분석 가능해요.
         </p>
+
+        {/* 정확도 가이드 — 얼굴형·피부톤 분석 직결 (테스터 피드백 2026-04-27)
+            "정면 / 자연광 / 화장 없음" 3 조건 시각화. 옵션이 아닌 권장 (강한 톤). */}
+        <div
+          className="font-sans"
+          style={{
+            marginTop: 20,
+            padding: "16px 18px",
+            border: "1px solid var(--color-line)",
+            borderRadius: 10,
+            background: "rgba(0, 0, 0, 0.025)",
+          }}
+        >
+          <p
+            className="uppercase"
+            style={{
+              margin: 0,
+              marginBottom: 10,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              opacity: 0.55,
+            }}
+          >
+            정확한 분석을 위해
+          </p>
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 7,
+              fontSize: 13,
+              lineHeight: 1.55,
+              letterSpacing: "-0.005em",
+            }}
+          >
+            <li style={{ display: "flex", gap: 8 }}>
+              <span aria-hidden style={{ opacity: 0.45 }}>·</span>
+              <span>
+                <strong style={{ fontWeight: 600 }}>정면 사진</strong> — 얼굴이 카메라를 똑바로 보는 각도
+              </span>
+            </li>
+            <li style={{ display: "flex", gap: 8 }}>
+              <span aria-hidden style={{ opacity: 0.45 }}>·</span>
+              <span>
+                <strong style={{ fontWeight: 600 }}>자연광</strong> — 창가·야외 권장 (실내 조명·플래시는 피부톤 왜곡)
+              </span>
+            </li>
+            <li style={{ display: "flex", gap: 8 }}>
+              <span aria-hidden style={{ opacity: 0.45 }}>·</span>
+              <span>
+                <strong style={{ fontWeight: 600 }}>화장 없는 상태</strong> — 피부톤·얼굴형 정확도 직결
+              </span>
+            </li>
+          </ul>
+        </div>
 
         {/* 사진 슬롯 그리드 — 정면 1 + 측면 2 (마케터 dashed + 슬롯 번호 차용) */}
         <div

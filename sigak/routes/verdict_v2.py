@@ -230,15 +230,16 @@ async def create_verdict_v2(
             "verdict v2 create: history_injector failed user=%s", user["id"]
         )
 
-    # 5. Sonnet 4.6 cross-analysis
+    # 5. Sonnet 4.6 cross-analysis (return_raw=True — LLM raw 영구 저장)
     try:
-        result = build_verdict_v2(
+        result, raw_sonnet_text, sonnet_attempts = build_verdict_v2(
             user_profile=profile,
             photos=photo_inputs,
             trend_data=None,       # Phase 1 에선 trend_data (legacy 벡터) 미주입
             matched_trends=matched_trends,   # Phase L 확장
             taste_profile=taste_profile,     # Phase L 확장
             history_context=history_context,
+            return_raw=True,
         )
     except VerdictV2RateLimitedError:
         # 429 — 모든 backoff 시도 소진. 친화 메시지 + 503 (service unavailable, retry-after 힌트).
@@ -267,6 +268,9 @@ async def create_verdict_v2(
         raise HTTPException(400, str(e))
 
     # 5. R2 업로드 — 영구 보관. ranked_photo_ids 컬럼에 photo_index + r2_key 기록.
+    # 데이터 기업 원칙: R2 put 실패 → r2_persistence dead-letter 보존.
+    from services import r2_persistence
+
     verdict_id = f"vrd_{uuid.uuid4().hex[:24]}"
     photo_records: list[dict] = []       # DB 저장용: {photo_index, r2_key, content_type}
     photo_urls: list[Optional[str]] = [] # 응답용
@@ -276,24 +280,62 @@ async def create_verdict_v2(
             user["id"], f"verdicts/{verdict_id}/photo_{idx}{ext}",
         )
         try:
-            r2_client.put_bytes(key, data, content_type=ct)
-            photo_records.append({
-                "photo_index": idx,
-                "r2_key": key,
-                "content_type": ct,
-            })
-            photo_urls.append(r2_client.public_url(key))
-        except Exception:
-            logger.exception(
-                "verdict v2 R2 upload failed: verdict_id=%s idx=%d", verdict_id, idx,
+            _, durable = r2_persistence.put_bytes_durable(
+                db,
+                user_id=user["id"],
+                purpose="verdict_v2_photo",
+                r2_key=key,
+                data=data,
+                content_type=ct,
             )
-            # 저장 실패해도 verdict 생성 계속 — 응답에선 해당 slot None.
+            if durable:
+                photo_records.append({
+                    "photo_index": idx,
+                    "r2_key": key,
+                    "content_type": ct,
+                })
+                photo_urls.append(r2_client.public_url(key))
+            else:
+                # dead-letter 에는 보존됨. 응답에선 해당 slot None (재시도 후 회복 가능).
+                photo_records.append({
+                    "photo_index": idx,
+                    "r2_key": None,
+                    "content_type": ct,
+                    "dead_letter": True,
+                })
+                photo_urls.append(None)
+        except Exception:
+            logger.critical(
+                "verdict v2 R2 upload CRITICAL (dead-letter 도 실패?): "
+                "verdict_id=%s idx=%d", verdict_id, idx,
+            )
             photo_records.append({
                 "photo_index": idx,
                 "r2_key": None,
                 "content_type": ct,
             })
             photo_urls.append(None)
+
+    # 5.5. LLM raw response 영구 저장 — 데이터 기업 원칙 (재현 불가능한 LLM 출력).
+    raw_sonnet_r2_key: Optional[str] = None
+    if raw_sonnet_text:
+        sonnet_key = r2_client.verdict_sonnet_raw_key(user["id"], verdict_id)
+        try:
+            _, durable = r2_persistence.put_bytes_durable(
+                db,
+                user_id=user["id"],
+                purpose="verdict_v2_sonnet_raw",
+                r2_key=sonnet_key,
+                data=raw_sonnet_text.encode("utf-8"),
+                content_type="text/plain; charset=utf-8",
+            )
+            # dead-letter 라도 key 는 동일하므로 컬럼에 기록 (운영자 retry 후 회복).
+            raw_sonnet_r2_key = sonnet_key
+        except Exception:
+            logger.critical(
+                "verdict v2 sonnet_raw CRITICAL: verdict_id=%s — raw 손실 위험",
+                verdict_id,
+            )
 
     # v1 NOT NULL columns 에 v2 sensible defaults
     # 2026-04-26: full_unlocked=TRUE (선결제 — 생성 시점 차감 후 풀 노출)
@@ -304,12 +346,14 @@ async def create_verdict_v2(
             "  id, user_id, candidate_count, winner_photo_id, ranked_photo_ids, "
             "  coordinates_snapshot, reasoning_unlocked, blur_released, gold_reading, "
             "  preview_shown, full_unlocked, preview_content, full_content, "
-            "  user_profile_snapshot, version"
+            "  user_profile_snapshot, version, "
+            "  raw_sonnet_r2_key, sonnet_attempt_count"
             ") VALUES ("
             "  :id, :uid, :cc, :wp, CAST(:ranked AS jsonb), "
             "  NULL, FALSE, FALSE, '', "
             "  TRUE, TRUE, CAST(:pc AS jsonb), CAST(:fc AS jsonb), "
-            "  CAST(:ps AS jsonb), 'v2'"
+            "  CAST(:ps AS jsonb), 'v2', "
+            "  :raw_key, :attempts"
             ")"
         ),
         {
@@ -325,6 +369,8 @@ async def create_verdict_v2(
             "ps": json.dumps(
                 _sanitize_profile_snapshot(profile), default=str, ensure_ascii=False,
             ),
+            "raw_key": raw_sonnet_r2_key,
+            "attempts": sonnet_attempts,
         },
     )
 

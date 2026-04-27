@@ -636,7 +636,8 @@ def build_verdict_v2(
     taste_profile: Optional[Any] = None,
     max_retries: int = 2,
     history_context: str = "",
-) -> VerdictV2Result:
+    return_raw: bool = False,
+) -> "VerdictV2Result | tuple[VerdictV2Result, str, int]":
     """Verdict 2.0 build — Sonnet 4.6 cross-analysis.
 
     Args:
@@ -648,9 +649,14 @@ def build_verdict_v2(
         taste_profile: (Phase L, optional) UserTasteProfile snapshot. 대화+IG 누적 취향.
         max_retries: 파싱/검증/API 실패 시 재시도 횟수. default 4 (= 총 5 attempts).
             Rate limit (429) 발생 시 exponential backoff 으로 자동 대기 (15s/30s/60s/120s).
+        return_raw: True 이면 (result, raw_sonnet_response, attempt_count) tuple 반환.
+            False (기본) 이면 VerdictV2Result 만 반환 (backward-compat).
+            데이터 기업 원칙으로 LLM raw 영구 저장이 필요할 때 caller 가 True.
 
     Returns:
-        VerdictV2Result (preview + full_content)
+        VerdictV2Result (preview + full_content) — return_raw=False 시.
+        tuple[VerdictV2Result, str, int] — return_raw=True 시. raw 는 _strip_json_fence
+        적용 전 원시 텍스트, attempt_count 는 1-based 성공 시도 번호.
 
     Raises:
         ValueError: photos 0 장 또는 10 장 초과
@@ -690,6 +696,8 @@ def build_verdict_v2(
                 "verdict_v2 success: attempt=%d photos=%d best_fit_idx=%s (cta_pi suppressed)",
                 attempt + 1, len(photos), result.full_content.best_fit_photo_index,
             )
+            if return_raw:
+                return result, raw, attempt + 1
             return result
         except (json.JSONDecodeError, ValidationError) as e:
             last_error = e

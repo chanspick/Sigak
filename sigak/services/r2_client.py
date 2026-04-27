@@ -178,6 +178,29 @@ def ig_snapshot_vision_raw_key(user_id: str, snapshot_ts: str) -> str:
     )
 
 
+def verdict_sonnet_raw_key(user_id: str, verdict_id: str) -> str:
+    """Verdict v2 Sonnet cross-analysis response raw text 저장 키.
+
+    데이터 기업 원칙 — LLM 출력 영구 보존. 응답 본문이 수 KB 라 BYTEA
+    DB 누적 부담 → R2 영구 저장. 실패 시 r2_persistence dead-letter.
+    """
+    return user_media_key(
+        user_id, f"verdicts/{verdict_id}/sonnet_raw.txt"
+    )
+
+
+def pi_llm_raw_key(user_id: str, report_id: str, step: str) -> str:
+    """옛 SIGAK_V3 PI 의 LLM 호출별 raw response 저장 키.
+
+    step 예시: face_structure / interview / type_match / gap_narration / finale.
+    각 호출의 원시 응답 (재현 불가능한 LLM 텍스트) 영구 보존.
+    """
+    safe_step = "".join(c for c in step if c.isalnum() or c in "_-")
+    return user_media_key(
+        user_id, f"reports/{report_id}/llm_raw/{safe_step}.txt"
+    )
+
+
 # ─────────────────────────────────────────────
 #  Public API
 # ─────────────────────────────────────────────

@@ -45,20 +45,14 @@ from services import user_history
 from services.sia_decision import (
     Composition,
     decide,
-    decide_v4,
     update_state_from_user_turn,
 )
-from services.sia_flag_extractor import extract_flags, extract_flags_v4
-from services.sia_hardcoded import render_hardcoded, render_opening_v4
+from services.sia_flag_extractor import extract_flags
+from services.sia_hardcoded import render_hardcoded
 from services.sia_llm import _render_ig_summary
 from services.sia_prompts_v4 import load_haiku_prompt
 from services.sia_session import _backup_key, session_key  # Redis 키 재사용
-from services.sia_v4_slots import render_v4_template
-from services.sia_validators_v4 import (
-    populate_turn_counts,
-    validate,
-    validate_v4,
-)
+from services.sia_validators_v4 import populate_turn_counts, validate
 from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
 
@@ -566,77 +560,6 @@ def _record_assistant_turn(
 
 
 # ─────────────────────────────────────────────
-#  v4 Maintenance Gate (Phase 1, 2026-04-28)
-# ─────────────────────────────────────────────
-
-def _maintenance_gate() -> None:
-    """SIA_V4_MAINTENANCE=true 시 /sia/chat/* 엔드포인트 503 차단.
-
-    페르소나 C → v4 "미감 비서" 재작성 진입 (베타 hotfix Final).
-    v4 완성 (Phase 7) 후 SIA_V4_MAINTENANCE=false 로 복귀.
-
-    Railway env override: SIA_V4_MAINTENANCE="true"/"false".
-    """
-    from config import get_settings
-    if get_settings().sia_v4_maintenance:
-        raise HTTPException(
-            status_code=503,
-            detail="Sia 점검 중입니다. 잠시 후 다시 시도해주세요.",
-        )
-
-
-# ─────────────────────────────────────────────
-#  v4 Helpers (Phase 3, 2026-04-28)
-# ─────────────────────────────────────────────
-
-def _render_v4_assistant_text(
-    turn_id: str,
-    state: ConversationState,
-    *,
-    vault_history: Optional[UserHistory] = None,
-    user_phrases: Optional[list[str]] = None,
-) -> str:
-    """v4 assistant 메시지 렌더링.
-
-    T1 → render_opening_v4 (단일 템플릿).
-    T2-T11 → render_v4_template (슬롯 동적 치환).
-
-    LLM 호출 없음. 결정적 출력 보장.
-    """
-    if turn_id == "T1":
-        return render_opening_v4(state)
-    return render_v4_template(
-        turn_id, state,
-        vault_history=vault_history,
-        user_phrases=user_phrases,
-    )
-
-
-def _record_v4_assistant_turn(
-    state: ConversationState,
-    text: str,
-    turn_id: str,
-) -> AssistantTurn:
-    """v4 turn → AssistantTurn append + 어미 카운트 충전.
-
-    msg_type 은 sentinel — v4 라우팅은 turn_id 사용, msg_type 은 logging/호환만.
-    T1 → OPENING_DECLARATION, 그 외 → OBSERVATION.
-    """
-    sentinel = (
-        MsgType.OPENING_DECLARATION if turn_id == "T1"
-        else MsgType.OBSERVATION
-    )
-    turn = AssistantTurn(
-        text=text,
-        msg_type=sentinel,
-        turn_idx=len(state.turns),
-    )
-    populate_turn_counts(turn)
-    state.turns.append(turn)
-    return turn
-
-
-# ─────────────────────────────────────────────
 #  Endpoints
 # ─────────────────────────────────────────────
 
@@ -652,7 +575,6 @@ def chat_start(
     - decide(state) → M1 결합 Composition
     - OPENING 하드코딩 + OBSERVATION Haiku 합쳐서 한 메시지 전송
     """
-    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
@@ -681,20 +603,40 @@ def chat_start(
     state.gender = profile.get("gender") if profile.get("gender") in ("female", "male") else None
     state.ig_feed_cache = profile.get("ig_feed_cache")
 
-    # v4 T1 — 단일 템플릿 (LLM 호출 X). decide_v4 user_turn_count=0 시 T1 반환.
-    # 페르소나 C 시대 M1 결합 (OPENING + OBSERVATION) 폐기 — Sia 가 첫 메시지에서
-    # 분석/단정 안 하는 게 v4 핵심 (A-24 해석 천천히, T1-T5 단정 금지).
-    opening_message = _render_v4_assistant_text("T1", state)
-
-    # v4 validate — warning only (A-30 / A-34 / 영업/추상칭찬/길이/마크다운)
-    v4_result = validate_v4(opening_message, "T1")
-    if v4_result.get("errors"):
-        logger.warning(
-            "v4 T1 validate cid=%s errors=%s",
-            conv_id, v4_result["errors"],
+    composition = decide(state)
+    if composition.primary_type != MsgType.OPENING_DECLARATION:
+        # decide() 가 첫 턴에서 M1 결합을 보장하는데, 다른 타입이 나오면 로직 버그.
+        logger.error(
+            "chat_start: decide returned %s instead of OPENING_DECLARATION",
+            composition.primary_type,
         )
 
-    _record_v4_assistant_turn(state, opening_message, "T1")
+    # STEP 5i — 이전 대화/분석 맥락 주입 (cross-session, markdown prepend)
+    history_context = ""
+    try:
+        from services.history_injector import build_history_context
+        history_context = build_history_context(
+            db, user["id"],
+            include=[
+                "conversations", "aspiration_analyses", "best_shot_sessions",
+                "verdict_sessions", "pi_history",
+            ],
+            max_per_type=1,
+        )
+    except Exception:
+        logger.exception("chat_start: history_injector failed user=%s", user["id"])
+
+    # 재대화 vault 주입 (4 기능 누적 데이터 + user_original_phrases) → Haiku
+    # _build_context "## 본인 누적 데이터 (재대화 시)" 블록.
+    vault_history, user_phrases = _load_vault_for_sia(db, user["id"])
+
+    opening_message = _render_assistant_message(
+        composition, state,
+        history_context=history_context,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
+    )
+    _record_assistant_turn(state, opening_message, composition)
     sia_session_v4.save_conversation_state(state)
 
     return StartResponse(
@@ -722,7 +664,6 @@ def chat_message(
       6. AssistantTurn append + 집계 갱신.
       7. save_conversation_state (primary+backup dual-write).
     """
-    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
@@ -750,43 +691,57 @@ def chat_message(
     if state.status != "active":
         raise HTTPException(409, f"session not active: status={state.status}")
 
-    # 재대화 vault 조회 (vault_present 판정 + T7-vault 슬롯용)
-    vault_history, user_phrases = _load_vault_for_sia(db, user["id"])
-    vault_present = (vault_history is not None) or bool(user_phrases)
-
-    # 1. v4 flag 추출 (3 flag) + UserTurn append
-    user_flags = extract_flags_v4(body.user_message, vault_present=vault_present)
+    # 1. UserTurn append + 상태 업데이트
+    user_flags = extract_flags(body.user_message)
     state.turns.append(UserTurn(
         text=body.user_message,
         turn_idx=len(state.turns),
         flags=user_flags,
     ))
+    update_state_from_user_turn(state, body.user_message)
 
-    # 2. v4 turn_id 결정 (T1-T11 + 분기 4건: T2/T3/T5/T7)
-    turn_id = decide_v4(state, user_flags)
+    # 2. 의사결정
+    composition = decide(state)
+    msg_type = composition.primary_type
 
-    # 3. v4 렌더 (LLM 호출 X — 결정적 슬롯 치환)
-    assistant_text = _render_v4_assistant_text(
-        turn_id, state,
+    # 재대화 vault 주입 — chat_start 와 동일 entry. 매 turn load (단일 SELECT, 1-3ms).
+    vault_history, user_phrases = _load_vault_for_sia(db, user["id"])
+
+    # 3. 응답 렌더
+    assistant_text = _render_assistant_message(
+        composition, state,
         vault_history=vault_history,
         user_phrases=user_phrases,
     )
 
-    # 4. v4 validate — warning only
-    v4_result = validate_v4(assistant_text, turn_id)
-    if v4_result.get("errors"):
+    # 4. Validator — 경고만 (STEP 2-G 스코프: 파이프라인 개통 우선)
+    v = validate(
+        assistant_text, msg_type, state=state,
+        range_mode=composition.range_mode,
+        confrontation_block=composition.confrontation_block,
+        is_combined=composition.is_combined,
+        exit_confirmed=composition.exit_confirmed,
+    )
+    if v.errors:
         logger.warning(
-            "v4 %s validate cid=%s errors=%s",
-            turn_id, body.conversation_id, v4_result["errors"],
+            "sia validate errors cid=%s type=%s errs=%s",
+            body.conversation_id, msg_type.value, v.errors,
+        )
+    if v.warnings:
+        logger.info(
+            "sia validate warnings cid=%s: %s",
+            body.conversation_id, v.warnings,
         )
 
-    # 5. AssistantTurn append + state save
-    _record_v4_assistant_turn(state, assistant_text, turn_id)
+    # 5. AssistantTurn append + 집계
+    _record_assistant_turn(state, assistant_text, composition)
     sia_session_v4.save_conversation_state(state)
 
-    # 6. v4 종료 신호: T11 (마무리) 도달 시 ending_soon
-    turn_count = len(state.turns) // 2
-    status = "ending_soon" if turn_id == "T11" else "active"
+    # 6. 세션 한계 체크
+    from config import get_settings
+    limit = get_settings().sia_session_max_turns
+    turn_count = len(state.turns) // 2  # user+assistant 왕복 기준
+    status = "ending_soon" if turn_count >= limit else "active"
 
     return MessageResponse(
         conversation_id=body.conversation_id,
@@ -804,7 +759,6 @@ def chat_end(
     db=Depends(db_session),
 ) -> EndResponse:
     """명시 종료 — conversations INSERT (status="ended") + Sonnet extraction 큐잉."""
-    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 

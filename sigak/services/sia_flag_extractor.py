@@ -16,14 +16,6 @@ PHASE_H_DIRECTIVE §3.1. 0.01s 수준 결정적 플래그. 애매 케이스는 H
 """
 from __future__ import annotations
 
-# ─────────────────────────────────────────────
-# v4 QUARANTINE (2026-04-28) — 페르소나 C 시대 코드.
-# Phase 3 에서 9 flag → 3 flag (has_self_doubt / has_uncertainty / vault_present)
-# 으로 재작성. 시그니처 호환을 위해 기존 9 flag 필드는 보존 (default False) 가능.
-# 런타임 보호: SIA_V4_MAINTENANCE=true 시 /sia/* 503 응답.
-# Archive: sigak/services/_legacy_persona_c/README.md 참조.
-# ─────────────────────────────────────────────
-
 import re
 
 from schemas.sia_state import UserMessageFlags
@@ -131,71 +123,3 @@ def extract_flags(text: str) -> UserMessageFlags:
     flags.is_defensive = any(m in text for m in _DEFENSIVE_MARKERS)
 
     return flags
-
-
-# ─────────────────────────────────────────────
-#  v4 Flag Extractor (2026-04-28)
-#
-#  T3-norm / T5-B / T7-vault 분기용 3 flag.
-#  페르소나 C 시대 9 flag 는 default False (시그니처 호환 보존).
-# ─────────────────────────────────────────────
-
-_SELF_DOUBT_PATTERNS = [
-    re.compile(r"별로"),
-    re.compile(r"못생"),
-    re.compile(r"이상해"),
-    re.compile(r"괜찮나"),
-    re.compile(r"자신없"),
-    re.compile(r"안\s*예쁘"),
-    re.compile(r"잘\s*안\s*어울"),
-    re.compile(r"비교"),
-    re.compile(r"부럽"),
-    re.compile(r"나만"),
-]
-
-_UNCERTAINTY_PATTERNS = [
-    re.compile(r"잘\s*모르겠"),
-    re.compile(r"확실하지\s*않"),
-    re.compile(r"잘\s*모"),
-    re.compile(r"글쎄"),
-    re.compile(r"음\.\."),
-]
-
-# 답변 자수 임계 — 미만 + 결정 회피 표현 부재 시 has_uncertainty 판정 보조
-_V4_UNCERTAINTY_LEN_THRESHOLD = 20
-
-
-def extract_flags_v4(user_text: str, vault_present: bool = False) -> UserMessageFlags:
-    """v4 flag 추출 (3 flag) — T3-norm / T5-B / T7-vault 분기.
-
-    Parameters
-    ----------
-    user_text : 직전 사용자 발화.
-    vault_present : 외부에서 주입 — UserDataVault 에 history 1+ 건 또는
-                    user_original_phrases 1+ 개 있으면 True. 라우터 (routes/sia.py)
-                    의 _load_vault_for_sia 결과로부터 계산.
-
-    Returns
-    -------
-    UserMessageFlags : v4 3 flag (has_self_doubt / has_uncertainty / vault_present)
-                       + 페르소나 C 시대 9 flag (default False, 시그니처 호환).
-    """
-    text = user_text or ""
-    return UserMessageFlags(
-        has_self_doubt=any(p.search(text) for p in _SELF_DOUBT_PATTERNS),
-        has_uncertainty=(
-            any(p.search(text) for p in _UNCERTAINTY_PATTERNS)
-            or len(text.strip()) < _V4_UNCERTAINTY_LEN_THRESHOLD
-        ),
-        vault_present=vault_present,
-        # 페르소나 C 시대 9 flag — v4 미사용, default False
-        has_concede=False,
-        has_emotion_word=False,
-        emotion_word_raw=None,
-        has_tt=False,
-        has_explain_req=False,
-        has_meta_challenge=False,
-        has_evidence_doubt=False,
-        has_self_disclosure=False,
-        is_defensive=False,
-    )

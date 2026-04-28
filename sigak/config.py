@@ -89,12 +89,6 @@ class Settings(BaseSettings):
     # ISO date string. Railway env BETA_FREE_UNTIL 로 override.
     beta_free_until: str = "2026-05-15"
 
-    # ── Sia v4 Maintenance Gate (2026-04-28) ──
-    # 페르소나 C → v4 "미감 비서" 재작성 진입 (베타 hotfix Final).
-    # True 시 /api/v1/sia/chat/* 엔드포인트 503. 베타 광고 일시 중단 + v4 완성 후 false 복귀.
-    # Railway env SIA_V4_MAINTENANCE 로 override (string "true"/"false" → bool 자동 파싱).
-    sia_v4_maintenance: bool = False
-
     class Config:
         env_file = (".env", "../.env")
         env_file_encoding = "utf-8"

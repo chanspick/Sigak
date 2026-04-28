@@ -35,17 +35,9 @@ Detectors (세션 #6/7 패턴):
 """
 from __future__ import annotations
 
-# ─────────────────────────────────────────────
-# v4 QUARANTINE (2026-04-28) — 페르소나 C 시대 코드.
-# Phase 3 에서 14 메시지 타입 라우팅 → 11 turn (T1-T11) 단일 시나리오 + 분기 4건
-# (T2 30자 / T3 self_doubt / T5 uncertainty / T7 vault_present) 으로 재작성.
-# 런타임 보호: SIA_V4_MAINTENANCE=true 시 /sia/* 503 응답.
-# Archive: sigak/services/_legacy_persona_c/README.md 참조.
-# ─────────────────────────────────────────────
-
 import re
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Optional
 
 from schemas.sia_state import (
     DIAGNOSIS_MIN_RATIO,
@@ -548,79 +540,3 @@ def _empathy_combined(
         primary_type=MsgType.EMPATHY_MIRROR,
         secondary_type=MsgType.PROBE,
     )
-
-
-# ─────────────────────────────────────────────
-#  v4 Decision (T1-T11 + 분기 4건)  —  2026-04-28
-#
-#  페르소나 C 시대 14 메시지 타입 라우팅 → 11 turn 단일 시나리오 + 분기 4건
-#  (T2 30자 / T3 self_doubt / T5 uncertainty / T7 vault_present) 으로 재작성.
-# ─────────────────────────────────────────────
-
-V4Turn = Literal[
-    "T1", "T2-A", "T2-C",
-    "T3-base", "T3-norm",
-    "T4",
-    "T5-A", "T5-B",
-    "T6",
-    "T7-base", "T7-vault",
-    "T8", "T9", "T10", "T11",
-]
-"""v4 turn 식별자 (15 종 = 11 turn + 분기 4건)."""
-
-
-_V4_T2_LENGTH_THRESHOLD = 30
-"""T2 분기 자수 기준 — 미만 = T2-A / 이상 = T2-C."""
-
-
-def decide_v4(state: ConversationState, user_flags: UserMessageFlags) -> V4Turn:
-    """v4 단일 시나리오 라우팅 (T1-T11 + 분기 4건).
-
-    user_turn_count = len(state.user_turns()) — 사용자가 응답한 횟수.
-    chat_start 시 0 → T1 (오프닝). 이후 사용자 발화 1건당 1 증가.
-
-    분기:
-      T2: 사용자 답변 30자 미만 → T2-A / 30자+ → T2-C
-      T3: has_self_doubt → T3-norm / 그 외 → T3-base
-      T5: has_uncertainty → T5-B / 그 외 → T5-A
-      T7: vault_present → T7-vault / 그 외 → T7-base
-
-    user_turn_count >= 10 → T11 (작별).
-    """
-    user_turn_count = len(state.user_turns())
-
-    if user_turn_count == 0:
-        return "T1"
-
-    if user_turn_count == 1:
-        last_user = state.last_user()
-        last_text = last_user.text if last_user else ""
-        return (
-            "T2-A" if len(last_text.strip()) < _V4_T2_LENGTH_THRESHOLD else "T2-C"
-        )
-
-    if user_turn_count == 2:
-        return "T3-norm" if user_flags.has_self_doubt else "T3-base"
-
-    if user_turn_count == 3:
-        return "T4"
-
-    if user_turn_count == 4:
-        return "T5-B" if user_flags.has_uncertainty else "T5-A"
-
-    if user_turn_count == 5:
-        return "T6"
-
-    if user_turn_count == 6:
-        return "T7-vault" if user_flags.vault_present else "T7-base"
-
-    if user_turn_count == 7:
-        return "T8"
-
-    if user_turn_count == 8:
-        return "T9"
-
-    if user_turn_count == 9:
-        return "T10"
-
-    return "T11"

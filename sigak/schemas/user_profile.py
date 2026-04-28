@@ -140,10 +140,6 @@ class IgFeedAnalysis(_BaseSchema):
 
     analyzed_at: Vision 호출 시각. last_analyzed_post_count 와 결합하여
     refresh 정책 (delta >= 3) 판정.
-
-    v4 (2026-04-28): signature_observations 신규 — Sia v4 T6/T7/T8 의 [관찰]
-    슬롯 입력. 관형형+명사 형식 5-10개 (예: "채도 높은 쪽" / "톤 정돈된 분위기").
-    sia_v4_slots.render_slot 이 첫 항목 사용.
     """
     tone_category: ToneCategory
     tone_percentage: int = Field(ge=0, le=100)
@@ -155,8 +151,6 @@ class IgFeedAnalysis(_BaseSchema):
     mood_signal: str  # 1문장 정중체
     three_month_shift: Optional[str] = None
     analyzed_at: datetime
-    # v4: 관형형+명사 관찰 5-10개 (T6/T7/T8 [관찰] 슬롯 입력)
-    signature_observations: list[str] = Field(default_factory=list, max_length=10)
 
 
 class IgFeedCache(_BaseSchema):

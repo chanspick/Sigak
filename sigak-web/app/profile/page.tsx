@@ -18,17 +18,18 @@ import { useRouter } from "next/navigation";
 
 import { getCurrentUser, getToken, logout } from "@/lib/auth";
 import { useTokenBalance } from "@/hooks/use-token-balance";
+import { useAvatar } from "@/hooks/use-avatar";
 import { TopBar } from "@/components/ui/sigak";
 import { SiteFooter } from "@/components/sigak/site-footer";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { balance } = useTokenBalance();
+  const { feedAvatarUrl, kakaoAvatarUrl } = useAvatar();
+  const avatarSrc = feedAvatarUrl || kakaoAvatarUrl;
 
   const [profile, setProfile] = useState<{
     name: string;
-    email: string;
-    profileImage: string;
     kakaoId: string;
   } | null>(null);
 
@@ -41,8 +42,6 @@ export default function SettingsPage() {
     if (u) {
       setProfile({
         name: u.name || "",
-        email: u.email || "",
-        profileImage: u.profileImage || "",
         kakaoId: u.kakaoId || "",
       });
     }
@@ -111,17 +110,26 @@ export default function SettingsPage() {
             height: 56,
             borderRadius: "50%",
             flexShrink: 0,
-            background: profile?.profileImage
+            background: avatarSrc
               ? "transparent"
               : "linear-gradient(135deg, #e8d9c8, #b8a58a)",
             overflow: "hidden",
           }}
         >
-          {profile?.profileImage && (
+          {avatarSrc && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={profile.profileImage}
+              src={avatarSrc}
               alt=""
+              onError={(e) => {
+                if (
+                  feedAvatarUrl &&
+                  kakaoAvatarUrl &&
+                  e.currentTarget.src !== kakaoAvatarUrl
+                ) {
+                  e.currentTarget.src = kakaoAvatarUrl;
+                }
+              }}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
           )}
@@ -139,21 +147,6 @@ export default function SettingsPage() {
           >
             {profile?.name || "익명"}
           </div>
-          {profile?.email && (
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--color-mute)",
-                letterSpacing: "0.02em",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {profile.email}
-            </div>
-          )}
         </div>
       </section>
 

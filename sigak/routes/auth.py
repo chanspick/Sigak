@@ -99,6 +99,12 @@ class MeResponse(BaseModel):
     # 2026-04-27: 프론트 male v1.1 차단 UI 분기용. 권위 = user_profiles.gender
     # (vault 와 동일 source). NULL/미설정 시 None — UI 가 통과 처리.
     gender: Optional[str] = None
+    # 2026-04-28: 홈 / 설정 / 피드쉘 아바타 우선순위 = IG 첫 피드 사진 → 카카오 프사 fallback.
+    #   source: ig_feed_cache.latest_posts[0].display_url
+    #   guarantee: r2_public_base_url prefix 검증 통과한 영구 URL 만 반환.
+    #     raw IG CDN URL (24-48h 만료) / r2:// 스킴 / R2 public 미설정 케이스는 모두 None.
+    #   유저가 IG 핸들 없거나 scrape 실패면 None — 프론트가 카카오 프사 사용.
+    feed_avatar_url: Optional[str] = None
 
 
 @router.get("/me", response_model=MeResponse)
@@ -117,6 +123,7 @@ def get_me(
     onboarding_completed = False
     ig_handle: Optional[str] = None
     gender: Optional[str] = None
+    feed_avatar_url: Optional[str] = None
     if db is not None:
         # ig_handle 의 신뢰 source 우선순위 (3-tier fallback):
         #   1) user_profiles.ig_handle           — 분석 path (vault) 가 보는 값
@@ -128,6 +135,7 @@ def get_me(
         # essentials 와 update-ig 가 (1)+(2) dual-write 하지만 partial write /
         # v1→v2 마이그레이션으로 어긋난 경우, (3) 으로 자가 회복.
         # gender 는 vault 권위 = user_profiles.gender 우선. fallback users.gender.
+        # feed_avatar_url 은 latest_posts[0].display_url 을 R2 prefix 검증 후 반환.
         row = db.execute(
             text(
                 "SELECT u.consent_completed, u.onboarding_completed, u.birth_date, "
@@ -135,7 +143,8 @@ def get_me(
                 "       u.gender    AS u_gender, "
                 "       p.ig_handle AS p_ig, "
                 "       p.gender    AS p_gender, "
-                "       (p.ig_feed_cache #>> '{profile_basics,username}') AS cache_ig "
+                "       (p.ig_feed_cache #>> '{profile_basics,username}') AS cache_ig, "
+                "       (p.ig_feed_cache #>> '{latest_posts,0,display_url}') AS feed_avatar_raw "
                 "FROM users u "
                 "LEFT JOIN user_profiles p ON p.user_id = u.id "
                 "WHERE u.id = :uid"
@@ -155,6 +164,15 @@ def get_me(
             # gender — vault 권위 (p.gender) 우선, fallback users.gender. 비표준은 None.
             _g = (row.p_gender or row.u_gender or "").strip() or None
             gender = _g if _g in ("female", "male") else None
+            # feed_avatar_url — R2 public base 로 시작하는 영구 URL 만 통과.
+            # raw IG CDN URL (scontent-*.cdninstagram.com) / r2:// 스킴 / public 미설정
+            # 케이스는 전부 None. 프론트가 카카오 프사 fallback.
+            raw_avatar = getattr(row, "feed_avatar_raw", None)
+            if raw_avatar:
+                from config import get_settings
+                public_base = (get_settings().r2_public_base_url or "").rstrip("/")
+                if public_base and raw_avatar.startswith(public_base + "/"):
+                    feed_avatar_url = raw_avatar
             # 어디서 회복됐는지 진단용 한 줄 — 두 dual-write 컬럼이 어긋났거나
             # cache 로만 회복한 케이스를 식별 (정합 모니터링).
             if ig_handle is None:
@@ -180,6 +198,7 @@ def get_me(
         onboarding_completed=onboarding_completed,
         ig_handle=ig_handle,
         gender=gender,
+        feed_avatar_url=feed_avatar_url,
     )
 
 

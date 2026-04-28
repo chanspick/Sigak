@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { useTokenBalance } from "@/hooks/use-token-balance";
+import { useAvatar } from "@/hooks/use-avatar";
 import { getCurrentUser, getToken } from "@/lib/auth";
 import { getKakaoRedirectUri } from "@/lib/kakao";
 import { TopBar, SigakLoading } from "@/components/ui/sigak";
@@ -65,9 +66,9 @@ function LoggedInFeed() {
   const [tab, setTab] = useState<HomeTab>("feed");
   const [profile, setProfile] = useState<{
     name: string;
-    email: string;
-    profileImage: string;
   } | null>(null);
+  const { feedAvatarUrl, kakaoAvatarUrl } = useAvatar();
+  const avatarSrc = feedAvatarUrl || kakaoAvatarUrl;
 
   // 최신 PI 레포트 ID — 있으면 PiEntryCard / menu 03 가 /report/{id}/note 로 이동.
   // null = 없음 (1회차) / undefined = 로딩 중.
@@ -84,8 +85,6 @@ function LoggedInFeed() {
     if (u) {
       setProfile({
         name: u.name || "",
-        email: u.email || "",
-        profileImage: u.profileImage || "",
       });
     }
   }, []);
@@ -223,7 +222,7 @@ function LoggedInFeed() {
         </div>
       </header>
 
-      {/* PROFILE ME */}
+      {/* PROFILE ME — IG 첫 피드 사진(R2) 우선, 카카오 프사 fallback */}
       <section style={{ padding: "32px 24px 28px", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
         <div
           style={{
@@ -232,17 +231,27 @@ function LoggedInFeed() {
             borderRadius: "50%",
             margin: "0 auto 16px",
             overflow: "hidden",
-            background: profile?.profileImage
+            background: avatarSrc
               ? "transparent"
               : "linear-gradient(135deg, #e8d9c8, #b8a58a)",
             boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
           }}
         >
-          {profile?.profileImage && (
+          {avatarSrc && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={profile.profileImage}
+              src={avatarSrc}
               alt=""
+              onError={(e) => {
+                // R2 일시 장애 / 객체 삭제 등 — 카카오 프사로 graceful fallback.
+                if (
+                  feedAvatarUrl &&
+                  kakaoAvatarUrl &&
+                  e.currentTarget.src !== kakaoAvatarUrl
+                ) {
+                  e.currentTarget.src = kakaoAvatarUrl;
+                }
+              }}
               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
           )}
@@ -259,22 +268,6 @@ function LoggedInFeed() {
         >
           {profile?.name || "익명"}
         </div>
-        {profile?.email && (
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--color-mute)",
-              letterSpacing: "0.02em",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              padding: "0 24px",
-            }}
-          >
-            {profile.email}
-          </div>
-        )}
       </section>
 
       {/* TABS */}

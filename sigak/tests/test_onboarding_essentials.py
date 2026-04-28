@@ -288,6 +288,99 @@ def test_me_reports_essentials_incomplete_when_birth_date_null(client):
 
 
 # ─────────────────────────────────────────────
+#  /auth/me feed_avatar_url (홈/설정 IG 프사 — Option A)
+#  검증: latest_posts[0].display_url 이 r2_public_base_url prefix 통과해야만 노출.
+# ─────────────────────────────────────────────
+
+def _avatar_row(*, feed_avatar_raw):
+    """feed_avatar_url 테스트용 row 헬퍼. ig_handle/gender 안정값 함께 세팅."""
+    row = MagicMock()
+    row.consent_completed = True
+    row.onboarding_completed = False
+    row.birth_date = date(1999, 3, 15)
+    row.u_ig = None
+    row.p_ig = None
+    row.cache_ig = None
+    row.u_gender = "female"
+    row.p_gender = "female"
+    row.feed_avatar_raw = feed_avatar_raw
+    return row
+
+
+def _patch_r2_public(monkeypatch, base_url: str):
+    """config.get_settings().r2_public_base_url 만 차이나는 가벼운 stub."""
+    import config
+
+    class _S:
+        r2_public_base_url = base_url
+
+    monkeypatch.setattr(config, "get_settings", lambda: _S())
+
+
+def test_me_feed_avatar_url_returns_r2_url_when_prefix_matches(client, monkeypatch):
+    c, fake_db, _ = client
+    _patch_r2_public(monkeypatch, "https://cdn.sigak.asia")
+    fake_db.set_next_first(_avatar_row(
+        feed_avatar_raw="https://cdn.sigak.asia/user_media/u1/ig_snapshots/ts/photo_00.jpg",
+    ))
+
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["feed_avatar_url"] == \
+        "https://cdn.sigak.asia/user_media/u1/ig_snapshots/ts/photo_00.jpg"
+
+
+def test_me_feed_avatar_url_filters_raw_ig_cdn_url(client, monkeypatch):
+    """R2 업로드가 실패해서 display_url 이 raw IG CDN URL 로 남은 케이스 — 24-48h 만료."""
+    c, fake_db, _ = client
+    _patch_r2_public(monkeypatch, "https://cdn.sigak.asia")
+    fake_db.set_next_first(_avatar_row(
+        feed_avatar_raw="https://scontent-icn1-1.cdninstagram.com/v/t51/abc.jpg",
+    ))
+
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["feed_avatar_url"] is None
+
+
+def test_me_feed_avatar_url_filters_r2_scheme_fallback(client, monkeypatch):
+    """r2_public_base_url 미설정 환경에서 ig_scraper 가 r2://key 를 반환한 케이스."""
+    c, fake_db, _ = client
+    _patch_r2_public(monkeypatch, "https://cdn.sigak.asia")
+    fake_db.set_next_first(_avatar_row(
+        feed_avatar_raw="r2://user_media/u1/ig_snapshots/ts/photo_00.jpg",
+    ))
+
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["feed_avatar_url"] is None
+
+
+def test_me_feed_avatar_url_none_when_public_base_unset(client, monkeypatch):
+    """env 에 R2_PUBLIC_BASE_URL 이 없으면 어떤 URL 도 신뢰 안 함."""
+    c, fake_db, _ = client
+    _patch_r2_public(monkeypatch, "")
+    fake_db.set_next_first(_avatar_row(
+        feed_avatar_raw="https://cdn.sigak.asia/user_media/u1/ig_snapshots/ts/photo_00.jpg",
+    ))
+
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["feed_avatar_url"] is None
+
+
+def test_me_feed_avatar_url_none_when_cache_empty(client, monkeypatch):
+    """ig_feed_cache 자체가 NULL → SQL #>> 가 NULL 반환 → None."""
+    c, fake_db, _ = client
+    _patch_r2_public(monkeypatch, "https://cdn.sigak.asia")
+    fake_db.set_next_first(_avatar_row(feed_avatar_raw=None))
+
+    r = c.get("/api/v1/auth/me")
+    assert r.status_code == 200
+    assert r.json()["feed_avatar_url"] is None
+
+
+# ─────────────────────────────────────────────
 #  신규 가입자 30 토큰 지급 (essentials 완료 시 1회)
 #  idempotency_key 로 race / 재제출 방어.
 # ─────────────────────────────────────────────

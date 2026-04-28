@@ -129,6 +129,9 @@ export interface AuthMeV2Response {
   gender?: "female" | "male" | null;
   /** /profile/edit 가 현재 핸들 표시용으로 사용. null = 등록된 IG 핸들 없음. */
   ig_handle?: string | null;
+  /** 2026-04-28: 홈/설정/피드쉘 아바타 IG 우선. R2 영구 URL 만 노출 (raw IG CDN 24-48h 만료 차단).
+   *  null = IG 핸들 없음 / scrape 실패 / R2 미업로드. 프론트는 카카오 프사 fallback. */
+  feed_avatar_url?: string | null;
 }
 
 // ─────────────────────────────────────────────

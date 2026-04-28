@@ -16,6 +16,8 @@ const LEGACY_KEYS = [
   "sigak_user_phone",
   "sigak_profile_image",
   "sigak_kakao_id",
+  // useAvatar 캐시 — 다른 계정 로그인 시 IG 프사 누수 방지.
+  "sigak_feed_avatar",
 ] as const;
 
 // ─────────────────────────────────────────────

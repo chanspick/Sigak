@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { getCurrentUser } from "@/lib/auth";
+import { useAvatar } from "@/hooks/use-avatar";
 import { FeedTopBar } from "@/components/ui/sigak";
 
 interface FeedShellProps {
@@ -30,7 +31,6 @@ const TABS: { key: TabKey; label: string; href: string }[] = [
 interface ProfileState {
   name: string;
   kakaoId: string;
-  profileImage: string;
 }
 
 function resolveActiveTab(pathname: string): TabKey {
@@ -43,11 +43,11 @@ export function FeedShell({ children, verdictCount = null }: FeedShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const active = resolveActiveTab(pathname);
+  const { feedAvatarUrl, kakaoAvatarUrl } = useAvatar();
 
   const [profile, setProfile] = useState<ProfileState>({
     name: "",
     kakaoId: "",
-    profileImage: "",
   });
 
   useEffect(() => {
@@ -56,7 +56,6 @@ export function FeedShell({ children, verdictCount = null }: FeedShellProps) {
       setProfile({
         name: u.name || "익명",
         kakaoId: u.kakaoId || "",
-        profileImage: u.profileImage || "",
       });
     }
   }, []);
@@ -67,7 +66,8 @@ export function FeedShell({ children, verdictCount = null }: FeedShellProps) {
       <ProfileSection
         name={profile.name}
         kakaoId={profile.kakaoId}
-        profileImage={profile.profileImage}
+        feedAvatarUrl={feedAvatarUrl}
+        kakaoAvatarUrl={kakaoAvatarUrl}
         verdictCount={verdictCount}
       />
       <TabBar
@@ -89,16 +89,19 @@ export function FeedShell({ children, verdictCount = null }: FeedShellProps) {
 interface ProfileSectionProps {
   name: string;
   kakaoId: string;
-  profileImage: string;
+  feedAvatarUrl: string | null;
+  kakaoAvatarUrl: string;
   verdictCount: number | null;
 }
 
 function ProfileSection({
   name,
   kakaoId,
-  profileImage,
+  feedAvatarUrl,
+  kakaoAvatarUrl,
   verdictCount,
 }: ProfileSectionProps) {
+  const avatarSrc = feedAvatarUrl || kakaoAvatarUrl;
   return (
     <section
       style={{
@@ -118,11 +121,20 @@ function ProfileSection({
           flexShrink: 0,
         }}
       >
-        {profileImage && (
+        {avatarSrc && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={profileImage}
+            src={avatarSrc}
             alt="profile"
+            onError={(e) => {
+              if (
+                feedAvatarUrl &&
+                kakaoAvatarUrl &&
+                e.currentTarget.src !== kakaoAvatarUrl
+              ) {
+                e.currentTarget.src = kakaoAvatarUrl;
+              }
+            }}
             style={{
               width: "100%",
               height: "100%",

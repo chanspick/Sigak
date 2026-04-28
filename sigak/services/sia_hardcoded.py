@@ -1,13 +1,17 @@
 """Sia 하드코딩 메시지 템플릿 (Phase H4, 14 타입 확정판).
 
-SPEC 출처 (총 44 문구):
+SPEC 출처 (총 39 문구):
   - 세션 #4 v2 §8 — 기본 4 타입 × 5 = 20
       OPENING_DECLARATION / META_REBUTTAL / EVIDENCE_DEFENSE / SOFT_WALKBACK
   - 세션 #6 v2 §10 — 관리 3 타입 = 19
       CHECK_IN 5
       RE_ENTRY 5 + 이탈 종결 V5 1
       RANGE_DISCLOSURE 경미 (limit mild) 5 + 심각 (limit severe) 3
-  - 세션 #7 §9 — RANGE_REAFFIRM 5
+
+  ※ 세션 #7 §9 RANGE_REAFFIRM 5변형 — 베타 hotfix 로 폐기 (2026-04-28).
+    결정 트리가 "막막함 우세" 로 과민 분류 → 유저가 안 말한 막막함 가정
+    케이스 6/20 보고. range_mode="reaffirm" 들어와도 limit (mild/severe) 로 fallback.
+    sia_decision.py 분기 비활성화는 1-B 단계에서 별도 처리.
 
 Haiku 호출 없이 결정적 해시로 변형 선택. 선택 시드:
   sha256("{user_id}:{msg_type}:{turn_idx}") → index % n
@@ -26,9 +30,8 @@ Slots
 
 Mode selectors
 --------------
-  range_mode            — "limit" (기본) | "reaffirm"
+  range_mode            — "limit" (기본) | "reaffirm" (hotfix 후 limit 으로 fallback)
                           limit + state.overattachment_severity="severe" → 심각 pool
-                          reaffirm → 세션 #7 §9 RANGE_REAFFIRM pool
   exit_confirmed        — RE_ENTRY 전용. True 이면 이탈 종결 V5 pool 사용.
 """
 from __future__ import annotations
@@ -133,18 +136,10 @@ _RANGE_LIMIT_SEVERE_VARIANTS: tuple[str, ...] = (
 
 
 # ─────────────────────────────────────────────
-#  세션 #7 §9 — RANGE_REAFFIRM
+#  세션 #7 §9 RANGE_REAFFIRM 5변형 — 베타 hotfix (2026-04-28) 로 폐기.
+#  결정 트리가 "막막함 우세" 과민 분류 → 유저가 안 말한 막막함 가정 케이스 6/20.
+#  range_mode="reaffirm" 들어와도 limit pool 로 fallback (아래 _pick_variant_pool 참조).
 # ─────────────────────────────────────────────
-
-# RANGE_DISCLOSURE reaffirm 모드 — 막막함 토로 / 평가요청+막막함우세. 사업 존재 재선언.
-# 페르소나 C: `~잖아요` 제거. 담담한 진술 종결. 자기 권위 ("보여드릴/읽어드릴") 약화.
-_RANGE_REAFFIRM_VARIANTS: tuple[str, ...] = (
-    "{user_name}님, 막막한 마음 같이 풀어보려고 제가 온 거예요. 자세히 말씀해주실수록 같이 더 정확하게 볼 수 있어요",
-    "{user_name}님 그 막막함 같이 풀어보려고 있는 거예요. 솔직하게 꺼내주시면 같이 더 또렷하게 볼 수 있어요",
-    "{user_name}님, 막막하실수록 같이 풀어보려고 온 거예요. 편하게 말씀해주셔도 돼요",
-    "그 막막함 같이 풀어보려고 제가 온 거예요 {user_name}님. 자세히 말씀해주실수록 같이 더 정확하게 볼 수 있어요",
-    "{user_name}님, 그 답답함 같이 정리해보려고 들어온 거예요. 같이 꺼내놓으시면 더 또렷하게 잡힐 거예요",
-)
 
 
 # ─────────────────────────────────────────────
@@ -164,7 +159,7 @@ TEMPLATES: dict[MsgType, tuple[str, ...]] = {
     MsgType.RANGE_DISCLOSURE: _RANGE_LIMIT_MILD_VARIANTS,
 }
 
-# 전수 변형 카탈로그 (총 44 검증용)
+# 전수 변형 카탈로그 (베타 hotfix 후 총 39, 원래 44 — RANGE_REAFFIRM 5변형 폐기)
 ALL_VARIANT_POOLS: dict[str, tuple[str, ...]] = {
     "opening_declaration": _OPENING_VARIANTS,
     "meta_rebuttal": _META_REBUTTAL_VARIANTS,
@@ -175,7 +170,7 @@ ALL_VARIANT_POOLS: dict[str, tuple[str, ...]] = {
     "re_entry_exit": _RE_ENTRY_EXIT_VARIANTS,
     "range_limit_mild": _RANGE_LIMIT_MILD_VARIANTS,
     "range_limit_severe": _RANGE_LIMIT_SEVERE_VARIANTS,
-    "range_reaffirm": _RANGE_REAFFIRM_VARIANTS,
+    # "range_reaffirm" 삭제 — 베타 hotfix (2026-04-28). 막막함 가정 진앙.
 }
 
 
@@ -193,9 +188,8 @@ def _pick_variant_pool(
     if msg_type == MsgType.RE_ENTRY and exit_confirmed:
         return _RE_ENTRY_EXIT_VARIANTS
     if msg_type == MsgType.RANGE_DISCLOSURE:
-        if range_mode == "reaffirm":
-            return _RANGE_REAFFIRM_VARIANTS
-        # limit 모드 — severity 분기
+        # range_mode="reaffirm" 진입해도 limit pool 로 fallback — 베타 hotfix (2026-04-28).
+        # 막막함 가정 진앙 (sia_decision.py 분기 비활성화는 1-B에서 별도 처리).
         if state.overattachment_severity == "severe":
             return _RANGE_LIMIT_SEVERE_VARIANTS
         return _RANGE_LIMIT_MILD_VARIANTS
@@ -239,7 +233,7 @@ def render_hardcoded(
     observation_evidence : EVIDENCE_DEFENSE 전용 슬롯.
     last_diagnosis       : SOFT_WALKBACK 전용 슬롯.
     feed_count           : RANGE_DISCLOSURE 전용 슬롯 (정수).
-    range_mode           : "limit" (기본) | "reaffirm".
+    range_mode           : "limit" (기본) | "reaffirm" (베타 hotfix 후 limit 으로 fallback).
     exit_confirmed       : RE_ENTRY 이탈 종결 버전 트리거.
     """
     if msg_type not in HARDCODED_TYPES:
@@ -262,5 +256,5 @@ def render_hardcoded(
 
 
 def total_variant_count() -> int:
-    """전수 하드코딩 문구 개수 (스펙 확정값 = 44)."""
+    """전수 하드코딩 문구 개수 (베타 hotfix 후 39 — 원래 44에서 RANGE_REAFFIRM 5 폐기)."""
     return sum(len(v) for v in ALL_VARIANT_POOLS.values())

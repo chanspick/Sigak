@@ -593,11 +593,8 @@ class TestRangeDisclosureTypeCheck:
         r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="limit")
         assert any("범위 명시" in e for e in r.errors)
 
-    def test_reaffirm_without_scope_passes(self):
-        """reaffirm 모드에선 피드 범위 명시 불필요."""
-        text = "근데 만재님, 막막한 마음 풀어보려고 제가 온 거니까 이렇게 자세히 말씀해주실수록 더 정확하게 같이 볼 수 있어요"
-        r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="reaffirm")
-        assert r.ok, f"errors: {r.errors}"
+    # 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # test_reaffirm_without_scope_passes 폐기.
 
     def test_self_negation_fails(self):
         text = "제가 본 건 피드 15장이 전부라서 별 의미 없지만 괜찮아요"
@@ -725,7 +722,10 @@ class TestHaikuNaturalness:
 # ─────────────────────────────────────────────
 
 class TestHardcodedSeventypesClean:
-    """관리 3 타입 + RANGE_REAFFIRM 변형이 validator v4 pass."""
+    """관리 3 타입 변형이 validator v4 pass.
+
+    ※ 베타 hotfix (2026-04-28) — RANGE_REAFFIRM 변형 검증은 폐기 (1-A 변형 / 1-B 분기 / 1-C 가이드 / 1-D 테스트).
+    """
 
     _SLOTS = dict(
         user_name="만재",
@@ -792,18 +792,8 @@ class TestHardcodedSeventypesClean:
                 f"RANGE severe fail (block checks): {block_errors}\n  text={text}"
             )
 
-    def test_range_reaffirm_variants(self):
-        from services.sia_hardcoded import ALL_VARIANT_POOLS
-        for raw in ALL_VARIANT_POOLS["range_reaffirm"]:
-            text = raw.format(**self._SLOTS)
-            r = validate(text, MsgType.RANGE_DISCLOSURE, range_mode="reaffirm")
-            block_errors = [
-                e for e in r.errors
-                if any(k in e for k in ("범위 명시", "자기부정", "관계 형성"))
-            ]
-            assert not block_errors, (
-                f"RANGE reaffirm fail (block checks): {block_errors}\n  text={text}"
-            )
+    # 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # test_range_reaffirm_variants 폐기.
 
 
 # ─────────────────────────────────────────────

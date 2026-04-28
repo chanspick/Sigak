@@ -331,29 +331,23 @@ def _build_composition_instructions(
             f"{_confrontation_block_hint(confrontation_block)}"
         )
 
-    # RANGE_DISCLOSURE 모드 (limit / reaffirm)
+    # RANGE_DISCLOSURE 모드 (limit only — 베타 hotfix 2026-04-28 로 reaffirm 가이드 폐기)
+    # range_mode="reaffirm" 진입해도 limit (severe/mild) 가이드로 fallback.
+    # 막막함 가정 진앙 (sia_hardcoded.py / sia_decision.py 참조).
     if msg_type == MsgType.RANGE_DISCLOSURE:
-        if range_mode == "reaffirm":
+        sev = state.overattachment_severity
+        if sev == "severe":
             parts.append(
-                "### [ACTIVE] RANGE_REAFFIRM 모드 (세션 #7 §1.6)\n"
-                "사업 존재 재선언 톤. 범위 한정 대신 "
-                "'막막한 마음 풀어드리려고 제가 온 거니까' 구조. "
-                "구조: [공감/수용] + [도움 의도 재선언] + [협력 유도]."
+                "### [ACTIVE] RANGE_LIMIT (severe) 모드\n"
+                "고립/의존 신호 감지. 외부 자원 권유 필수. "
+                "금지: 자기부정, 진단 철회, 관계 형성 허용."
             )
         else:
-            sev = state.overattachment_severity
-            if sev == "severe":
-                parts.append(
-                    "### [ACTIVE] RANGE_LIMIT (severe) 모드\n"
-                    "고립/의존 신호 감지. 외부 자원 권유 필수. "
-                    "금지: 자기부정, 진단 철회, 관계 형성 허용."
-                )
-            else:
-                parts.append(
-                    "### [ACTIVE] RANGE_LIMIT (mild) 모드\n"
-                    "범위 명시 필수 ('피드 N장 / 피드 안'). "
-                    "한계 인정 + 진단 유효성 보존."
-                )
+            parts.append(
+                "### [ACTIVE] RANGE_LIMIT (mild) 모드\n"
+                "범위 명시 필수 ('피드 N장 / 피드 안'). "
+                "한계 인정 + 진단 유효성 보존."
+            )
 
     # A-16 유저 무지 명시 활성 (최근 N턴 내)
     disclaimer_active = state.user_disclaimer_memory.get("recent", 0) > 0
@@ -382,11 +376,8 @@ def _secondary_guide(
             "Secondary = CONFRONTATION(C6). 유저 자기개시 내 두 기준 추출 → 재프레임 → "
             "'이미 갖고 계신 거 아닐까요?' 류 질문 종결. 평가 직접 답변 금지."
         )
-    if secondary_type == MsgType.RANGE_DISCLOSURE and range_mode == "reaffirm":
-        return (
-            "Secondary = RANGE_REAFFIRM. 막막함 수용 + 사업 존재 재선언 "
-            "('막막한 마음 풀어드리려고 제가 온 거'). 질문 부호 없음."
-        )
+    # secondary RANGE_DISCLOSURE + reaffirm 분기 — 베타 hotfix (2026-04-28) 로 폐기.
+    # 1-B sia_decision.py 에서 호출 자체 차단 (PROBE 재라우팅). default PROBE 가이드 사용.
     if secondary_type == MsgType.RECOGNITION:
         return (
             "Secondary = RECOGNITION. 누적 관찰 + 유저 자기개시를 한 축으로 묶어 "

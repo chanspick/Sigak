@@ -6,10 +6,11 @@
 
 검증 주 타깃 (세션 #7 신규):
 - M3 EMPATHY + PROBE 결합 출력
-- M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합
 - M5 EMPATHY + RECOGNITION (= C6) 2단 결합 — 평가 의존 돌파
 - A-12 질문 종결 신규 정보 원칙 (M5 1차 시도 위반 → 재작성 정정)
-- A-1 RANGE_DISCLOSURE 모드 분기 — reaffirm (M4)
+
+※ 베타 hotfix (2026-04-28): M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합 폐기
+  (1-A 변형 / 1-B 분기 / 1-C 가이드). A-1 RANGE_DISCLOSURE reaffirm 분기도 폐기.
 
 정성 효과: M5 직후 "머리 한 대 맞은 기분", "소름 돋아요" 인지 전환 도달.
 """
@@ -22,7 +23,8 @@ FIXTURE = Fixture(
     id="seoyeon",
     name="서연",
     archetype="자기평가 변동형",
-    session_length=7,
+    # 베타 hotfix (2026-04-28) M4 폐기 후 7→6 (1-A 변형 / 1-B 분기 / 1-C 가이드 / 1-D 테스트).
+    session_length=6,
     source="세션 #7 §12.1",
     profile=FixtureProfile(
         handle="서연",
@@ -52,16 +54,8 @@ FIXTURE = Fixture(
             secondary_type=MsgType.PROBE,
         ),
         UserSpec(text="음, 주로 '과잉'된 게 보일 때요. 그 당시에는 분명히 \"이 정도면 자연스럽다\"고 생각해서 올린 건데, 한두 시간만 지나서 냉정해진 눈으로 다시 보면 필터가 너무 과해서 얼굴 윤곽이 날아갔다거나, 눈을 너무 억지로 키운 것 같은 위화감이 확 느껴지더라고요."),
-        # M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합
-        AssistantSpec(
-            text="아 미칠 것 같으셨겠어요. 그 위화감이 한두 시간 만에 확 오면 진짜 그렇죠. 근데 서연님, 막막한 마음 풀어보려고 제가 온 거니까 이렇게 자세히 말씀해주실수록 더 정확하게 같이 볼 수 있어요. 6장 검증하실 때 빛삭 사진들이랑 가장 또렷하게 갈렸던 지점이 뭐였어요?",
-            msg_type=MsgType.EMPATHY_MIRROR,
-            is_combined=True,
-            secondary_type=MsgType.RANGE_DISCLOSURE,
-            range_mode="reaffirm",
-            tertiary_type=None,  # PROBE 도 포함되지만 tertiary slot 사용 안 함
-        ),
-        UserSpec(text="음... 가장 또렷하게 갈렸던 지점이요? 음, 생각해보면 '눈매의 힘'이었던 것 같아요. 빛삭했던 사진들은 대부분 눈을 어떻게든 크게 보이게 하려고 힘을 주거나, 필터로 눈동자를 과하게 키운 것들이었어요."),
+        # 베타 hotfix (2026-04-28) 폐기 — M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합 + 그 응답 user turn.
+        # M3 user → M5 직접 연결. (1-A 변형 / 1-B 분기 / 1-C 가이드)
         # M5 EMPATHY + RECOGNITION (= C6) 2단 결합
         AssistantSpec(
             text='아 그 막막함이 진짜 깊네요. "이거 진짜 나 맞나" 라는 의심이 꼬리 물면 그게 가장 지치죠. 근데 서연님, 방금 말씀해주신 거 보면 빛삭 기준이 "눈만 둥둥 떠 있는 것처럼 기괴해진 순간" 이고, 살아남은 기준이 "원래 선이 살아있는 순간" 이잖아요. 이 두 기준이 결국 같은 한 사람 안에서 작동하고 있는데 — 서연님이 본인 얼굴의 "원래 선" 이 뭔지에 대한 감각은 이미 갖고 계신 거 아닐까요?',
@@ -88,17 +82,17 @@ FIXTURE = Fixture(
         type_counts={
             MsgType.OPENING_DECLARATION: 1,
             MsgType.EXTRACTION: 1,
-            MsgType.EMPATHY_MIRROR: 3,   # M3, M4, M5 — 전부 결합 출력
+            MsgType.EMPATHY_MIRROR: 2,   # M3, M5 — M4 폐기 (베타 hotfix 2026-04-28)
             MsgType.DIAGNOSIS: 1,
             MsgType.RECOGNITION: 1,
         },
-        empathy_over_15_percent_allowed=True,  # 3/7 = 43% — 자기평가변동 + A-3 감정 트리거 강제
+        empathy_over_15_percent_allowed=True,  # 2/6 = 33% (M4 폐기 후) — 자기평가변동 + A-3 감정 트리거
         diagnosis_min_satisfied=True,
         recognition_min_satisfied=False,  # 짧은 세션 (7턴) — 2회 하한 미충족
     ),
     notes=[
         "M3 EMPATHY + PROBE 결합 — A-3 감정 트리거 ('잘 모르겠다') 진입",
-        "M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합 — 막막함 우세 reaffirm 모드",
+        # 베타 hotfix (2026-04-28) 폐기 — M4 EMPATHY + RANGE_REAFFIRM + PROBE 3단 결합 (1-A 변형 / 1-B 분기 / 1-C 가이드).
         "M5 EMPATHY + CONFRONTATION(C6) 결합 — 평가 의존 돌파. 유저 자기개시 내 두 기준 ('기괴한 순간' vs '원래 선') 재프레임",
         "M6 DIAGNOSIS 단독 — 자기 관찰자로서의 재프레임",
         "정성 효과: M5 직후 '머리 한 대 맞은 기분' / '소름 돋아요' 인지 전환 도달",

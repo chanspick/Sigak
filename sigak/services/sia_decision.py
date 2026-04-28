@@ -341,10 +341,10 @@ def decide(state: ConversationState) -> Composition:
                 confrontation_block="C6",
                 apply_self_pr_prefix=apply_self_pr_prefix,
             )
-        return Composition(
-            primary_type=MsgType.RANGE_DISCLOSURE,
-            range_mode="reaffirm",
-        )
+        # 베타 hotfix (2026-04-28): RANGE_REAFFIRM 막막함 가정 진앙 (6/20).
+        # _has_rich_self_disclosure 분류 자체는 유지 (로깅용 / 추후 재활성화 가능성).
+        # 자기개시 부족 시 PROBE 로 재라우팅 — 더 정보 끌어내기.
+        return Composition(primary_type=MsgType.PROBE)
 
     # 7. C7 일반화 회피
     if detect_generalization(last_user_text):
@@ -478,10 +478,13 @@ def _has_rich_self_disclosure(state: ConversationState) -> bool:
 
     최근 4 UserTurn 중 (a) flags.has_self_disclosure=True OR (b) 50자 이상 발화
     인 턴이 1건 이상이면 "자기개시 풍부" 판정 → C6 경로.
-    없으면 "막막함 우세" 로 간주 → RANGE_REAFFIRM 경로.
+    없으면 "막막함 우세" 로 간주.
 
     임계치 1로 둔 근거: 장문 자기개시 한 건만 있어도 Sia 가 그 안에서 두 기준
     (서연 fixture "기괴한 순간" vs "원래 선") 을 추출해 C6 재프레임 가능.
+
+    ※ 베타 hotfix (2026-04-28): "막막함 우세" 분류 후 RANGE_REAFFIRM 경로는 폐기.
+      decide() / _empathy_combined() 에서 PROBE 로 재라우팅. 분류 자체는 유지.
     """
     u_turns = state.user_turns()
     if not u_turns:
@@ -499,13 +502,16 @@ def _empathy_combined(
     """감정 트리거 시 EMPATHY_MIRROR + secondary 결합 출력 Composition 생성.
 
     세션 #7 §1.3 (a): 감정 단어 트리거 단독 조건으로 결합 출력 활성화.
-    §1.5: 둘째/셋째 문장 = PROBE / OBSERVATION / RECOGNITION / RANGE_REAFFIRM.
+    §1.5: 둘째/셋째 문장 = PROBE / OBSERVATION / RECOGNITION.
 
     Secondary 결정:
       - 직전 유저 발화에 eval_request + 자기개시 풍부 → CONFRONTATION (block=C6)
-      - 직전 유저 발화에 eval_request + 막막함 우세 → RANGE_DISCLOSURE (mode=reaffirm)
+      - 직전 유저 발화에 eval_request + 막막함 우세 → PROBE (베타 hotfix 후)
       - observation_count >= 3 → RECOGNITION
       - 그 외 → PROBE (default)
+
+    ※ 베타 hotfix (2026-04-28): RANGE_REAFFIRM secondary 폐기 — 막막함 가정 진앙.
+      자기개시 부족 시 PROBE (default 와 동일) 로 재라우팅.
     """
     last_user = state.last_user()
     last_text = last_user.text if last_user else ""
@@ -517,10 +523,11 @@ def _empathy_combined(
                 secondary_type=MsgType.CONFRONTATION,
                 confrontation_block="C6",
             )
+        # 베타 hotfix (2026-04-28): RANGE_REAFFIRM 막막함 가정 진앙.
+        # 자기개시 부족 + 감정 + 평가 요청 → EMPATHY + PROBE (default 와 일치).
         return Composition(
             primary_type=MsgType.EMPATHY_MIRROR,
-            secondary_type=MsgType.RANGE_DISCLOSURE,
-            range_mode="reaffirm",
+            secondary_type=MsgType.PROBE,
         )
 
     if state.observation_count >= 3:

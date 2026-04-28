@@ -568,16 +568,18 @@ class TestC6EvalRequest:
         assert comp.primary_type == MsgType.CONFRONTATION
         assert comp.confrontation_block == "C6"
 
-    def test_eval_request_with_sparse_self_disclosure_returns_range_reaffirm(self):
-        """막막함 우세 → RANGE_DISCLOSURE reaffirm."""
+    # 베타 hotfix (2026-04-28) 폐기 + 신규 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # 폐기: test_eval_request_with_sparse_self_disclosure_returns_range_reaffirm.
+    # 신규: test_eval_request_with_sparse_self_disclosure_returns_probe (PROBE 재라우팅 검증).
+    def test_eval_request_with_sparse_self_disclosure_returns_probe(self):
+        """베타 hotfix (2026-04-28): 막막함 우세 → PROBE 재라우팅 (RANGE_REAFFIRM 폐기 후)."""
         s = _new_state()
         _add_assistant(s, MsgType.OPENING_DECLARATION)
         _add_user(s, "네")
         _add_assistant(s, MsgType.OBSERVATION)
         _add_user(s, "제가 어때 보여요?")
         comp = decide(s)
-        assert comp.primary_type == MsgType.RANGE_DISCLOSURE
-        assert comp.range_mode == "reaffirm"
+        assert comp.primary_type == MsgType.PROBE
 
 
 class TestC7Generalization:
@@ -647,8 +649,11 @@ class TestEmpathyCombinedOutput:
         assert comp.secondary_type == MsgType.CONFRONTATION
         assert comp.confrontation_block == "C6"
 
-    def test_emotion_with_eval_and_sparse_disclosure_returns_empathy_reaffirm(self):
-        """막막함 우세 → EMPATHY + RANGE_REAFFIRM."""
+    # 베타 hotfix (2026-04-28) 폐기 + 신규 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # 폐기: test_emotion_with_eval_and_sparse_disclosure_returns_empathy_reaffirm.
+    # 신규: test_emotion_with_eval_and_sparse_disclosure_returns_empathy_probe (PROBE 재라우팅 검증).
+    def test_emotion_with_eval_and_sparse_disclosure_returns_empathy_probe(self):
+        """베타 hotfix (2026-04-28): 막막함 우세 → EMPATHY + PROBE (RANGE_REAFFIRM 폐기 후)."""
         s = _new_state()
         _add_assistant(s, MsgType.OPENING_DECLARATION)
         _add_user(s, "네")
@@ -660,8 +665,7 @@ class TestEmpathyCombinedOutput:
         )
         comp = decide(s)
         assert comp.primary_type == MsgType.EMPATHY_MIRROR
-        assert comp.secondary_type == MsgType.RANGE_DISCLOSURE
-        assert comp.range_mode == "reaffirm"
+        assert comp.secondary_type == MsgType.PROBE
 
 
 class TestA13SelfPrPrefix:

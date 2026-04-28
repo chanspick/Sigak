@@ -6,7 +6,7 @@ Scope:
      - 결정성 (같은 시드 → 같은 index)
      - user_name / user_meta_raw / observation_evidence / last_diagnosis / feed_count 슬롯
      - RE_ENTRY exit_confirmed 분기 → V5 종결
-     - RANGE_DISCLOSURE range_mode="reaffirm" 분기 → RANGE_REAFFIRM
+     ※ 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 분기 검증 항목 (1-A 변형 / 1-B 분기 / 1-C 가이드 / 1-D 테스트).
      - RANGE_DISCLOSURE limit + state.overattachment_severity="severe" → severe pool
      - 질문 종결 규칙 준수 (A-5 / A-6) — 스펙 구조 불변
   B) sia_prompts_v4.load_haiku_prompt
@@ -75,22 +75,28 @@ class TestTemplateInventory:
         total = sum(len(v) for v in TEMPLATES.values())
         assert total == 35
 
-    def test_all_pools_total_fortyfour_variants(self):
-        """디폴트 + 특수 pool 합: 35 + 1 (RE_ENTRY exit V5) + 3 (RANGE severe) + 5 (RANGE reaffirm) = 44.
+    def test_all_pools_total_thirtynine_variants(self):
+        """디폴트 + 특수 pool 합: 35 + 1 (RE_ENTRY exit V5) + 3 (RANGE severe) = 39.
 
         스펙 확정값 (세션 #7 §9.3).
+        ※ 베타 hotfix (2026-04-28) — RANGE reaffirm 5변형 폐기 (1-A 변형 / 1-B 분기 / 1-C 가이드).
         """
-        assert total_variant_count() == 44
+        assert total_variant_count() == 39
 
-    def test_all_pools_registry_has_ten_pools(self):
-        """디폴트 7 + 특수 3 = 10 pool."""
-        assert len(ALL_VARIANT_POOLS) == 10
+    def test_all_pools_registry_has_nine_pools(self):
+        """디폴트 7 + 특수 2 = 9 pool.
+
+        ※ 베타 hotfix (2026-04-28) — range_reaffirm 키 폐기 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+        """
+        assert len(ALL_VARIANT_POOLS) == 9
 
     def test_special_pool_sizes(self):
-        """특수 pool 개별 크기 검증 (스펙 상 고정)."""
+        """특수 pool 개별 크기 검증 (스펙 상 고정).
+
+        ※ 베타 hotfix (2026-04-28) — range_reaffirm assertion 폐기 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+        """
         assert len(ALL_VARIANT_POOLS["re_entry_exit"]) == 1
         assert len(ALL_VARIANT_POOLS["range_limit_severe"]) == 3
-        assert len(ALL_VARIANT_POOLS["range_reaffirm"]) == 5
 
 
 # ─────────────────────────────────────────────
@@ -248,32 +254,8 @@ class TestRenderHardcoded:
             f"심각 pool 외부 자원 권유 누락: {text}"
         )
 
-    def test_range_reaffirm_mode_uses_reaffirm_pool(self):
-        """세션 #7 §9: range_mode="reaffirm" → 사업 존재 재선언 pool."""
-        s = _blank_state(user_name="서연")
-        text = render_hardcoded(
-            MsgType.RANGE_DISCLOSURE, s, range_mode="reaffirm",
-        )
-        reaffirm_markers = ["막막", "풀어", "도와드리", "정리해보려고", "제가 온 거", "제가 들어온 거"]
-        assert any(m in text for m in reaffirm_markers), (
-            f"reaffirm pool 특유 표현 누락: {text}"
-        )
-        # reaffirm 은 feed_count 무관 — 숫자 놓고 안 들어가도 OK
-        assert "서연" in text
-
-    def test_range_mode_reaffirm_overrides_severe(self):
-        """reaffirm 모드는 severity 와 무관하게 항상 reaffirm pool.
-
-        평가 요청 + 막막함 우세 (세션 #7 §2.4) 케이스 커버.
-        """
-        s = _blank_state(user_name="서연")
-        s.overattachment_severity = "severe"
-        text = render_hardcoded(
-            MsgType.RANGE_DISCLOSURE, s, range_mode="reaffirm", feed_count=24,
-        )
-        # severe pool 특유 표현은 안 나와야 함
-        assert "상담 대체" not in text
-        assert "가까운 사람한테" not in text
+    # 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # test_range_reaffirm_mode_uses_reaffirm_pool / test_range_mode_reaffirm_overrides_severe 두 테스트 폐기.
 
     def test_exit_confirmed_ignored_for_non_re_entry(self):
         """exit_confirmed 는 RE_ENTRY 전용. 다른 타입에선 무시."""
@@ -310,6 +292,7 @@ class TestQuestionTerminationRule:
     DIAGNOSIS/SOFT_WALKBACK 은 질문 부호 금지. META_REBUTTAL/EVIDENCE_DEFENSE 는 필수.
     """
 
+    # 베타 hotfix (2026-04-28) — "range_reaffirm" parametrize 항목 폐기 (1-A 변형 / 1-B 분기 / 1-C 가이드).
     @pytest.mark.parametrize("pool_name", [
         "opening_declaration",
         "soft_walkback",
@@ -318,7 +301,6 @@ class TestQuestionTerminationRule:
         "re_entry_exit",
         "range_limit_mild",
         "range_limit_severe",
-        "range_reaffirm",
     ])
     def test_no_question_mark_in_forbidden_pools(self, pool_name):
         for text in _render_all_variants_for(pool_name):
@@ -483,16 +465,8 @@ class TestCompositionInjection:
         assert "C6" in prompt
         assert "재프레임" in prompt
 
-    def test_empathy_combined_reaffirm_secondary(self):
-        s = _blank_state()
-        prompt = load_haiku_prompt(
-            MsgType.EMPATHY_MIRROR, s,
-            is_combined=True,
-            secondary_type=MsgType.RANGE_DISCLOSURE,
-            range_mode="reaffirm",
-        )
-        assert "RANGE_REAFFIRM" in prompt
-        assert "사업 존재 재선언" in prompt
+    # 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    # test_empathy_combined_reaffirm_secondary 폐기.
 
     def test_apply_self_pr_prefix_activates(self):
         s = _blank_state()

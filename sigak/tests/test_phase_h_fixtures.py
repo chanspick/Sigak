@@ -196,27 +196,24 @@ def test_seoyeon_empathy_combined_outputs_present():
         s for s in fixture.assistant_turns()
         if s.msg_type == MsgType.EMPATHY_MIRROR
     ]
-    assert len(empathy_turns) == 3
+    # 베타 hotfix (2026-04-28) — M4 폐기로 EMPATHY 3 → 2 (M3, M5) (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    assert len(empathy_turns) == 2
     for t in empathy_turns:
         assert t.is_combined is True
         assert t.secondary_type is not None
 
 
-def test_seoyeon_m4_reaffirm_mode():
-    """서연 M4 = EMPATHY + RANGE_REAFFIRM (막막함 우세)."""
-    fixture = ALL_FIXTURES["seoyeon"]
-    assistants = fixture.assistant_turns()
-    # M1, M2, M3, M4 — 인덱스 3 (0-based)
-    m4 = assistants[3]
-    assert m4.msg_type == MsgType.EMPATHY_MIRROR
-    assert m4.secondary_type == MsgType.RANGE_DISCLOSURE
-    assert m4.range_mode == "reaffirm"
+# 베타 hotfix (2026-04-28) 폐기 — RANGE_REAFFIRM 동작 정리 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+# test_seoyeon_m4_reaffirm_mode 폐기. M4 AssistantSpec 자체도 fixture 에서 폐기됨 (seoyeon.py).
 
 
 def test_seoyeon_m5_c6_combined():
-    """서연 M5 = EMPATHY + CONFRONTATION(C6) — 평가 의존 돌파."""
+    """서연 M5 = EMPATHY + CONFRONTATION(C6) — 평가 의존 돌파.
+
+    ※ 베타 hotfix (2026-04-28) — M4 폐기로 M5 인덱스 4→3 시프트 (1-A 변형 / 1-B 분기 / 1-C 가이드).
+    """
     fixture = ALL_FIXTURES["seoyeon"]
-    m5 = fixture.assistant_turns()[4]
+    m5 = fixture.assistant_turns()[3]
     assert m5.msg_type == MsgType.EMPATHY_MIRROR
     assert m5.secondary_type == MsgType.CONFRONTATION
     assert m5.confrontation_block == "C6"

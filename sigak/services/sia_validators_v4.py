@@ -1037,8 +1037,20 @@ def populate_turn_counts(turn: AssistantTurn) -> AssistantTurn:
 #    - T1 (오프닝) 예외
 # ─────────────────────────────────────────────
 
-_A30_BLOCKED_NOUNS = ["결", "느낌이 들어요", "느낌도 보여요", "무드"]
-_A30_BLOCKED_WEAKENERS = ["같아요", "같습니다", "같은데", "살짝", "혹시"]
+# A-30 차단 명사 — 두 그룹:
+#   1. _A30_NOUN_REGEX: "결" 류 — 단독 명사 또는 "결+조사" 만 차단
+#      ("결국" / "결과" / "결혼" 등 합성어는 false positive 회피)
+#   2. _A30_NOUN_LITERAL: 고정 phrase
+_A30_NOUN_REGEX = [
+    # 결: 단독 또는 결+조사 (이/을/은/의/로). "결국" / "결정" 등 단어 일부일 때 미매칭.
+    re.compile(r"(?<![\w가-힣])결(?=[이을은의로])"),
+]
+_A30_NOUN_LITERAL = ["느낌이 들어요", "느낌도 보여요", "무드"]
+
+# "살짝" / "혹시" 는 base.md "살짝 ~ 보여요" / "혹시 ~" 패턴 차단인데 단독 어휘는
+# 정상 사용 (예: T5-A "살짝 걸리는 포인트"). 단독 차단 X — 패턴 차단만 유지.
+_A30_BLOCKED_WEAKENERS = ["같아요", "같습니다", "같은데"]
+_A30_BLOCKED_WEAKENER_PATTERNS = ["살짝 보여요", "살짝 보이", "혹시 ~인가"]
 _A30_BLOCKED_SAFETY = ["단정은 아니고", "잘못 본 걸 수도", "제가 잘 모르겠지만"]
 
 # turn_id 별 예외 어휘 (template 에 의도적으로 등장하는 표현)
@@ -1080,7 +1092,17 @@ def check_a30_aitic_words(text: str, turn_id: str) -> list[str]:
     errors: list[str] = []
     exceptions = _A30_EXCEPTIONS.get(turn_id, [])
 
-    for noun in _A30_BLOCKED_NOUNS:
+    # 결 등 — regex 매칭 (word boundary)
+    for pattern in _A30_NOUN_REGEX:
+        for m in pattern.finditer(text):
+            matched = m.group(0)
+            if not _blocked_term_in_exception_context(
+                matched, text, exceptions,
+            ):
+                errors.append(f"A-30 차단 명사: '{matched}' in {turn_id}")
+
+    # 무드 등 — 리터럴 매칭
+    for noun in _A30_NOUN_LITERAL:
         if noun in text and not _blocked_term_in_exception_context(
             noun, text, exceptions,
         ):
@@ -1091,6 +1113,11 @@ def check_a30_aitic_words(text: str, turn_id: str) -> list[str]:
             weak, text, exceptions,
         ):
             errors.append(f"A-30 차단 약화: '{weak}' in {turn_id}")
+
+    # "살짝 보여요" 패턴 차단 (단독 "살짝" 은 허용, 추측 prefix 만 차단)
+    for pattern in _A30_BLOCKED_WEAKENER_PATTERNS:
+        if pattern in text:
+            errors.append(f"A-30 차단 약화 패턴: '{pattern}' in {turn_id}")
 
     for safety in _A30_BLOCKED_SAFETY:
         if safety in text and not _blocked_term_in_exception_context(

@@ -126,7 +126,7 @@ _TURN_TEMPLATES: dict[str, str] = {
         "{user}님은 어디부터 손대고 싶어요?"
     ),
     "T7-vault": (
-        "근데 지난번에도 [vault 발화] 비슷한 얘기 하셨거든요.\n"
+        "{user}님, 지난번에도 [vault 발화] 비슷한 얘기 하셨거든요.\n"
         "처음에 [T2-T3 단어]랑 그때 얘기 결국 같은 축이에요.\n"
         "이 안에서 어디부터 손대고 싶어요?"
     ),
@@ -211,7 +211,17 @@ def render_slot(
                 if obs_list:
                     first = obs_list[0]
                     if isinstance(first, str) and first.strip():
-                        return first.strip()
+                        cleaned = first.strip()
+                        # T6/T7-base 템플릿이 " 쪽" 자동 추가 — observation 이
+                        # "쪽" 으로 끝나면 제거 (double 쪽 회피).
+                        # 예: "채도 높은 쪽" + " 쪽이에요" = "채도 높은 쪽 쪽이에요" (X)
+                        # → "채도 높은" + " 쪽이에요" = "채도 높은 쪽이에요" (O)
+                        if cleaned.endswith(" 쪽"):
+                            cleaned = cleaned[:-2].strip()
+                        elif cleaned.endswith("쪽") and len(cleaned) > 1:
+                            cleaned = cleaned[:-1].strip()
+                        if cleaned:
+                            return cleaned
         return _DEFAULT_OBSERVATION
 
     if slot_name == "T7 발화":

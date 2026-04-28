@@ -350,6 +350,22 @@ _SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
    읽히면 채우고, 일관되면 null.
 5. JSON 외 텍스트 출력 금지. ```json fence 허용.
 
+[signature_observations 출력 형식 — HARD]
+
+각 항목은 "관형형 + 명사" 형태로 출력. 5-10개. Sia v4 의 T6/T7/T8 [관찰] 슬롯
+입력으로 직접 사용됨. 형식 파괴 시 한국어 비문 발생.
+
+✅ 좋음:
+- "채도 높은 쪽"
+- "톤 정돈된 분위기"
+- "조용한 인상의 결"
+
+❌ 나쁨:
+- "채도가 높음" (명사형 단독)
+- "채도 높습니다" (종결어미)
+- "채도 높은" (수식어만 — 명사 누락)
+- "매우 채도 높은" (부사 누적)
+
 [출력 스키마]
 {
   "tone_category": "쿨뮤트" | "웜뮤트" | "쿨비비드" | "웜비비드" | "중성",
@@ -360,7 +376,8 @@ _SYSTEM_PROMPT = """당신은 SIGAK 의 피드 분석 엔진입니다.
   "observed_adjectives": ["<최대 5개, 댓글에서 실제 등장한 형용사>"],
   "style_consistency": 0.0-1.0 실수,
   "mood_signal": "<1 문장 정중체>",
-  "three_month_shift": "<변화 설명 or null>"
+  "three_month_shift": "<변화 설명 or null>",
+  "signature_observations": ["<관형형+명사 5-10개, v4 슬롯 입력>"]
 }
 """
 

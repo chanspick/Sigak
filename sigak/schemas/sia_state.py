@@ -137,7 +137,13 @@ OverattachmentSeverity = Literal["", "mild", "severe"]
 
 @dataclass
 class UserMessageFlags:
-    """유저 메시지 정규식 1단 추출 (services/sia_flag_extractor.py)."""
+    """유저 메시지 정규식 1단 추출 (services/sia_flag_extractor.py).
+
+    v4 (2026-04-28): has_self_doubt / has_uncertainty / vault_present 신규.
+    페르소나 C 시대 9 flag (has_concede ~ is_defensive) 는 시그니처 호환을
+    위해 보존 (v4 라우팅 사용 X, default False).
+    """
+    # 페르소나 C 시대 (시그니처 호환 보존, v4 미사용)
     has_concede: bool = False              # 맞아요 / 사실 / 맞긴 해요
     has_emotion_word: bool = False         # 부담 / 어색 / 힘들어서 / 속상
     emotion_word_raw: Optional[str] = None
@@ -147,6 +153,11 @@ class UserMessageFlags:
     has_evidence_doubt: bool = False       # 근거 없잖아 / 어떻게 알아
     has_self_disclosure: bool = False      # 사실 저는 / 실은 / 원래
     is_defensive: bool = False             # 편해서 / 취향 / 그냥 / 잘 안 찍
+
+    # v4 3 flag (T3-norm / T5-B / T7-vault 분기용)
+    has_self_doubt: bool = False           # 별로 / 못생 / 비교 / 부럽 → T3-norm
+    has_uncertainty: bool = False          # 잘 모르겠 / 글쎄 / 음.. → T5-B
+    vault_present: bool = False            # vault history 1+ 건 → T7-vault
 
 
 def _flags_to_dict(f: UserMessageFlags) -> dict[str, Any]:

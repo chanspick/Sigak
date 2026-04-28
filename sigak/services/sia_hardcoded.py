@@ -269,3 +269,29 @@ def render_hardcoded(
 def total_variant_count() -> int:
     """전수 하드코딩 문구 개수 (베타 hotfix 후 39 — 원래 44에서 RANGE_REAFFIRM 5 폐기)."""
     return sum(len(v) for v in ALL_VARIANT_POOLS.values())
+
+
+# ─────────────────────────────────────────────
+#  v4 — render_opening_v4 (T1 단일 템플릿, 2026-04-28)
+#
+#  페르소나 C 시대 _OPENING_VARIANTS 5변형 폐기 → v4 단일 템플릿.
+#  사용자 본 적 없는 첫 메시지에서 톤이 흔들리지 않도록 결정적 단일.
+# ─────────────────────────────────────────────
+
+_OPENING_V4_TEMPLATE = (
+    "안녕하세요 {user_name}님, Sia예요.\n"
+    "첫 만남이라 천천히 시작할게요.\n"
+    "오늘은 두 개 같이 봐요. 추구미랑 지금 피드.\n"
+    "되고 싶은 모습부터 들려주세요."
+)
+
+
+def render_opening_v4(state: ConversationState) -> str:
+    """v4 T1 오프닝 단일 템플릿 렌더링.
+
+    호명 1회 ({user_name}님). user_name 빈 문자열일 시 "님"만 남으므로
+    routes 에서 user_name 충전 필수.
+
+    이 함수는 ConversationState 만 소비 — Haiku 호출 X. 결정적 출력 보장.
+    """
+    return _OPENING_V4_TEMPLATE.format(user_name=state.user_name or "")

@@ -1022,3 +1022,136 @@ def populate_turn_counts(turn: AssistantTurn) -> AssistantTurn:
     turn.neyo_count = count_neyo(turn.text)
     turn.yeyo_count = count_yeyo(turn.text)
     return turn
+
+
+# ─────────────────────────────────────────────
+#  v4 A-30 / A-34  —  페르소나 C → "미감 비서" 전환 (2026-04-28)
+#
+#  A-30: AI틱 어휘 차단 (HARD reject)
+#    - 차단 명사: 결 / 무드 / 결로 가다 / 느낌이 ~다
+#    - 차단 약화: 같아요 / 살짝 / 혹시
+#    - 차단 안전망: 단정은 아니고 / 잘못 본 걸 수도
+#    - 예외 자리 (turn_id 별): T6 좀 / T6 제가 보기엔 / T11 좋을 것 같아요
+#
+#  A-34: MI 매턴 anchor (시점 / 유니크 / 격차 / 같이 톤 4 중 1+ 필요)
+#    - T1 (오프닝) 예외
+# ─────────────────────────────────────────────
+
+_A30_BLOCKED_NOUNS = ["결", "느낌이 들어요", "느낌도 보여요", "무드"]
+_A30_BLOCKED_WEAKENERS = ["같아요", "같습니다", "같은데", "살짝", "혹시"]
+_A30_BLOCKED_SAFETY = ["단정은 아니고", "잘못 본 걸 수도", "제가 잘 모르겠지만"]
+
+# turn_id 별 예외 어휘 (template 에 의도적으로 등장하는 표현)
+_A30_EXCEPTIONS: dict[str, list[str]] = {
+    "T6": ["좀", "제가 보기엔"],          # "좀 어긋나요?" / "제가 보기엔 ~ 쪽이에요"
+    "T10": ["좋을 것 같아요"],            # "들고 있어도 좋을 것 같아요" (Callback)
+    "T11": ["좋을 것 같아요"],            # "슬쩍 떠올려보셔도 좋을 것 같아요" (마무리)
+    "T2-C": [],                           # 깊이 turn (A-18 5문장 예외)
+}
+
+
+def _blocked_term_in_exception_context(
+    term: str, text: str, exceptions: list[str],
+) -> bool:
+    """차단 어휘가 예외 phrase 의 일부로 등장하는지 확인.
+
+    예: weak="같아요" / exc="좋을 것 같아요". text 에 "좋을 것 같아요" 가 있으면
+    그 안의 "같아요" 는 허용. 이 함수가 True → 차단 skip.
+
+    조건:
+      - exception phrase 에 term 이 substring 으로 포함
+      - text 에도 그 exception phrase 가 substring 으로 포함
+    """
+    for exc in exceptions:
+        if term in exc and exc in text:
+            return True
+    return False
+
+
+def check_a30_aitic_words(text: str, turn_id: str) -> list[str]:
+    """A-30 — AI틱 어휘 차단 (HARD reject).
+
+    명사 / 약화 어휘 / 안전망 3 카테고리 차단. turn_id 별 예외 자리 허용.
+
+    예외 매칭 (2026-04-28 fix):
+      차단 어휘가 예외 phrase 의 substring 으로 등장하면 허용.
+      예: T11 의 "같아요" (차단 약화) 가 "좋을 것 같아요" (예외) 의 일부 → 허용.
+    """
+    errors: list[str] = []
+    exceptions = _A30_EXCEPTIONS.get(turn_id, [])
+
+    for noun in _A30_BLOCKED_NOUNS:
+        if noun in text and not _blocked_term_in_exception_context(
+            noun, text, exceptions,
+        ):
+            errors.append(f"A-30 차단 명사: '{noun}' in {turn_id}")
+
+    for weak in _A30_BLOCKED_WEAKENERS:
+        if weak in text and not _blocked_term_in_exception_context(
+            weak, text, exceptions,
+        ):
+            errors.append(f"A-30 차단 약화: '{weak}' in {turn_id}")
+
+    for safety in _A30_BLOCKED_SAFETY:
+        if safety in text and not _blocked_term_in_exception_context(
+            safety, text, exceptions,
+        ):
+            errors.append(f"A-30 차단 안전망: '{safety}' in {turn_id}")
+
+    return errors
+
+
+# A-34 anchor 4 카테고리 (매턴 1+ 필요, T1 제외)
+_A34_ANCHORS_TEMPORAL = ["처음에", "아까", "방금", "지난번"]            # 시점 짚기
+_A34_ANCHORS_UNIQUE = ["본인", "다른 사람", "거예요", "스타일"]         # 유니크 강조
+_A34_ANCHORS_GAP = ["추구미", "그때", "지금"]                            # 격차 명시
+_A34_ANCHORS_TOGETHER = ["같이", "우리"]                                  # "같이" 톤
+
+
+def check_a34_mi_anchors(text: str, turn_id: str) -> list[str]:
+    """A-34 — MI 매턴 anchor (4 카테고리 중 1+ 필요).
+
+    T1 (오프닝) 예외 — 첫 만남 라포 형성 turn.
+    """
+    if turn_id == "T1":
+        return []
+
+    anchors_found = 0
+    if any(a in text for a in _A34_ANCHORS_TEMPORAL):
+        anchors_found += 1
+    if any(a in text for a in _A34_ANCHORS_UNIQUE):
+        anchors_found += 1
+    if any(a in text for a in _A34_ANCHORS_GAP):
+        anchors_found += 1
+    if any(a in text for a in _A34_ANCHORS_TOGETHER):
+        anchors_found += 1
+
+    if anchors_found == 0:
+        return [
+            f"A-34: {turn_id} anchor 0 (시점/유니크/격차/같이 4 중 1+ 필요)"
+        ]
+    return []
+
+
+def validate_v4(text: str, turn_id: str) -> dict:
+    """v4 통합 validator.
+
+    A-30 (AI틱 어휘) + A-34 (MI anchor) + A-17 (영업/상품 보존) +
+    A-20 (추상 칭찬 보존) + A-18 (300자 hard) + 마크다운 차단.
+
+    페르소나 C 시대 A-1~A-22 본문 (validate 함수) 은 별도 보존. v4 라우터
+    (routes/sia.py) 는 본 함수만 호출.
+
+    Returns
+    -------
+    dict : {"errors": [...], "passed": bool}
+    """
+    errors: list[str] = []
+    errors.extend(check_a30_aitic_words(text, turn_id))
+    errors.extend(check_a34_mi_anchors(text, turn_id))
+    # 페르소나 C 보존 — 영업/추상 칭찬/길이/마크다운 (전 turn 공통)
+    errors.extend(check_a17_commerce(text))
+    errors.extend(check_a20_abstract_praise(text))
+    errors.extend(check_a18_length(text))
+    errors.extend(check_markdown_markup(text))
+    return {"errors": errors, "passed": len(errors) == 0}

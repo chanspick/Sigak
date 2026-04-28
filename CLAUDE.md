@@ -1,8 +1,8 @@
 # SIGAK 프로덕트 설계 문서 (통합 최종본)
 
-**버전:** v2.3
-**작성:** 2026-04-22 / **갱신:** 2026-04-27 (페르소나 B → C 전환)
-**상태:** **최종 퍼블리시 전 디자인/미감 통일 + 디버그 단계.** Phase G~M 코드 완료 → PI v3 (잠금) → **PI Revive Phase B 진행 (B-1~B-8)** + 마케터 redesign 1815 적용 (§15 참조)
+**버전:** v2.4
+**작성:** 2026-04-22 / **갱신:** 2026-04-29 (베타 hotfix v4 revert + v4 Turn Flow Phase A 진입)
+**상태:** **최종 퍼블리시 전 디자인/미감 통일 + 디버그 단계.** Phase G~M 코드 완료 → PI v3 (잠금) → **PI Revive Phase B 진행 (B-1~B-8)** + 마케터 redesign 1815 적용 + **Sia v4 Turn Flow Phase A (T1-T5) 환경변수 토글로 stage 진입** (§15 참조)
 
 > 과거 MoAI Execution Directive 는 `CLAUDE.moai.md` 로 보존. 에이전트 규칙은 `.claude/rules/moai/` 유지.
 
@@ -91,6 +91,69 @@ SIGAK (시각) 은 **개인의 시각적 정체성을 분석하고, 추구하는
 - `components/sigak/` = **현역**. `app/page.tsx` 가 VerdictGrid / AspirationGrid / SiteFooter / TopBar 임포트. 폐기 아님.
 - `components/pi-v3/PiMaintenance.tsx` = PI v3 잠금 시기 산물. PI Revive 부활 후 미사용 (정리 대상).
 - `components/report/sections/` 11개 = B안 (face-structure/skin-analysis/hair-recommendation/celeb-reference/overlay-compare 5개 폐기 예정) 였으나 **PI Revive 가 옛 v3 풀 부활시키면서 재사용 중** — 폐기 보류.
+
+---
+
+## 0.5. 오늘 작업 (2026-04-29)
+
+베타 6/20 부정 피드백 + 친구 베타 후기 ("AI틱 / 관통 X / 외모 정병 조심") 기반 Sia 페르소나 재작업 사이클.
+
+### 작업 1 — 베타 hotfix v4 사이클 (4 commits) → REVERT
+
+페르소나 C → v4 "미감 비서" 전면 재작성 명령서 집행 (5 Phase, 4 commits):
+
+| Phase | Commit | 작업 |
+|---|---|---|
+| 1 | `827d335` | 페르소나 C 코드 → `_legacy_persona_c/` 격리 + `SIA_V4_MAINTENANCE` 503 게이트 |
+| 2 | `076da7a` | base.md v4 본문 (T1-T11 + 5축 + A-30/A-34 + MI 원칙) |
+| 3 | `0fe7bfe` | sia_v4_slots.py / sia_v4_lint.py 신규 + 라우터 재배선 (100% 결정성 템플릿) |
+| 4 | `f745a3d` | test_sia_v4 8 class / 90 test + 5 fixture 시뮬레이션 |
+| **REVERT** | `50d7797` | **전체 롤백 → 페르소나 C 24b7d1b 복귀 (29 files / +324 / -2465)** |
+
+**revert 진앙**:
+- 100% 하드코딩 템플릿 + 정규식 슬롯 추출 → 사용자 발화 통째로 박힘
+- T2-C [핵심 단어] 3회 반복 → AI 봇 톤
+- 사용자 적응 0 (유도리 없음)
+- LIVE 노출 시 사용자 분노 트리거 ("야 이게 뭐야 llm한테 자유도 좀 줘서 풀어야지")
+
+### 작업 2 — A-NEW1 / A-NEW2 패치 (`78211ef`)
+
+페르소나 C 인프라 유지하며 두 진앙 보강 (코드 변경 최소, 3 files / +178):
+- `prompts/haiku_sia/base.md`:
+  - **A-NEW1** 사용자 자가 제시 정보 재질문 금지 (인물/사진/색/스타일 4 카테고리)
+  - **A-NEW2** 재대화 분기 (vault block 있으면 "첫 만남이라" 어휘 reject + 항목 인용 + redirection)
+- `prompts/haiku_sia/observation.md`: M1 결합 출력 모드에 "M1 재대화 분기" 서브섹션
+- `services/sia_prompts_v4.py`: `_format_vault_history_block` 끝에 A-NEW2 트리거 hint 1줄
+
+### 작업 3 — v4 Turn Flow Phase A (`1c2fbd5`)
+
+T1-T5 흐름 의도는 살리되, **본문은 Haiku 자유 생성** 으로 디자인 (15 files / +1011):
+- `prompts/haiku_sia/turns/` 신규 8 파일 — T1, T2-A/C, T3-base/norm, T4, T5-A/B
+  - 각 파일 = 의도 + INCLUDE + AVOID + 좋은/나쁜 예 (템플릿 X)
+- `services/sia_decision.py` `decide_v4` — turn_id 라우팅 (T6+ → None → 페르소나 C fallback)
+- `services/sia_flag_extractor.py` `extract_flags_v4` — 3 v4 flag (has_self_doubt / has_uncertainty / vault_present)
+- `services/sia_validators_v4.py` `validate_v4_turn` — A-17/A-20/A-18/markdown/A-NEW2 hard reject
+- `services/sia_prompts_v4.py` `load_v4_turn_prompt` — base.md + turns/{turn_id}.md + context
+- `config.py` `sia_v4_turn_flow: bool = False` (Railway env 토글)
+- `routes/sia.py` `_v4_chat_start` / `_v4_chat_message` helpers + chat handler 분기
+
+**안전 장치**:
+- 기본 false — `SIA_V4_TURN_FLOW=true` 만 추가하면 v4 진입
+- 실패 시 try-except → 페르소나 C 자동 fallback
+- T6+ → 페르소나 C 위임 (T1-T5 만 v4 처리)
+
+### 작업 4 — Avatar 통합 (`f132543`)
+
+홈 / 설정 / 피드쉘 공용 아바타 우선순위 (8 files / +243):
+- IG 첫 피드 사진 (R2 영구 URL, prefix 검증) → 카카오 프사 fallback
+- `routes/auth.py` `MeResponse.feed_avatar_url` 신규
+- `sigak-web/hooks/use-avatar.ts` 신규 (마운트 즉시 캐시 + 백그라운드 갱신)
+
+### 다음 단계
+
+1. **Railway env**: `SIA_V4_TURN_FLOW=true` 설정 → LIVE probe (본인 결제)
+2. T1-T5 톤 검증 → 좋으면 T6-T11 turn 가이드 추가, 회귀 시 base.md / turns/ 보강
+3. 톤 회귀 시 즉시 `SIA_V4_TURN_FLOW=false` 토글 → 페르소나 C 복귀 (코드 변경 X)
 
 ---
 

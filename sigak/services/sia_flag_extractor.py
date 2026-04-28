@@ -123,3 +123,37 @@ def extract_flags(text: str) -> UserMessageFlags:
     flags.is_defensive = any(m in text for m in _DEFENSIVE_MARKERS)
 
     return flags
+
+
+# ─────────────────────────────────────────────
+#  v4 Turn Flow Flag Extractor (2026-04-28)
+# ─────────────────────────────────────────────
+
+_V4_SELF_DOUBT_PATTERNS = [
+    re.compile(r"별로"), re.compile(r"못생"), re.compile(r"이상해"),
+    re.compile(r"괜찮나"), re.compile(r"자신없"), re.compile(r"안\s*예쁘"),
+    re.compile(r"잘\s*안\s*어울"), re.compile(r"비교"),
+    re.compile(r"부럽"), re.compile(r"나만"),
+]
+_V4_UNCERTAINTY_PATTERNS = [
+    re.compile(r"잘\s*모르겠"), re.compile(r"확실하지\s*않"),
+    re.compile(r"잘\s*모"), re.compile(r"글쎄"), re.compile(r"음\.\."),
+]
+_V4_UNCERTAINTY_LEN_THRESHOLD = 20
+
+
+def extract_flags_v4(user_text: str, vault_present: bool = False) -> UserMessageFlags:
+    """v4 turn flow flag 추출 (3 flag).
+
+    T3-norm (자기 의심 정상화) / T5-B (혼란 풀이) / T7-vault (재대화) 분기.
+    페르소나 C 9 flag default False.
+    """
+    text = user_text or ""
+    return UserMessageFlags(
+        has_self_doubt=any(p.search(text) for p in _V4_SELF_DOUBT_PATTERNS),
+        has_uncertainty=(
+            any(p.search(text) for p in _V4_UNCERTAINTY_PATTERNS)
+            or len(text.strip()) < _V4_UNCERTAINTY_LEN_THRESHOLD
+        ),
+        vault_present=vault_present,
+    )

@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 from schemas.sia_state import (
     DIAGNOSIS_MIN_RATIO,
@@ -540,3 +540,47 @@ def _empathy_combined(
         primary_type=MsgType.EMPATHY_MIRROR,
         secondary_type=MsgType.PROBE,
     )
+
+
+# ─────────────────────────────────────────────
+#  v4 Turn Flow Decision (T1-T5, 2026-04-28)
+#
+#  Phase A: T1-T5 의도 가이드 + Haiku 자유 생성. T6+ 미빌드 → None → 페르소나 C fallback.
+# ─────────────────────────────────────────────
+
+V4Turn = Literal[
+    "T1",
+    "T2-A", "T2-C",
+    "T3-base", "T3-norm",
+    "T4",
+    "T5-A", "T5-B",
+]
+
+_V4_T2_LENGTH_THRESHOLD = 30
+
+
+def decide_v4(state: ConversationState, user_flags: UserMessageFlags) -> Optional[V4Turn]:
+    """v4 turn flow 라우팅 (T1-T5).
+
+    분기:
+      T2: 30자 미만 → T2-A / 30자+ → T2-C
+      T3: has_self_doubt → T3-norm / 그 외 → T3-base
+      T5: has_uncertainty → T5-B / 그 외 → T5-A
+
+    Returns None for user_turn_count >= 5 → 라우터 페르소나 C fallback.
+    """
+    user_turn_count = len(state.user_turns())
+
+    if user_turn_count == 0:
+        return "T1"
+    if user_turn_count == 1:
+        last_user = state.last_user()
+        last_text = last_user.text if last_user else ""
+        return "T2-A" if len(last_text.strip()) < _V4_T2_LENGTH_THRESHOLD else "T2-C"
+    if user_turn_count == 2:
+        return "T3-norm" if user_flags.has_self_doubt else "T3-base"
+    if user_turn_count == 3:
+        return "T4"
+    if user_turn_count == 4:
+        return "T5-B" if user_flags.has_uncertainty else "T5-A"
+    return None

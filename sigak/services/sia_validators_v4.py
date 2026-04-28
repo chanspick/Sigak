@@ -1010,3 +1010,53 @@ def populate_turn_counts(turn: AssistantTurn) -> AssistantTurn:
     turn.neyo_count = count_neyo(turn.text)
     turn.yeyo_count = count_yeyo(turn.text)
     return turn
+
+
+# ─────────────────────────────────────────────
+#  v4 Turn Flow Validator (T1-T5, 2026-04-28)
+#
+#  Haiku 자유 생성 결과 hard reject 검증. Haiku 가 base.md / turn 가이드
+#  self-check 로 톤 준수 — validator 는 critical violations 만 차단.
+#
+#  검증: A-17 영업 / A-20 추상 칭찬 / A-18 300자 / markdown / A-NEW2 재대화 어휘
+# ─────────────────────────────────────────────
+
+_A_NEW2_FIRST_MEETING_TERMS = [
+    "첫 만남이라",
+    "처음이라",
+    "Sia 라고 해요",
+    "Sia 라고 합니다",
+    "처음 봬요",
+    "처음 뵙겠습니다",
+    "이름 처음",
+]
+
+
+def check_a_new2_first_meeting(text: str, vault_present: bool) -> list[str]:
+    """A-NEW2 — 재대화 시 첫 만남 어휘 hard reject (vault_present=False 면 skip)."""
+    if not vault_present:
+        return []
+    errors: list[str] = []
+    for term in _A_NEW2_FIRST_MEETING_TERMS:
+        if term in text:
+            errors.append(f"A-NEW2: 재대화에서 첫 만남 어휘 금지 — '{term}'")
+    return errors
+
+
+def validate_v4_turn(
+    text: str,
+    turn_id: str,
+    *,
+    vault_present: bool = False,
+) -> dict:
+    """v4 turn flow Haiku 응답 hard reject 검증.
+
+    Returns: {"errors": [...], "passed": bool}
+    """
+    errors: list[str] = []
+    errors.extend(check_a17_commerce(text))
+    errors.extend(check_a20_abstract_praise(text))
+    errors.extend(check_a18_length(text))
+    errors.extend(check_markdown_markup(text))
+    errors.extend(check_a_new2_first_meeting(text, vault_present))
+    return {"errors": errors, "passed": len(errors) == 0}

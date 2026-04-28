@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # ISO date string. Railway env BETA_FREE_UNTIL 로 override.
     beta_free_until: str = "2026-05-15"
 
+    # ── Sia v4 Turn Flow Toggle (2026-04-28) ──
+    # True 시 routes/sia.py 가 v4 turn 흐름 (T1-T5 의도 가이드 + Haiku 자유 생성).
+    # False 시 페르소나 C (14 MsgType + Haiku). T6+ 미빌드 — true 모드에서도
+    # user_turn_count >= 5 시 페르소나 C fallback.
+    # Railway env SIA_V4_TURN_FLOW="true"/"false" override.
+    sia_v4_turn_flow: bool = False
+
     class Config:
         env_file = (".env", "../.env")
         env_file_encoding = "utf-8"

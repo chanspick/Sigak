@@ -490,3 +490,73 @@ def load_haiku_prompt(
         sections.append(composition_block)
     sections.append(ctx)
     return "\n\n".join(sections)
+
+
+# ─────────────────────────────────────────────
+#  v4 Turn Flow Prompt Loader (T1-T5, 2026-04-28)
+#
+#  페르소나 C MsgType 기반 load_haiku_prompt 와 분리. v4 turn 흐름 전용.
+#  base.md (인격/룰) + turns/{turn_id}.md (turn 의도) + state context.
+# ─────────────────────────────────────────────
+
+@lru_cache(maxsize=16)
+def _load_turn_markdown(turn_id: str) -> str:
+    """prompts/haiku_sia/turns/{turn_id}.md 읽기. 없으면 FileNotFoundError."""
+    path = _PROMPTS_DIR / "turns" / f"{turn_id}.md"
+    if not path.exists():
+        raise FileNotFoundError(f"v4 turn prompt not found: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def load_v4_turn_prompt(
+    turn_id: str,
+    state: ConversationState,
+    *,
+    user_flags: Optional[UserMessageFlags] = None,
+    vision_summary: str = "",
+    vault_history: Optional[UserHistory] = None,
+    user_phrases: Optional[list[str]] = None,
+) -> str:
+    """v4 turn flow Haiku system prompt — base.md + turns/{turn_id}.md + context.
+
+    Parameters
+    ----------
+    turn_id : "T1" / "T2-A" / "T2-C" / "T3-base" / "T3-norm" / "T4" / "T5-A" / "T5-B"
+    state : 누적 ConversationState (state.user_turns / ig_feed_cache 등 참조).
+    user_flags : extract_flags_v4 결과 (선택적).
+    vision_summary : Vision IG 요약 (T6+ 에서 사용 예정, T1-T5 는 참고만).
+    vault_history / user_phrases : 재대화 시 vault 데이터 (A-NEW2 트리거).
+
+    Returns
+    -------
+    str : Haiku system prompt — base.md + turn 가이드 + context.
+    """
+    base = _load_markdown("base.md")
+    turn_guide = _load_turn_markdown(turn_id)
+
+    ctx = _build_context(
+        state, user_flags, vision_summary,
+        vault_history=vault_history,
+        user_phrases=user_phrases,
+    )
+
+    # 3 섹션: base 인격/룰 + 현재 turn 의도 + state context
+    return (
+        f"{base}\n\n"
+        f"---\n\n"
+        f"# 현재 turn: {turn_id}\n\n"
+        f"{turn_guide}\n\n"
+        f"---\n\n"
+        f"{ctx}"
+    )
+
+
+def available_v4_turns() -> set[str]:
+    """v4 turn flow Phase A 지원 turn_id 집합."""
+    return {
+        "T1",
+        "T2-A", "T2-C",
+        "T3-base", "T3-norm",
+        "T4",
+        "T5-A", "T5-B",
+    }

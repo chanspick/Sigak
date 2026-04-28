@@ -45,14 +45,19 @@ from services import user_history
 from services.sia_decision import (
     Composition,
     decide,
+    decide_v4,
     update_state_from_user_turn,
 )
-from services.sia_flag_extractor import extract_flags
+from services.sia_flag_extractor import extract_flags, extract_flags_v4
 from services.sia_hardcoded import render_hardcoded
 from services.sia_llm import _render_ig_summary
-from services.sia_prompts_v4 import load_haiku_prompt
+from services.sia_prompts_v4 import load_haiku_prompt, load_v4_turn_prompt
 from services.sia_session import _backup_key, session_key  # Redis 키 재사용
-from services.sia_validators_v4 import populate_turn_counts, validate
+from services.sia_validators_v4 import (
+    populate_turn_counts,
+    validate,
+    validate_v4_turn,
+)
 from services.user_data_vault import load_vault
 from services.user_profiles import get_profile
 
@@ -560,6 +565,134 @@ def _record_assistant_turn(
 
 
 # ─────────────────────────────────────────────
+#  v4 Turn Flow Helpers (Phase A — T1-T5, 2026-04-28)
+#
+#  SIA_V4_TURN_FLOW=true 시 페르소나 C 의 14 MsgType 결정 트리 대신 사용.
+#  T6+ (user_turn_count >= 5) 또는 v4 실패 시 페르소나 C fallback.
+# ─────────────────────────────────────────────
+
+def _v4_chat_start(
+    state: ConversationState,
+    db,
+    user_id: str,
+    conv_id: str,
+) -> Optional[str]:
+    """v4 chat_start (T1) — 응답 텍스트 반환. None 시 페르소나 C fallback."""
+    vault_history, user_phrases = _load_vault_for_sia(db, user_id)
+    vault_present = (vault_history is not None) or bool(user_phrases)
+
+    flags = extract_flags_v4("", vault_present=vault_present)
+    turn_id = decide_v4(state, flags)
+    if turn_id != "T1":
+        # 첫 턴인데 T1 아니면 로직 버그 — fallback
+        logger.error(
+            "v4 chat_start: decide_v4 returned %s instead of T1 cid=%s",
+            turn_id, conv_id,
+        )
+        return None
+
+    vision_summary = _render_ig_summary(state.ig_feed_cache)
+    prompt = load_v4_turn_prompt(
+        "T1", state, user_flags=flags,
+        vision_summary=vision_summary,
+        vault_history=vault_history, user_phrases=user_phrases,
+    )
+    history = _history_for_haiku(state)
+    text = sia_llm.call_sia_turn_with_retry(
+        system_prompt=prompt, messages_history=history,
+    )
+
+    v = validate_v4_turn(text, "T1", vault_present=vault_present)
+    if v["errors"]:
+        logger.warning(
+            "v4 T1 validate cid=%s errors=%s", conv_id, v["errors"],
+        )
+
+    # AssistantTurn append (sentinel msg_type)
+    turn = AssistantTurn(
+        text=text, msg_type=MsgType.OPENING_DECLARATION, turn_idx=len(state.turns),
+    )
+    populate_turn_counts(turn)
+    state.turns.append(turn)
+    state.type_counts[MsgType.OPENING_DECLARATION] = (
+        state.type_counts.get(MsgType.OPENING_DECLARATION, 0) + 1
+    )
+    return text
+
+
+def _v4_chat_message(
+    state: ConversationState,
+    db,
+    user_id: str,
+    body: "MessageRequest",
+    background_tasks: BackgroundTasks,
+) -> Optional["MessageResponse"]:
+    """v4 chat_message (T2-T5) — MessageResponse 반환. None 시 페르소나 C fallback.
+
+    UserTurn append → decide_v4 → None 이면 pop & 페르소나 C 로 위임.
+    """
+    vault_history, user_phrases = _load_vault_for_sia(db, user_id)
+    vault_present = (vault_history is not None) or bool(user_phrases)
+
+    user_flags = extract_flags_v4(body.user_message, vault_present=vault_present)
+
+    # UserTurn append (v4 flags 로)
+    state.turns.append(UserTurn(
+        text=body.user_message,
+        turn_idx=len(state.turns),
+        flags=user_flags,
+    ))
+
+    turn_id = decide_v4(state, user_flags)
+    if turn_id is None:
+        # T6+ — UserTurn 롤백 후 페르소나 C path 가 자체 append
+        state.turns.pop()
+        return None
+
+    # T2-T5 — Haiku 자유 생성
+    vision_summary = _render_ig_summary(state.ig_feed_cache)
+    prompt = load_v4_turn_prompt(
+        turn_id, state, user_flags=user_flags,
+        vision_summary=vision_summary,
+        vault_history=vault_history, user_phrases=user_phrases,
+    )
+    history = _history_for_haiku(state)
+    assistant_text = sia_llm.call_sia_turn_with_retry(
+        system_prompt=prompt, messages_history=history,
+    )
+
+    v = validate_v4_turn(assistant_text, turn_id, vault_present=vault_present)
+    if v["errors"]:
+        logger.warning(
+            "v4 %s validate cid=%s errors=%s",
+            turn_id, body.conversation_id, v["errors"],
+        )
+
+    # AssistantTurn append (sentinel msg_type — T2-T5 모두 OBSERVATION 으로 기록)
+    turn = AssistantTurn(
+        text=assistant_text,
+        msg_type=MsgType.OBSERVATION,
+        turn_idx=len(state.turns),
+    )
+    populate_turn_counts(turn)
+    state.turns.append(turn)
+    state.type_counts[MsgType.OBSERVATION] = (
+        state.type_counts.get(MsgType.OBSERVATION, 0) + 1
+    )
+    state.observation_count += 1
+
+    sia_session_v4.save_conversation_state(state)
+
+    turn_count = len(state.turns) // 2
+    return MessageResponse(
+        conversation_id=body.conversation_id,
+        assistant_message=assistant_text,
+        turn_count=turn_count,
+        status="active",
+    )
+
+
+# ─────────────────────────────────────────────
 #  Endpoints
 # ─────────────────────────────────────────────
 
@@ -602,6 +735,23 @@ def chat_start(
     )
     state.gender = profile.get("gender") if profile.get("gender") in ("female", "male") else None
     state.ig_feed_cache = profile.get("ig_feed_cache")
+
+    # ▼ v4 turn flow (Phase A — T1) — toggle false 시 페르소나 C fallback ▼
+    from config import get_settings
+    if get_settings().sia_v4_turn_flow:
+        try:
+            v4_text = _v4_chat_start(state, db, user["id"], conv_id)
+            if v4_text is not None:
+                sia_session_v4.save_conversation_state(state)
+                return StartResponse(
+                    conversation_id=conv_id,
+                    opening_message=v4_text,
+                    turn_count=0,
+                )
+        except Exception:
+            logger.exception(
+                "v4 chat_start failed cid=%s — fallback 페르소나 C", conv_id,
+            )
 
     composition = decide(state)
     if composition.primary_type != MsgType.OPENING_DECLARATION:
@@ -690,6 +840,21 @@ def chat_message(
         raise HTTPException(403, "not your conversation")
     if state.status != "active":
         raise HTTPException(409, f"session not active: status={state.status}")
+
+    # ▼ v4 turn flow (Phase A — T2-T5) — toggle false 또는 T6+ 시 페르소나 C fallback ▼
+    from config import get_settings
+    if get_settings().sia_v4_turn_flow:
+        try:
+            v4_response = _v4_chat_message(
+                state, db, user["id"], body, background_tasks,
+            )
+            if v4_response is not None:
+                return v4_response
+        except Exception:
+            logger.exception(
+                "v4 chat_message failed cid=%s — fallback 페르소나 C",
+                body.conversation_id,
+            )
 
     # 1. UserTurn append + 상태 업데이트
     user_flags = extract_flags(body.user_message)

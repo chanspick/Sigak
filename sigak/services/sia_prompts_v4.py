@@ -264,6 +264,11 @@ def _format_vault_history_block(
             quoted = ", ".join(f"\"{p}\"" for p in cleaned)
             lines.append(f"- 본인 자주 쓰는 표현: {quoted}")
 
+    # base.md A-NEW2 / observation.md M1 재대화 분기 트리거 hint (1줄, 80자 이내)
+    lines.append(
+        "→ 재대화. base.md A-NEW2: 첫 만남 어휘 reject + 위 항목 인용 + redirection."
+    )
+
     block = "\n".join(lines)
 
     # 전체 블록 ≤ 500자 — 초과 시 후반부 잘라내고 표시.

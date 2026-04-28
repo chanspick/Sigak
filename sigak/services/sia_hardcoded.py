@@ -36,6 +36,17 @@ Mode selectors
 """
 from __future__ import annotations
 
+# ─────────────────────────────────────────────
+# v4 QUARANTINE (2026-04-28) — 페르소나 C 시대 코드.
+# Phase 3 에서 본문 재작성 예정 (T1-T11 + 5축 + A-30/A-34).
+#   - _OPENING_VARIANTS 5변형 → 1변형 단일화
+#   - _META_REBUTTAL / _EVIDENCE_DEFENSE / _SOFT_WALKBACK / _CHECK_IN /
+#     _RE_ENTRY / _RANGE_LIMIT_* 7 pool 폐기
+#   - ALL_VARIANT_POOLS v4 정합 갱신
+# 런타임 보호: SIA_V4_MAINTENANCE=true 시 /sia/* 503 응답.
+# Archive: sigak/services/_legacy_persona_c/README.md 참조.
+# ─────────────────────────────────────────────
+
 import hashlib
 
 from schemas.sia_state import (

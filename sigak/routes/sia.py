@@ -560,6 +560,26 @@ def _record_assistant_turn(
 
 
 # ─────────────────────────────────────────────
+#  v4 Maintenance Gate (Phase 1, 2026-04-28)
+# ─────────────────────────────────────────────
+
+def _maintenance_gate() -> None:
+    """SIA_V4_MAINTENANCE=true 시 /sia/chat/* 엔드포인트 503 차단.
+
+    페르소나 C → v4 "미감 비서" 재작성 진입 (베타 hotfix Final).
+    v4 완성 (Phase 7) 후 SIA_V4_MAINTENANCE=false 로 복귀.
+
+    Railway env override: SIA_V4_MAINTENANCE="true"/"false".
+    """
+    from config import get_settings
+    if get_settings().sia_v4_maintenance:
+        raise HTTPException(
+            status_code=503,
+            detail="Sia 점검 중입니다. 잠시 후 다시 시도해주세요.",
+        )
+
+
+# ─────────────────────────────────────────────
 #  Endpoints
 # ─────────────────────────────────────────────
 
@@ -575,6 +595,7 @@ def chat_start(
     - decide(state) → M1 결합 Composition
     - OPENING 하드코딩 + OBSERVATION Haiku 합쳐서 한 메시지 전송
     """
+    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
@@ -664,6 +685,7 @@ def chat_message(
       6. AssistantTurn append + 집계 갱신.
       7. save_conversation_state (primary+backup dual-write).
     """
+    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 
@@ -759,6 +781,7 @@ def chat_end(
     db=Depends(db_session),
 ) -> EndResponse:
     """명시 종료 — conversations INSERT (status="ended") + Sonnet extraction 큐잉."""
+    _maintenance_gate()
     if db is None:
         raise HTTPException(500, "DB unavailable")
 

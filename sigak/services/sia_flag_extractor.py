@@ -16,6 +16,14 @@ PHASE_H_DIRECTIVE §3.1. 0.01s 수준 결정적 플래그. 애매 케이스는 H
 """
 from __future__ import annotations
 
+# ─────────────────────────────────────────────
+# v4 QUARANTINE (2026-04-28) — 페르소나 C 시대 코드.
+# Phase 3 에서 9 flag → 3 flag (has_self_doubt / has_uncertainty / vault_present)
+# 으로 재작성. 시그니처 호환을 위해 기존 9 flag 필드는 보존 (default False) 가능.
+# 런타임 보호: SIA_V4_MAINTENANCE=true 시 /sia/* 503 응답.
+# Archive: sigak/services/_legacy_persona_c/README.md 참조.
+# ─────────────────────────────────────────────
+
 import re
 
 from schemas.sia_state import UserMessageFlags

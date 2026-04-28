@@ -46,6 +46,18 @@ SPEC 출처: .moai/specs/SPEC-SIA/
 """
 from __future__ import annotations
 
+# ─────────────────────────────────────────────
+# v4 QUARANTINE (2026-04-28) — 페르소나 C 시대 코드.
+# Phase 3 재작성 정책:
+#   - A-17 (가격/결제) 보존
+#   - A-23 (환각 가드) 보존
+#   - A-30 (AI틱 어휘 차단) 신설
+#   - A-34 (MI 원칙 + 매턴 anchor) 신설
+#   - A-1~A-22 본문 폐기 (시그니처는 호환 위해 유지 가능)
+# 런타임 보호: SIA_V4_MAINTENANCE=true 시 /sia/* 503 응답.
+# Archive: sigak/services/_legacy_persona_c/README.md 참조.
+# ─────────────────────────────────────────────
+
 import re
 from typing import Optional
 
